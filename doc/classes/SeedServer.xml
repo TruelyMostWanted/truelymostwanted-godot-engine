@@ -147,10 +147,10 @@
 		</method>
 	</methods>
 	<members>
-		<member name="global_seed" type="int" setter="set_global_seed" getter="get_global_seed" default="0">
+		<member name="global_seed" type="int" setter="set_global_seed" getter="get_global_seed">
 			The seed all streams and noise generators derive from. Setting it reseeds every stream and noise generator, so they start from the beginning, and emits [signal seed_changed]. It starts at [code]0[/code]; call [method randomize_seed] for a random run.
 		</member>
-		<member name="seed_global_functions" type="bool" setter="set_seed_global_functions" getter="is_seed_global_functions" default="false">
+		<member name="seed_global_functions" type="bool" setter="set_seed_global_functions" getter="is_seed_global_functions">
 			If [code]true[/code], the global random functions ([method @GlobalScope.randi], [method @GlobalScope.randf] and others) are seeded with [member global_seed] whenever it changes.
 		</member>
 	</members>
