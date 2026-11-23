@@ -78,6 +78,9 @@
 #include "servers/rendering/storage/render_data_extension.h"
 #include "servers/rendering/storage/render_scene_buffers.h"
 #include "servers/rendering/storage/render_scene_data.h"
+#include "servers/settings/list_settings_server.h"
+#include "servers/settings/settings_server.h"
+#include "servers/settings/settings_server_manager.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 #include "servers/text/text_server_extension.h"
@@ -154,6 +157,7 @@ static bool has_server_feature_callback(const String &p_feature) {
 
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
 static TtsServer *tts_server = nullptr;
+static SettingsServerManager *settings_server_manager = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -174,6 +178,12 @@ void register_server_types() {
 	GDREGISTER_ABSTRACT_CLASS(TtsServer);
 	tts_server = memnew(TtsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TtsServer", TtsServer::get_singleton(), "TtsServer"));
+
+	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
+	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
+	GDREGISTER_ABSTRACT_CLASS(SettingsServerManager);
+	settings_server_manager = memnew(SettingsServerManager);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("SettingsServerManager", SettingsServerManager::get_singleton(), "SettingsServerManager"));
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -409,6 +419,8 @@ void unregister_server_types() {
 	memdelete(shader_types);
 	memdelete(tts_server);
 	tts_server = nullptr;
+	memdelete(settings_server_manager);
+	settings_server_manager = nullptr;
 	if constexpr (GD_IS_CLASS_ENABLED(MovieWriterPNGWAV)) {
 		memdelete(writer_pngwav);
 	}

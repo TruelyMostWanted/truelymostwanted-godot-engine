@@ -531,3 +531,5 @@
 /.agents/                                     @TruelyMostWanted
 /servers/tts/                                 @TruelyMostWanted
 /servers/tts/**/SCsub                         @TruelyMostWanted @godotengine/buildsystem
+/servers/settings/                            @TruelyMostWanted
+/servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
