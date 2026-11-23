@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PathPrefixServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A table of path prefixes such as [code]user://[/code] or [code]mods://[/code], and safe path resolution.
+	</brief_description>
+	<description>
+		The [PathPrefixServer] keeps a table of path prefixes. Each prefix is resolved by logic, a [PathPrefix] or a [Callable], that turns a prefixed path into a real path on the current platform. [FileAccess], [DirAccess], [ResourceLoader], [ResourceSaver] and [method ProjectSettings.globalize_path] resolve every registered prefix.
+		The engine prefixes are registered first and are locked: [code]res://[/code], [code]user://[/code], [code]uid://[/code], [code]pipe://[/code] and [code]exec://[/code]. [code]exec://[/code] is the folder of the executable in an exported project (on macOS the folder that contains the [code].app[/code] bundle) and the project folder in the editor. It is not available on Android, iOS and the Web.
+		If [member ProjectSettings.filesystem/path_prefixes/defaults] is enabled, [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] are registered at startup for the OS folders of [method OS.get_data_dir], [method OS.get_config_dir], [method OS.get_cache_dir] and [method OS.get_temp_dir]. They can be replaced or removed. On the Web only [code]temp://[/code] is registered, because the other folders are not persistent there.
+		[method resolve] returns a [PathInfo] with all forms of a path. [method resolve_safe] does the same for untrusted paths from players, mods or the network.
+		[codeblocks]
+		[gdscript]
+		PathPrefixServer.register_prefix_folder("mods://", "exec://mods")
+		var file := FileAccess.open("mods://readme.txt", FileAccess.READ)
+
+		var info := PathPrefixServer.resolve_safe(player_path, true, ["user://saves/"])
+		if not info.valid:
+			push_error(info.error_message)
+		[/gdscript]
+		[csharp]
+		PathPrefixServer.RegisterPrefixFolder("mods://", "exec://mods");
+		using var file = FileAccess.Open("mods://readme.txt", FileAccess.ModeFlags.Read);
+
+		PathInfo info = PathPrefixServer.ResolveSafe(playerPath, true, ["user://saves/"]);
+		if (!info.Valid)
+		{
+		    GD.PushError(info.ErrorMessage);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] [method ProjectSettings.localize_path] does not map OS paths to registered prefixes, so that existing projects keep their behavior. Use [method localize] or [method resolve] for that.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_folder_logic" qualifiers="const">
+			<return type="PathPrefix" />
+			<param index="0" name="folder" type="String" />
+			<description>
+				Returns a [PathPrefix] that maps a prefix to [param folder]. [param folder] is an absolute path or a path with another prefix, for example [code]exec://mods[/code]; it is resolved on every call.
+			</description>
+		</method>
+		<method name="create_os_path_logic" qualifiers="const">
+			<return type="PathPrefix" />
+			<param index="0" name="path" type="int" enum="PathPrefixServer.OSPath" />
+			<description>
+				Returns a [PathPrefix] that maps a prefix to an OS folder, see [enum OSPath].
+			</description>
+		</method>
+		<method name="create_system_dir_logic" qualifiers="const">
+			<return type="PathPrefix" />
+			<param index="0" name="dir" type="int" enum="OS.SystemDir" />
+			<param index="1" name="shared_storage" type="bool" default="true" />
+			<description>
+				Returns a [PathPrefix] that maps a prefix to the system folder [param dir], see [method OS.get_system_dir].
+			</description>
+		</method>
+		<method name="get_prefixes" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns all registered prefixes in the order of their first registration. The engine prefixes come first.
+			</description>
+		</method>
+		<method name="globalize" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns the real path for [param path]. Returns [param path] unchanged if it has no prefix, or if the prefix is unknown or not available.
+			</description>
+		</method>
+		<method name="has_prefix" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Returns [code]true[/code] if [param prefix] is registered, for any platform.
+			</description>
+		</method>
+		<method name="is_prefix_available" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Returns [code]true[/code] if [param prefix] is registered for this platform and its logic reports it as available.
+			</description>
+		</method>
+		<method name="is_prefix_locked" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Returns [code]true[/code] if [param prefix] is an engine prefix that cannot be changed.
+			</description>
+		</method>
+		<method name="is_prefix_read_only" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Returns [code]true[/code] if paths with [param prefix] cannot be written to on this platform.
+			</description>
+		</method>
+		<method name="localize" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="global_path" type="String" />
+			<description>
+				Returns the prefixed path for the OS path [param global_path], or an empty string if it is not below any prefix. If several prefixes contain the path, the one with the deepest folder wins; on a tie the earlier registration wins (for example [code]res://[/code] before [code]exec://[/code] in the editor). The comparison ignores case on Windows and macOS.
+			</description>
+		</method>
+		<method name="register_prefix">
+			<return type="int" enum="Error" />
+			<param index="0" name="prefix" type="String" />
+			<param index="1" name="logic" type="PathPrefix" />
+			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Registers [param logic] for [param prefix]. [param prefix] consists of lowercase letters, digits and [code]_[/code], followed by [code]://[/code]; URL schemes such as [code]http://[/code] are not allowed.
+				[param platforms] are feature tags (see [method OS.has_feature]), for example [code]["windows", "linux"][/code]. Empty means all platforms. A registration for named platforms that match wins over one for all platforms. Registering again with the same platforms replaces the logic.
+				Returns [constant ERR_LOCKED] for engine prefixes and [constant ERR_INVALID_PARAMETER] for invalid names.
+			</description>
+		</method>
+		<method name="register_prefix_callable">
+			<return type="int" enum="Error" />
+			<param index="0" name="prefix" type="String" />
+			<param index="1" name="globalize" type="Callable" />
+			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
+			<param index="3" name="localize" type="Callable" default="Callable()" />
+			<param index="4" name="is_available" type="Callable" default="Callable()" />
+			<description>
+				Registers a prefix whose logic is given as callables: [param globalize] receives the prefixed path and returns the real path, [param localize] receives a real path and returns the prefixed path or an empty string, [param is_available] returns a [bool]. See [method register_prefix] for [param prefix] and [param platforms].
+				[b]Note:[/b] The callables can be called from any thread and must be thread-safe.
+			</description>
+		</method>
+		<method name="register_prefix_folder">
+			<return type="int" enum="Error" />
+			<param index="0" name="prefix" type="String" />
+			<param index="1" name="folder" type="String" />
+			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Registers a prefix that maps to [param folder], see [method create_folder_logic] and [method register_prefix].
+			</description>
+		</method>
+		<method name="resolve" qualifiers="const">
+			<return type="PathInfo" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Resolves [param path] into a [PathInfo]. [param path] is a prefixed path, an OS path below a known prefix, or a path relative to [code]res://[/code]. Separators ([code]\\[/code] to [code]/[/code]), the case of the prefix and [code].[/code]/[code]..[/code] segments are normalized. An unknown prefix gives an invalid result instead of the unchanged input.
+			</description>
+		</method>
+		<method name="resolve_safe" qualifiers="const">
+			<return type="PathInfo" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="for_write" type="bool" />
+			<param index="2" name="allowed_roots" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Resolves an untrusted [param path] like [method resolve], but the result is invalid with [constant ERR_FILE_BAD_PATH] for [code]..[/code] segments, paths without a prefix (including absolute OS paths), unknown or unavailable prefixes, and paths outside [param allowed_roots] (for example [code]["user://saves/", "exec://mods/"][/code]). If [param for_write] is [code]true[/code] and the prefix is read-only, the result is invalid with [constant ERR_FILE_NO_PERMISSION].
+				[b]Note:[/b] Symbolic links and Windows short names are not resolved before the check.
+			</description>
+		</method>
+		<method name="unregister_prefix">
+			<return type="int" enum="Error" />
+			<param index="0" name="prefix" type="String" />
+			<param index="1" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Removes the registration of [param prefix] for [param platforms], or all its registrations if [param platforms] is empty. Returns [constant ERR_LOCKED] for engine prefixes and [constant ERR_DOES_NOT_EXIST] if there is no such registration.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="prefix_registered">
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Emitted on the main thread after [param prefix] was registered or replaced.
+			</description>
+		</signal>
+		<signal name="prefix_unregistered">
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Emitted on the main thread after a registration of [param prefix] was removed.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="OS_PATH_DATA" value="0" enum="OSPath">
+			The folder of [method OS.get_data_dir].
+		</constant>
+		<constant name="OS_PATH_CONFIG" value="1" enum="OSPath">
+			The folder of [method OS.get_config_dir].
+		</constant>
+		<constant name="OS_PATH_CACHE" value="2" enum="OSPath">
+			The folder of [method OS.get_cache_dir].
+		</constant>
+		<constant name="OS_PATH_TEMP" value="3" enum="OSPath">
+			The folder of [method OS.get_temp_dir].
+		</constant>
+	</constants>
+</class>

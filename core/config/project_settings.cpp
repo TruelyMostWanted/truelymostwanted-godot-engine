@@ -37,6 +37,7 @@
 #include "core/io/file_access.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/marshalls.h"
+#include "core/io/path_prefix_server.h"
 #include "core/io/resource_uid.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
@@ -285,6 +286,9 @@ String ProjectSettings::globalize_path(const String &p_path) const {
 			return p_path.replace("user:/", data_dir);
 		}
 		return p_path.replace("user://", "");
+	} else if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+		// Prefixes other than the engine ones (`exec://`, `appdata://`, registered ones).
+		return PathPrefixServer::get_singleton()->globalize(p_path);
 	}
 
 	return p_path;

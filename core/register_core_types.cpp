@@ -58,6 +58,7 @@
 #include "core/io/packet_peer.h"
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
+#include "core/io/path_prefix_server.h"
 #include "core/io/pck_packer.h"
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_importer.h"
@@ -106,6 +107,7 @@ static Ref<ResourceFormatSaverJSON> resource_saver_json;
 static Ref<ResourceFormatLoaderJSON> resource_loader_json;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
+static PathPrefixServer *_path_prefix_server = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
 static CoreBind::Engine *_engine = nullptr;
@@ -322,6 +324,9 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(IP);
 	GDREGISTER_CLASS(CoreBind::Geometry2D);
 	GDREGISTER_CLASS(CoreBind::Geometry3D);
+	GDREGISTER_CLASS(PathInfo);
+	GDREGISTER_CLASS(PathPrefix);
+	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
 	GDREGISTER_CLASS(CoreBind::OS);
@@ -341,6 +346,8 @@ void register_core_types() {
 	_geometry_2d = memnew(CoreBind::Geometry2D);
 	_geometry_3d = memnew(CoreBind::Geometry3D);
 
+	// Before anything resolves a path: registers the locked engine prefixes.
+	_path_prefix_server = memnew(PathPrefixServer);
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
 	_os = memnew(CoreBind::OS);
@@ -366,6 +373,8 @@ void register_core_settings() {
 
 	GLOBAL_DEF("threading/worker_pool/max_threads", -1);
 	GLOBAL_DEF("threading/worker_pool/low_priority_thread_ratio", 0.3);
+
+	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 }
 
 void register_early_core_singletons() {
@@ -391,6 +400,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
 
 	OS::get_singleton()->benchmark_end_measure("Core", "Register Singletons");
@@ -398,6 +408,9 @@ void register_core_singletons() {
 
 void register_core_extensions() {
 	OS::get_singleton()->benchmark_begin_measure("Core", "Register Extensions");
+
+	// The project settings are loaded here: register the default path prefixes before extensions can replace them.
+	PathPrefixServer::get_singleton()->register_default_prefixes();
 
 	// Hardcoded for now.
 	GDExtension::initialize_gdextensions();
@@ -433,6 +446,7 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_path_prefix_server);
 
 	memdelete(_geometry_3d);
 	memdelete(_geometry_2d);

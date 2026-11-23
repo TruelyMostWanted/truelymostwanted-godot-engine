@@ -37,6 +37,7 @@
 #include "core/io/file_access_encrypted.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/marshalls.h"
+#include "core/io/path_prefix_server.h"
 #include "core/io/resource_uid.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
@@ -255,6 +256,11 @@ String FileAccess::fix_path(const String &p_path) const {
 	// Helper used by file accesses that use a single filesystem.
 
 	String r_path = p_path.replace_char('\\', '/');
+
+	if (_access_type == ACCESS_FILESYSTEM && PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(r_path)) {
+		// Prefixes other than the engine ones (`exec://`, `appdata://`, registered ones).
+		return PathPrefixServer::get_singleton()->globalize(r_path);
+	}
 
 	switch (_access_type) {
 		case ACCESS_RESOURCES: {

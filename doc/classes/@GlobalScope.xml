@@ -1627,6 +1627,9 @@
 		<member name="OS" type="OS" setter="" getter="">
 			The [OS] singleton.
 		</member>
+		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
+			The [PathPrefixServer] singleton.
+		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
 		</member>
