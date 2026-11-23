@@ -102,16 +102,22 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='6a30858649'
+LAST_INTEGRATED_COMMIT='488eee09dc'
 CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
 
-**In Arbeit:** –
+**In Arbeit:** – (kein Agent läuft, keine offenen Feature-Branches mit ungemergter Arbeit)
 
 ## Übergabe
 
-**Zuerst fortsetzen:** Stapel 1 gemergt (#38, #46, #1, #2, #3, #39, #11); CI-Lauf auf `truely-godot-engine` prüfen; Testprojekt-Branches 01, 02, 03, 39, 11 nach `main` des Testprojekts und dort testen; Wiki-Status „done“. Danach je ein Agent (nach Freigabe, Wochenlimit): #37 → #34 → #5 → #7 → #35 → #36 → #8 → #9 → #10; Checks vorab liegen für #37 und #34 im Testprojekt.
+**Zuerst fortsetzen:** Stapel 1 ist gemergt und abgeschlossen (#38, #46, #1, #2, #3, #39, #11, #48; Wiki „done“; Checks auf `main` des Testprojekts grün). Offen in dieser Reihenfolge:
+1. CI-Lauf 45199284329 auf `truely-godot-engine`: 17/20 grün, macOS/iOS bekamen keinen Runner (Infrastruktur). Einmal `gh run rerun 45199284329 --failed`; echter Fehler → Fix auf dem Feature-Branch.
+2. #37 (Filter für gecachte Pfade, baut auf #1): Checks vorab liegen im Testprojekt-Branch `37-feature-cached-paths-filters`. Engine-Branch `37-feature-cached-paths-filters` von `truely-godot-engine`.
+3. #34 (Endungs-Index, baut auf #2): Checks vorab im Testprojekt-Branch `34-feature-loader-extension-index`.
+4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39 auf einem neuen Testprojekt-Branch.
+5. Danach: #5 → #7 → #35 → #36 → #8 → #9 → #10; Phase 2: #12, #13; Phase 3 ab #15 (Konzept #14 entschieden); Phase 5: #50, #51 (TextureAtlas).
+6. Alte Agent-Worktrees unter `.claude/worktrees/` entfernen (`git worktree remove --force <pfad>`; die Branches sind gepusht und bleiben).
 
 **Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin, #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
 
