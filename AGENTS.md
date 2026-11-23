@@ -48,6 +48,7 @@ als native Engine-Features, nutzbar aus GDScript, C# und GDExtension.
 
 - **Sprache:** Unterhaltung mit dem Nutzer auf Deutsch. Issues, Commits, Code-Kommentare und Wiki auf Englisch.
 - **Erst prüfen, dann bauen:** den Teil „Feasibility to check“ eines Issues beantworten und im Issue festhalten, bevor die Umsetzung beginnt.
+- **Cross-Plattform und Web:** Beim Entwerfen, Planen und Umsetzen jedes Features die Benutzbarkeit und Performance auf Windows, Linux, macOS, Android, iOS **und im Web-Export** bedenken. Features sollen möglichst überall funktionieren, auch im Web (single-threaded, Dateien nur in `user://` und im PCK, wenig Speicher). Was nicht geht, steht im Issue unter „Platforms“.
 - **Kein Commit auf `master`.** Keine Änderungen an `version.py` (Konflikte beim Sync).
 - **Kein Push zu `upstream`.** PRs an Godot nur auf ausdrücklichen Wunsch, und dann das *base repository* prüfen.
 - Pushes starten die volle CI aller Plattformen. Reine Doku- oder Vorlagen-Änderungen dürfen `[skip ci]` in der Commit-Message tragen.
