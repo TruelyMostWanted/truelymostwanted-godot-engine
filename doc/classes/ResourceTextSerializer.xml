@@ -97,7 +97,7 @@
 			<param index="0" name="resource" type="Resource" />
 			<param index="1" name="options" type="Dictionary" default="{}" />
 			<description>
-				Returns [param resource] as a [Dictionary] that contains only JSON types ([Dictionary], [Array], [String], numbers, booleans and [code]null[/code]): the same layout as the JSON format. Option: [code]"enums_as_names"[/code] ([bool]).
+				Returns [param resource] as a [Dictionary] that contains only JSON types ([Dictionary], [Array], [String], numbers, booleans and [code]null[/code]): the same layout as the JSON format. Options: [code]"enums_as_names"[/code] ([bool]) and [code]"defaults"[/code] ([Resource]): values of the root resource that are equal to the same property of [code]"defaults"[/code] are not written (metadata is always written).
 			</description>
 		</method>
 		<method name="resource_to_ini" qualifiers="const">
@@ -105,7 +105,7 @@
 			<param index="0" name="resource" type="Resource" />
 			<param index="1" name="options" type="Dictionary" default="{}" />
 			<description>
-				Returns [param resource] as INI text. Options: [code]"plain"[/code] ([bool], values without type syntax) and [code]"enums_as_names"[/code] ([bool]).
+				Returns [param resource] as INI text. Options: [code]"plain"[/code] ([bool], values without type syntax), [code]"enums_as_names"[/code] ([bool]) and [code]"defaults"[/code] ([Resource]): values of the root resource that are equal to the same property of [code]"defaults"[/code] are not written (metadata is always written).
 			</description>
 		</method>
 		<method name="resource_to_json" qualifiers="const">
@@ -113,7 +113,7 @@
 			<param index="0" name="resource" type="Resource" />
 			<param index="1" name="options" type="Dictionary" default="{}" />
 			<description>
-				Returns [param resource] as JSON text. Options: [code]"indent"[/code] ([String], an empty string writes one line) and [code]"enums_as_names"[/code] ([bool]). Options that are not given come from the project settings under [code]filesystem/resources/text_formats/[/code].
+				Returns [param resource] as JSON text. Options: [code]"indent"[/code] ([String], an empty string writes one line), [code]"enums_as_names"[/code] ([bool]) and [code]"defaults"[/code] ([Resource]): values of the root resource that are equal to the same property of [code]"defaults"[/code] are not written (metadata is always written). Nested resources are written completely. Options that are not given come from the project settings under [code]filesystem/resources/text_formats/[/code].
 				[codeblocks]
 				[gdscript]
 				var compact = ResourceTextSerializer.resource_to_json(settings, { "indent": "", "enums_as_names": false })

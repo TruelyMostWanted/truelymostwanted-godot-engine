@@ -79,6 +79,7 @@ public:
 	Vector<String> get_recognized_extensions_for_type(const String &p_type);
 	void add_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader, bool p_at_front);
 	void remove_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader);
+	void refresh_format_index();
 	void set_abort_on_missing_resources(bool p_abort);
 	PackedStringArray get_dependencies(const String &p_path);
 	bool has_cached(const String &p_path);
@@ -96,6 +97,10 @@ public:
 	PackedStringArray get_manifest_paths(const Ref<FilesManifest> &p_manifest);
 	Dictionary load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Error load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads = false, CacheMode p_cache_mode = CACHE_MODE_REUSE);
+
+	Error register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension(const String &p_extension);
+	bool is_extension_registered(const String &p_extension);
 
 	ResourceLoader() { singleton = this; }
 };
@@ -128,6 +133,10 @@ public:
 	void remove_resource_format_saver(RequiredParam<ResourceFormatSaver> p_format_saver);
 
 	ResourceUID::ID get_resource_id_for_path(const String &p_path, bool p_generate = false);
+
+	Error register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension(const String &p_extension);
+	bool is_extension_registered(const String &p_extension);
 
 	ResourceSaver() { singleton = this; }
 };
@@ -279,6 +288,8 @@ public:
 	uint64_t get_static_memory_usage() const;
 	uint64_t get_static_memory_peak_usage() const;
 	Dictionary get_memory_info() const;
+	uint64_t get_process_memory_usage() const;
+	Dictionary get_process_memory_info() const;
 
 	void delay_usec(int p_usec) const;
 	void delay_msec(int p_msec) const;

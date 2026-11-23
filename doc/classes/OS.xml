@@ -462,6 +462,36 @@
 				[b]Note:[/b] On Web, this method always returns [code]0[/code].
 			</description>
 		</method>
+		<method name="get_process_memory_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns a [Dictionary] containing information about the memory used by the running process, with the following entries:
+				- [code]"resident"[/code] - physical memory currently used by the process (resident set or working set), in bytes. On Web, this is the size of the WebAssembly memory.
+				- [code]"private"[/code] - memory that belongs to this process only, in bytes. On Windows, this is the private commit charge. On Linux and Android, this is the resident memory that is not shared or file-backed. On macOS, iOS and visionOS, this is the physical footprint, which is the value the system memory limit is checked against.
+				- [code]"peak"[/code] - highest [code]"resident"[/code] value since the process started, in bytes. On Web, this equals [code]"resident"[/code] because the WebAssembly memory never shrinks.
+				- [code]"heap"[/code] - memory currently allocated through [code]malloc[/code] (by the engine, modules and libraries), in bytes.
+				Unlike [method get_static_memory_usage], this method also works in release builds. It is slower than [method get_process_memory_usage], so avoid calling it every frame.
+				[codeblocks]
+				[gdscript]
+				var info = OS.get_process_memory_info()
+				print("Resident: %d bytes, peak: %d bytes" % [info["resident"], info["peak"]])
+				[/gdscript]
+				[csharp]
+				var info = OS.GetProcessMemoryInfo();
+				GD.Print($"Resident: {(long)info["resident"]} bytes, peak: {(long)info["peak"]} bytes");
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] Each entry's value may be [code]-1[/code] if it is unknown on the current platform. [code]"heap"[/code] is [code]-1[/code] on Windows and on Linux systems without glibc, [code]"private"[/code] is [code]-1[/code] on Web. On BSD systems without a mounted [code]/proc[/code], only [code]"peak"[/code] is known.
+			</description>
+		</method>
+		<method name="get_process_memory_usage" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the amount of memory used by the running process in bytes, or [code]0[/code] if it is unknown on the current platform. This is the best single number for each platform: the working set on Windows, the resident set on Linux and Android, the physical footprint on macOS, iOS and visionOS, and the size of the WebAssembly memory on Web.
+				Unlike [method get_static_memory_usage], this method also works in release builds and includes memory that is not allocated by the engine (drivers, libraries, the .NET runtime). It does not allocate and is cheap enough to be called every few frames.
+				See [method get_process_memory_info] for more detailed values.
+			</description>
+		</method>
 		<method name="get_processor_count" qualifiers="const">
 			<return type="int" />
 			<description>

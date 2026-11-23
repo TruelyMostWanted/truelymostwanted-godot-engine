@@ -531,3 +531,10 @@
 /.agents/                                     @TruelyMostWanted
 /servers/tts/                                 @TruelyMostWanted
 /servers/tts/**/SCsub                         @TruelyMostWanted @godotengine/buildsystem
+/modules/toml/                                @TruelyMostWanted
+/modules/toml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
+/modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
+/modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
+/servers/settings/                            @TruelyMostWanted
+/servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem

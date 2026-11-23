@@ -32,10 +32,13 @@
 
 TEST_FORCE_LINK(test_resource_formats)
 
+#include "core/io/resource_format_binary.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "tests/test_utils.h"
 
 namespace TestResourceFormats {
 
@@ -321,6 +324,104 @@ TEST_CASE("[ResourceLoader] Extension index finds the same loaders as asking eve
 	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxfront").is_empty(), "An older snapshot keeps its own index.");
 	ResourceLoader::remove_resource_format_loader(changed.formats[0]);
 	CHECK(recognized_by_index(ResourceLoader::get_format_snapshot(), "res://a.idxfront").is_empty());
+}
+
+// The first non-empty type through the candidates of the path, and by asking every loader.
+static String type_by_index(const ResourceLoaderFormatSnapshot &p_snapshot, const String &p_path) {
+	for (const Ref<ResourceFormatLoader> &format_loader : p_snapshot.candidates_for(p_path)) {
+		const String type = format_loader->get_resource_type(p_path);
+		if (!type.is_empty()) {
+			return type;
+		}
+	}
+	return String();
+}
+
+static String type_by_all(const ResourceLoaderFormatSnapshot &p_snapshot, const String &p_path) {
+	for (const Ref<ResourceFormatLoader> &format_loader : p_snapshot) {
+		const String type = format_loader->get_resource_type(p_path);
+		if (!type.is_empty()) {
+			return type;
+		}
+	}
+	return String();
+}
+
+TEST_CASE("[ResourceLoader] Extension index reports the same resource types as asking every loader") {
+	const String saved = TestUtils::get_temp_path("index_type.res");
+	Ref<Resource> resource;
+	resource.instantiate();
+	REQUIRE(ResourceSaver::save(resource, saved) == OK);
+
+	Vector<String> paths = { saved, "res://icon.png", "res://icon.png.import", "res://noext", "res://dir.tres/file" };
+	List<String> extensions;
+	ResourceLoader::get_recognized_extensions_for_type("", &extensions);
+	for (const String &E : extensions) {
+		paths.push_back("res://test." + E);
+		paths.push_back("res://TEST." + E.to_upper());
+	}
+
+	const ResourceLoaderFormatSnapshot snapshot = ResourceLoader::get_format_snapshot();
+	int mismatches = 0;
+	for (const String &path : paths) {
+		if (type_by_index(snapshot, path) != type_by_all(snapshot, path)) {
+			mismatches++;
+			MESSAGE("Different type for ", path);
+		}
+	}
+	CHECK(mismatches == 0);
+	CHECK(ResourceLoader::get_resource_type(saved) == "Resource");
+}
+
+TEST_CASE("[ResourceLoader] The binary loader is indexed and follows new ClassDB resource extensions") {
+	int binary = -1;
+	ResourceLoaderFormatSnapshot snapshot = ResourceLoader::get_format_snapshot();
+	for (int i = 0; i < snapshot.formats.size(); i++) {
+		if (Object::cast_to<ResourceFormatLoaderBinary>(snapshot.formats[i].ptr())) {
+			binary = i;
+			break;
+		}
+	}
+	REQUIRE(binary >= 0);
+	CHECK_MESSAGE(!snapshot.always_asked.has(uint32_t(binary)), "The binary loader is found through the index.");
+	CHECK(recognized_by_index(snapshot, "res://a.res").has(binary));
+	CHECK_FALSE(recognized_by_index(snapshot, "res://a.idxbintest").has(binary));
+
+	const uint32_t version = ClassDB::get_resource_base_extensions_version();
+	ClassDB::add_resource_base_extension("idxbintest", "X509Certificate");
+	CHECK(ClassDB::get_resource_base_extensions_version() != version);
+	snapshot = ResourceLoader::get_format_snapshot();
+	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxbintest").has(binary), "The index is rebuilt when ClassDB adds a resource extension.");
+	CHECK(recognized_by_index(snapshot, "res://a.idxbintest") == recognized_by_all(snapshot, "res://a.idxbintest"));
+
+	const uint32_t same = ClassDB::get_resource_base_extensions_version();
+	ClassDB::add_resource_base_extension("idxbintest", "X509Certificate");
+	CHECK_MESSAGE(ClassDB::get_resource_base_extensions_version() == same, "Adding a known extension again changes nothing.");
+}
+
+TEST_CASE("[ResourceLoader] refresh_format_index() reads changed extension lists again") {
+	Ref<IndexTestLoader> loader = make_index_loader({ "idxold" });
+	ResourceLoader::add_resource_format_loader(loader, true);
+	CHECK(recognized_by_index(ResourceLoader::get_format_snapshot(), "res://a.idxold") == Vector<int>({ 0 }));
+
+	loader->extensions = { "idxnew", "IDXNEW2" };
+	ResourceLoaderFormatSnapshot snapshot = ResourceLoader::get_format_snapshot();
+	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxnew").is_empty(), "A changed list is not seen before the refresh.");
+	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxold").is_empty(), "A removed extension is still checked with recognize_path().");
+
+	ResourceLoader::refresh_format_index();
+	snapshot = ResourceLoader::get_format_snapshot();
+	CHECK(recognized_by_index(snapshot, "res://a.idxnew") == Vector<int>({ 0 }));
+	CHECK(recognized_by_index(snapshot, "res://a.idxnew2") == Vector<int>({ 0 }));
+	CHECK(recognized_by_index(snapshot, "res://a.idxold").is_empty());
+	CHECK(snapshot.entries.size() == snapshot.formats.size());
+	CHECK(snapshot.entries[0].keys == Vector<String>({ "idxnew", "idxnew2" }));
+	CHECK_FALSE(snapshot.entries[0].scripted);
+
+	ResourceLoader::remove_resource_format_loader(loader);
+	snapshot = ResourceLoader::get_format_snapshot();
+	CHECK(recognized_by_index(snapshot, "res://a.idxnew").is_empty());
+	CHECK(snapshot.entries.size() == snapshot.formats.size());
 }
 
 // Run with --test --test-case="*Extension index measurement*" --no-skip; prints the time to resolve the loaders of 10,000 paths.
