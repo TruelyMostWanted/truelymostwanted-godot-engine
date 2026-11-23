@@ -527,4 +527,5 @@
 # Truely Godot Engine (fork-specific)
 
 /truely/                                      @TruelyMostWanted
+/truely/**/*.py                               @TruelyMostWanted @godotengine/buildsystem
 /.agents/                                     @TruelyMostWanted
