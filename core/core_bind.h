@@ -97,6 +97,10 @@ public:
 	Dictionary load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Error load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads = false, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 
+	Error register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension(const String &p_extension);
+	bool is_extension_registered(const String &p_extension);
+
 	ResourceLoader() { singleton = this; }
 };
 
@@ -128,6 +132,10 @@ public:
 	void remove_resource_format_saver(RequiredParam<ResourceFormatSaver> p_format_saver);
 
 	ResourceUID::ID get_resource_id_for_path(const String &p_path, bool p_generate = false);
+
+	Error register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension(const String &p_extension);
+	bool is_extension_registered(const String &p_extension);
 
 	ResourceSaver() { singleton = this; }
 };
