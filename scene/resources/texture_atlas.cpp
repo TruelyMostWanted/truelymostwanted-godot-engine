@@ -35,6 +35,7 @@
 #include "core/io/resource_loader.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
+#include "core/object/class_db.h"
 #include "core/templates/hash_set.h"
 #include "scene/resources/sprite_frames.h"
 
@@ -289,25 +290,25 @@ void TextureAtlas::set_regions(const TypedDictionary<StringName, Rect2i> &p_regi
 	new_regions.reserve(p_regions.size());
 	PackedStringArray errors;
 	for (const KeyValue<Variant, Variant> &E : p_regions) {
-		const StringName name = E.key;
+		const StringName region_name = E.key;
 		const Rect2i rect = E.value;
 		String error;
-		if (!is_valid_region_name(name)) {
-			errors.push_back(vformat("\"%s\" is not a valid region name.", name));
+		if (!is_valid_region_name(region_name)) {
+			errors.push_back(vformat("\"%s\" is not a valid region region_name.", region_name));
 			continue;
 		}
-		if (_check_rect(name, rect, texture, error) != OK) {
+		if (_check_rect(region_name, rect, texture, error) != OK) {
 			errors.push_back(error);
 			continue;
 		}
 		Region region;
 		region.rect = rect;
-		const Region *old = regions.getptr(name);
+		const Region *old = regions.getptr(region_name);
 		if (old != nullptr) {
 			region.margin = old->margin;
 			region.texture = old->texture;
 		}
-		new_regions.insert(name, region);
+		new_regions.insert(region_name, region);
 	}
 	regions = new_regions;
 	_update_all_cached_textures();
@@ -331,15 +332,15 @@ void TextureAtlas::set_margins(const TypedDictionary<StringName, Rect2i> &p_marg
 	}
 	PackedStringArray errors;
 	for (const KeyValue<Variant, Variant> &E : p_margins) {
-		const StringName name = E.key;
+		const StringName region_name = E.key;
 		const Rect2i margin = E.value;
-		Region *region = regions.getptr(name);
+		Region *region = regions.getptr(region_name);
 		if (region == nullptr) {
-			errors.push_back(vformat("The margin of the unknown region \"%s\" is ignored.", name));
+			errors.push_back(vformat("The margin of the unknown region \"%s\" is ignored.", region_name));
 			continue;
 		}
 		String error;
-		if (_check_margin(name, margin, error) != OK) {
+		if (_check_margin(region_name, margin, error) != OK) {
 			errors.push_back(error);
 			continue;
 		}
@@ -506,13 +507,13 @@ Ref<SpriteFrames> TextureAtlas::create_sprite_frames(const String &p_prefix, dou
 	HashMap<String, LocalVector<AtlasFrame>> animations;
 	int order = 0;
 	for (const KeyValue<StringName, Region> &E : regions) {
-		const String name = E.key;
-		if (!name.begins_with(p_prefix)) {
+		const String region_name = E.key;
+		if (!region_name.begins_with(p_prefix)) {
 			continue;
 		}
 		String base;
 		AtlasFrame frame;
-		frame.number = split_trailing_number(name, base);
+		frame.number = split_trailing_number(region_name, base);
 		frame.order = order++;
 		frame.name = E.key;
 		String animation = strip_trailing_separators(base);
@@ -520,7 +521,7 @@ Ref<SpriteFrames> TextureAtlas::create_sprite_frames(const String &p_prefix, dou
 			animation = strip_trailing_separators(p_prefix);
 		}
 		if (animation.is_empty()) {
-			animation = name;
+			animation = region_name;
 		}
 		animations[animation].push_back(frame); // Inserts the animation on first use, in region order.
 	}
