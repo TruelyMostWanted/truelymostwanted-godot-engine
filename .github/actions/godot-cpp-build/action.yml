@@ -37,4 +37,10 @@ runs:
       shell: sh
       env:
         SCONS_CACHE: ${{ inputs.scons-cache }}
-      run: scons --directory=./godot-cpp/test "gdextension_dir=${{ github.workspace }}" ${{ inputs.scons-flags }}
+      # truely-godot-engine: the workspace path of this fork is long, so the single `ar` command
+      # with all absolute object paths exceeds the argument limit ("Argument list too long").
+      # Build godot-cpp from a copy in a short path; the API files stay in the workspace.
+      run: |
+        rm -rf /tmp/gcpp
+        cp -r ./godot-cpp /tmp/gcpp
+        scons --directory=/tmp/gcpp/test "gdextension_dir=${{ github.workspace }}" ${{ inputs.scons-flags }}
