@@ -298,7 +298,8 @@ TEST_CASE("[SettingsServer] Immediate apply pushes only changed values") {
 	CHECK(TestEngine::volume == doctest::Approx(0.25));
 	CHECK(server->apply_calls == 0); // Bound by callbacks: _apply_settings() is not needed.
 	const Array changed_args = { { StringName("volume"), 0.25 } };
-	const Array applied_args = { { Variant(PackedStringArray({ "volume" })) } };
+	Array applied_args;
+	applied_args.push_back(Array({ Variant(PackedStringArray({ "volume" })) }));
 	SIGNAL_CHECK("value_changed", changed_args);
 	SIGNAL_CHECK("applied", applied_args);
 
@@ -343,6 +344,9 @@ TEST_CASE("[SettingsServer] Save, restart and apply on startup (INI and JSON)") 
 	TestSetup setup;
 	for (const String &extension : { String("ini"), String("json") }) {
 		const String path = temp_file("startup." + extension);
+		// Every round starts from the project defaults of the engine.
+		TestEngine::volume = 0.5;
+		TestEngine::quality = 1;
 		{
 			TestDomainServer *server = memnew(TestDomainServer);
 			server->set_file_path(path);
@@ -506,7 +510,8 @@ TEST_CASE("[SettingsServer] Restart flags and values without an engine target") 
 	CHECK(TestEngine::quality == 1);
 	CHECK(server->apply_calls == 0);
 	CHECK(server->get_restart_values() == PackedStringArray({ "quality" }));
-	const Array restart_args = { { Variant(PackedStringArray({ "quality" })) } };
+	Array restart_args;
+	restart_args.push_back(Array({ Variant(PackedStringArray({ "quality" })) }));
 	SIGNAL_CHECK("restart_required", restart_args);
 	SIGNAL_UNWATCH(server, "restart_required");
 	memdelete(server);
