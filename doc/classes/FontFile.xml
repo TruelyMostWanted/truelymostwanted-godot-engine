@@ -11,6 +11,7 @@
 		- Dynamic font importer: TrueType (.ttf), TrueType collection (.ttc), OpenType (.otf), OpenType collection (.otc), WOFF (.woff), WOFF2 (.woff2), Type 1 (.pfb, .pfm).
 		- Bitmap font importer: AngelCode BMFont (.fnt, .font), text and binary (version 3) format variants.
 		- Monospace image font importer: All supported image formats.
+		[b]Runtime loading and saving:[/b] Font files without an import (for example in [code]user://[/code], in a mod folder or in a PCK as raw files) are loaded with [method ResourceLoader.load] as [FontFile]: the dynamic font formats above and AngelCode BMFont (.fnt, .font). BMFont page textures are read from the folder of the .fnt file. Font files under [code]res://[/code] that have a [code].import[/code] file are still loaded through their importer. [method ResourceSaver.save] writes the [member data] of a [FontFile] back to a .ttf, .ttc, .otf, .otc, .woff, .woff2, .pfb or .pfm file, byte for byte. The data must already be in the format of the target extension (no conversion); a [FontFile] without [member data] (a bitmap font or a font built in code) can only be saved as .res, .tres or .fontdata.
 		[b]Note:[/b] A character is a symbol that represents an item (letter, digit etc.) in an abstract way.
 		[b]Note:[/b] A glyph is a bitmap or a shape used to draw one or more characters in a context-dependent manner. Glyph indices are bound to the specific font data source.
 		[b]Note:[/b] If none of the font data sources contain glyphs for a character used in a string, the character in question will be replaced with a box displaying its hexadecimal code.
@@ -19,11 +20,19 @@
 		var f = load("res://BarlowCondensed-Bold.ttf")
 		$Label.add_theme_font_override("font", f)
 		$Label.add_theme_font_size_override("font_size", 64)
+
+		# Load a font file without import at runtime and save a copy.
+		var user_font = ResourceLoader.load("user://fonts/MyFont.ttf") as FontFile
+		ResourceSaver.save(user_font, "user://fonts/MyFont_copy.ttf")
 		[/gdscript]
 		[csharp]
 		var f = ResourceLoader.Load&lt;FontFile&gt;("res://BarlowCondensed-Bold.ttf");
 		GetNode("Label").AddThemeFontOverride("font", f);
 		GetNode("Label").AddThemeFontSizeOverride("font_size", 64);
+
+		// Load a font file without import at runtime and save a copy.
+		var userFont = ResourceLoader.Load&lt;FontFile&gt;("user://fonts/MyFont.ttf");
+		ResourceSaver.Save(userFont, "user://fonts/MyFont_copy.ttf");
 		[/csharp]
 		[/codeblocks]
 	</description>
@@ -599,7 +608,7 @@
 			Font anti-aliasing mode.
 		</member>
 		<member name="data" type="PackedByteArray" setter="set_data" getter="get_data" default="PackedByteArray()">
-			Contents of the dynamic font source file.
+			Contents of the dynamic font source file, unchanged (for WOFF and WOFF2 still compressed). [method ResourceSaver.save] writes these bytes back to a font file of the same format. Empty for bitmap fonts.
 		</member>
 		<member name="disable_embedded_bitmaps" type="bool" setter="set_disable_embedded_bitmaps" getter="get_disable_embedded_bitmaps" default="true">
 			If set to [code]true[/code], embedded font bitmap loading is disabled (bitmap-only and color fonts ignore this property).
