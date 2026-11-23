@@ -39,7 +39,7 @@ TEST_FORCE_LINK(test_resource_format_callable)
 #include "core/io/resource_format_callable.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
-#include "core/object/callable_method_pointer.h"
+#include "core/object/callable_mp.h"
 #include "tests/test_utils.h"
 
 namespace TestResourceFormatCallable {

@@ -85,10 +85,11 @@ static bool _type_inherits(const StringName &p_type, const StringName &p_base) {
 }
 
 static String _get_error_name(Error p_error) {
-	if (p_error >= 0 && p_error < ERR_MAX) {
-		return error_names[p_error];
+	const int code = int(p_error);
+	if (code >= 0 && code < int(ERR_MAX)) {
+		return error_names[code];
 	}
-	return itos(p_error);
+	return itos(code);
 }
 
 /////////////////////////////////////////////////////////////////////////////
