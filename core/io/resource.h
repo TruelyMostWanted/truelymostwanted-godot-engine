@@ -207,10 +207,16 @@ class ResourceCache {
 	static void clear();
 	friend void register_core_types();
 
+	template <typename F>
+	static void _get_cached_paths_filtered(List<String> *r_paths, const F &p_filter);
+
 public:
 	static bool has(const String &p_path);
 	static Ref<Resource> get_ref(const String &p_path);
 	static void get_cached_resources(List<Ref<Resource>> *p_resources);
 	static void get_cached_paths(List<String> *r_paths);
+	static void get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths);
+	static void get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths);
+	static void get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths);
 	static int get_cached_resource_count();
 };

@@ -34,6 +34,7 @@
 #include "core/math/math_funcs.h"
 #include "core/math/random_pcg.h"
 #include "core/object/class_db.h"
+#include "core/object/script_language.h"
 #include "core/os/os.h"
 #include "core/variant/container_type_validate.h" // IWYU pragma: keep.
 #include "scene/main/node.h" //only so casting works
@@ -893,7 +894,8 @@ void ResourceCache::get_cached_resources(List<Ref<Resource>> *p_resources) {
 	}
 }
 
-void ResourceCache::get_cached_paths(List<String> *r_paths) {
+template <typename F>
+void ResourceCache::_get_cached_paths_filtered(List<String> *r_paths, const F &p_filter) {
 	ERR_FAIL_NULL(r_paths);
 	MutexLock mutex_lock(lock);
 
@@ -902,8 +904,70 @@ void ResourceCache::get_cached_paths(List<String> *r_paths) {
 			// This resource is in the process of being deleted, ignore its existence.
 			continue;
 		}
-		r_paths->push_back(E.key);
+		if (p_filter(E.key, E.value)) {
+			r_paths->push_back(E.key);
+		}
 	}
+}
+
+// Returns the file part of a cached path, without the "::<id>" of a built-in sub-resource.
+static String _cached_path_get_file(const String &p_path) {
+	const int sep = p_path.find("::");
+	return sep < 0 ? p_path : p_path.substr(0, sep);
+}
+
+void ResourceCache::get_cached_paths(List<String> *r_paths) {
+	_get_cached_paths_filtered(r_paths, [](const String &, const Resource *) { return true; });
+}
+
+void ResourceCache::get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths) {
+	if (p_type == StringName()) {
+		return;
+	}
+
+	_get_cached_paths_filtered(r_paths, [&p_type, p_exact](const String &, const Resource *p_res) {
+		// Script data used here is cached by the script; no script code runs under the cache lock.
+		Ref<Script> scr = p_res->get_script();
+		if (p_exact) {
+			// The most derived named class: the first global script class, else the native class.
+			for (; scr.is_valid(); scr = scr->get_base_script()) {
+				const StringName global_name = scr->get_global_name();
+				if (global_name != StringName()) {
+					return global_name == p_type;
+				}
+			}
+			return p_res->get_class_name() == p_type;
+		}
+
+		for (; scr.is_valid(); scr = scr->get_base_script()) {
+			if (scr->get_global_name() == p_type) {
+				return true;
+			}
+		}
+		return p_res->is_class(p_type);
+	});
+}
+
+void ResourceCache::get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths) {
+	const String extension = p_extension.begins_with(".") ? p_extension.substr(1) : p_extension;
+
+	_get_cached_paths_filtered(r_paths, [&extension](const String &p_path, const Resource *) {
+		return _cached_path_get_file(p_path).get_extension().nocasecmp_to(extension) == 0;
+	});
+}
+
+void ResourceCache::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths) {
+	if (p_directory.is_empty()) {
+		return;
+	}
+	const String directory = p_directory.ends_with("/") ? p_directory : p_directory + "/";
+
+	_get_cached_paths_filtered(r_paths, [&directory, p_recursive](const String &p_path, const Resource *) {
+		if (!p_path.begins_with(directory)) {
+			return false;
+		}
+		return p_recursive || _cached_path_get_file(p_path).find_char('/', directory.length()) < 0;
+	});
 }
 
 int ResourceCache::get_cached_resource_count() {

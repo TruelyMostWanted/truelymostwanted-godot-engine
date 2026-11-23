@@ -37,7 +37,7 @@
 			<return type="PackedStringArray" />
 			<description>
 				Returns the paths of all resources that are currently in the resource cache, in no particular order. A resource stays in the cache as long as at least one reference to it exists. Each returned path can be passed to [method get_cached_ref] or [method has_cached].
-				The result includes the paths of built-in sub-resources that were cached together with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code]. Resources without a path are never cached and are not included. Filter the result in your script if you only need some of the paths:
+				The result includes the paths of built-in sub-resources that were cached together with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code]. Resources without a path are never cached and are not included. To get only some of the paths, prefer [method get_cached_paths_for_type], [method get_cached_paths_with_extension] and [method get_cached_paths_in_directory], which filter in C++ and copy only the matching paths. Other filters can be applied in your script:
 				[codeblocks]
 				[gdscript]
 				var textures = ResourceLoader.get_cached_paths().filter(func(path): return path.ends_with(".png"))
@@ -47,6 +47,60 @@
 				[/csharp]
 				[/codeblocks]
 				[b]Note:[/b] The result is a snapshot. It is safe to call this method while other threads load resources, but those threads may add or remove paths right after it returns.
+			</description>
+		</method>
+		<method name="get_cached_paths_for_type">
+			<return type="PackedStringArray" />
+			<param index="0" name="type" type="StringName" />
+			<param index="1" name="exact" type="bool" default="false" />
+			<description>
+				Returns the paths of the cached resources whose class is [param type] or inherits from it, in no particular order. [param type] can be a native class (including GDExtension classes) or a global script class ([code]class_name[/code] in GDScript, [code][GlobalClass][/code] in C#); a resource matches a script class if its script or one of its base scripts has that name.
+				If [param exact] is [code]true[/code], only resources whose most derived named class is [param type] match: the first global class name found on the resource's script and its base scripts, otherwise its native class. A resource with a [code]class_name[/code] script therefore does not match its native base class exactly.
+				An unknown class name returns an empty array. Like [method get_cached_paths], the result includes built-in sub-resources and is a snapshot that is safe to take while other threads load resources.
+				[codeblocks]
+				[gdscript]
+				var textures = ResourceLoader.get_cached_paths_for_type(&amp;"Texture2D")
+				var only_curves = ResourceLoader.get_cached_paths_for_type(&amp;"Curve", true)
+				[/gdscript]
+				[csharp]
+				string[] textures = ResourceLoader.GetCachedPathsForType("Texture2D");
+				string[] onlyCurves = ResourceLoader.GetCachedPathsForType("Curve", true);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_cached_paths_in_directory">
+			<return type="PackedStringArray" />
+			<param index="0" name="directory" type="String" />
+			<param index="1" name="recursive" type="bool" default="true" />
+			<description>
+				Returns the paths of the cached resources inside [param directory], in no particular order. A missing trailing slash is added, so [code]"res://levels"[/code] matches [code]res://levels/a.tres[/code] but not [code]res://levels2/a.tres[/code]. The comparison is a case-sensitive string prefix and works with any path prefix, such as [code]res://[/code] or [code]user://[/code].
+				If [param recursive] is [code]false[/code], only resources directly in [param directory] are returned, not those in its subdirectories. Built-in sub-resources (such as [code]res://levels/a.tscn::Gradient_x1y2z[/code]) belong to the directory of their file.
+				[codeblocks]
+				[gdscript]
+				var level = ResourceLoader.get_cached_paths_in_directory("res://levels/")
+				var top_level_only = ResourceLoader.get_cached_paths_in_directory("res://levels/", false)
+				[/gdscript]
+				[csharp]
+				string[] level = ResourceLoader.GetCachedPathsInDirectory("res://levels/");
+				string[] topLevelOnly = ResourceLoader.GetCachedPathsInDirectory("res://levels/", false);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_cached_paths_with_extension">
+			<return type="PackedStringArray" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Returns the paths of the cached resources whose file has the extension [param extension], in no particular order. The extension is compared case-insensitively and may be given with or without a leading dot ([code]"tscn"[/code] or [code]".tscn"[/code]). Built-in sub-resources count as the extension of their file. An empty [param extension] returns the paths without an extension.
+				[codeblocks]
+				[gdscript]
+				var scenes = ResourceLoader.get_cached_paths_with_extension("tscn")
+				[/gdscript]
+				[csharp]
+				string[] scenes = ResourceLoader.GetCachedPathsWithExtension("tscn");
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_cached_ref">
