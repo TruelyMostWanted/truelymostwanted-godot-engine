@@ -32,6 +32,8 @@
 
 TEST_FORCE_LINK(test_resource)
 
+#include "core/io/image.h"
+#include "core/io/json.h"
 #include "core/io/resource.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -624,6 +626,100 @@ TEST_CASE("[Resource] Breaking circular references on save") {
 
 	// Break circular reference to avoid memory leak
 	resource_c->remove_meta("next");
+}
+
+static Vector<String> _sorted_paths_under(const List<String> &p_paths, const String &p_root) {
+	Vector<String> ret;
+	for (const String &E : p_paths) {
+		if (E.begins_with(p_root)) {
+			ret.push_back(E);
+		}
+	}
+	ret.sort();
+	return ret;
+}
+
+TEST_CASE("[Resource] Filtering cached paths") {
+	const String root = "res://__test_cached_paths_filters/";
+	Ref<Resource> res_a = memnew(Resource);
+	res_a->set_path(root + "a.tres");
+	Ref<Image> image = memnew(Image);
+	image->set_path(root + "sub/image.res");
+	Ref<JSON> json = memnew(JSON);
+	json->set_path(root + "sub/data.JSON");
+	Ref<Resource> sub_resource = memnew(Resource);
+	sub_resource->set_path(root + "a.tres::Resource_x1");
+	Ref<Resource> no_extension = memnew(Resource);
+	no_extension->set_path(root + "sub/deeper/plain");
+
+	List<String> paths;
+
+	SUBCASE("By type") {
+		ResourceCache::get_cached_paths_for_type("Resource", false, &paths);
+		CHECK(_sorted_paths_under(paths, root).size() == 5);
+
+		paths.clear();
+		ResourceCache::get_cached_paths_for_type("Resource", true, &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "a.tres", root + "a.tres::Resource_x1", root + "sub/deeper/plain" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_for_type("Image", true, &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/image.res" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_for_type("Node", false, &paths);
+		ResourceCache::get_cached_paths_for_type("NoSuchClass", false, &paths);
+		ResourceCache::get_cached_paths_for_type(StringName(), false, &paths);
+		CHECK(_sorted_paths_under(paths, root).is_empty());
+	}
+
+	SUBCASE("By extension") {
+		ResourceCache::get_cached_paths_with_extension("TRES", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "a.tres", root + "a.tres::Resource_x1" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension(".json", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/data.JSON" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/deeper/plain" }));
+
+		// A dot in a directory name is not an extension.
+		Ref<Resource> dotted_dir = memnew(Resource);
+		dotted_dir->set_path(root + "v1.tres/plain");
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("tres", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "a.tres", root + "a.tres::Resource_x1" }));
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/deeper/plain", root + "v1.tres/plain" }));
+	}
+
+	SUBCASE("By directory") {
+		ResourceCache::get_cached_paths_in_directory(root + "sub", true, &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/data.JSON", root + "sub/deeper/plain", root + "sub/image.res" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_in_directory(root + "sub/", false, &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/data.JSON", root + "sub/image.res" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_in_directory(root, false, &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "a.tres", root + "a.tres::Resource_x1" }));
+
+		paths.clear();
+		ResourceCache::get_cached_paths_in_directory(root + "su", true, &paths);
+		ResourceCache::get_cached_paths_in_directory("", true, &paths);
+		CHECK(_sorted_paths_under(paths, root).is_empty());
+	}
+
+	SUBCASE("Freed resources are not returned") {
+		image.unref();
+		ResourceCache::get_cached_paths_in_directory(root, true, &paths);
+		CHECK(_sorted_paths_under(paths, root).size() == 4);
+		CHECK(paths.find(root + "sub/image.res") == nullptr);
+	}
 }
 
 } // namespace TestResource
