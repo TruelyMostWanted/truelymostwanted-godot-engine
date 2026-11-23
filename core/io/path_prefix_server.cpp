@@ -464,34 +464,39 @@ Error PathPrefixServer::_register(const String &p_prefix, const Ref<PathPrefix> 
 	ERR_FAIL_COND_V_MSG(p_logic.is_null(), ERR_INVALID_PARAMETER, "The logic of a path prefix must not be null.");
 	const String prefix = normalize_prefix(p_prefix);
 	ERR_FAIL_COND_V_MSG(!p_locked && !is_valid_prefix_name(prefix), ERR_INVALID_PARAMETER, vformat("Invalid path prefix '%s': use lowercase letters, digits and '_', followed by '://'. URL schemes such as 'http://' are reserved.", p_prefix));
+	// Errors are printed after the lock is released: printing takes the global lock,
+	// which other threads may hold while resolving paths through this server.
+	bool was_locked = false;
 	{
 		RWLockWrite write_lock(lock);
 		Entry *entry = prefixes.getptr(prefix);
 		if (entry && entry->locked) {
-			ERR_FAIL_V_MSG(ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
-		}
-		if (!entry) {
-			Entry new_entry;
-			new_entry.locked = p_locked;
-			new_entry.order = next_order++;
-			entry = &prefixes.insert(prefix, new_entry)->value;
-		}
-		bool replaced = false;
-		for (Registration &reg : entry->registrations) {
-			if (_same_platforms(reg.platforms, p_platforms)) {
-				reg.logic = p_logic;
-				replaced = true;
-				break;
+			was_locked = true;
+		} else {
+			if (!entry) {
+				Entry new_entry;
+				new_entry.locked = p_locked;
+				new_entry.order = next_order++;
+				entry = &prefixes.insert(prefix, new_entry)->value;
 			}
+			bool replaced = false;
+			for (Registration &reg : entry->registrations) {
+				if (_same_platforms(reg.platforms, p_platforms)) {
+					reg.logic = p_logic;
+					replaced = true;
+					break;
+				}
+			}
+			if (!replaced) {
+				Registration reg;
+				reg.platforms = p_platforms;
+				reg.logic = p_logic;
+				entry->registrations.push_back(reg);
+			}
+			_update_active(*entry);
 		}
-		if (!replaced) {
-			Registration reg;
-			reg.platforms = p_platforms;
-			reg.logic = p_logic;
-			entry->registrations.push_back(reg);
-		}
-		_update_active(*entry);
 	}
+	ERR_FAIL_COND_V_MSG(was_locked, ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
 	if (!p_locked) {
 		_emit_deferred(SNAME("prefix_registered"), prefix);
 	}
@@ -522,14 +527,22 @@ Error PathPrefixServer::register_prefix_folder(const String &p_prefix, const Str
 
 Error PathPrefixServer::unregister_prefix(const String &p_prefix, const PackedStringArray &p_platforms) {
 	const String prefix = normalize_prefix(p_prefix);
+	// Errors are printed after the lock is released (see _register()).
+	enum UnregisterResult {
+		UNREGISTER_OK,
+		UNREGISTER_MISSING,
+		UNREGISTER_LOCKED,
+		UNREGISTER_NO_PLATFORMS,
+	};
+	UnregisterResult result = UNREGISTER_OK;
 	{
 		RWLockWrite write_lock(lock);
 		Entry *entry = prefixes.getptr(prefix);
-		ERR_FAIL_NULL_V_MSG(entry, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' is not registered.", prefix));
-		if (entry->locked) {
-			ERR_FAIL_V_MSG(ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be unregistered.", prefix));
-		}
-		if (p_platforms.is_empty()) {
+		if (!entry) {
+			result = UNREGISTER_MISSING;
+		} else if (entry->locked) {
+			result = UNREGISTER_LOCKED;
+		} else if (p_platforms.is_empty()) {
 			prefixes.erase(prefix);
 		} else {
 			bool found = false;
@@ -540,14 +553,18 @@ Error PathPrefixServer::unregister_prefix(const String &p_prefix, const PackedSt
 					break;
 				}
 			}
-			ERR_FAIL_COND_V_MSG(!found, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' has no registration for these platforms.", prefix));
-			if (entry->registrations.is_empty()) {
+			if (!found) {
+				result = UNREGISTER_NO_PLATFORMS;
+			} else if (entry->registrations.is_empty()) {
 				prefixes.erase(prefix);
 			} else {
 				_update_active(*entry);
 			}
 		}
 	}
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_MISSING, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' is not registered.", prefix));
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_LOCKED, ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be unregistered.", prefix));
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_NO_PLATFORMS, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' has no registration for these platforms.", prefix));
 	_emit_deferred(SNAME("prefix_unregistered"), prefix);
 	return OK;
 }
