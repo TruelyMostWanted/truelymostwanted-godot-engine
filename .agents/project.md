@@ -32,7 +32,7 @@ HOST_PARAMETER=''
 REPO_PARAMETER='TruelyMostWanted/truelymostwanted-godot-engine'
 APPROVAL='Autonomous'
 CHECKPOINTS=''
-MAX_ISSUE_AGENTS='3'
+MAX_ISSUE_AGENTS='5'
 MAX_ISSUES_PER_AGENT='1'
 ALLOW_TEAMS_PER_ISSUE='false'
 MIRROR_GIT_ISSUES='false'
@@ -40,6 +40,7 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
 - 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
 - 2026-11-23: Besitzer: **Wiki-Seiten sind immer Pflicht**, für jedes umgesetzte Issue (auch Refactorings ohne neue API) Guide-Seite und Klassenreferenz jeder betroffenen Klasse; Concept-Entscheidungen auf der Seite `Design-Decisions`. Jede Seite mit nummeriertem Inhaltsverzeichnis (`python truely/wiki-toc.py <wiki-ordner>` vor jedem Wiki-Push). Der Orchestrator veröffentlicht sie sofort nach dem Bericht des Agenten (Status „in review“ auf `Home`), nach dem Merge Status „done“.
@@ -103,21 +104,23 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='111a69de32'
-CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
-UPDATED='2026-11-23'
+LAST_INTEGRATED_COMMIT='e17517d82c'
+CURRENT_MILESTONE='Phase 3 · Settings'
+UPDATED='2026-11-24'
 ```
 
-**In Arbeit:** – #8 gemergt (offen nur für Prüfung im Export-Build, Board: Review). #9: WIP-Commit auf `09-feature-resource-database` (ungebaut, nur `preload_list.*`, `resource_database.h`).
+**In Arbeit (Agenten, ohne Build):** #53 (`53-feature-loader-index-scripts`), #68 (`68-feature-xml-and-unified-serializer`), #16 (`16-feature-audio-settings`); Concepts #13, #31 (Entwurf `scratch/issues/<N>/issue-comment.md` + `followups/`).
 
 ## Übergabe
 
 **Zuerst fortsetzen:**
-1. #9 fortsetzen (WIP auf dem Branch), dann: je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
-2. CI 45215922124 (Stapel #37 + #34) prüfen. macOS/iOS bekamen schon zweimal keinen Runner (abgebrochen ohne Schritt) – Infrastruktur, kein Code-Fehler.
-3. Danach: #35, #36 (jetzt frei, #5 ist gemergt), #10, #53 (Folge von #34), #13, Phase 3 ab #15, Phase 5 #50, #51.
-4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39.
-5. Reste alter Agent-Worktrees unter `.claude/worktrees/agent-a46…`, `agent-ad63…`, `agent-ad82…`, `agent-afea…` (abgemeldet, Löschen scheiterte an langen Pfaden; Löschen per `Remove-Item \?\…` braucht die Freigabe des Besitzers). Alte Testprojekt-Worktrees im Scratch der vorigen Session (`git -C …/godot-custom-build-project worktree list`).
+1. Berichte der laufenden Agenten integrieren, je Issue nacheinander: Branch im Hauptbaum, `git merge truely-godot-engine`, Build (Mono, `tests=yes`), Unit-Tests einzeln + gesamt, Glue, Assemblies, `--doctool`, Checks im Testprojekt-Worktree (`scratch/issues/<N>/testproject`, Junction `nuget-local`), Issue-Kommentar, PR + Squash-Merge, Wiki (`scratch/wiki`, `wiki-toc.py`), Testprojekt-Branch pushen und in `main` mergen, Board.
+2. Concepts #13, #31: Entwurf prüfen, als Kommentar posten, Folge-Issues anlegen.
+3. Danach: #70 (nach #53, gleiche Dateien), #71 (SettingsServer-Folgepunkte), Settings-Domänen #17–#30 (Muster aus #16), #51 (Atlas-Editor inkl. Inspector aus #50).
+4. Batch-CI 45272798826 (nach #15; enthält #9, #10, #35, #36, #50, #15) prüfen. macOS/iOS bekommen weiterhin keinen Runner (Infrastruktur).
+5. Reste alter Agent-Worktrees unter `.claude/worktrees/` (abgemeldet bzw. detached; Löschen braucht Freigabe des Besitzers).
+
+**Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 
 **Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin (umgesetzt; Skript-/Binary-Loader in #53), #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
 
@@ -125,11 +128,14 @@ UPDATED='2026-11-23'
 
 **Fragen an den Besitzer:** –
 
-**Am Bildschirm zu prüfen (manual):** #8: Export-Build mit `user://`/`exec://`-Ordnern, `res://` schreibgeschützt; danach #8 schließen. #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
+**Am Bildschirm zu prüfen (manual):** #10: Check „Haupt-PCK eines exportierten Builds“ nur im Export. #8: Export-Build mit `user://`/`exec://`-Ordnern, `res://` schreibgeschützt; danach #8 schließen. #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
 
 **Regeln, neu:** –
 
 **Fallen:**
+- Testprojekt-Worktrees brauchen die Junction `scratch/issues/<N>/nuget-local` → sonst „Godot.NET.Sdk nicht gefunden“.
+- `.tres` sortiert Dictionary-Schlüssel: Reihenfolge separat speichern (#50 `region_order`).
+- doctest `const Array a = { { Variant(x) } }` wird flach: `push_back(Array({ ... }))` verwenden (#15).
 - Erster `--import` des Testprojekts nach dem Merge von #5 stürzte einmal ab (Access Violation, Exit -1073741819), danach nicht reproduzierbar. Beobachten.
 - Agent-Worktrees belegen ihren Branch: vor `git switch <branch>` im Hauptbaum `git -C .claude/worktrees/<agent> switch --detach`. Testprojekt-Worktrees im Scratch brauchen die Junction `scratch/issues/<N>/nuget-local` → `P:/Projects/GitHub/nuget-local` (relativer Pfad in `nuget.config`).
 - **`run-checks.ps1` mit der GUI-Exe meldete immer PASSED** (PowerShell wartet nicht, kein Exit-Code; GD und C# liefen gleichzeitig). Seit Testprojekt `95830a0` nimmt das Skript die `.console.exe` daneben; Branches ohne diesen Fix: `-Godot …mono.console.exe` direkt übergeben. Stapel 1 wurde damit erneut geprüft: grün.

@@ -133,3 +133,21 @@ protected:
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const override;
 	virtual bool _can_save(const Ref<Resource> &p_resource) const override;
 };
+
+// XML: root element <resource type="..."> with one child element per property. Files without that root are left to other loaders.
+class ResourceFormatLoaderResourceXML : public ResourceFormatLoaderTextTree {
+	GDSOFTCLASS(ResourceFormatLoaderResourceXML, ResourceFormatLoaderTextTree);
+
+protected:
+	virtual String _get_extension() const override { return "xml"; }
+	virtual Error _parse_text(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error) const override;
+	virtual String _get_marker_type(const String &p_text) const override;
+};
+
+class ResourceFormatSaverResourceXML : public ResourceFormatSaverTextTree {
+	GDSOFTCLASS(ResourceFormatSaverResourceXML, ResourceFormatSaverTextTree);
+
+protected:
+	virtual String _get_extension() const override { return "xml"; }
+	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const override;
+};

@@ -105,6 +105,10 @@ void ResourceLoader::remove_resource_format_loader(RequiredParam<ResourceFormatL
 	::ResourceLoader::remove_resource_format_loader(format_loader);
 }
 
+void ResourceLoader::refresh_format_index() {
+	::ResourceLoader::refresh_format_index();
+}
+
 void ResourceLoader::set_abort_on_missing_resources(bool p_abort) {
 	::ResourceLoader::set_abort_on_missing_resources(p_abort);
 }
@@ -217,6 +221,7 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_recognized_extensions_for_type", "type"), &ResourceLoader::get_recognized_extensions_for_type);
 	ClassDB::bind_method(D_METHOD("add_resource_format_loader", "format_loader", "at_front"), &ResourceLoader::add_resource_format_loader, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_loader", "format_loader"), &ResourceLoader::remove_resource_format_loader);
+	ClassDB::bind_method(D_METHOD("refresh_format_index"), &ResourceLoader::refresh_format_index);
 	ClassDB::bind_method(D_METHOD("set_abort_on_missing_resources", "abort"), &ResourceLoader::set_abort_on_missing_resources);
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
@@ -705,6 +710,14 @@ Dictionary OS::get_memory_info() const {
 	return ::OS::get_singleton()->get_memory_info();
 }
 
+uint64_t OS::get_process_memory_usage() const {
+	return ::OS::get_singleton()->get_process_memory_usage();
+}
+
+Dictionary OS::get_process_memory_info() const {
+	return ::OS::get_singleton()->get_process_memory_info();
+}
+
 /** This method uses a signed argument for better error reporting as it's used from the scripting API. */
 void OS::delay_usec(int p_usec) const {
 	ERR_FAIL_COND_MSG(
@@ -926,6 +939,8 @@ void OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_static_memory_usage"), &OS::get_static_memory_usage);
 	ClassDB::bind_method(D_METHOD("get_static_memory_peak_usage"), &OS::get_static_memory_peak_usage);
 	ClassDB::bind_method(D_METHOD("get_memory_info"), &OS::get_memory_info);
+	ClassDB::bind_method(D_METHOD("get_process_memory_usage"), &OS::get_process_memory_usage);
+	ClassDB::bind_method(D_METHOD("get_process_memory_info"), &OS::get_process_memory_info);
 
 	ClassDB::bind_method(D_METHOD("move_to_trash", "path"), &OS::move_to_trash);
 	ClassDB::bind_method(D_METHOD("get_user_data_dir"), &OS::get_user_data_dir);
