@@ -560,6 +560,8 @@ void AudioMixerServer::_process_channel(const StringName &p_name, Channel &p_cha
 				ended_from_queue = voice.from_queue;
 				ended_stream = voice.stream;
 				ended_path = voice.stream_path;
+			} else if (voice.fade.active) {
+				fade_finished = true; // The stream ended during its fade-out: the fade is over too.
 			}
 			p_channel.voices.remove_at(i);
 			continue;
