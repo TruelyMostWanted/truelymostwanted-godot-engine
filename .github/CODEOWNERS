@@ -529,3 +529,5 @@
 /truely/                                      @TruelyMostWanted
 /truely/**/*.py                               @TruelyMostWanted @godotengine/buildsystem
 /.agents/                                     @TruelyMostWanted
+/servers/tts/                                 @TruelyMostWanted
+/servers/tts/**/SCsub                         @TruelyMostWanted @godotengine/buildsystem
