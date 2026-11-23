@@ -699,6 +699,17 @@
 		<member name="debug/gdscript/warnings/unused_variable" type="int" setter="" getter="" default="1">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when a local variable is unused.
 		</member>
+		<member name="debug/performance_recording/enabled" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [PerformanceRecorder] starts recording when the project starts, with the profile from [member debug/performance_recording/profile]. It does not start in the editor or the project manager. Use feature tags to enable it only for some exports, for example [code]debug/performance_recording/enabled.web[/code].
+			This can be specified on the command line with [code]--record-performance &lt;file&gt;[/code], which also sets the output path.
+		</member>
+		<member name="debug/performance_recording/output_path" type="String" setter="" getter="" default="&quot;&quot;">
+			If not empty, overrides [member PerformanceRecordingProfile.output_path] of the profile used at startup. Supports the placeholders [code]{date}[/code], [code]{time}[/code] and [code]{platform}[/code]. A path under [code]user://[/code] is recommended; on Web it is the only writable location.
+		</member>
+		<member name="debug/performance_recording/profile" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to a [PerformanceRecordingProfile] resource used when recording starts at startup. If empty, a new [PerformanceRecordingProfile] with its default columns is used.
+			This can be specified on the command line with [code]--record-performance-profile &lt;file&gt;[/code].
+		</member>
 		<member name="debug/settings/crash_handler/message" type="String" setter="" getter="" default="&quot;Please include this when reporting the bug to the project developer.&quot;">
 			Message to be displayed before the backtrace when the engine crashes. By default, this message is only used in exported projects due to the editor-only override applied to this setting.
 		</member>

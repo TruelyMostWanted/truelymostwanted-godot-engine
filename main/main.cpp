@@ -65,6 +65,7 @@
 #include "main/app_icon.gen.h"
 #include "main/main_timer_sync.h"
 #include "main/performance.h"
+#include "main/performance_recorder.h"
 #include "main/splash.gen.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
@@ -172,6 +173,7 @@ static Input *input = nullptr;
 static InputMap *input_map = nullptr;
 static TranslationServer *translation_server = nullptr;
 static Performance *performance = nullptr;
+static PerformanceRecorder *performance_recorder = nullptr;
 static PackedData *packed_data = nullptr;
 #ifdef MINIZIP_ENABLED
 static ZipArchive *zip_packed_data = nullptr;
@@ -218,6 +220,8 @@ static String locale;
 static String log_file;
 static bool show_help = false;
 static uint64_t quit_after = 0;
+static String record_performance_path;
+static String record_performance_profile;
 #ifdef TOOLS_ENABLED
 static ProcessID editor_pid = 0;
 static bool found_project = false;
@@ -580,6 +584,8 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("", "--fixed-fps is forced when enabled, but it can be used to change movie FPS.\n");
 	print_help_option("", "--disable-vsync can speed up movie writing but makes interaction more difficult.\n");
 	print_help_option("", "--quit-after can be used to specify the number of frames to write.\n");
+	print_help_option("--record-performance <file>", "Record per-frame performance metrics to the specified CSV file (see PerformanceRecorder).\n");
+	print_help_option("--record-performance-profile <file>", "PerformanceRecordingProfile resource to use with --record-performance.\n");
 
 	print_help_title("Display options");
 	print_help_option("-f, --fullscreen", "Request fullscreen mode.\n");
@@ -1035,6 +1041,10 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	performance = memnew(Performance);
 	GDREGISTER_CLASS(Performance);
 	engine->add_singleton(Engine::Singleton("Performance", performance));
+	performance_recorder = memnew(PerformanceRecorder);
+	GDREGISTER_CLASS(PerformanceRecorder);
+	GDREGISTER_CLASS(PerformanceRecordingProfile);
+	engine->add_singleton(Engine::Singleton("PerformanceRecorder", performance_recorder));
 
 	// Only flush stdout in debug builds by default, as spamming `print()` will
 	// decrease performance if this is enabled.
@@ -1949,6 +1959,14 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				OS::get_singleton()->_writing_movie = true;
 			} else {
 				OS::get_singleton()->print("Missing write-movie argument, aborting.\n");
+				goto error;
+			}
+		} else if (arg == "--record-performance" || arg == "--record-performance-profile") {
+			if (N) {
+				(arg == "--record-performance" ? record_performance_path : record_performance_profile) = N->get();
+				N = N->next();
+			} else {
+				OS::get_singleton()->print(vformat("Missing %s argument, aborting.\n", arg));
 				goto error;
 			}
 		} else if (arg == "--disable-vsync") {
@@ -3073,6 +3091,8 @@ error:
 
 	EngineDebugger::deinitialize();
 
+	memdelete(performance_recorder);
+	performance_recorder = nullptr;
 	memdelete(performance);
 	performance = nullptr;
 	memdelete(input_map);
@@ -4920,6 +4940,8 @@ int Main::start() {
 		movie_writer->begin(movie_size, fixed_fps, Engine::get_singleton()->get_write_movie_path());
 	}
 
+	performance_recorder->start_from_settings(record_performance_path, record_performance_profile, !editor && !project_manager);
+
 	GDExtensionManager::get_singleton()->startup();
 
 #ifdef MACOS_ENABLED
@@ -5184,6 +5206,8 @@ bool Main::iteration() {
 		EngineDebugger::get_singleton()->iteration(frame_time, process_ticks, physics_process_ticks, physics_step);
 	}
 
+	performance_recorder->frame(frame_time, process_ticks, physics_process_ticks, advance.physics_steps);
+
 	frames++;
 	Engine::get_singleton()->_process_frames++;
 
@@ -5304,6 +5328,8 @@ void Main::cleanup(bool p_force) {
 		movie_writer->end();
 		movie_writer = nullptr;
 	}
+
+	performance_recorder->finish();
 
 	if (SettingsServerManager::get_singleton()) {
 		SettingsServerManager::get_singleton()->finish();
@@ -5431,6 +5457,8 @@ void Main::cleanup(bool p_force) {
 
 	memdelete(packed_data);
 	packed_data = nullptr;
+	memdelete(performance_recorder);
+	performance_recorder = nullptr;
 	memdelete(performance);
 	performance = nullptr;
 	memdelete(input_map);
