@@ -355,4 +355,102 @@ TEST_CASE("[SceneTree][TextureAtlas] Properties round-trip for .tres") {
 	CHECK(Dictionary(copy->get("margins")).size() == 1);
 }
 
+// 50 sprites of mixed sizes in 5 rows of 10, one transparent pixel or more between them.
+static Ref<Image> make_mixed_sheet(LocalVector<Rect2i> &r_expected) {
+	Ref<Image> image = Image::create_empty(240, 120, false, Image::FORMAT_RGBA8);
+	for (int i = 0; i < 50; i++) {
+		const Rect2i rect((i % 10) * 24 + 1, (i / 10) * 24 + 1, 4 + (i % 5) * 4, 6 + (i % 3) * 7);
+		image->fill_rect(rect, Color(1, 0, 0, 1));
+		r_expected.push_back(rect);
+	}
+	return image;
+}
+
+TEST_CASE("[SceneTree][TextureAtlas] Auto slice finds sprites of mixed sizes") {
+	LocalVector<Rect2i> expected;
+	Ref<Image> image = make_mixed_sheet(expected);
+	const TypedArray<Rect2i> found = TextureAtlas::detect_sprite_rects(image);
+	REQUIRE(found.size() == 50);
+	for (int i = 0; i < 50; i++) {
+		CHECK(Rect2i(found[i]) == expected[i]);
+	}
+
+	Ref<TextureAtlas> atlas;
+	atlas.instantiate();
+	atlas->set_texture(ImageTexture::create_from_image(image));
+	const PackedStringArray names = atlas->auto_slice("enemy_");
+	REQUIRE(names.size() == 50);
+	CHECK(names[0] == "enemy_0");
+	CHECK(names[49] == "enemy_49");
+	CHECK(atlas->get_region("enemy_12") == expected[12]);
+
+	// Running it again finds only sprites that are not regions yet.
+	CHECK(atlas->auto_slice("enemy_").is_empty());
+	atlas->remove_region("enemy_3");
+	const PackedStringArray again = atlas->auto_slice("enemy_");
+	REQUIRE(again.size() == 1);
+	CHECK(again[0] == "enemy_3");
+	CHECK(atlas->get_region("enemy_3") == expected[3]);
+	CHECK(atlas->get_region_count() == 50);
+}
+
+TEST_CASE("[SceneTree][TextureAtlas] Auto slice joins touching pixels and keeps separate sprites apart") {
+	Ref<Image> image = Image::create_empty(32, 16, false, Image::FORMAT_RGBA8);
+	// Diagonal neighbors belong to one sprite.
+	image->set_pixel(1, 1, Color(1, 1, 1, 1));
+	image->set_pixel(2, 2, Color(1, 1, 1, 1));
+	// Two boxes that touch after flood fill are merged (an L shape with a separate dot inside its box).
+	image->fill_rect(Rect2i(6, 1, 6, 2), Color(1, 1, 1, 1));
+	image->fill_rect(Rect2i(6, 1, 2, 6), Color(1, 1, 1, 1));
+	image->set_pixel(10, 5, Color(1, 1, 1, 1));
+	// One transparent column between two sprites keeps them apart.
+	image->fill_rect(Rect2i(16, 1, 3, 3), Color(1, 1, 1, 1));
+	image->fill_rect(Rect2i(20, 1, 3, 3), Color(1, 1, 1, 1));
+	// Pixels at or below the alpha threshold are ignored.
+	image->fill_rect(Rect2i(26, 10, 4, 4), Color(1, 1, 1, 0.05));
+
+	const TypedArray<Rect2i> found = TextureAtlas::detect_sprite_rects(image);
+	REQUIRE(found.size() == 4);
+	CHECK(Rect2i(found[0]) == Rect2i(1, 1, 2, 2));
+	CHECK(Rect2i(found[1]) == Rect2i(6, 1, 6, 6));
+	CHECK(Rect2i(found[2]) == Rect2i(16, 1, 3, 3));
+	CHECK(Rect2i(found[3]) == Rect2i(20, 1, 3, 3));
+
+	// A lower threshold also finds the faint sprite.
+	CHECK(TextureAtlas::detect_sprite_rects(image, 0.01).size() == 5);
+	// An empty sheet has no sprites.
+	CHECK(TextureAtlas::detect_sprite_rects(Image::create_empty(8, 8, false, Image::FORMAT_RGBA8)).is_empty());
+}
+
+TEST_CASE("[SceneTree][TextureAtlas] Grid rectangles, unique names and add_regions") {
+	const TypedArray<Rect2i> cells = TextureAtlas::make_grid_rects(Vector2i(100, 50), Vector2i(16, 16), Vector2i(2, 4), Vector2i(1, 1));
+	// Columns at x = 1, 19, 37, 55, 73 (91 + 16 > 100); rows at y = 1, 21 (41 + 16 > 50).
+	REQUIRE(cells.size() == 10);
+	CHECK(Rect2i(cells[0]) == Rect2i(1, 1, 16, 16));
+	CHECK(Rect2i(cells[4]) == Rect2i(73, 1, 16, 16));
+	CHECK(Rect2i(cells[5]) == Rect2i(1, 21, 16, 16));
+	ERR_PRINT_OFF;
+	CHECK(TextureAtlas::make_grid_rects(Vector2i(100, 50), Vector2i(0, 16)).is_empty());
+	ERR_PRINT_ON;
+
+	Ref<TextureAtlas> atlas = make_atlas(make_sheet());
+	CHECK(atlas->make_unique_region_name("tile_") == "tile_0");
+	atlas->set_region("tile_0", Rect2i(0, 0, 8, 8));
+	atlas->set_region("tile_2", Rect2i(0, 0, 8, 8));
+	CHECK(atlas->make_unique_region_name("tile_") == "tile_1");
+
+	const PackedStringArray names = atlas->add_regions(TypedArray<Rect2i>({ Rect2i(0, 8, 8, 8), Rect2i(8, 8, 8, 8), Rect2i(16, 8, 8, 8) }), "tile_");
+	CHECK(names == PackedStringArray({ "tile_1", "tile_3", "tile_4" }));
+	CHECK(atlas->get_region("tile_3") == Rect2i(8, 8, 8, 8));
+	CHECK(atlas->get_region_names()[atlas->get_region_count() - 1] == "tile_4");
+
+	// All or nothing: one rectangle outside the texture adds nothing.
+	const int count = atlas->get_region_count();
+	ERR_PRINT_OFF;
+	CHECK(atlas->add_regions(TypedArray<Rect2i>({ Rect2i(0, 0, 8, 8), Rect2i(120, 0, 16, 16) }), "tile_").is_empty());
+	CHECK(atlas->make_unique_region_name("bad/") == String());
+	ERR_PRINT_ON;
+	CHECK(atlas->get_region_count() == count);
+}
+
 } // namespace TestTextureAtlas

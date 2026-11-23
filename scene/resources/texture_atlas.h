@@ -33,9 +33,11 @@
 #include "core/io/resource.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
+#include "core/variant/typed_array.h"
 #include "core/variant/typed_dictionary.h"
 #include "scene/resources/atlas_texture.h"
 
+class Image;
 class SpriteFrames;
 
 // One sprite sheet (any Texture2D) with named regions of any size. Every region is available as an
@@ -81,6 +83,11 @@ public:
 	// Splits "walk_10" into "walk" and 10. Returns -1 (and the whole name) if the name does not end with a number.
 	static int split_trailing_number(const String &p_name, String &r_base);
 
+	// Auto slice: boxes around groups of touching opaque pixels, sorted in rows (top to bottom, left to right).
+	static TypedArray<Rect2i> detect_sprite_rects(const Ref<Image> &p_image, float p_alpha_threshold = 0.1f);
+	// Grid slice: all cells fully inside the area, row by row.
+	static TypedArray<Rect2i> make_grid_rects(const Vector2i &p_area_size, const Vector2i &p_cell_size, const Vector2i &p_separation = Vector2i(), const Vector2i &p_offset = Vector2i());
+
 	void set_texture(const Ref<Texture2D> &p_texture);
 	Ref<Texture2D> get_sheet_texture() const;
 
@@ -108,6 +115,10 @@ public:
 	PackedStringArray get_region_names() const;
 	int get_region_count() const;
 	void clear_regions();
+
+	String make_unique_region_name(const String &p_prefix) const;
+	PackedStringArray add_regions(const TypedArray<Rect2i> &p_rects, const String &p_prefix = "sprite_");
+	PackedStringArray auto_slice(const String &p_prefix = "sprite_", float p_alpha_threshold = 0.1f);
 
 	Error set_region_margin(const StringName &p_name, const Rect2i &p_margin);
 	Rect2i get_region_margin(const StringName &p_name) const;
