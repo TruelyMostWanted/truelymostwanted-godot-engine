@@ -156,7 +156,13 @@ Neuen Feature-Ordner anlegen:
 - `build_assemblies.py --push-nupkgs-local` leert den NuGet-Cache für diese Pakete selbst (`ClearNuGetLocalCache=true`).
   Ein neuer Engine-Build mit derselben Version wird also übernommen.
 
-### 4.4 Tests
+### 4.4 Testcode vorab, Merge nach `main` erst mit fertigem Engine-Build
+
+- Für jedes Feature wird der Testcode **vorab** im Testprojekt geschrieben, auf dem Feature-Branch mit demselben Namen wie in der Engine, auch wenn die Engine dafür noch nicht gebaut ist. Die Checks rufen die API so auf, wie sie im Issue festgelegt ist (GDScript und C#). So laufen Engine-Arbeit und Testcode parallel.
+- Der Testprojekt-Branch wird gepusht, sobald der Testcode steht. Er enthält nur den Feature-Ordner `res://<feature-branch>/`.
+- **Nach `main` des Testprojekts** kommt der Testcode erst, wenn das Feature in `truely-godot-engine` gemergt und die Engine damit gebaut ist (Glue und NuGet-Pakete). Sonst baut das C#-Projekt auf `main` nicht. Danach werden die Checks auf `main` ausgeführt; das Ergebnis kommt als Kommentar ins Issue.
+
+### 4.5 Tests
 
 - **Jedes Feature wird in GDScript und in C# getestet.** Beide Checks prüfen dasselbe.
 - GDScript: `scripts/gd/check.gd` erbt von `FeatureCheck`, überschreibt `_run_checks()` und ruft `expect()` auf.
