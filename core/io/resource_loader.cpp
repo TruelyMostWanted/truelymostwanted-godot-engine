@@ -59,29 +59,62 @@ ResourceLoaderFormatSnapshot ResourceLoader::loaders;
 Mutex ResourceLoader::loaders_mutex;
 
 ResourceLoaderFormatSnapshot ResourceLoader::_get_loaders() {
+	const uint32_t class_db_version = ClassDB::get_resource_base_extensions_version();
 	MutexLock lock(loaders_mutex);
+	if (unlikely(loaders.class_db_version != class_db_version)) {
+		// ClassDB registered new resource extensions (the binary loader's list): read the C++ lists again.
+		// C++ loaders neither print nor lock here; script lists are only read by refresh_format_index(), outside the lock.
+		loaders.class_db_version = class_db_version;
+		for (int i = 0; i < loaders.formats.size(); i++) {
+			if (!loaders.entries[i].scripted) {
+				loaders.entries.write[i] = ResourceLoaderFormatSnapshot::read_entry(loaders.formats[i]);
+			}
+		}
+		loaders.index_entries();
+	}
 	return loaders;
 }
 
+ResourceLoaderFormatSnapshot::Entry ResourceLoaderFormatSnapshot::read_entry(const Ref<ResourceFormatLoader> &p_format_loader) {
+	Entry entry;
+	entry.scripted = p_format_loader->has_scripted_extensions();
+	entry.by_extension = p_format_loader->recognizes_path_by_extension();
+	if (!entry.by_extension) {
+		return entry;
+	}
+
+	List<String> extensions;
+	p_format_loader->get_recognized_extensions(&extensions);
+	for (const String &E : extensions) {
+		// recognize_path() matches the suffix ".<extension>", so the path's last extension equals the last component.
+		const int dot = E.rfind_char('.');
+		const String key = (dot < 0 ? E : E.substr(dot + 1)).to_lower();
+		if (!entry.keys.has(key)) {
+			entry.keys.push_back(key);
+		}
+	}
+	return entry;
+}
+
 void ResourceLoaderFormatSnapshot::build_index() {
+	entries.resize(formats.size());
+	for (int i = 0; i < formats.size(); i++) {
+		entries.write[i] = read_entry(formats[i]);
+	}
+	index_entries();
+}
+
+void ResourceLoaderFormatSnapshot::index_entries() {
 	HashMap<String, LocalVector<uint32_t>> by_extension;
 	LocalVector<uint32_t> asked;
-	for (uint32_t i = 0; i < uint32_t(formats.size()); i++) {
-		const Ref<ResourceFormatLoader> &format_loader = formats[i];
-		if (!format_loader->recognizes_path_by_extension()) {
+	for (uint32_t i = 0; i < uint32_t(entries.size()); i++) {
+		const Entry &entry = entries[i];
+		if (!entry.by_extension) {
 			asked.push_back(i);
 			continue;
 		}
-
-		List<String> extensions;
-		format_loader->get_recognized_extensions(&extensions);
-		for (const String &E : extensions) {
-			// recognize_path() matches the suffix ".<extension>", so the path's last extension equals the last component.
-			const int dot = E.rfind_char('.');
-			LocalVector<uint32_t> &positions = by_extension[(dot < 0 ? E : E.substr(dot + 1)).to_lower()];
-			if (positions.is_empty() || positions[positions.size() - 1] != i) {
-				positions.push_back(i);
-			}
+		for (const String &key : entry.keys) {
+			by_extension[key].push_back(i); // Keys are unique per entry, so positions stay unique and ascending.
 		}
 	}
 
@@ -161,8 +194,14 @@ ResourceLoaderFormatSnapshot::Candidates::Iterator ResourceLoaderFormatSnapshot:
 }
 
 bool ResourceFormatLoader::recognizes_path_by_extension() const {
-	// Scripts, C# and GDExtension may compute their answer per call.
-	return !GDVIRTUAL_IS_OVERRIDDEN(_recognize_path) && !GDVIRTUAL_IS_OVERRIDDEN(_get_recognized_extensions);
+	// A script, C# or GDExtension `_recognize_path` may accept any path. A `_get_recognized_extensions` list is indexed;
+	// loaders that change it call ResourceLoader::refresh_format_index().
+	return !GDVIRTUAL_IS_OVERRIDDEN(_recognize_path);
+}
+
+bool ResourceFormatLoader::has_scripted_extensions() const {
+	// Any loader with a script or a GDExtension class may answer from script code: its list is never read under a lock.
+	return get_script_instance() != nullptr || _get_extension() != nullptr;
 }
 
 bool ResourceFormatLoader::recognize_path(const String &p_path, const String &p_for_type) const {
@@ -1378,23 +1417,54 @@ bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
 void ResourceLoader::add_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader, bool p_at_front) {
 	ERR_FAIL_COND(p_format_loader.is_null());
 
+	// Read outside the lock: a script, C# or GDExtension loader runs its own code here.
+	const ResourceLoaderFormatSnapshot::Entry entry = ResourceLoaderFormatSnapshot::read_entry(p_format_loader);
+
 	MutexLock lock(loaders_mutex);
 	if (p_at_front) {
 		loaders.formats.insert(0, p_format_loader);
+		loaders.entries.insert(0, entry);
 	} else {
 		loaders.formats.push_back(p_format_loader);
+		loaders.entries.push_back(entry);
 	}
-	loaders.build_index();
+	loaders.index_entries();
 }
 
 void ResourceLoader::remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader) {
 	ERR_FAIL_COND(p_format_loader.is_null());
 
+	int64_t index = -1;
+	{
+		MutexLock lock(loaders_mutex);
+		index = loaders.formats.find(p_format_loader);
+		if (index >= 0) {
+			loaders.formats.remove_at(index);
+			loaders.entries.remove_at(index);
+			loaders.index_entries();
+		}
+	}
+	ERR_FAIL_COND(index < 0); // Not found; reported after releasing the lock.
+}
+
+void ResourceLoader::refresh_format_index() {
+	// Read every list outside the lock (script code may run), then store the entries of the loaders still registered.
+	const ResourceLoaderFormatSnapshot current = _get_loaders();
+	Vector<ResourceLoaderFormatSnapshot::Entry> fresh;
+	fresh.resize(current.formats.size());
+	for (int i = 0; i < current.formats.size(); i++) {
+		fresh.write[i] = ResourceLoaderFormatSnapshot::read_entry(current.formats[i]);
+	}
+
 	MutexLock lock(loaders_mutex);
-	int64_t index = loaders.formats.find(p_format_loader);
-	ERR_FAIL_COND(index < 0); // Not found
-	loaders.formats.remove_at(index);
-	loaders.build_index();
+	for (int i = 0; i < loaders.formats.size(); i++) {
+		// Loaders added meanwhile keep the entry read when they were added.
+		const int64_t read = current.formats.find(loaders.formats[i]);
+		if (read >= 0) {
+			loaders.entries.write[i] = fresh[read];
+		}
+	}
+	loaders.index_entries();
 }
 
 String ResourceLoader::get_import_group_file(const String &p_path) {
@@ -1486,7 +1556,9 @@ void ResourceLoader::get_classes_used(const String &p_path, HashSet<StringName> 
 String ResourceLoader::get_resource_type(const String &p_path) {
 	String local_path = _validate_local_path(p_path);
 
-	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+	// Only loaders that may recognize the path report its type (see ResourceLoaderFormatSnapshot::candidates_for()).
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
 		String result = format_loader->get_resource_type(local_path);
 		if (!result.is_empty()) {
 			return result;
@@ -1499,7 +1571,8 @@ String ResourceLoader::get_resource_type(const String &p_path) {
 String ResourceLoader::get_resource_script_class(const String &p_path) {
 	String local_path = _validate_local_path(p_path);
 
-	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
 		String result = format_loader->get_resource_script_class(local_path);
 		if (!result.is_empty()) {
 			return result;
