@@ -46,27 +46,25 @@ git switch -c 03-feature-path-prefix-server
 - **Beliebig oft** in den Feature-Branch committen.
 - Der pre-commit-Hook (clang-format, codespell, doc-status, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen.
 
-### 2.3 Pushen
+### 2.3 Lokal prüfen und pushen
 
-- **Nur bei einem WIP-Stand oder wenn das Feature fertig ist.** Nicht nach jedem Commit.
-- Jeder Push startet die volle CI mit allen Plattformen. Reine Änderungen an Vorlagen oder Doku dürfen `[skip ci]` in der Commit-Message tragen.
+- Vor dem Merge muss lokal alles grün sein: Windows/Mono-Build ohne Fehler und Warnungen, Unit-Tests, Checks in GDScript und C# im Testprojekt.
+- Pushen auf den Feature-Branch ist jederzeit erlaubt (Sicherung). **Ein Push auf einen Feature-Branch startet keine CI** (`.github/workflows/runner.yml`).
 
-```powershell
-git push -u origin 03-feature-path-prefix-server
-```
+### 2.4 CI in Stapeln
 
-### 2.4 CI abwarten
-
-```powershell
-gh run watch                      # den laufenden Lauf verfolgen
-gh run list --branch 03-feature-path-prefix-server -L 3
-```
-
-Erst weitermachen, wenn der Lauf **grün** ist. Ist er rot, den Fehler im Feature-Branch beheben, committen, pushen und wieder abwarten.
+- Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
+- Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
+- Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
+- **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
+- Damit das selten nötig ist, prüft der Orchestrator **vor** dem Merge eines Features auf dessen Branch auch das, was die CI prüft und lokal geht: `--doctool --headless` ohne Diff, pre-commit-Hooks, Unit-Tests.
+- Ein eigenes Bug-Issue mit eigenem Branch nur für Fehler, die zu keinem Feature gehören (z. B. CI, Werkzeuge). `truely-godot-engine` wird nie zurückgesetzt.
 
 ### 2.5 Mergen
 
-Bei grüner CI: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature.
+Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft danach auf `truely-godot-engine` (2.4).
+
+**Richtung:** Feature-Branches enthalten nur ihre eigenen Änderungen, wie ein PR. Sie gehen nach `truely-godot-engine`, nie umgekehrt: `truely-godot-engine` wird nicht in einen Feature-Branch gemergt.
 
 ```powershell
 gh pr create --base truely-godot-engine --head 03-feature-path-prefix-server --fill
@@ -154,7 +152,13 @@ Neuen Feature-Ordner anlegen:
 - `build_assemblies.py --push-nupkgs-local` leert den NuGet-Cache für diese Pakete selbst (`ClearNuGetLocalCache=true`).
   Ein neuer Engine-Build mit derselben Version wird also übernommen.
 
-### 4.4 Tests
+### 4.4 Testcode vorab, Merge nach `main` erst mit fertigem Engine-Build
+
+- Für jedes Feature wird der Testcode **vorab** im Testprojekt geschrieben, auf dem Feature-Branch mit demselben Namen wie in der Engine, auch wenn die Engine dafür noch nicht gebaut ist. Die Checks rufen die API so auf, wie sie im Issue festgelegt ist (GDScript und C#). So laufen Engine-Arbeit und Testcode parallel.
+- Der Testprojekt-Branch wird gepusht, sobald der Testcode steht. Er enthält nur den Feature-Ordner `res://<feature-branch>/`.
+- **Nach `main` des Testprojekts** kommt der Testcode erst, wenn das Feature in `truely-godot-engine` gemergt und die Engine damit gebaut ist (Glue und NuGet-Pakete). Sonst baut das C#-Projekt auf `main` nicht. Danach werden die Checks auf `main` ausgeführt; das Ergebnis kommt als Kommentar ins Issue.
+
+### 4.5 Tests
 
 - **Jedes Feature wird in GDScript und in C# getestet.** Beide Checks prüfen dasselbe.
 - GDScript: `scripts/gd/check.gd` erbt von `FeatureCheck`, überschreibt `_run_checks()` und ruft `expect()` auf.
@@ -207,6 +211,8 @@ Vorbild: [Custom resource format loaders](https://docs.godotengine.org/en/4.4/co
 | Schritte | eine Überschrift pro Schritt der Benutzung (z. B. „Registering a prefix“, „Loading a resource“), jeweils mit GDScript, C# und C++ (GDExtension) |
 | Limitations | was nicht geht, Plattform-Unterschiede (aus „Feasibility to check“) |
 
+- **Wiki-Seiten sind immer Pflicht**, für jedes umgesetzte Issue, auch für Refactorings ohne neue API (Guide-Seite und Klassenreferenz jeder betroffenen Klasse). Entscheidungen aus Concept-Issues stehen auf der Seite `Design-Decisions`.
+- **Inhaltsverzeichnis:** Jede Seite hat unter dem Titelblock ein nummeriertes Inhaltsverzeichnis (1, 1.1, 1.2, …) mit Sprungmarken zu den Überschriften. Es wird erzeugt, nicht von Hand geschrieben: `python truely/wiki-toc.py <wiki-ordner>` vor jedem Push des Wikis (ersetzt ein vorhandenes Verzeichnis zwischen `<!-- toc -->` und `<!-- /toc -->`).
 - Die Seite `Home` listet alle Features mit Status, `_Sidebar` verlinkt Guides und Klassenreferenzen.
 - Das Wiki ist ein eigenes Git-Repository: `https://github.com/TruelyMostWanted/truelymostwanted-godot-engine.wiki.git`.
 
@@ -222,7 +228,7 @@ Jedes Feature- und Refactoring-Issue endet mit diesen fünf Punkten:
 - [ ] Test build on the current platform done (no errors or warnings)
 - [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
 
-Danach: Push → CI grün → Squash-Merge → Feature-Branch bleibt bestehen.
+Danach: lokal grün → Squash-Merge → CI auf `truely-godot-engine` (im Stapel) → Feature-Branch bleibt bestehen.
 
 ---
 

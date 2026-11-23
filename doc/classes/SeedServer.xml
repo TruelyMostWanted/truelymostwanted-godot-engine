@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SeedServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Holds one global seed and derives named random streams and noise generators from it.
+	</brief_description>
+	<description>
+		[SeedServer] holds one [member global_seed]. Named random streams ([RandomNumberGenerator]) and noise generators (such as [FastNoiseLite]) derive their own seeds from it, so that each system of a game draws from its own stream and does not change the numbers of another system. The same global seed gives the same numbers on every platform, in GDScript, C# and GDExtension. This is useful for procedural worlds, replays, daily challenges and tests.
+		The seed of a stream is derived from [member global_seed] and the stream's name with fixed hashes (FNV-1a 64 over the UTF-8 bytes of the name, mixed with SplitMix64). Unlike [method String.hash], these values do not change between engine versions.
+		[codeblocks]
+		[gdscript]
+		SeedServer.set_seed_from_text("Daily-2026-11-23")
+		var loot = SeedServer.get_rng("loot")
+		var weather = SeedServer.get_rng("weather")
+		print(loot.randi_range(1, 6)) # Always the same number for this text.
+
+		# Save the state with the save game ...
+		var state = SeedServer.get_state()
+		# ... and restore it later: the streams continue exactly where they were.
+		SeedServer.set_state(state)
+		[/gdscript]
+		[csharp]
+		SeedServer.SetSeedFromText("Daily-2026-11-23");
+		RandomNumberGenerator loot = SeedServer.GetRng("loot");
+		RandomNumberGenerator weather = SeedServer.GetRng("weather");
+		GD.Print(loot.RandiRange(1, 6)); // Always the same number for this text.
+
+		// Save the state with the save game ...
+		Godot.Collections.Dictionary state = SeedServer.GetState();
+		// ... and restore it later: the streams continue exactly where they were.
+		SeedServer.SetState(state);
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The methods of [SeedServer] are thread-safe. A single [RandomNumberGenerator] is not: use each stream from one thread only, or give each thread its own stream (for example [code]"worker_%d" % index[/code]).
+		[b]Note:[/b] The numbers of a stream depend on the algorithm of [RandomNumberGenerator] (PCG32). If a future engine version changes that algorithm, the derived seeds stay the same, but the drawn numbers may differ.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes all random streams and noise generators. [member global_seed] is kept.
+			</description>
+		</method>
+		<method name="get_derived_seed" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the seed that a stream called [param name] gets from the current [member global_seed]. A noise generator gets the upper 32 bits of this value ([code]get_derived_seed(name) &gt;&gt; 32[/code]).
+			</description>
+		</method>
+		<method name="get_noise">
+			<return type="Resource" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the noise generator called [param name]. On first use a new [FastNoiseLite] is created and gets the seed derived from [member global_seed] and [param name]. Returns [code]null[/code] if the engine was built without the noise module.
+				[b]Note:[/b] Only the seed is managed. Other settings of the noise (type, frequency, fractal) are set by the caller.
+			</description>
+		</method>
+		<method name="get_noise_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all noise generators, sorted.
+			</description>
+		</method>
+		<method name="get_rng">
+			<return type="RandomNumberGenerator" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the random stream called [param name]. On first use it is created with the seed derived from [member global_seed] and [param name]; later calls return the same object.
+			</description>
+		</method>
+		<method name="get_rng_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all random streams, sorted.
+			</description>
+		</method>
+		<method name="get_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the global seed and the state of every random stream as a [Dictionary] with the keys [code]"global_seed"[/code] ([int]) and [code]"streams"[/code] (a [Dictionary] of stream name to [member RandomNumberGenerator.state]). Store it in a save game and pass it to [method set_state] to continue a run.
+			</description>
+		</method>
+		<method name="has_noise" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if a noise generator called [param name] exists.
+			</description>
+		</method>
+		<method name="has_rng" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if a random stream called [param name] exists.
+			</description>
+		</method>
+		<method name="randomize_seed">
+			<return type="int" />
+			<description>
+				Sets [member global_seed] to a random value based on the time and returns it. Use it for a new, unpredictable run; store the returned value to reproduce it.
+			</description>
+		</method>
+		<method name="register_noise">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="noise" type="Resource" />
+			<description>
+				Registers [param noise] under [param name] and sets its seed from [member global_seed] and [param name]. [param noise] can be any [Resource] with an integer property [code]seed[/code], for example [FastNoiseLite] or a noise class from a GDExtension. Replaces a noise generator with the same name.
+			</description>
+		</method>
+		<method name="remove_noise">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Removes the noise generator called [param name].
+			</description>
+		</method>
+		<method name="remove_rng">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Removes the random stream called [param name]. A later [method get_rng] with this name creates a new stream that starts from the beginning.
+			</description>
+		</method>
+		<method name="set_seed_from_text">
+			<return type="int" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Sets [member global_seed] to [method text_to_seed] of [param text] and returns it. For example, [code]"Daily-2026-11-23"[/code] gives every player the same daily challenge.
+			</description>
+		</method>
+		<method name="set_state">
+			<return type="void" />
+			<param index="0" name="state" type="Dictionary" />
+			<description>
+				Restores a state from [method get_state]: sets [member global_seed], reseeds all streams and noise generators, then restores the state of every stream in [param state]. Streams that do not exist yet are created. Emits [signal seed_changed].
+			</description>
+		</method>
+		<method name="text_to_seed" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns the seed for [param text] without setting it. The value is the same on every platform and in every engine version.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="global_seed" type="int" setter="set_global_seed" getter="get_global_seed">
+			The seed all streams and noise generators derive from. Setting it reseeds every stream and noise generator, so they start from the beginning, and emits [signal seed_changed]. It starts at [code]0[/code]; call [method randomize_seed] for a random run.
+		</member>
+		<member name="seed_global_functions" type="bool" setter="set_seed_global_functions" getter="is_seed_global_functions">
+			If [code]true[/code], the global random functions ([method @GlobalScope.randi], [method @GlobalScope.randf] and others) are seeded with [member global_seed] whenever it changes.
+		</member>
+	</members>
+	<signals>
+		<signal name="seed_changed">
+			<param index="0" name="global_seed" type="int" />
+			<description>
+				Emitted when [member global_seed] is set, also by [method set_seed_from_text], [method randomize_seed] and [method set_state]. Always emitted on the main thread.
+			</description>
+		</signal>
+	</signals>
+</class>

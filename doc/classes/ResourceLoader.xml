@@ -33,6 +33,76 @@
 				[b]Note:[/b] If you use [method Resource.take_over_path], this method will return [code]true[/code] for the taken path even if the resource wasn't saved (i.e. exists only in resource cache).
 			</description>
 		</method>
+		<method name="get_cached_paths">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the paths of all resources that are currently in the resource cache, in no particular order. A resource stays in the cache as long as at least one reference to it exists. Each returned path can be passed to [method get_cached_ref] or [method has_cached].
+				The result includes the paths of built-in sub-resources that were cached together with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code]. Resources without a path are never cached and are not included. To get only some of the paths, prefer [method get_cached_paths_for_type], [method get_cached_paths_with_extension] and [method get_cached_paths_in_directory], which filter in C++ and copy only the matching paths. Other filters can be applied in your script:
+				[codeblocks]
+				[gdscript]
+				var textures = ResourceLoader.get_cached_paths().filter(func(path): return path.ends_with(".png"))
+				[/gdscript]
+				[csharp]
+				var textures = ResourceLoader.GetCachedPaths().Where(path =&gt; path.EndsWith(".png"));
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] The result is a snapshot. It is safe to call this method while other threads load resources, but those threads may add or remove paths right after it returns.
+			</description>
+		</method>
+		<method name="get_cached_paths_for_type">
+			<return type="PackedStringArray" />
+			<param index="0" name="type" type="StringName" />
+			<param index="1" name="exact" type="bool" default="false" />
+			<description>
+				Returns the paths of the cached resources whose class is [param type] or inherits from it, in no particular order. [param type] can be a native class (including GDExtension classes) or a global script class ([code]class_name[/code] in GDScript, [code][GlobalClass][/code] in C#); a resource matches a script class if its script or one of its base scripts has that name.
+				If [param exact] is [code]true[/code], only resources whose most derived named class is [param type] match: the first global class name found on the resource's script and its base scripts, otherwise its native class. A resource with a [code]class_name[/code] script therefore does not match its native base class exactly.
+				An unknown class name returns an empty array. Like [method get_cached_paths], the result includes built-in sub-resources and is a snapshot that is safe to take while other threads load resources.
+				[codeblocks]
+				[gdscript]
+				var textures = ResourceLoader.get_cached_paths_for_type(&amp;"Texture2D")
+				var only_curves = ResourceLoader.get_cached_paths_for_type(&amp;"Curve", true)
+				[/gdscript]
+				[csharp]
+				string[] textures = ResourceLoader.GetCachedPathsForType("Texture2D");
+				string[] onlyCurves = ResourceLoader.GetCachedPathsForType("Curve", true);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_cached_paths_in_directory">
+			<return type="PackedStringArray" />
+			<param index="0" name="directory" type="String" />
+			<param index="1" name="recursive" type="bool" default="true" />
+			<description>
+				Returns the paths of the cached resources inside [param directory], in no particular order. A missing trailing slash is added, so [code]"res://levels"[/code] matches [code]res://levels/a.tres[/code] but not [code]res://levels2/a.tres[/code]. The comparison is a case-sensitive string prefix and works with any path prefix, such as [code]res://[/code] or [code]user://[/code].
+				If [param recursive] is [code]false[/code], only resources directly in [param directory] are returned, not those in its subdirectories. Built-in sub-resources (such as [code]res://levels/a.tscn::Gradient_x1y2z[/code]) belong to the directory of their file.
+				[codeblocks]
+				[gdscript]
+				var level = ResourceLoader.get_cached_paths_in_directory("res://levels/")
+				var top_level_only = ResourceLoader.get_cached_paths_in_directory("res://levels/", false)
+				[/gdscript]
+				[csharp]
+				string[] level = ResourceLoader.GetCachedPathsInDirectory("res://levels/");
+				string[] topLevelOnly = ResourceLoader.GetCachedPathsInDirectory("res://levels/", false);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_cached_paths_with_extension">
+			<return type="PackedStringArray" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Returns the paths of the cached resources whose file has the extension [param extension], in no particular order. The extension is compared case-insensitively and may be given with or without a leading dot ([code]"tscn"[/code] or [code]".tscn"[/code]). Built-in sub-resources count as the extension of their file. An empty [param extension] returns the paths without an extension.
+				[codeblocks]
+				[gdscript]
+				var scenes = ResourceLoader.get_cached_paths_with_extension("tscn")
+				[/gdscript]
+				[csharp]
+				string[] scenes = ResourceLoader.GetCachedPathsWithExtension("tscn");
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="get_cached_ref">
 			<return type="Resource" />
 			<param index="0" name="path" type="String" />
@@ -57,6 +127,14 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="get_manifest_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<description>
+				Returns all paths described by [param manifest]: the files in its [member FilesManifest.folder_paths] that match [member FilesManifest.extensions] and [member FilesManifest.type_hint], then its [member FilesManifest.file_paths], without duplicates. The paths are in their canonical form (see [method PathPrefixServer.resolve]); use them as keys for [method load_threaded_get_status] and [method load_threaded_get].
+				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_non_existing_folders] is [code]true[/code] and the folder is writable.
+			</description>
+		</method>
 		<method name="get_recognized_extensions_for_type">
 			<return type="PackedStringArray" />
 			<param index="0" name="type" type="String" />
@@ -69,6 +147,7 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Returns the resource type associated with a given resource path.
+				Only the loaders that may recognize the path are asked: those whose [method ResourceFormatLoader._get_recognized_extensions] contain the path's extension, and those that recognize paths in another way (for example by implementing [method ResourceFormatLoader._recognize_path], or by an [code].import[/code] file).
 			</description>
 		</method>
 		<method name="get_resource_uid">
@@ -84,6 +163,13 @@
 			<description>
 				Returns whether a cached resource is available for the given [param path].
 				Once a resource has been loaded by the engine, it is cached in memory for faster access, and future calls to the [method load] method will use the cached version. The cached resource can be overridden by using [method Resource.take_over_path] on a new resource for that same path.
+			</description>
+		</method>
+		<method name="is_extension_registered">
+			<return type="bool" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Returns [code]true[/code] if a load [Callable] is registered for [param extension] with [method register_extension]. The extension is compared without the leading dot and case-insensitively.
 			</description>
 		</method>
 		<method name="list_directory">
@@ -115,6 +201,30 @@
 				[b]Note:[/b] Relative paths will be prefixed with [code]"res://"[/code] before loading, to avoid unexpected results make sure your paths are absolute.
 			</description>
 		</method>
+		<method name="load_manifest">
+			<return type="Dictionary" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<param index="1" name="cache_mode" type="int" enum="ResourceLoader.CacheMode" default="1" />
+			<description>
+				Loads all resources described by [param manifest] (see [method get_manifest_paths]) on the calling thread and returns a [Dictionary] that maps each path to its [Resource]. Paths that fail to load print an error and are left out. If [member FilesManifest.type_hint] is a built-in class, it is passed to the loaders as type hint.
+				[codeblocks]
+				[gdscript]
+				var manifest: FilesManifest = load("res://data/items.tres")
+				var items := ResourceLoader.load_manifest(manifest)
+				for path in items:
+					print(path, ": ", items[path])
+				[/gdscript]
+				[csharp]
+				var manifest = GD.Load&lt;FilesManifest&gt;("res://data/items.tres");
+				Godot.Collections.Dictionary items = ResourceLoader.LoadManifest(manifest);
+				foreach (var (path, resource) in items)
+				{
+				    GD.Print(path, ": ", resource);
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="load_threaded_get">
 			<return type="Resource" />
 			<param index="0" name="path" type="String" />
@@ -144,6 +254,108 @@
 				The [param cache_mode] parameter defines whether and how the cache should be used or updated when loading the resource.
 			</description>
 		</method>
+		<method name="load_threaded_request_manifest">
+			<return type="int" enum="Error" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<param index="1" name="use_sub_threads" type="bool" default="false" />
+			<param index="2" name="cache_mode" type="int" enum="ResourceLoader.CacheMode" default="1" />
+			<description>
+				Starts a threaded load (see [method load_threaded_request]) for every path described by [param manifest]. Query the progress of each path with [method load_threaded_get_status] and get the resources with [method load_threaded_get], using the paths returned by [method get_manifest_paths]. Returns [constant OK] if all requests were started, otherwise the first error; the other paths are still requested.
+				[codeblocks]
+				[gdscript]
+				var paths := ResourceLoader.get_manifest_paths(manifest)
+				ResourceLoader.load_threaded_request_manifest(manifest)
+				# Later, for example in _process():
+				for path in paths:
+					if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
+						var resource := ResourceLoader.load_threaded_get(path)
+				[/gdscript]
+				[csharp]
+				string[] paths = ResourceLoader.GetManifestPaths(manifest);
+				ResourceLoader.LoadThreadedRequestManifest(manifest);
+				// Later, for example in _Process():
+				foreach (string path in paths)
+				{
+				    if (ResourceLoader.LoadThreadedGetStatus(path) == ResourceLoader.ThreadLoadStatus.Loaded)
+				    {
+				        Resource resource = ResourceLoader.LoadThreadedGet(path);
+				    }
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] In builds without threads (the default Web export), the worker thread pool runs each request on the calling thread, so this method blocks until all resources are loaded, like [method load_manifest].
+			</description>
+		</method>
+		<method name="refresh_format_index">
+			<return type="void" />
+			<description>
+				Reads the recognized extensions of every registered [ResourceFormatLoader] again and rebuilds the index that finds loaders by the extension of a path.
+				The list of a loader is read when it is added with [method add_resource_format_loader]. Call this method after a loader implemented in a script, in C# or in a GDExtension changes the list returned by [method ResourceFormatLoader._get_recognized_extensions], or after its script changed. Until then, paths with a newly added extension do not reach the loader. Removing and adding the loader again has the same effect.
+				Loaders implemented in C++ do not need this: their lists are read again automatically when new resource classes register their extensions.
+				[codeblocks]
+				[gdscript]
+				my_loader.extensions = PackedStringArray(["mydata"])
+				ResourceLoader.refresh_format_index()
+				print(ResourceLoader.exists("res://level.mydata")) # Asks my_loader.
+				[/gdscript]
+				[csharp]
+				myLoader.Extensions = ["mydata"];
+				ResourceLoader.RefreshFormatIndex();
+				GD.Print(ResourceLoader.Exists("res://level.mydata")); // Asks myLoader.
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="register_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="extension" type="String" />
+			<param index="1" name="load" type="Callable" />
+			<param index="2" name="type" type="StringName" default="&amp;&quot;Resource&quot;" />
+			<param index="3" name="at_front" type="bool" default="false" />
+			<description>
+				Registers a simple resource format with one call: files whose name ends with [param extension] are loaded by calling [param load], without writing a [ResourceFormatLoader]. Use [method ResourceSaver.register_extension] to save files of the same format.
+				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param load] receives the path of the file ([code]func(path: String)[/code]) and returns the loaded [Resource], or an [enum Error] code if loading fails. If it returns [constant ERR_FILE_UNRECOGNIZED], the file is handed to the next loader that recognizes it, without an error message.
+				[param type] is the class of the loaded resources: a [Resource] class or a global script class ([code]class_name[/code]) that extends [Resource]. A load with a type hint only uses this format if [param type] is the hint or inherits it, and [method get_resource_type] reports [param type] (or the native base class of a script class). If [param at_front] is [code]true[/code], the format is asked before all other registered loaders, so it can take over extensions of other formats.
+				Registering an extension again replaces the previous [Callable]. Returns [constant OK], or [constant ERR_INVALID_PARAMETER] if the extension, the callable or the type is not valid.
+				The format behaves like any other [ResourceFormatLoader]: loaded resources are cached as with [method load], and [method load_threaded_request] works as well. No [code].uid[/code] files are used for these files.
+				[codeblocks]
+				[gdscript]
+				func _ready():
+					ResourceLoader.register_extension("quiz", _load_quiz, &amp;"QuizSet")
+					var quiz: QuizSet = load("res://questions.quiz")
+
+				static func _load_quiz(path: String) -&gt; Variant:
+					var file := FileAccess.open(path, FileAccess.READ)
+					if file == null:
+						return FileAccess.get_open_error()
+					var quiz := QuizSet.new()
+					quiz.questions = file.get_as_text().split("\n", false)
+					return quiz
+				[/gdscript]
+				[csharp]
+				public override void _Ready()
+				{
+					ResourceLoader.RegisterExtension("quiz", Callable.From&lt;string, Variant&gt;(LoadQuiz), "QuizSet");
+					var quiz = GD.Load&lt;QuizSet&gt;("res://questions.quiz");
+				}
+
+				private static Variant LoadQuiz(string path)
+				{
+					using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+					if (file == null)
+					{
+						return (int)FileAccess.GetOpenError();
+					}
+					var quiz = new QuizSet();
+					quiz.Questions = file.GetAsText().Split('\n', System.StringSplitOptions.RemoveEmptyEntries);
+					return quiz;
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] [param load] is called on the thread that loads the file. With [method load_threaded_request], this is a worker thread, so [param load] must be safe to call from other threads; a static function that only reads the file is. No engine lock is held while [param load] runs. In the single-threaded Web export, it always runs on the main thread.
+				[b]Note:[/b] If the object that [param load] is bound to is freed, loading fails with an error. Call [method unregister_extension] before freeing it. All registrations are removed when the engine shuts down.
+			</description>
+		</method>
 		<method name="remove_resource_format_loader">
 			<return type="void" />
 			<param index="0" name="format_loader" type="ResourceFormatLoader" />
@@ -156,6 +368,13 @@
 			<param index="0" name="abort" type="bool" />
 			<description>
 				Changes the behavior on missing sub-resources. The default behavior is to abort loading.
+			</description>
+		</method>
+		<method name="unregister_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Removes the format registered for [param extension] with [method register_extension]. Loading such a file afterwards fails with the usual error for files that no loader recognizes, unless another loader takes the extension. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no load [Callable] is registered for [param extension].
 			</description>
 		</method>
 	</methods>

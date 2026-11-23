@@ -55,9 +55,154 @@
 #define print_lt(m_text)
 #endif
 
-Ref<ResourceFormatLoader> ResourceLoader::loader[ResourceLoader::MAX_LOADERS];
+ResourceLoaderFormatSnapshot ResourceLoader::loaders;
+Mutex ResourceLoader::loaders_mutex;
 
-int ResourceLoader::loader_count = 0;
+ResourceLoaderFormatSnapshot ResourceLoader::_get_loaders() {
+	const uint32_t class_db_version = ClassDB::get_resource_base_extensions_version();
+	MutexLock lock(loaders_mutex);
+	if (unlikely(loaders.class_db_version != class_db_version)) {
+		// ClassDB registered new resource extensions (the binary loader's list): read the C++ lists again.
+		// C++ loaders neither print nor lock here; script lists are only read by refresh_format_index(), outside the lock.
+		loaders.class_db_version = class_db_version;
+		for (int i = 0; i < loaders.formats.size(); i++) {
+			if (!loaders.entries[i].scripted) {
+				loaders.entries.write[i] = ResourceLoaderFormatSnapshot::read_entry(loaders.formats[i]);
+			}
+		}
+		loaders.index_entries();
+	}
+	return loaders;
+}
+
+ResourceLoaderFormatSnapshot::Entry ResourceLoaderFormatSnapshot::read_entry(const Ref<ResourceFormatLoader> &p_format_loader) {
+	Entry entry;
+	entry.scripted = p_format_loader->has_scripted_extensions();
+	entry.by_extension = p_format_loader->recognizes_path_by_extension();
+	if (!entry.by_extension) {
+		return entry;
+	}
+
+	List<String> extensions;
+	p_format_loader->get_recognized_extensions(&extensions);
+	for (const String &E : extensions) {
+		// recognize_path() matches the suffix ".<extension>", so the path's last extension equals the last component.
+		const int dot = E.rfind_char('.');
+		const String key = (dot < 0 ? E : E.substr(dot + 1)).to_lower();
+		if (!entry.keys.has(key)) {
+			entry.keys.push_back(key);
+		}
+	}
+	return entry;
+}
+
+void ResourceLoaderFormatSnapshot::build_index() {
+	entries.resize(formats.size());
+	for (int i = 0; i < formats.size(); i++) {
+		entries.write[i] = read_entry(formats[i]);
+	}
+	index_entries();
+}
+
+void ResourceLoaderFormatSnapshot::index_entries() {
+	HashMap<String, LocalVector<uint32_t>> by_extension;
+	LocalVector<uint32_t> asked;
+	for (uint32_t i = 0; i < uint32_t(entries.size()); i++) {
+		const Entry &entry = entries[i];
+		if (!entry.by_extension) {
+			asked.push_back(i);
+			continue;
+		}
+		for (const String &key : entry.keys) {
+			by_extension[key].push_back(i); // Keys are unique per entry, so positions stay unique and ascending.
+		}
+	}
+
+	LocalVector<String> keys;
+	keys.reserve(by_extension.size());
+	for (const KeyValue<String, LocalVector<uint32_t>> &E : by_extension) {
+		keys.push_back(E.key);
+	}
+	keys.sort();
+
+	index_extensions.resize(keys.size());
+	index_offsets.resize(keys.size() + 1);
+	index_positions.clear();
+	uint32_t offset = 0;
+	for (uint32_t i = 0; i < keys.size(); i++) {
+		index_extensions.write[i] = keys[i];
+		index_offsets.write[i] = offset;
+		for (uint32_t position : by_extension[keys[i]]) {
+			index_positions.push_back(position);
+			offset++;
+		}
+	}
+	index_offsets.write[keys.size()] = offset;
+
+	always_asked.resize(asked.size());
+	for (uint32_t i = 0; i < asked.size(); i++) {
+		always_asked.write[i] = asked[i];
+	}
+}
+
+// Compares the lower-case form of `p_chars` with the lower-case key `p_key`, like `String::operator<`.
+static int _compare_extension_key(const char32_t *p_chars, int p_length, const String &p_key) {
+	const int key_length = p_key.length();
+	const char32_t *key = p_key.ptr();
+	const int common = MIN(p_length, key_length);
+	for (int i = 0; i < common; i++) {
+		const char32_t c = String::char_lowercase(p_chars[i]);
+		if (c != key[i]) {
+			return c < key[i] ? -1 : 1;
+		}
+	}
+	return p_length == key_length ? 0 : (p_length < key_length ? -1 : 1);
+}
+
+ResourceLoaderFormatSnapshot::Candidates ResourceLoaderFormatSnapshot::candidates_for(const String &p_path) const {
+	const int dot = p_path.rfind_char('.');
+	if (dot >= 0) {
+		// Binary search without allocating a lower-case copy of the extension.
+		const char32_t *extension = p_path.ptr() + dot + 1;
+		const int extension_length = p_path.length() - dot - 1;
+		int low = 0;
+		int high = index_extensions.size() - 1;
+		while (low <= high) {
+			const int middle = (low + high) / 2;
+			const int cmp = _compare_extension_key(extension, extension_length, index_extensions[middle]);
+			if (cmp == 0) {
+				return Candidates(this, index_positions.ptr() + index_offsets[middle], index_offsets[middle + 1] - index_offsets[middle]);
+			}
+			if (cmp < 0) {
+				high = middle - 1;
+			} else {
+				low = middle + 1;
+			}
+		}
+	}
+	return Candidates(this, nullptr, 0);
+}
+
+ResourceLoaderFormatSnapshot::Candidates::Iterator ResourceLoaderFormatSnapshot::Candidates::begin() const {
+	const uint32_t *asked = snapshot->always_asked.ptr();
+	return Iterator(snapshot, indexed, indexed + indexed_count, asked, asked + snapshot->always_asked.size());
+}
+
+ResourceLoaderFormatSnapshot::Candidates::Iterator ResourceLoaderFormatSnapshot::Candidates::end() const {
+	const uint32_t *asked_end = snapshot->always_asked.ptr() + snapshot->always_asked.size();
+	return Iterator(snapshot, indexed + indexed_count, indexed + indexed_count, asked_end, asked_end);
+}
+
+bool ResourceFormatLoader::recognizes_path_by_extension() const {
+	// A script, C# or GDExtension `_recognize_path` may accept any path. A `_get_recognized_extensions` list is indexed;
+	// loaders that change it call ResourceLoader::refresh_format_index().
+	return !GDVIRTUAL_IS_OVERRIDDEN(_recognize_path);
+}
+
+bool ResourceFormatLoader::has_scripted_extensions() const {
+	// Any loader with a script or a GDExtension class may answer from script code: its list is never read under a lock.
+	return get_script_instance() != nullptr || _get_extension() != nullptr;
+}
 
 bool ResourceFormatLoader::recognize_path(const String &p_path, const String &p_for_type) const {
 	bool ret = false;
@@ -139,8 +284,8 @@ void ResourceFormatLoader::get_recognized_extensions_for_type(const String &p_ty
 }
 
 void ResourceLoader::get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions) {
-	for (int i = 0; i < loader_count; i++) {
-		loader[i]->get_recognized_extensions_for_type(p_type, p_extensions);
+	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+		format_loader->get_recognized_extensions_for_type(p_type, p_extensions);
 	}
 }
 
@@ -281,12 +426,13 @@ Ref<Resource> ResourceLoader::_load(const String &p_path, const String &p_origin
 	// Try all loaders and pick the first match for the type hint
 	bool found = false;
 	Ref<Resource> res;
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(p_path, p_type_hint)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(p_path)) {
+		if (!format_loader->recognize_path(p_path, p_type_hint)) {
 			continue;
 		}
 		found = true;
-		res = loader[i]->load(p_path, original_path, r_error, p_use_sub_threads, r_progress, p_cache_mode);
+		res = format_loader->load(p_path, original_path, r_error, p_use_sub_threads, r_progress, p_cache_mode);
 		if (res.is_valid()) {
 			break;
 		}
@@ -1254,12 +1400,13 @@ bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
 	String path = _path_remap(local_path);
 
 	// Try all loaders and pick the first match for the type hint
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(path, p_type_hint)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(path)) {
+		if (!format_loader->recognize_path(path, p_type_hint)) {
 			continue;
 		}
 
-		if (loader[i]->exists(path)) {
+		if (format_loader->exists(path)) {
 			return true;
 		}
 	}
@@ -1269,49 +1416,67 @@ bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
 
 void ResourceLoader::add_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader, bool p_at_front) {
 	ERR_FAIL_COND(p_format_loader.is_null());
-	ERR_FAIL_COND(loader_count >= MAX_LOADERS);
 
+	// Read outside the lock: a script, C# or GDExtension loader runs its own code here.
+	const ResourceLoaderFormatSnapshot::Entry entry = ResourceLoaderFormatSnapshot::read_entry(p_format_loader);
+
+	MutexLock lock(loaders_mutex);
 	if (p_at_front) {
-		for (int i = loader_count; i > 0; i--) {
-			loader[i] = loader[i - 1];
-		}
-		loader[0] = p_format_loader;
-		loader_count++;
+		loaders.formats.insert(0, p_format_loader);
+		loaders.entries.insert(0, entry);
 	} else {
-		loader[loader_count++] = p_format_loader;
+		loaders.formats.push_back(p_format_loader);
+		loaders.entries.push_back(entry);
 	}
+	loaders.index_entries();
 }
 
 void ResourceLoader::remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader) {
 	ERR_FAIL_COND(p_format_loader.is_null());
 
-	// Find loader
-	int i = 0;
-	for (; i < loader_count; ++i) {
-		if (loader[i] == p_format_loader) {
-			break;
+	int64_t index = -1;
+	{
+		MutexLock lock(loaders_mutex);
+		index = loaders.formats.find(p_format_loader);
+		if (index >= 0) {
+			loaders.formats.remove_at(index);
+			loaders.entries.remove_at(index);
+			loaders.index_entries();
 		}
 	}
+	ERR_FAIL_COND(index < 0); // Not found; reported after releasing the lock.
+}
 
-	ERR_FAIL_COND(i >= loader_count); // Not found
-
-	// Shift next loaders up
-	for (; i < loader_count - 1; ++i) {
-		loader[i] = loader[i + 1];
+void ResourceLoader::refresh_format_index() {
+	// Read every list outside the lock (script code may run), then store the entries of the loaders still registered.
+	const ResourceLoaderFormatSnapshot current = _get_loaders();
+	Vector<ResourceLoaderFormatSnapshot::Entry> fresh;
+	fresh.resize(current.formats.size());
+	for (int i = 0; i < current.formats.size(); i++) {
+		fresh.write[i] = ResourceLoaderFormatSnapshot::read_entry(current.formats[i]);
 	}
-	loader[loader_count - 1].unref();
-	--loader_count;
+
+	MutexLock lock(loaders_mutex);
+	for (int i = 0; i < loaders.formats.size(); i++) {
+		// Loaders added meanwhile keep the entry read when they were added.
+		const int64_t read = current.formats.find(loaders.formats[i]);
+		if (read >= 0) {
+			loaders.entries.write[i] = fresh[read];
+		}
+	}
+	loaders.index_entries();
 }
 
 String ResourceLoader::get_import_group_file(const String &p_path) {
 	String local_path = _path_remap(_validate_local_path(p_path));
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		return loader[i]->get_import_group_file(p_path);
+		return format_loader->get_import_group_file(p_path);
 	}
 
 	return String(); //not found
@@ -1320,12 +1485,13 @@ String ResourceLoader::get_import_group_file(const String &p_path) {
 bool ResourceLoader::is_import_valid(const String &p_path) {
 	String local_path = _path_remap(_validate_local_path(p_path));
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		return loader[i]->is_import_valid(p_path);
+		return format_loader->is_import_valid(p_path);
 	}
 
 	return false; //not found
@@ -1334,12 +1500,13 @@ bool ResourceLoader::is_import_valid(const String &p_path) {
 bool ResourceLoader::is_imported(const String &p_path) {
 	String local_path = _path_remap(_validate_local_path(p_path));
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		return loader[i]->is_imported(p_path);
+		return format_loader->is_imported(p_path);
 	}
 
 	return false; //not found
@@ -1348,24 +1515,26 @@ bool ResourceLoader::is_imported(const String &p_path) {
 void ResourceLoader::get_dependencies(const String &p_path, List<String> *p_dependencies, bool p_add_types) {
 	String local_path = _path_remap(_validate_local_path(p_path));
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		loader[i]->get_dependencies(local_path, p_dependencies, p_add_types);
+		format_loader->get_dependencies(local_path, p_dependencies, p_add_types);
 	}
 }
 
 Error ResourceLoader::rename_dependencies(const String &p_path, const HashMap<String, String> &p_map) {
 	String local_path = _path_remap(_validate_local_path(p_path));
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		return loader[i]->rename_dependencies(local_path, p_map);
+		return format_loader->rename_dependencies(local_path, p_map);
 	}
 
 	return OK; // ??
@@ -1374,20 +1543,23 @@ Error ResourceLoader::rename_dependencies(const String &p_path, const HashMap<St
 void ResourceLoader::get_classes_used(const String &p_path, HashSet<StringName> *r_classes) {
 	String local_path = _validate_local_path(p_path);
 
-	for (int i = 0; i < loader_count; i++) {
-		if (!loader[i]->recognize_path(local_path)) {
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (!format_loader->recognize_path(local_path)) {
 			continue;
 		}
 
-		return loader[i]->get_classes_used(p_path, r_classes);
+		return format_loader->get_classes_used(p_path, r_classes);
 	}
 }
 
 String ResourceLoader::get_resource_type(const String &p_path) {
 	String local_path = _validate_local_path(p_path);
 
-	for (int i = 0; i < loader_count; i++) {
-		String result = loader[i]->get_resource_type(local_path);
+	// Only loaders that may recognize the path report its type (see ResourceLoaderFormatSnapshot::candidates_for()).
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		String result = format_loader->get_resource_type(local_path);
 		if (!result.is_empty()) {
 			return result;
 		}
@@ -1399,8 +1571,9 @@ String ResourceLoader::get_resource_type(const String &p_path) {
 String ResourceLoader::get_resource_script_class(const String &p_path) {
 	String local_path = _validate_local_path(p_path);
 
-	for (int i = 0; i < loader_count; i++) {
-		String result = loader[i]->get_resource_script_class(local_path);
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		String result = format_loader->get_resource_script_class(local_path);
 		if (!result.is_empty()) {
 			return result;
 		}
@@ -1415,8 +1588,8 @@ ResourceUID::ID ResourceLoader::get_resource_uid(const String &p_path) {
 		return ResourceUID::get_singleton()->get_path_id(local_path);
 	}
 
-	for (int i = 0; i < loader_count; i++) {
-		ResourceUID::ID id = loader[i]->get_resource_uid(local_path);
+	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+		ResourceUID::ID id = format_loader->get_resource_uid(local_path);
 		if (id != ResourceUID::INVALID_ID) {
 			return id;
 		}
@@ -1431,9 +1604,10 @@ bool ResourceLoader::should_create_uid_file(const String &p_path) {
 		return false;
 	}
 
-	for (int i = 0; i < loader_count; i++) {
-		if (loader[i]->recognize_path(local_path)) {
-			return !loader[i]->has_custom_uid_support();
+	const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+	for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(local_path)) {
+		if (format_loader->recognize_path(local_path)) {
+			return !format_loader->has_custom_uid_support();
 		}
 	}
 	return false;
@@ -1642,9 +1816,9 @@ void ResourceLoader::set_load_callback(ResourceLoadedCallback p_callback) {
 ResourceLoadedCallback ResourceLoader::_loaded_callback = nullptr;
 
 Ref<ResourceFormatLoader> ResourceLoader::_find_custom_resource_format_loader(const String &p_path) {
-	for (int i = 0; i < loader_count; ++i) {
-		if (loader[i]->get_script_instance() && loader[i]->get_script_instance()->get_script()->get_path() == p_path) {
-			return loader[i];
+	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+		if (format_loader->get_script_instance() && format_loader->get_script_instance()->get_script()->get_path() == p_path) {
+			return format_loader;
 		}
 	}
 	return Ref<ResourceFormatLoader>();
@@ -1698,9 +1872,9 @@ void ResourceLoader::add_custom_loaders() {
 
 void ResourceLoader::remove_custom_loaders() {
 	Vector<Ref<ResourceFormatLoader>> custom_loaders;
-	for (int i = 0; i < loader_count; ++i) {
-		if (loader[i]->get_script_instance()) {
-			custom_loaders.push_back(loader[i]);
+	for (const Ref<ResourceFormatLoader> &format_loader : _get_loaders()) {
+		if (format_loader->get_script_instance()) {
+			custom_loaders.push_back(format_loader);
 		}
 	}
 
@@ -1746,8 +1920,9 @@ Vector<String> ResourceLoader::list_directory(const String &p_directory) {
 
 			const String full_path = p_directory.path_join(d);
 			// Try all loaders and pick the first match for the type hint.
-			for (int i = 0; i < loader_count; i++) {
-				if (loader[i]->recognize_path(full_path)) {
+			const ResourceLoaderFormatSnapshot snapshot = _get_loaders();
+			for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(full_path)) {
+				if (format_loader->recognize_path(full_path)) {
 					recognized = true;
 					break;
 				}

@@ -38,6 +38,7 @@
 #include "core/debugger/script_debugger.h"
 #include "core/io/file_access.h"
 #include "core/io/marshalls.h"
+#include "core/io/resource_format_callable.h"
 #include "core/math/geometry_2d.h"
 #include "core/math/geometry_3d.h"
 #include "core/object/class_db.h"
@@ -104,6 +105,10 @@ void ResourceLoader::remove_resource_format_loader(RequiredParam<ResourceFormatL
 	::ResourceLoader::remove_resource_format_loader(format_loader);
 }
 
+void ResourceLoader::refresh_format_index() {
+	::ResourceLoader::refresh_format_index();
+}
+
 void ResourceLoader::set_abort_on_missing_resources(bool p_abort) {
 	::ResourceLoader::set_abort_on_missing_resources(p_abort);
 }
@@ -130,6 +135,40 @@ Ref<Resource> ResourceLoader::get_cached_ref(const String &p_path) {
 	return ResourceCache::get_ref(local_path);
 }
 
+static PackedStringArray _cached_paths_to_packed(const List<String> &p_paths) {
+	PackedStringArray ret;
+	ret.resize(p_paths.size());
+	String *w = ret.ptrw();
+	for (const String &E : p_paths) {
+		*w++ = E;
+	}
+	return ret;
+}
+
+PackedStringArray ResourceLoader::get_cached_paths() {
+	List<String> paths;
+	ResourceCache::get_cached_paths(&paths);
+	return _cached_paths_to_packed(paths);
+}
+
+PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact) {
+	List<String> paths;
+	ResourceCache::get_cached_paths_for_type(p_type, p_exact, &paths);
+	return _cached_paths_to_packed(paths);
+}
+
+PackedStringArray ResourceLoader::get_cached_paths_with_extension(const String &p_extension) {
+	List<String> paths;
+	ResourceCache::get_cached_paths_with_extension(p_extension, &paths);
+	return _cached_paths_to_packed(paths);
+}
+
+PackedStringArray ResourceLoader::get_cached_paths_in_directory(const String &p_directory, bool p_recursive) {
+	List<String> paths;
+	ResourceCache::get_cached_paths_in_directory(p_directory, p_recursive, &paths);
+	return _cached_paths_to_packed(paths);
+}
+
 bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
 	return ::ResourceLoader::exists(p_path, p_type_hint);
 }
@@ -146,6 +185,33 @@ Vector<String> ResourceLoader::list_directory(const String &p_directory) {
 	return ::ResourceLoader::list_directory(p_directory);
 }
 
+PackedStringArray ResourceLoader::get_manifest_paths(const Ref<FilesManifest> &p_manifest) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), PackedStringArray());
+	return p_manifest->get_paths();
+}
+
+Dictionary ResourceLoader::load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), Dictionary());
+	return p_manifest->load_resources(ResourceFormatLoader::CacheMode(p_cache_mode));
+}
+
+Error ResourceLoader::load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads, CacheMode p_cache_mode) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), ERR_INVALID_PARAMETER);
+	return p_manifest->load_threaded_request_resources(p_use_sub_threads, ResourceFormatLoader::CacheMode(p_cache_mode));
+}
+
+Error ResourceLoader::register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatLoaderCallable::register_extension(p_extension, p_load, p_type, p_at_front);
+}
+
+Error ResourceLoader::unregister_extension(const String &p_extension) {
+	return ResourceFormatLoaderCallable::unregister_extension(p_extension);
+}
+
+bool ResourceLoader::is_extension_registered(const String &p_extension) {
+	return ResourceFormatLoaderCallable::is_extension_registered(p_extension);
+}
+
 void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("load_threaded_request", "path", "type_hint", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request, DEFVAL(""), DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_get_status", "path", "progress"), &ResourceLoader::load_threaded_get_status, DEFVAL_ARRAY);
@@ -155,14 +221,25 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_recognized_extensions_for_type", "type"), &ResourceLoader::get_recognized_extensions_for_type);
 	ClassDB::bind_method(D_METHOD("add_resource_format_loader", "format_loader", "at_front"), &ResourceLoader::add_resource_format_loader, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_loader", "format_loader"), &ResourceLoader::remove_resource_format_loader);
+	ClassDB::bind_method(D_METHOD("refresh_format_index"), &ResourceLoader::refresh_format_index);
 	ClassDB::bind_method(D_METHOD("set_abort_on_missing_resources", "abort"), &ResourceLoader::set_abort_on_missing_resources);
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
 	ClassDB::bind_method(D_METHOD("get_cached_ref", "path"), &ResourceLoader::get_cached_ref);
+	ClassDB::bind_method(D_METHOD("get_cached_paths"), &ResourceLoader::get_cached_paths);
+	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension"), &ResourceLoader::get_cached_paths_with_extension);
+	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("exists", "path", "type_hint"), &ResourceLoader::exists, DEFVAL(""));
 	ClassDB::bind_method(D_METHOD("get_resource_uid", "path"), &ResourceLoader::get_resource_uid);
 	ClassDB::bind_method(D_METHOD("get_resource_type", "path"), &ResourceLoader::get_resource_type);
 	ClassDB::bind_method(D_METHOD("list_directory", "directory_path"), &ResourceLoader::list_directory);
+	ClassDB::bind_method(D_METHOD("get_manifest_paths", "manifest"), &ResourceLoader::get_manifest_paths);
+	ClassDB::bind_method(D_METHOD("load_manifest", "manifest", "cache_mode"), &ResourceLoader::load_manifest, DEFVAL(CACHE_MODE_REUSE));
+	ClassDB::bind_method(D_METHOD("load_threaded_request_manifest", "manifest", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request_manifest, DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
+	ClassDB::bind_method(D_METHOD("register_extension", "extension", "load", "type", "at_front"), &ResourceLoader::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceLoader::unregister_extension);
+	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceLoader::is_extension_registered);
 
 	BIND_ENUM_CONSTANT(THREAD_LOAD_INVALID_RESOURCE);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);
@@ -211,6 +288,18 @@ ResourceUID::ID ResourceSaver::get_resource_id_for_path(const String &p_path, bo
 	return ::ResourceSaver::get_resource_id_for_path(p_path, p_generate);
 }
 
+Error ResourceSaver::register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatSaverCallable::register_extension(p_extension, p_save, p_type, p_at_front);
+}
+
+Error ResourceSaver::unregister_extension(const String &p_extension) {
+	return ResourceFormatSaverCallable::unregister_extension(p_extension);
+}
+
+bool ResourceSaver::is_extension_registered(const String &p_extension) {
+	return ResourceFormatSaverCallable::is_extension_registered(p_extension);
+}
+
 void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("save", "resource", "path", "flags"), &ResourceSaver::save, DEFVAL(""), DEFVAL((uint32_t)FLAG_NONE));
 	ClassDB::bind_method(D_METHOD("set_uid", "resource", "uid"), &ResourceSaver::set_uid);
@@ -218,6 +307,9 @@ void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_resource_format_saver", "format_saver", "at_front"), &ResourceSaver::add_resource_format_saver, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_saver", "format_saver"), &ResourceSaver::remove_resource_format_saver);
 	ClassDB::bind_method(D_METHOD("get_resource_id_for_path", "path", "generate"), &ResourceSaver::get_resource_id_for_path, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("register_extension", "extension", "save", "type", "at_front"), &ResourceSaver::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceSaver::unregister_extension);
+	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceSaver::is_extension_registered);
 
 	BIND_BITFIELD_FLAG(FLAG_NONE);
 	BIND_BITFIELD_FLAG(FLAG_RELATIVE_PATHS);
@@ -618,6 +710,14 @@ Dictionary OS::get_memory_info() const {
 	return ::OS::get_singleton()->get_memory_info();
 }
 
+uint64_t OS::get_process_memory_usage() const {
+	return ::OS::get_singleton()->get_process_memory_usage();
+}
+
+Dictionary OS::get_process_memory_info() const {
+	return ::OS::get_singleton()->get_process_memory_info();
+}
+
 /** This method uses a signed argument for better error reporting as it's used from the scripting API. */
 void OS::delay_usec(int p_usec) const {
 	ERR_FAIL_COND_MSG(
@@ -839,6 +939,8 @@ void OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_static_memory_usage"), &OS::get_static_memory_usage);
 	ClassDB::bind_method(D_METHOD("get_static_memory_peak_usage"), &OS::get_static_memory_peak_usage);
 	ClassDB::bind_method(D_METHOD("get_memory_info"), &OS::get_memory_info);
+	ClassDB::bind_method(D_METHOD("get_process_memory_usage"), &OS::get_process_memory_usage);
+	ClassDB::bind_method(D_METHOD("get_process_memory_info"), &OS::get_process_memory_info);
 
 	ClassDB::bind_method(D_METHOD("move_to_trash", "path"), &OS::move_to_trash);
 	ClassDB::bind_method(D_METHOD("get_user_data_dir"), &OS::get_user_data_dir);

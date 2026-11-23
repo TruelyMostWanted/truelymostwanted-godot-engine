@@ -34,6 +34,7 @@
 #include "core/io/resource_loader_constants.h"
 #include "core/object/gdvirtual.gen.h"
 #include "core/object/worker_thread_pool.h"
+#include "core/os/mutex.h"
 #include "core/os/thread.h"
 
 namespace CoreBind {
@@ -78,6 +79,13 @@ public:
 	virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions) const;
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const;
+	// True if recognize_path() matches only the suffixes from get_recognized_extensions(). ResourceLoader then finds
+	// the loader through its extension index (the list is read when the loader is added, when
+	// `ResourceLoader::refresh_format_index()` is called, and for C++ lists when ClassDB's resource extensions change);
+	// otherwise the loader is asked for every path.
+	virtual bool recognizes_path_by_extension() const;
+	// True if the loader is implemented by a script, C# or GDExtension, so its extension list comes from script code.
+	bool has_scripted_extensions() const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	virtual String get_resource_type(const String &p_path) const;
@@ -100,13 +108,85 @@ typedef void (*DependencyErrorNotify)(const String &p_loading, const String &p_w
 typedef Error (*ResourceLoaderImport)(const String &p_path);
 typedef void (*ResourceLoadedCallback)(Ref<Resource> p_resource, const String &p_path);
 
+// Immutable snapshot of the registered format loaders, in lookup order (first match wins).
+// Copying it is cheap: the list and its index are copy-on-write and shared with every copy until a change replaces them.
+struct ResourceLoaderFormatSnapshot {
+	// What the index knows about one loader, read by `read_entry()` outside any lock.
+	struct Entry {
+		Vector<String> keys; // Lower-case extension keys (the part after the last dot), without duplicates.
+		bool by_extension = false; // See `ResourceFormatLoader::recognizes_path_by_extension()`.
+		bool scripted = false; // The list comes from a script, C# or GDExtension; never re-read implicitly.
+	};
+
+	Vector<Ref<ResourceFormatLoader>> formats;
+	Vector<Entry> entries; // One per format, same order.
+	uint32_t class_db_version = 0; // `ClassDB::get_resource_base_extensions_version()` when the C++ lists were read.
+
+	// Index by extension, built by `build_index()` or `index_entries()`. For each lower-case extension key (the part after the last dot
+	// of a recognized extension), the positions of the loaders that recognize it, ascending.
+	Vector<String> index_extensions; // Sorted.
+	Vector<uint32_t> index_offsets; // Positions of `index_extensions[i]` are `index_positions[index_offsets[i]..index_offsets[i + 1]]`.
+	Vector<uint32_t> index_positions;
+	// Loaders that do not recognize paths by extension only (see `ResourceFormatLoader::recognizes_path_by_extension()`), ascending.
+	Vector<uint32_t> always_asked;
+
+	// Asks the loader for its extensions. May run script code: never call it while holding a lock.
+	static Entry read_entry(const Ref<ResourceFormatLoader> &p_format_loader);
+	// Reads the entry of every format, then builds the index.
+	void build_index();
+	// Builds the index from `entries` without calling any loader.
+	void index_entries();
+
+	// The loaders that may recognize a path, in registration order: the indexed loaders for the path's last extension
+	// and the always-asked loaders. Each candidate must still be checked with `recognize_path()`.
+	// The range refers to this snapshot, which must outlive it.
+	class Candidates {
+		const ResourceLoaderFormatSnapshot *snapshot = nullptr;
+		const uint32_t *indexed = nullptr;
+		uint32_t indexed_count = 0;
+
+	public:
+		class Iterator {
+			const ResourceLoaderFormatSnapshot *snapshot = nullptr;
+			const uint32_t *indexed = nullptr;
+			const uint32_t *indexed_end = nullptr;
+			const uint32_t *asked = nullptr;
+			const uint32_t *asked_end = nullptr;
+
+			_FORCE_INLINE_ bool _take_indexed() const { return asked == asked_end || (indexed != indexed_end && *indexed < *asked); }
+
+		public:
+			Iterator(const ResourceLoaderFormatSnapshot *p_snapshot, const uint32_t *p_indexed, const uint32_t *p_indexed_end, const uint32_t *p_asked, const uint32_t *p_asked_end) :
+					snapshot(p_snapshot), indexed(p_indexed), indexed_end(p_indexed_end), asked(p_asked), asked_end(p_asked_end) {}
+
+			const Ref<ResourceFormatLoader> &operator*() const { return snapshot->formats[_take_indexed() ? *indexed : *asked]; }
+			Iterator &operator++() {
+				if (_take_indexed()) {
+					indexed++;
+				} else {
+					asked++;
+				}
+				return *this;
+			}
+			bool operator!=(const Iterator &p_other) const { return indexed != p_other.indexed || asked != p_other.asked; }
+		};
+
+		Candidates(const ResourceLoaderFormatSnapshot *p_snapshot, const uint32_t *p_indexed, uint32_t p_indexed_count) :
+				snapshot(p_snapshot), indexed(p_indexed), indexed_count(p_indexed_count) {}
+
+		Iterator begin() const;
+		Iterator end() const;
+	};
+
+	Candidates candidates_for(const String &p_path) const;
+
+	const Ref<ResourceFormatLoader> *begin() const { return formats.ptr(); }
+	const Ref<ResourceFormatLoader> *end() const { return formats.ptr() + formats.size(); }
+};
+
 class ResourceLoader {
 	friend class LoadToken;
 	friend class CoreBind::ResourceLoader;
-
-	enum {
-		MAX_LOADERS = 64
-	};
 
 	struct ThreadLoadTask;
 
@@ -153,8 +233,12 @@ private:
 
 	static Ref<Resource> _load_complete_inner(LoadToken &p_load_token, Error *r_error, MutexLock<SafeBinaryMutex<BINARY_MUTEX_TAG>> &p_thread_load_lock);
 
-	static Ref<ResourceFormatLoader> loader[MAX_LOADERS];
-	static int loader_count;
+	// Registered formats, without a size limit. Every change builds a new snapshot under `loaders_mutex`.
+	// Readers take the current snapshot from `_get_loaders()` and iterate it without a lock,
+	// so other threads may add or remove formats meanwhile.
+	static ResourceLoaderFormatSnapshot loaders;
+	static Mutex loaders_mutex;
+	static ResourceLoaderFormatSnapshot _get_loaders();
 	static bool timestamp_on_load;
 
 	static void *err_notify_ud;
@@ -261,6 +345,10 @@ public:
 
 	static void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions);
 	static void add_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader, bool p_at_front = false);
+	// The registered loaders and their extension index, for tests and diagnostics.
+	static ResourceLoaderFormatSnapshot get_format_snapshot() { return _get_loaders(); }
+	// Reads the extension lists of all registered loaders again and rebuilds the index.
+	static void refresh_format_index();
 	static void remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader);
 	static void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	static String get_resource_type(const String &p_path);

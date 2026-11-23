@@ -68,6 +68,7 @@ public:
 	virtual void get_recognized_extensions(List<String> *p_extensions) const override;
 	virtual void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions) const override;
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const override;
+	virtual bool recognizes_path_by_extension() const override { return false; } // Recognizes paths by their `.import` file.
 	virtual bool handles_type(const String &p_type) const override;
 	virtual String get_resource_type(const String &p_path) const override;
 	virtual String get_resource_script_class(const String &p_path) const override;

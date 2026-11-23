@@ -48,6 +48,7 @@
 			<return type="PackedStringArray" />
 			<description>
 				Gets the list of extensions for files this loader is able to read.
+				[b]Note:[/b] [ResourceLoader] finds loaders through an index by extension. The list returned by this method is read once, when the loader is added with [method ResourceLoader.add_resource_format_loader]. If the list changes later, call [method ResourceLoader.refresh_format_index] (or remove and add the loader again); until then, paths with a new extension do not reach this loader. Extensions are matched case-insensitively, and an extension with dots like [code]"tar.gz"[/code] is indexed by its last part.
 			</description>
 		</method>
 		<method name="_get_resource_script_class" qualifiers="virtual const">
@@ -55,6 +56,7 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Returns the script class name associated with the [Resource] under the given [param path]. If the resource has no script or the script isn't a named class, it should return [code]""[/code].
+				[b]Note:[/b] Like [method _get_resource_type], this is only asked for paths whose extension this loader recognizes, unless it implements [method _recognize_path].
 			</description>
 		</method>
 		<method name="_get_resource_type" qualifiers="virtual const">
@@ -63,6 +65,7 @@
 			<description>
 				Gets the class name of the resource associated with the given path. If the loader cannot handle it, it should return [code]""[/code].
 				[b]Note:[/b] Custom resource types defined by scripts aren't known by the [ClassDB], so you might just return [code]"Resource"[/code] for them.
+				[b]Note:[/b] [method ResourceLoader.get_resource_type] only asks loaders whose [method _get_recognized_extensions] contain the path's extension, and loaders that implement [method _recognize_path].
 			</description>
 		</method>
 		<method name="_get_resource_uid" qualifiers="virtual const">
@@ -98,6 +101,7 @@
 			<description>
 				Tells whether or not this loader should load a resource from its resource path for a given type.
 				If it is not implemented, the default behavior returns whether the path's extension is within the ones provided by [method _get_recognized_extensions], and if the type is within the ones provided by [method _get_resource_type].
+				[b]Note:[/b] A loader that implements this method can accept any path, so [ResourceLoader] asks it for every path that is loaded, checked or typed, which is slower with many loaders. Implement only [method _get_recognized_extensions] when the extension is enough to decide.
 			</description>
 		</method>
 		<method name="_rename_dependencies" qualifiers="virtual const">

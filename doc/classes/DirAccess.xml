@@ -177,6 +177,23 @@
 				[b]Note:[/b] The returned directories in the editor and after exporting in the [code]res://[/code] directory may differ as some files are converted to engine-specific formats when exported.
 			</description>
 		</method>
+		<method name="get_directory_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="recursive" type="bool" default="false" />
+			<description>
+				Returns the full paths of the directories in the current directory, built from [method get_current_dir]. If [param recursive] is [code]true[/code], the directories of all subdirectories are included as well. The array is sorted by path.
+				[code].[/code] and [code]..[/code] are never returned, even if [member include_navigational] is [code]true[/code]. Hidden directories are returned and entered only if [member include_hidden] is [code]true[/code]. Symbolic links to directories are returned, but not followed. A subdirectory that can't be read is skipped with a warning.
+			</description>
+		</method>
+		<method name="get_directory_paths_at" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="recursive" type="bool" default="false" />
+			<description>
+				Returns the full paths of the directories at the given [param path], and of all subdirectories if [param recursive] is [code]true[/code]. The paths start with [param path] as given, so they keep its prefix (e.g. [code]res://[/code] or [code]user://[/code]). Hidden directories are skipped. The array is sorted by path.
+				Use [method get_directory_paths] if you want more control of what gets included.
+			</description>
+		</method>
 		<method name="get_drive_count" qualifiers="static">
 			<return type="int" />
 			<description>
@@ -203,6 +220,55 @@
 				On Linux, returns the path to the mounted volume or GTK 3 bookmark passed as an argument.
 				On Android (API level 30+), returns the path to the mounted volume as an argument.
 				On other platforms, or if the requested drive does not exist, returns an empty String.
+			</description>
+		</method>
+		<method name="get_file_extensions">
+			<return type="PackedStringArray" />
+			<param index="0" name="recursive" type="bool" default="false" />
+			<description>
+				Returns the distinct extensions of the files in the current directory, and of all subdirectories if [param recursive] is [code]true[/code]. The extensions have no leading dot, are in lower case and sorted. Files without an extension are ignored. Hidden files are included only if [member include_hidden] is [code]true[/code].
+			</description>
+		</method>
+		<method name="get_file_extensions_at" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="recursive" type="bool" default="false" />
+			<description>
+				Returns the distinct extensions of the files at the given [param path], and of all subdirectories if [param recursive] is [code]true[/code]. The extensions have no leading dot, are in lower case and sorted. Hidden entries are skipped.
+				Use [method get_file_extensions] if you want more control of what gets included.
+			</description>
+		</method>
+		<method name="get_file_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="recursive" type="bool" default="false" />
+			<param index="1" name="extensions" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Returns the full paths of the files in the current directory, built from [method get_current_dir]. If [param recursive] is [code]true[/code], the files of all subdirectories are included as well. The array is sorted by path.
+				If [param extensions] is not empty, only files with one of these extensions are returned. The comparison is case-insensitive and a leading dot is allowed, so [code]"png"[/code], [code]"PNG"[/code] and [code]".png"[/code] match the same files. Files without an extension never match.
+				Hidden files and directories are included only if [member include_hidden] is [code]true[/code]. Symbolic links to directories are not followed. A subdirectory that can't be read is skipped with a warning, the rest is still returned.
+				[codeblocks]
+				[gdscript]
+				var dir = DirAccess.open("user://mods")
+				var images = dir.get_file_paths(true, ["png", "webp"])
+				[/gdscript]
+				[csharp]
+				using var dir = DirAccess.Open("user://mods");
+				string[] images = dir.GetFilePaths(true, ["png", "webp"]);
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] When used on a [code]res://[/code] path in an exported project, the raw entries of the PCK are returned, like [method get_files] does: imported resources appear as [code].import[/code] files and converted resources as [code].remap[/code] files, not under their original names. Use [method ResourceLoader.list_directory] to get loadable resource paths of one directory.
+				[b]Note:[/b] The whole tree is read in one call on the calling thread. On the Web platform, listing large trees blocks the frame.
+			</description>
+		</method>
+		<method name="get_file_paths_at" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="recursive" type="bool" default="false" />
+			<param index="2" name="extensions" type="PackedStringArray" default="PackedStringArray()" />
+			<description>
+				Returns the full paths of the files at the given [param path], and of all subdirectories if [param recursive] is [code]true[/code], optionally only with one of the given [param extensions] (case-insensitive, without the dot). The paths start with [param path] as given, so they keep its prefix (e.g. [code]res://[/code] or [code]user://[/code]). Hidden entries are skipped. The array is sorted by path.
+				Use [method get_file_paths] if you want more control of what gets included.
+				[b]Note:[/b] When used on a [code]res://[/code] path in an exported project, the raw entries of the PCK are returned, see [method get_file_paths].
 			</description>
 		</method>
 		<method name="get_files">

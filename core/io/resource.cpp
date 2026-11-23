@@ -34,6 +34,7 @@
 #include "core/math/math_funcs.h"
 #include "core/math/random_pcg.h"
 #include "core/object/class_db.h"
+#include "core/object/script_language.h"
 #include "core/os/os.h"
 #include "core/variant/container_type_validate.h" // IWYU pragma: keep.
 #include "scene/main/node.h" //only so casting works
@@ -891,6 +892,105 @@ void ResourceCache::get_cached_resources(List<Ref<Resource>> *p_resources) {
 	for (const String &E : to_remove) {
 		resources.erase(E);
 	}
+}
+
+template <typename F>
+void ResourceCache::_get_cached_paths_filtered(List<String> *r_paths, const F &p_filter) {
+	ERR_FAIL_NULL(r_paths);
+	MutexLock mutex_lock(lock);
+
+	for (const KeyValue<String, Resource *> &E : resources) {
+		if (E.value->get_reference_count() == 0) {
+			// This resource is in the process of being deleted, ignore its existence.
+			continue;
+		}
+		if (p_filter(E.key, E.value)) {
+			r_paths->push_back(E.key);
+		}
+	}
+}
+
+void ResourceCache::get_cached_paths(List<String> *r_paths) {
+	_get_cached_paths_filtered(r_paths, [](const String &, const Resource *) { return true; });
+}
+
+void ResourceCache::get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths) {
+	if (p_type == StringName()) {
+		return;
+	}
+
+	_get_cached_paths_filtered(r_paths, [&p_type, p_exact](const String &, const Resource *p_res) {
+		// Script data used here is cached by the script; no script code runs under the cache lock.
+		Ref<Script> scr = p_res->get_script();
+		if (p_exact) {
+			// The most derived named class: the first global script class, else the native class.
+			for (; scr.is_valid(); scr = scr->get_base_script()) {
+				const StringName global_name = scr->get_global_name();
+				if (global_name != StringName()) {
+					return global_name == p_type;
+				}
+			}
+			return p_res->get_class_name() == p_type;
+		}
+
+		for (; scr.is_valid(); scr = scr->get_base_script()) {
+			if (scr->get_global_name() == p_type) {
+				return true;
+			}
+		}
+		return p_res->is_class(p_type);
+	});
+}
+
+void ResourceCache::get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths) {
+	const String extension = (p_extension.begins_with(".") ? p_extension.substr(1) : p_extension).to_lower();
+	const int ext_len = extension.length();
+	const char32_t *ext = extension.ptr();
+
+	// Compares in place, without allocating a string per cached path.
+	_get_cached_paths_filtered(r_paths, [ext, ext_len](const String &p_path, const Resource *) {
+		const int sep = p_path.find("::");
+		const int file_end = sep < 0 ? p_path.length() : sep;
+		const int dot = file_end > 0 ? p_path.rfind_char('.', file_end - 1) : -1;
+		const int slash = file_end > 0 ? p_path.rfind_char('/', file_end - 1) : -1;
+		if (dot < 0 || dot < slash) {
+			// No extension in the file name.
+			return ext_len == 0;
+		}
+		if (file_end - dot - 1 != ext_len) {
+			return false;
+		}
+		const char32_t *path = p_path.ptr() + dot + 1;
+		for (int i = 0; i < ext_len; i++) {
+			if (String::char_lowercase(path[i]) != ext[i]) {
+				return false;
+			}
+		}
+		return true;
+	});
+}
+
+void ResourceCache::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths) {
+	if (p_directory.is_empty()) {
+		return;
+	}
+	const String directory = p_directory.ends_with("/") ? p_directory : p_directory + "/";
+
+	_get_cached_paths_filtered(r_paths, [&directory, p_recursive](const String &p_path, const Resource *) {
+		if (!p_path.begins_with(directory)) {
+			return false;
+		}
+		if (p_recursive) {
+			return true;
+		}
+		// Direct child: no further '/' in the file part (the "::<id>" of a sub-resource is not part of it).
+		const int slash = p_path.find_char('/', directory.length());
+		if (slash < 0) {
+			return true;
+		}
+		const int sep = p_path.find("::", directory.length());
+		return sep >= 0 && sep < slash;
+	});
 }
 
 int ResourceCache::get_cached_resource_count() {

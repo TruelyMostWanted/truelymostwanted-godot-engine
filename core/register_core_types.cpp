@@ -48,6 +48,8 @@
 #include "core/io/config_file.h"
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
+#include "core/io/files_manifest.h"
+#include "core/io/files_manifest_server.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
@@ -59,11 +61,16 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_package.h"
+#include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
+#include "core/io/resource_database.h"
 #include "core/io/resource_format_binary.h"
+#include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
@@ -72,10 +79,12 @@
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
 #include "core/io/xml_parser.h"
+#include "core/io/xml_writer.h"
 #include "core/math/a_star.h"
 #include "core/math/a_star_grid_2d.h"
 #include "core/math/expression.h"
 #include "core/math/random_number_generator.h"
+#include "core/math/seed_server.h"
 #include "core/math/triangle_mesh.h"
 #include "core/object/class_db.h"
 #include "core/object/script_backtrace.h"
@@ -105,9 +114,19 @@ static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<GDExtensionResourceLoader> resource_loader_gdextension;
 static Ref<ResourceFormatSaverJSON> resource_saver_json;
 static Ref<ResourceFormatLoaderJSON> resource_loader_json;
+static Ref<ResourceFormatLoaderResourceJSON> resource_loader_resource_json;
+static Ref<ResourceFormatSaverResourceJSON> resource_saver_resource_json;
+static Ref<ResourceFormatLoaderResourceINI> resource_loader_resource_ini;
+static Ref<ResourceFormatSaverResourceINI> resource_saver_resource_ini;
+static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
+static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
+static ResourceTextSerializer *_resource_text_serializer = nullptr;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
+static FilesManifestServer *_files_manifest_server = nullptr;
+static PckPackageServer *_pck_package_server = nullptr;
+static ResourceDatabase *_resource_database = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
 static CoreBind::Engine *_engine = nullptr;
@@ -131,6 +150,7 @@ extern void register_global_constants();
 extern void unregister_global_constants();
 
 static ResourceUID *resource_uid = nullptr;
+static SeedServer *seed_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -254,6 +274,15 @@ void register_core_types() {
 		ResourceLoader::add_resource_format_loader(resource_format_loader_crypto);
 	}
 
+	// Resource text formats (JSON, INI, CSV). The JSON loader comes before ResourceFormatLoaderJSON,
+	// which takes all JSON files without a "$type" key.
+	resource_loader_resource_json.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_json);
+	resource_loader_resource_ini.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_ini);
+	resource_loader_resource_csv.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_csv);
+
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		resource_saver_json.instantiate();
 		ResourceSaver::add_resource_format_saver(resource_saver_json);
@@ -261,6 +290,13 @@ void register_core_types() {
 		resource_loader_json.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_json);
 	}
+
+	resource_saver_resource_json.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_json);
+	resource_saver_resource_ini.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_ini);
+	resource_saver_resource_csv.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_csv);
 
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
@@ -277,6 +313,7 @@ void register_core_types() {
 	GDREGISTER_VIRTUAL_CLASS(CoreBind::Logger);
 
 	GDREGISTER_CLASS(XMLParser);
+	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
 	GDREGISTER_CLASS(RegExMatch);
 	GDREGISTER_CLASS(RegEx);
@@ -290,6 +327,10 @@ void register_core_types() {
 	GDREGISTER_CLASS(AStarGrid2D);
 	GDREGISTER_CLASS(EncodedObjectAsID);
 	GDREGISTER_CLASS(RandomNumberGenerator);
+	GDREGISTER_ABSTRACT_CLASS(SeedServer);
+	seed_server = memnew(SeedServer);
+	GDREGISTER_ABSTRACT_CLASS(ResourceTextSerializer);
+	_resource_text_serializer = memnew(ResourceTextSerializer);
 #ifndef DISABLE_DEPRECATED
 	GDREGISTER_CLASS(PackedDataContainer);
 	GDREGISTER_ABSTRACT_CLASS(PackedDataContainerRef);
@@ -324,9 +365,15 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(IP);
 	GDREGISTER_CLASS(CoreBind::Geometry2D);
 	GDREGISTER_CLASS(CoreBind::Geometry3D);
+	GDREGISTER_CLASS(FilesManifest);
 	GDREGISTER_CLASS(PathInfo);
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
+	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(PckPackage);
+	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
+	GDREGISTER_CLASS(PreloadList);
+	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
 	GDREGISTER_CLASS(CoreBind::OS);
@@ -350,6 +397,9 @@ void register_core_types() {
 	_path_prefix_server = memnew(PathPrefixServer);
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
+	_files_manifest_server = memnew(FilesManifestServer);
+	_pck_package_server = memnew(PckPackageServer);
+	_resource_database = memnew(ResourceDatabase);
 	_os = memnew(CoreBind::OS);
 	_engine = memnew(CoreBind::Engine);
 	_classdb = memnew(CoreBind::Special::ClassDB);
@@ -366,6 +416,8 @@ void register_core_types() {
 
 void register_core_settings() {
 	// Since in register core types, globals may not be present.
+	GLOBAL_DEF(PropertyInfo(Variant::DICTIONARY, "filesystem/manifests/autoload", PROPERTY_HINT_DICTIONARY_TYPE, "String;String"), Dictionary());
+	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, "filesystem/resources/preload_lists", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:*.tres,*.res", Variant::STRING, PROPERTY_HINT_FILE)), PackedStringArray());
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/tcp/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/unix/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "network/limits/packet_peer_stream/max_buffer_po2", PROPERTY_HINT_RANGE, "8,64,1,or_greater"), (16));
@@ -375,6 +427,7 @@ void register_core_settings() {
 	GLOBAL_DEF("threading/worker_pool/low_priority_thread_ratio", 0.3);
 
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
+	ResourceTextSerializer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -391,6 +444,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("IP", IP::get_singleton(), "IP"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Geometry2D", CoreBind::Geometry2D::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Geometry3D", CoreBind::Geometry3D::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("SeedServer", SeedServer::get_singleton(), "SeedServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceLoader", CoreBind::ResourceLoader::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceSaver", CoreBind::ResourceSaver::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", CoreBind::Marshalls::get_singleton()));
@@ -401,6 +455,10 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("PckPackageServer", PckPackageServer::get_singleton(), "PckPackageServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceDatabase", ResourceDatabase::get_singleton(), "ResourceDatabase"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
 
 	OS::get_singleton()->benchmark_end_measure("Core", "Register Singletons");
@@ -437,6 +495,8 @@ void unregister_core_types() {
 
 	// Destroy singletons in reverse order to ensure dependencies are not broken.
 
+	// Waits for preloads on worker threads, so before the pool goes away.
+	memdelete(_resource_database);
 	memdelete(worker_thread_pool);
 
 	memdelete(_engine_debugger);
@@ -446,6 +506,8 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_pck_package_server);
+	memdelete(_files_manifest_server);
 	memdelete(_path_prefix_server);
 
 	memdelete(_geometry_3d);
@@ -454,6 +516,9 @@ void unregister_core_types() {
 	memdelete(gdextension_manager);
 
 	memdelete(resource_uid);
+
+	memdelete(seed_server);
+	memdelete(_resource_text_serializer);
 
 	memdelete(ip);
 
@@ -486,6 +551,19 @@ void unregister_core_types() {
 		ResourceLoader::remove_resource_format_loader(resource_format_loader_crypto);
 		resource_format_loader_crypto.unref();
 	}
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_json);
+	resource_loader_resource_json.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_json);
+	resource_saver_resource_json.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_ini);
+	resource_loader_resource_ini.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_ini);
+	resource_saver_resource_ini.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_csv);
+	resource_loader_resource_csv.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_csv);
+	resource_saver_resource_csv.unref();
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_json);
