@@ -437,10 +437,10 @@
 		</method>
 	</methods>
 	<members>
-		<member name="apply_mode" type="int" setter="set_apply_mode" getter="get_apply_mode" enum="SettingsServer.ApplyMode" default="0">
+		<member name="apply_mode" type="int" setter="set_apply_mode" getter="get_apply_mode" enum="SettingsServer.ApplyMode">
 			When changed values are applied: at once or when [method apply] is called.
 		</member>
-		<member name="file_path" type="String" setter="set_file_path" getter="get_file_path" default="&quot;&quot;">
+		<member name="file_path" type="String" setter="set_file_path" getter="get_file_path">
 			The path of the settings file. If empty, the file is [code]&lt;storage folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] (see [method get_storage_folder] and [method get_storage_format]); the getter then returns this path. The format is taken from the extension of the path: [code].ini[/code], [code].json[/code] or [code].csv[/code]. Anything else is written as INI.
 		</member>
 	</members>
