@@ -59,12 +59,12 @@ TypedArray<FilesManifest> PreloadList::get_manifests() const {
 	return manifests;
 }
 
-void PreloadList::set_keys(const Dictionary &p_keys) {
+void PreloadList::set_keys(const TypedDictionary<String, String> &p_keys) {
 	keys = p_keys;
 	emit_changed();
 }
 
-Dictionary PreloadList::get_keys() const {
+TypedDictionary<String, String> PreloadList::get_keys() const {
 	return keys;
 }
 

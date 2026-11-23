@@ -32,8 +32,8 @@
 
 #include "core/io/files_manifest.h"
 #include "core/io/resource.h"
-#include "core/variant/dictionary.h"
 #include "core/variant/typed_array.h"
+#include "core/variant/typed_dictionary.h"
 
 // Names resources to keep in memory: direct references, paths and manifests, plus optional
 // keys (key -> path). `ResourceDatabase.preload_list()` loads them once and holds them.
@@ -45,7 +45,7 @@ class PreloadList : public Resource {
 	TypedArray<Resource> resources;
 	PackedStringArray paths;
 	TypedArray<FilesManifest> manifests;
-	Dictionary keys;
+	TypedDictionary<String, String> keys;
 
 protected:
 	static void _bind_methods();
@@ -60,8 +60,8 @@ public:
 	void set_manifests(const TypedArray<FilesManifest> &p_manifests);
 	TypedArray<FilesManifest> get_manifests() const;
 
-	void set_keys(const Dictionary &p_keys);
-	Dictionary get_keys() const;
+	void set_keys(const TypedDictionary<String, String> &p_keys);
+	TypedDictionary<String, String> get_keys() const;
 
 	// True if the list names nothing.
 	bool is_empty() const;
