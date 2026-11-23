@@ -705,7 +705,7 @@ PackedStringArray PerformanceRecorder::get_column_names() const {
 PackedFloat64Array PerformanceRecorder::get_column(const StringName &p_name) const {
 	PackedFloat64Array result;
 	const String name = p_name;
-	const int column = column_names.find(name);
+	const int64_t column = column_names.find(name);
 	ERR_FAIL_COND_V_MSG(column < 0, result, vformat("PerformanceRecorder: there is no column \"%s\".", name));
 	const uint64_t count = MIN(rows_total, (uint64_t)capacity);
 	result.resize(count);
