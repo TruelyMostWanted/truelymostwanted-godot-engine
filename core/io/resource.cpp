@@ -893,6 +893,19 @@ void ResourceCache::get_cached_resources(List<Ref<Resource>> *p_resources) {
 	}
 }
 
+void ResourceCache::get_cached_paths(List<String> *r_paths) {
+	ERR_FAIL_NULL(r_paths);
+	MutexLock mutex_lock(lock);
+
+	for (const KeyValue<String, Resource *> &E : resources) {
+		if (E.value->get_reference_count() == 0) {
+			// This resource is in the process of being deleted, ignore its existence.
+			continue;
+		}
+		r_paths->push_back(E.key);
+	}
+}
+
 int ResourceCache::get_cached_resource_count() {
 	MutexLock mutex_lock(lock);
 	return resources.size();

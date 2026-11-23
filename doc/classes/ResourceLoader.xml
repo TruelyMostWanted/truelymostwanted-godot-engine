@@ -33,6 +33,22 @@
 				[b]Note:[/b] If you use [method Resource.take_over_path], this method will return [code]true[/code] for the taken path even if the resource wasn't saved (i.e. exists only in resource cache).
 			</description>
 		</method>
+		<method name="get_cached_paths">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the paths of all resources that are currently in the resource cache, in no particular order. A resource stays in the cache as long as at least one reference to it exists. Each returned path can be passed to [method get_cached_ref] or [method has_cached].
+				The result includes the paths of built-in sub-resources that were cached together with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code]. Resources without a path are never cached and are not included. Filter the result in your script if you only need some of the paths:
+				[codeblocks]
+				[gdscript]
+				var textures = ResourceLoader.get_cached_paths().filter(func(path): return path.ends_with(".png"))
+				[/gdscript]
+				[csharp]
+				var textures = ResourceLoader.GetCachedPaths().Where(path =&gt; path.EndsWith(".png"));
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] The result is a snapshot. It is safe to call this method while other threads load resources, but those threads may add or remove paths right after it returns.
+			</description>
+		</method>
 		<method name="get_cached_ref">
 			<return type="Resource" />
 			<param index="0" name="path" type="String" />
