@@ -172,6 +172,29 @@ TEST_CASE("[OS] Processor count and memory information") {
 #endif // DEBUG_ENABLED
 }
 
+TEST_CASE("[OS] Process memory") {
+	const Dictionary info = OS::get_singleton()->get_process_memory_info();
+	CHECK(info.has("resident"));
+	CHECK(info.has("private"));
+	CHECK(info.has("peak"));
+	CHECK(info.has("heap"));
+	CHECK_EQ(info.size(), 4);
+	for (const Variant &key : info.keys()) {
+		const int64_t value = info[key];
+		CHECK_MESSAGE(value >= -1, "Each process memory entry should be -1 (unknown) or a byte count.");
+	}
+
+#if defined(WINDOWS_ENABLED) || defined(LINUXBSD_ENABLED) || defined(MACOS_ENABLED)
+	const uint64_t usage = OS::get_singleton()->get_process_memory_usage();
+	CHECK_MESSAGE(usage > 0, "The process memory usage should be known on desktop platforms.");
+
+	const int64_t resident = info["resident"];
+	const int64_t peak = info["peak"];
+	CHECK_MESSAGE(resident > 0, "The resident memory should be known on desktop platforms.");
+	CHECK_MESSAGE(peak >= resident, "The peak resident memory should not be lower than the resident memory.");
+#endif
+}
+
 TEST_CASE("[OS] Execute") {
 #ifdef WINDOWS_ENABLED
 	List<String> arguments;

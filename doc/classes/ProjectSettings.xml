@@ -3642,6 +3642,9 @@
 		<member name="settings/apply/confirmation_timeout" type="float" setter="" getter="" default="15.0">
 			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_pending] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
 		</member>
+		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
+		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
 		</member>
