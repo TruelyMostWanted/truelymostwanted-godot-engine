@@ -103,17 +103,17 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='e87125ff1b'
+LAST_INTEGRATED_COMMIT='111a69de32'
 CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
 
-**In Arbeit:** – #5 gemergt und geschlossen. #8 und #9: WIP-Commits auf ihren Branches (gepusht, ungebaut, nur Teile: `files_manifest_server.h`; `preload_list.*`, `resource_database.h`). Fortsetzen mit frischem Agenten auf dem Branch. Board #8/#9: WIP.
+**In Arbeit:** – #8 gemergt (offen nur für Prüfung im Export-Build, Board: Review). #9: WIP-Commit auf `09-feature-resource-database` (ungebaut, nur `preload_list.*`, `resource_database.h`).
 
 ## Übergabe
 
 **Zuerst fortsetzen:**
-1. #8, #9 fortsetzen (WIP auf den Branches), dann je Issue nacheinander: je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
+1. #9 fortsetzen (WIP auf dem Branch), dann: je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
 2. CI 45215922124 (Stapel #37 + #34) prüfen. macOS/iOS bekamen schon zweimal keinen Runner (abgebrochen ohne Schritt) – Infrastruktur, kein Code-Fehler.
 3. Danach: #35, #36 (jetzt frei, #5 ist gemergt), #10, #53 (Folge von #34), #13, Phase 3 ab #15, Phase 5 #50, #51.
 4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39.
@@ -125,7 +125,7 @@ UPDATED='2026-11-23'
 
 **Fragen an den Besitzer:** –
 
-**Am Bildschirm zu prüfen (manual):** #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
+**Am Bildschirm zu prüfen (manual):** #8: Export-Build mit `user://`/`exec://`-Ordnern, `res://` schreibgeschützt; danach #8 schließen. #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
 
 **Regeln, neu:** –
 
