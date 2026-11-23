@@ -49,6 +49,7 @@
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
+#include "core/io/files_manifest_server.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
@@ -120,6 +121,7 @@ static ResourceTextSerializer *_resource_text_serializer = nullptr;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
+static FilesManifestServer *_files_manifest_server = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
 static CoreBind::Engine *_engine = nullptr;
@@ -362,6 +364,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathInfo);
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
+	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
 	GDREGISTER_CLASS(CoreBind::OS);
@@ -385,6 +388,7 @@ void register_core_types() {
 	_path_prefix_server = memnew(PathPrefixServer);
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
+	_files_manifest_server = memnew(FilesManifestServer);
 	_os = memnew(CoreBind::OS);
 	_engine = memnew(CoreBind::Engine);
 	_classdb = memnew(CoreBind::Special::ClassDB);
@@ -401,6 +405,7 @@ void register_core_types() {
 
 void register_core_settings() {
 	// Since in register core types, globals may not be present.
+	GLOBAL_DEF(PropertyInfo(Variant::DICTIONARY, "filesystem/manifests/autoload", PROPERTY_HINT_DICTIONARY_TYPE, "String;String"), Dictionary());
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/tcp/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/unix/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "network/limits/packet_peer_stream/max_buffer_po2", PROPERTY_HINT_RANGE, "8,64,1,or_greater"), (16));
@@ -438,6 +443,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
 
@@ -484,6 +490,7 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_files_manifest_server);
 	memdelete(_path_prefix_server);
 
 	memdelete(_geometry_3d);
