@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioBusSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the volume, mute and solo values of the audio buses.
+	</brief_description>
+	<description>
+		[AudioBusSettingsServer] is the settings domain [code]"audio_buses"[/code]: it stores the volume, mute and solo values of the buses of [AudioServer] for the player, loads them when the game starts and applies them before the first sound plays (in [constant SettingsServer.APPLY_PHASE_SERVERS], right after the default bus layout is loaded and before the [SceneTree] exists, so no [AudioStreamPlayer] can start earlier).
+		The settings resource is an [AudioBusListSettings] with one [AudioBusSettings] entry per bus. Buses are identified by their name ([member AudioBusSettings.bus_name]), not by their index, so a game update that adds or reorders buses keeps the stored values. The defaults are the values of the bus layout when the game starts. Buses of the layout that have no stored entry yet (added by a game update) keep their layout values and are added to the list after loading. Stored buses that the layout does not have are skipped with a warning, or created if [member create_missing_buses] is [code]true[/code].
+		The file is [code]user://settings/audio_buses.ini[/code] by default. Because the settings resource holds nothing but the list, it can also be stored as CSV with one row per bus ([member ProjectSettings.settings/storage/format] [code]"csv"[/code]). The output and input device are a separate domain, see [AudioSettingsServer].
+		All typed methods below go through [method ListSettingsServer.set_entry_value] or [method ListSettingsServer.add_entry]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change is applied to [AudioServer] at once and saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
+		[codeblocks]
+		[gdscript]
+		# A volume slider from 0 to 100 %.
+		func _on_music_slider_value_changed(value):
+			AudioBusSettingsServer.set_bus_volume_linear(&amp;"Music", value / 100.0)
+
+		func _ready():
+			$MusicSlider.value = AudioBusSettingsServer.get_bus_volume_linear(&amp;"Music") * 100.0
+			$MuteCheck.button_pressed = AudioBusSettingsServer.is_bus_mute(&amp;"Master")
+
+		# A menu with "Apply" and "Cancel".
+		func open_menu():
+			AudioBusSettingsServer.apply_mode = SettingsServer.APPLY_MODE_MANUAL
+
+		func _on_apply_pressed():
+			AudioBusSettingsServer.apply()
+
+		func _on_cancel_pressed():
+			AudioBusSettingsServer.revert()
+		[/gdscript]
+		[csharp]
+		// A volume slider from 0 to 100 %.
+		private void OnMusicSliderValueChanged(double value)
+		{
+		    AudioBusSettingsServer.SetBusVolumeLinear("Music", (float)(value / 100.0));
+		}
+
+		public override void _Ready()
+		{
+		    GetNode&lt;Slider&gt;("MusicSlider").Value = AudioBusSettingsServer.GetBusVolumeLinear("Music") * 100.0;
+		    GetNode&lt;CheckBox&gt;("MuteCheck").ButtonPressed = AudioBusSettingsServer.IsBusMute("Master");
+		}
+
+		// A menu with "Apply" and "Cancel". Methods of the base classes are called through Singleton.
+		private void OpenMenu()
+		{
+		    AudioBusSettingsServer.Singleton.ApplyMode = SettingsServer.ApplyModeEnum.Manual;
+		}
+
+		private void OnApplyPressed()
+		{
+		    AudioBusSettingsServer.Singleton.Apply();
+		}
+
+		private void OnCancelPressed()
+		{
+		    AudioBusSettingsServer.Singleton.Revert();
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]AudioBusSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] and [ListSettingsServer] are called through [code]AudioBusSettingsServer.Singleton[/code].
+		[b]Note:[/b] [method AudioServer.set_bus_layout] replaces all bus values. If the game switches the bus layout at runtime, the stored values are not applied to the new layout automatically.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_bus_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all buses that have an entry, in the order of the list: the buses of the layout first, then stored buses that the layout does not have.
+			</description>
+		</method>
+		<method name="get_bus_volume_db" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns the pending volume of the bus [param bus] in decibels. For a bus of the layout without an entry, returns its value in [AudioServer]. Reports an error and returns [code]0.0[/code] if there is no such bus.
+			</description>
+		</method>
+		<method name="get_bus_volume_linear" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns the pending volume of the bus [param bus] as a linear value: [code]1.0[/code] is 0 dB (100 %), [code]0.0[/code] is silence (-80 dB or lower). Useful for sliders in percent.
+			</description>
+		</method>
+		<method name="has_bus" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the bus [param bus] has an entry or exists in the current bus layout of [AudioServer], that is, if its values can be set.
+			</description>
+		</method>
+		<method name="is_bus_mute" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the bus [param bus] is muted in the pending settings.
+			</description>
+		</method>
+		<method name="is_bus_solo" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the bus [param bus] is in solo mode in the pending settings.
+			</description>
+		</method>
+		<method name="set_bus_mute">
+			<return type="void" />
+			<param index="0" name="bus" type="StringName" />
+			<param index="1" name="mute" type="bool" />
+			<description>
+				Mutes or unmutes the bus [param bus]. Reports an error if the bus has no entry and does not exist in the bus layout.
+			</description>
+		</method>
+		<method name="set_bus_solo">
+			<return type="void" />
+			<param index="0" name="bus" type="StringName" />
+			<param index="1" name="solo" type="bool" />
+			<description>
+				Sets the solo mode of the bus [param bus]. Reports an error if the bus has no entry and does not exist in the bus layout.
+			</description>
+		</method>
+		<method name="set_bus_volume_db">
+			<return type="void" />
+			<param index="0" name="bus" type="StringName" />
+			<param index="1" name="volume_db" type="float" />
+			<description>
+				Sets the volume of the bus [param bus] in decibels, clamped to -80 dB … 24 dB (the range of the bus slider in the editor). If the bus exists in the layout but has no entry yet, an entry with its current values is added first. Reports an error if the bus has no entry and does not exist in the bus layout.
+			</description>
+		</method>
+		<method name="set_bus_volume_linear">
+			<return type="void" />
+			<param index="0" name="bus" type="StringName" />
+			<param index="1" name="volume_linear" type="float" />
+			<description>
+				Sets the volume of the bus [param bus] as a linear value ([code]1.0[/code] is 0 dB, [code]0.5[/code] is about -6 dB, [code]0.0[/code] or less is -80 dB). The value is stored in decibels, see [method set_bus_volume_db].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="create_missing_buses" type="bool" setter="set_create_missing_buses" getter="is_create_missing_buses_enabled">
+			If [code]true[/code], a stored bus that the bus layout does not have is added to [AudioServer] at the end of the layout when the values are applied. If [code]false[/code], it is skipped with one warning per bus and session; its entry stays in the settings and in the file. Initialized from [member ProjectSettings.settings/audio/create_missing_buses] when the server is created, so the startup uses the project setting.
+		</member>
+	</members>
+</class>
