@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextureAtlas" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A sprite sheet with named regions of any size.
+	</brief_description>
+	<description>
+		A [TextureAtlas] references exactly one [Texture2D] (the sprite sheet, see [member texture]) and maps sprite names to rectangles in pixels of that texture (see [member regions]). The regions may have any size. Each region is available by name as an [AtlasTexture] through [method get_texture]; these textures always reference the atlas texture and are updated when the atlas changes.
+		[codeblocks]
+		[gdscript]
+		var atlas: TextureAtlas = load("res://ui/icons.atlas.tres")
+		$Icon.texture = atlas.get_texture("coin")
+		$Player.sprite_frames = atlas.create_sprite_frames("walk_")
+		[/gdscript]
+		[csharp]
+		var atlas = GD.Load&lt;TextureAtlas&gt;("res://ui/icons.atlas.tres");
+		GetNode&lt;Sprite2D&gt;("Icon").Texture = atlas.GetTexture("coin");
+		GetNode&lt;AnimatedSprite2D&gt;("Player").SpriteFrames = atlas.CreateSpriteFrames("walk_");
+		[/csharp]
+		[/codeblocks]
+		Besides [code].tres[/code], an atlas is read from and written to three fixed text layouts and can import TexturePacker JSON files (Hash and Array), the sprite sheet format used by Phaser and PixiJS:
+		[b]JSON[/b] ([method save_as_json], [method load_from_json]): an object with the keys [code]TexturePath[/code] and [code]AtlasImages[/code]; [code]AtlasImages[/code] maps each sprite name to an object with [code]X[/code], [code]Y[/code], [code]Width[/code] and [code]Height[/code], in region order. Unknown keys are ignored.
+		[codeblock lang=text]
+		{
+			"TexturePath": "res://ui/icons.png",
+			"AtlasImages": {
+				"My_Sprite": { "X": 0, "Y": 0, "Width": 100, "Height": 100 },
+				"Coin": { "X": 100, "Y": 0, "Width": 32, "Height": 32 }
+			}
+		}
+		[/codeblock]
+		[b]CSV[/b] ([method save_as_csv], [method load_from_csv]): the first row is [code]TexturePath,&lt;path&gt;[/code], the second row the column names [code]Name,X,Y,Width,Height[/code], then one row per sprite.
+		[b]INI[/b] ([method save_as_ini], [method load_from_ini]): a section [code][Atlas][/code] with the key [code]TexturePath[/code], then one section per sprite with the keys [code]X[/code], [code]Y[/code], [code]Width[/code] and [code]Height[/code].
+		All three layouts have the optional keys (or columns) [code]MarginX[/code], [code]MarginY[/code], [code]SourceWidth[/code] and [code]SourceHeight[/code] for regions with a margin (see [method set_region_margin]); they are written only for regions that have one. CSV rows and INI sections are read and written with the same rules as the text formats of [ResourceTextSerializer] (quoting, comments, byte order mark).
+		Loading is all-or-nothing: the text is parsed and every region is validated first. On an error, the atlas is not changed and the error message names the sprite.
+		[b]Note:[/b] Like other resources, a [TextureAtlas] is not thread-safe. Use it from one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear_regions">
+			<return type="void" />
+			<description>
+				Removes all regions. [AtlasTexture]s handed out before keep their last values.
+			</description>
+		</method>
+		<method name="create_sprite_frames">
+			<return type="SpriteFrames" />
+			<param index="0" name="prefix" type="String" default="&quot;&quot;" />
+			<param index="1" name="fps" type="float" default="5.0" />
+			<description>
+				Builds a [SpriteFrames] resource from the regions whose names start with [param prefix]. The animation name is the region name without its trailing number and without a trailing [code]_[/code], [code]-[/code], [code].[/code] or space: [code]walk_0[/code], [code]walk_1[/code] and [code]walk_10[/code] become the animation [code]walk[/code]. If nothing is left (for example with the prefix [code]walk_[/code]), the prefix without its separator is used. Frames are sorted by their number in numeric order ([code]walk_2[/code] before [code]walk_10[/code]); regions without a number become one-frame animations. Every animation plays at [param fps] frames per second and loops.
+				The frames are the [AtlasTexture]s of [method get_texture], so they stay linked to the atlas. The animation [code]"default"[/code] is removed unless a region produces it.
+				[codeblocks]
+				[gdscript]
+				var frames = atlas.create_sprite_frames("hero_", 12.0)
+				$Hero.sprite_frames = frames
+				$Hero.play("hero_walk")
+				[/gdscript]
+				[csharp]
+				SpriteFrames frames = atlas.CreateSpriteFrames("hero_", 12.0);
+				hero.SpriteFrames = frames;
+				hero.Play("hero_walk");
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_region" qualifiers="const">
+			<return type="Rect2i" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the rectangle of the region [param name] in pixels of [member texture]. Prints an error and returns an empty [Rect2i] if the region does not exist.
+			</description>
+		</method>
+		<method name="get_region_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of regions.
+			</description>
+		</method>
+		<method name="get_region_margin" qualifiers="const">
+			<return type="Rect2i" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the margin of the region [param name] (see [method set_region_margin]). Prints an error and returns an empty [Rect2i] if the region does not exist.
+			</description>
+		</method>
+		<method name="get_region_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all regions, in insertion order.
+			</description>
+		</method>
+		<method name="get_texture">
+			<return type="AtlasTexture" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the [AtlasTexture] of the region [param name]: its [member AtlasTexture.atlas] is [member texture], its [member AtlasTexture.region] the rectangle of the region, its [member AtlasTexture.margin] the margin of the region and its [member AtlasTexture.filter_clip] the value of [member filter_clip].
+				The texture is created on the first call and then returned again for the same name, so it can be compared and shared. It is updated whenever [member texture], [member filter_clip], the region or its margin changes, and it follows [method rename_region]. If the region is removed, the texture keeps its last values. Prints an error and returns [code]null[/code] if the region does not exist.
+			</description>
+		</method>
+		<method name="has_region" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a region named [param name] exists.
+			</description>
+		</method>
+		<method name="import_texture_packer_json">
+			<return type="int" enum="Error" />
+			<param index="0" name="json" type="String" />
+			<param index="1" name="base_dir" type="String" default="&quot;&quot;" />
+			<description>
+				Replaces all regions with the frames of a TexturePacker JSON file, in the Hash ([code]"frames": {...}[/code]) or Array ([code]"frames": [...][/code]) layout. [code]meta.image[/code] becomes the texture path; a relative path is resolved against [param base_dir] (usually the folder of the JSON file).
+				Frame file names become region names: an image extension is removed and slashes, backslashes, [code]:[/code] and [code]"[/code] become [code]_[/code] (see [method texture_packer_name_to_region_name]).
+				Trimmed frames keep their original size: the offset and the size difference become the margin of the region ([method set_region_margin]). Rotated frames are not supported and make the import fail with an error that names the frame. Multi-texture files ([code]"textures"[/code]) are not supported.
+			</description>
+		</method>
+		<method name="is_valid_region_name" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if [param name] can be used as a region name: not empty, no [code]/[/code], [code]:[/code] or [code]"[/code], no control characters and no leading or trailing spaces.
+			</description>
+		</method>
+		<method name="load_from_csv">
+			<return type="int" enum="Error" />
+			<param index="0" name="csv" type="String" />
+			<description>
+				Replaces the texture and all regions with the content of a CSV text in the layout described in the class description. The column names may be in any order and case. See [method load_from_json] for how the texture is resolved.
+			</description>
+		</method>
+		<method name="load_from_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Reads the file at [param path] and loads it by its extension: [code].json[/code] with [method load_from_json], or with [method import_texture_packer_json] if the JSON object has a [code]frames[/code] key (relative image paths are resolved against the folder of the file), [code].csv[/code] with [method load_from_csv] and [code].ini[/code] with [method load_from_ini]. Returns [constant ERR_FILE_UNRECOGNIZED] for other extensions.
+			</description>
+		</method>
+		<method name="load_from_ini">
+			<return type="int" enum="Error" />
+			<param index="0" name="ini" type="String" />
+			<description>
+				Replaces the texture and all regions with the content of an INI text in the layout described in the class description. The first section [code][Atlas][/code] holds the texture path; every other section is a sprite. See [method load_from_json] for how the texture is resolved.
+			</description>
+		</method>
+		<method name="load_from_json">
+			<return type="int" enum="Error" />
+			<param index="0" name="json" type="String" />
+			<description>
+				Replaces the texture and all regions with the content of a JSON text in the layout described in the class description, keeping the order of [code]AtlasImages[/code].
+				The texture path is stored in [member texture_path]. If it equals [member texture_path] or the resource path of the current [member texture], the current texture is kept; otherwise it is loaded with [method ResourceLoader.load] (any path the engine can load, including [code]uid://[/code] and path prefixes such as [code]mods://[/code]). A missing [code]TexturePath[/code], a texture that cannot be loaded, an invalid name or a region outside the texture is an error; the atlas is then not changed.
+			</description>
+		</method>
+		<method name="remove_region">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the region [param name]. The [AtlasTexture] handed out before for it keeps its last values.
+			</description>
+		</method>
+		<method name="rename_region">
+			<return type="int" enum="Error" />
+			<param index="0" name="from" type="StringName" />
+			<param index="1" name="to" type="StringName" />
+			<description>
+				Renames the region [param from] to [param to]. The region keeps its position in the order and its [AtlasTexture]. Returns [constant ERR_DOES_NOT_EXIST] if [param from] does not exist, [constant ERR_ALREADY_EXISTS] if [param to] exists, and [constant ERR_INVALID_PARAMETER] if [param to] is not a valid name.
+			</description>
+		</method>
+		<method name="save_as_csv" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the atlas as CSV text in the layout described in the class description. The margin columns are written only if at least one region has a margin. The texture path is written as described in [method save_as_json].
+			</description>
+		</method>
+		<method name="save_as_ini" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the atlas as INI text in the layout described in the class description. The texture path is written as described in [method save_as_json].
+			</description>
+		</method>
+		<method name="save_as_json" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="indent" type="String" default="&quot;\t&quot;" />
+			<description>
+				Returns the atlas as JSON text in the layout described in the class description, with the regions in their order. [param indent] is the indentation per level; an empty string writes one line.
+				[code]TexturePath[/code] is [member texture_path] if it is set; otherwise the [code]uid://[/code] path of [member texture] if the texture has a UID, otherwise its resource path.
+			</description>
+		</method>
+		<method name="save_to_file" qualifiers="const">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Writes the atlas to [param path] in the layout of its extension: [code].json[/code], [code].csv[/code] or [code].ini[/code]. Returns [constant ERR_FILE_UNRECOGNIZED] for other extensions.
+			</description>
+		</method>
+		<method name="set_region">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="rect" type="Rect2i" />
+			<description>
+				Adds the region [param name] or changes its rectangle. A new region is appended to the order. The width and height must be greater than [code]0[/code], and if [member texture] is set, the rectangle must lie completely inside it (the size is taken from [method Texture2D.get_size], no pixels are read). Otherwise an error is printed, [constant ERR_INVALID_PARAMETER] is returned and nothing changes. See [method is_valid_region_name] for valid names.
+				[codeblocks]
+				[gdscript]
+				var atlas = TextureAtlas.new()
+				atlas.texture = load("res://ui/icons.png")
+				atlas.set_region("coin", Rect2i(0, 0, 16, 16))
+				atlas.set_region("sword", Rect2i(16, 0, 24, 48))
+				$Coin.texture = atlas.get_texture("coin")
+				[/gdscript]
+				[csharp]
+				var atlas = new TextureAtlas();
+				atlas.Texture = GD.Load&lt;Texture2D&gt;("res://ui/icons.png");
+				atlas.SetRegion("coin", new Rect2I(0, 0, 16, 16));
+				atlas.SetRegion("sword", new Rect2I(16, 0, 24, 48));
+				GetNode&lt;Sprite2D&gt;("Coin").Texture = atlas.GetTexture("coin");
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="set_region_margin">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="margin" type="Rect2i" />
+			<description>
+				Sets the margin of the region [param name], used as [member AtlasTexture.margin] of its texture: [member Rect2i.position] is the offset of the region inside the original sprite, [member Rect2i.size] the size the original sprite is larger than the region. This restores the original size of trimmed sprites. All values must be [code]0[/code] or greater.
+			</description>
+		</method>
+		<method name="texture_packer_name_to_region_name" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="file_name" type="String" />
+			<description>
+				Returns the region name used for a TexturePacker frame file name: [code]"hero/walk_01.png"[/code] becomes [code]"hero_walk_01"[/code]. Image extensions ([code]png[/code], [code]jpg[/code], [code]jpeg[/code], [code]webp[/code], [code]bmp[/code], [code]tga[/code], [code]gif[/code], [code]svg[/code], [code]ktx[/code], [code]dds[/code]) are removed; slashes, backslashes, [code]:[/code] and [code]"[/code] become [code]_[/code].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="filter_clip" type="bool" setter="set_filter_clip" getter="is_filter_clip" default="false">
+			Value of [member AtlasTexture.filter_clip] for every texture of [method get_texture]. If [code]true[/code], the area outside a region is clipped to avoid bleeding of the surrounding pixels.
+		</member>
+		<member name="margins" type="Dictionary[StringName, Rect2i]" setter="set_margins" getter="get_margins" default="{}">
+			The margins of the regions that have one (see [method set_region_margin]). Setting this property resets all other margins to zero; names of unknown regions are ignored with an error.
+		</member>
+		<member name="regions" type="Dictionary[StringName, Rect2i]" setter="set_regions" getter="get_regions" default="{}">
+			The regions: sprite name to rectangle [code](x, y, width, height)[/code] in pixels of [member texture], in insertion order. Setting this property replaces all regions; invalid entries are skipped with an error. Regions that keep their name keep their margin and their [AtlasTexture].
+			[b]Note:[/b] The returned dictionary is a copy. Use [method set_region] and [method remove_region] to change single regions.
+		</member>
+		<member name="texture" type="Texture2D" setter="set_texture" getter="get_sheet_texture">
+			The sprite sheet of this atlas. Any [Texture2D] works ([CompressedTexture2D] of an imported image, [ImageTexture], [GradientTexture2D], [NoiseTexture2D], another [AtlasTexture], ...). Changing it updates every texture of [method get_texture] and clears [member texture_path]. Regions outside a new, smaller texture are kept and reported in one error.
+			[b]Note:[/b] Drawing never reads pixels. Only editor features such as thumbnails need [method Texture2D.get_image] to return an image.
+		</member>
+		<member name="texture_path" type="String" setter="set_texture_path" getter="get_texture_path" default="&quot;&quot;">
+			The texture path read from the last loaded text file, written back unchanged by [method save_as_json], [method save_as_csv] and [method save_as_ini], so paths with a prefix such as [code]mods://[/code] or [code]uid://[/code] round-trip as text. Empty if [member texture] was set from code.
+		</member>
+	</members>
+</class>
