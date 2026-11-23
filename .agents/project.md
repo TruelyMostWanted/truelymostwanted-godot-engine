@@ -6,6 +6,7 @@ Die eine Datei, mit der dieses Projekt geführt wird: Parameter, Ableitungen, Pl
 - Regeln: [`AGENTS.md`](../AGENTS.md), [`truely/CONVENTIONS.md`](../truely/CONVENTIONS.md), [`truely/FEATURE-WORKFLOW.md`](../truely/FEATURE-WORKFLOW.md). Es gibt **kein** `.agents/CONVENTIONS.md`, kein `godot-project/`, kein `upstream` godot-core-systems.
 - Reihenfolge und Abhängigkeiten: Tracker-Issue #32.
 - `.agents/state/` (Wissen je Issue, Datei-Index, Kosten) bleibt lokal (`.gitignore`); nur diese Datei ist versioniert. Das Repository ist öffentlich.
+- Eine lokale Kopie des Skills liegt in `.agents/skills/truely-run-agentic-project/` (gitignored, weil sie private Repositories nennt). Neu kopieren mit `cp -r ~/.claude/skills/truely-run-agentic-project .agents/skills/`.
 
 ## Abweichungen vom Skill (Besitzer, 2026-11-23)
 
