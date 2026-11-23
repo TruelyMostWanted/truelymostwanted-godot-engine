@@ -47,6 +47,7 @@
 #include "core/io/image.h"
 #include "core/io/image_loader.h"
 #include "core/io/resource_database.h"
+#include "core/io/resource_format_callable.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
@@ -857,6 +858,9 @@ void Main::test_cleanup() {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
+	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	ResourceFormatLoaderCallable::unregister_all();
+	ResourceFormatSaverCallable::unregister_all();
 	PropertyListHelper::clear_base_helpers();
 
 #ifdef TOOLS_ENABLED
@@ -5305,6 +5309,9 @@ void Main::cleanup(bool p_force) {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
+	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	ResourceFormatLoaderCallable::unregister_all();
+	ResourceFormatSaverCallable::unregister_all();
 	PropertyListHelper::clear_base_helpers();
 
 	// Remove the lock file if the engine exits successfully. Some automated processes such as
