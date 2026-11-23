@@ -58,6 +58,7 @@ public:
 		bool enums_as_names = true; // Enum properties as names instead of numbers.
 		bool plain_ini = false; // INI values without type syntax (other tools can read them).
 		String csv_delimiter = ","; // One character.
+		Ref<Resource> defaults; // JSON and INI: values of the root resource that are equal in this resource are not written.
 	};
 
 	// One INI section: the path (`root`, `root/entries/0`) and its keys.
@@ -92,6 +93,8 @@ public:
 	// INI.
 	static Error write_ini(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
 	static Error parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error);
+	// The tree of an INI text, in the layout of encode_resource(), without creating a resource.
+	static Error parse_ini_tree(const String &p_text, Dictionary &r_tree, String &r_error);
 	static Error parse_ini(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error);
 
 	// CSV.

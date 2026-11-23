@@ -536,3 +536,5 @@
 /modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
+/servers/settings/                            @TruelyMostWanted
+/servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem

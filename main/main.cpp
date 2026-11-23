@@ -82,6 +82,7 @@
 #include "servers/rendering/rendering_device.h"
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
+#include "servers/settings/settings_server_manager.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 
@@ -3330,6 +3331,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 		OS::get_singleton()->benchmark_end_measure("Servers", "Modules and Extensions");
 	}
 
+	if (!editor && !project_manager) { // Player settings, phase 1: before the DisplayServer exists.
+		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_PRE_DISPLAY);
+	}
+
 	/* Initialize Input */
 
 	{
@@ -3925,6 +3930,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 
 	theme_db->initialize_theme();
 	audio_server->load_default_bus_layout();
+
+	if (!editor && !project_manager) { // Player settings, phase 2: all servers and script languages exist.
+		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_SERVERS);
+	}
 
 #if defined(MODULE_MONO_ENABLED) && defined(TOOLS_ENABLED)
 	// Hacky to have it here, but we don't have good facility yet to let modules
@@ -4805,6 +4814,9 @@ int Main::start() {
 
 		if (!project_manager && !editor) { // game
 
+			// Player settings, phase 3: the root window is configured, the main scene is not loaded yet.
+			SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_SCENE);
+
 			OS::get_singleton()->benchmark_begin_measure("Startup", "Load Game");
 
 			// Load SSL Certificates from Project Settings (or builtin).
@@ -5291,6 +5303,10 @@ void Main::cleanup(bool p_force) {
 	if (movie_writer) {
 		movie_writer->end();
 		movie_writer = nullptr;
+	}
+
+	if (SettingsServerManager::get_singleton()) {
+		SettingsServerManager::get_singleton()->finish();
 	}
 
 	GDExtensionManager::get_singleton()->shutdown();
