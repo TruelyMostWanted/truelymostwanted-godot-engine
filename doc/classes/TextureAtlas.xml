@@ -180,7 +180,7 @@
 		</method>
 		<method name="save_as_json" qualifiers="const">
 			<return type="String" />
-			<param index="0" name="indent" type="String" default="&quot;\t&quot;" />
+			<param index="0" name="indent" type="String" default="&quot;	&quot;" />
 			<description>
 				Returns the atlas as JSON text in the layout described in the class description, with the regions in their order. [param indent] is the indentation per level; an empty string writes one line.
 				[code]TexturePath[/code] is [member texture_path] if it is set; otherwise the [code]uid://[/code] path of [member texture] if the texture has a UID, otherwise its resource path.
