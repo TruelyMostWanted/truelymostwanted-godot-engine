@@ -1117,9 +1117,8 @@ void AudioMixerServer::switch_clip(const StringName &p_channel, const StringName
 	ERR_FAIL_COND_MSG(current < 0, vformat("The audio mixer channel \"%s\" is not playing.", p_channel));
 	Ref<AudioStreamPlayback> playback = channel->voices[current].playback;
 	// AudioStreamPlaybackInteractive lives in the optional interactive_music module, so it is called by name.
-	static const StringName switch_method = "switch_to_clip_by_name";
-	ERR_FAIL_COND_MSG(playback.is_null() || !playback->has_method(switch_method), vformat("The stream of the audio mixer channel \"%s\" is not an AudioStreamInteractive.", p_channel));
-	playback->call(switch_method, p_clip);
+	ERR_FAIL_COND_MSG(playback.is_null() || !playback->has_method(SNAME("switch_to_clip_by_name")), vformat("The stream of the audio mixer channel \"%s\" is not an AudioStreamInteractive.", p_channel));
+	playback->call(SNAME("switch_to_clip_by_name"), p_clip);
 }
 
 Ref<AudioStreamPlayback> AudioMixerServer::get_channel_playback(const StringName &p_channel) const {
