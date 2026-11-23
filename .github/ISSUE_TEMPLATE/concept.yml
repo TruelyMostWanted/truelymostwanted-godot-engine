@@ -18,10 +18,10 @@ body:
       required: true
 
   - type: textarea
-    id: motivation
+    id: current_state
     attributes:
-      label: Motivation
-      description: Why it is worth thinking about now; who asked.
+      label: Current state
+      description: What the engine does today and why it is worth deciding now. Self-contained, no links into private repositories.
     validations:
       required: true
 

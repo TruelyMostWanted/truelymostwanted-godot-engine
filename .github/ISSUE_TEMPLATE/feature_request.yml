@@ -20,11 +20,20 @@ body:
       required: true
 
   - type: textarea
-    id: motivation
+    id: current_state
     attributes:
-      label: Motivation
-      description: Which problem does it solve, who benefits?
-      placeholder: Tools and games have to walk the file system by hand and miss files inside PCKs.
+      label: Current state
+      description: What the engine does today and where it falls short. Point to the code (file:line). Self-contained, no links into private repositories.
+      placeholder: ResourceLoader has no way to list resource paths; projects walk the file system by hand with DirAccess and miss files inside PCKs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What changes and why it is better. Details belong in Scope and Technical notes.
+      placeholder: ResourceLoader.list_resource_paths() returns all paths below a folder, including those inside PCK files.
     validations:
       required: true
 

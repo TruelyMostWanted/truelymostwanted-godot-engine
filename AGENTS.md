@@ -3,9 +3,8 @@
 Einstieg für KI-Agents (und Menschen), die an dieser Engine-Fork arbeiten.
 
 Dieses Repository ist **truelymostwanted-godot-engine**, eine Fork von [godotengine/godot](https://github.com/godotengine/godot).
-Hier entsteht die eigene Engine `truely-godot-engine`. Sie übernimmt Systeme aus unseren C#-Repositories
-[godot-file-system](https://github.com/TruelyMostWanted/godot-file-system) und [godot-core-systems](https://github.com/TruelyMostWanted/godot-core-systems)
-als native Engine-Features, nutzbar aus GDScript, C# und GDExtension.
+Hier entsteht die eigene Engine `truely-godot-engine`: zusätzliche native Engine-Features für Ressourcen, Pfade, Packs, Server und Einstellungen,
+nutzbar aus GDScript, C# und GDExtension.
 
 **Jede Aufgabe läuft über ein GitHub-Issue** in diesem Repository. Planung im Chat, Dokumentation im Issue und im Wiki.
 
@@ -46,6 +45,7 @@ als native Engine-Features, nutzbar aus GDScript, C# und GDExtension.
 
 ## Regeln für Agents
 
+- **Öffentlich:** Repository, Wiki und Testprojekt sind öffentlich. Private Repositories werden nirgends erwähnt (keine Namen, Links, Pfade, Klassennamen). Issues begründen sich über „Current state“ und „Proposal“.
 - **Sprache:** Unterhaltung mit dem Nutzer auf Deutsch. Issues, Commits, Code-Kommentare und Wiki auf Englisch.
 - **Erst prüfen, dann bauen:** den Teil „Feasibility to check“ eines Issues beantworten und im Issue festhalten, bevor die Umsetzung beginnt.
 - **Cross-Plattform und Web:** Beim Entwerfen, Planen und Umsetzen jedes Features die Benutzbarkeit und Performance auf Windows, Linux, macOS, Android, iOS **und im Web-Export** bedenken. Features sollen möglichst überall funktionieren, auch im Web (single-threaded, Dateien nur in `user://` und im PCK, wenig Speicher). Was nicht geht, steht im Issue unter „Platforms“.

@@ -11,7 +11,7 @@ Branches und Remotes in [`README.md`](README.md).
 
 | Regel | Bedeutung |
 |---|---|
-| **Keine Nodes** | Unsere C#-Systeme (godot-file-system, godot-core-systems) sind Nodes im Szenenbaum. **In der Engine nicht.** Server sind C++-Singletons wie `AudioServer` oder `TextServer`. Datentypen sind `Resource`s. |
+| **Keine Nodes** | Neue Systeme sind **keine Nodes** im Szenenbaum. Server sind C++-Singletons wie `AudioServer` oder `TextServer`. Datentypen sind `Resource`s. |
 | **Das C++-Objekt ist die API** | Methoden, Properties, Signale und Enums werden in `_bind_methods()` gebunden. GDScript sieht sie direkt. C# bekommt sie über den generierten Glue. |
 | **Doku gehört dazu** | Jede Klasse hat ihre Klassenreferenz in `doc/classes/<Klasse>.xml` oder `modules/<modul>/doc_classes/`. Die pre-commit-Hooks `doc-status` und `make-rst` müssen durchlaufen. Die Benutzung steht im [Wiki](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki). |
 | **Zwei Sprachen** | Jedes Feature wird in **GDScript und C#** getestet, mit einem **Mono-Build** (Testprojekt [godot-custom-build-project](https://github.com/TruelyMostWanted/godot-custom-build-project)). |
@@ -88,12 +88,13 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 
 | Art | Vorlage | Titel | Label | Überschriften |
 |---|---|---|---|---|
-| Neue Funktion | `feature_request.yml` | `[Feature] …` | `type: feature` | Summary, Motivation, Scope (In/Out of scope), Acceptance criteria, Area, Technical notes, References |
+| Neue Funktion | `feature_request.yml` | `[Feature] …` | `type: feature` | Summary, Current state, Proposal, Scope (In/Out of scope), Acceptance criteria, Area, Technical notes, References |
 | Umbau | `refactoring.yml` | `[Refactoring] …` | `type: refactoring` | Current state, Target state, Behavior change, Area, Acceptance criteria, References |
-| Konzept, Recherche | `concept.yml` | `[Concept] …` | `type: concept` | Summary, Motivation, Questions, Approaches, Acceptance criteria, References |
+| Konzept, Recherche | `concept.yml` | `[Concept] …` | `type: concept` | Summary, Current state, Questions, Approaches, Acceptance criteria, References |
 | Fehler | `bug_report.yml` | `[Bug] …` | `type: bug` | siehe Vorlage |
 | Organisation, Tracker | `task.yml` | `[Task] …` | `type: task` | Goal, Checklist, Due, Deliverables, References |
 
+- **Öffentlich und für sich verständlich:** Dieses Repository, das Wiki und das Testprojekt sind öffentlich. **Keine Verweise auf private Repositories**: keine Namen, Links, Pfade oder Klassennamen daraus. Ein Issue begründet sich allein über den Stand der Engine („Current state“ mit Code-Stellen) und den Vorschlag („Proposal“).
 - **Labels:** genau ein `type:`, mindestens ein `area:` (Engine-Bereiche: `core`, `scene`, `servers`, `editor`, `modules`, `dotnet`, `platform`, `thirdparty`, `build`, `tests`, `docs`), 0–3 `topic:`.
 - **Machbarkeit:** Jedes Feature-Issue hat unter „Technical notes“ einen Teil **„Feasibility to check“**: was in der Engine geht und was nicht. Das Ergebnis wird im Issue festgehalten, bevor die Umsetzung beginnt.
 - **Abnahme:** Jedes Feature- und Refactoring-Issue endet mit diesen fünf Punkten:
