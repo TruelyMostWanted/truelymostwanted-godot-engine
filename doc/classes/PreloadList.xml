@@ -31,7 +31,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="keys" type="Dictionary[String, String]" setter="set_keys" getter="get_keys" default="{}">
+		<member name="keys" type="Dictionary" setter="set_keys" getter="get_keys" default="{}">
 			Extra names for the preloaded resources: keys as keys, paths as values. A key can be used instead of the path in [method ResourceDatabase.get_resource] and matches patterns in [method ResourceDatabase.select]. Keys that are not paths are only known to [ResourceDatabase], not to [method ResourceLoader.load].
 		</member>
 		<member name="manifests" type="FilesManifest[]" setter="set_manifests" getter="get_manifests" default="[]">
