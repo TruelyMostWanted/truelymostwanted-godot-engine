@@ -108,7 +108,7 @@ CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
 
-**In Arbeit:** Agenten (Opus Medium, Worktrees unter `.claude/worktrees/`, kein Build) an #5 (`05-feature-resource-text-formats`), #8 (`08-feature-files-manifest-server`), #9 (`09-feature-resource-database`). Gemeinsamer Auftrag: `C:/Users/larsc/AppData/Local/Temp/claude/briefs/common.md`; Issue-Text und Wiki-Entwürfe in `C:/Users/larsc/AppData/Local/Temp/claude/scratch/issues/<N>/` (report.md ist für Agenten gesperrt → Bericht in der Antwort). Gemergt in dieser Session: #37, #34, #7, #12 (#12 offen nur für manuellen Sprachtest). Board: WIP.
+**In Arbeit:** – Agenten für #5, #8, #9 wurden beim Session-Ende gestoppt (Budget). Teilarbeit liegt ungepusht in den Worktrees unter `.claude/worktrees/agent-*` (Branches `05-feature-resource-text-formats`, `08-feature-files-manifest-server`, `09-feature-resource-database`, falls angelegt) und in `C:/Users/larsc/AppData/Local/Temp/claude/scratch/issues/<N>/`. Beim Fortsetzen: je Worktree `git log`/`git status` prüfen, dann mit frischem Agenten „setze fort“ auf dem Branch. Board steht noch auf WIP.
 
 ## Übergabe
 
