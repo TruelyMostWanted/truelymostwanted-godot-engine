@@ -1005,8 +1005,9 @@ struct TOMLWriter {
 		return "\\u" + String::num_int64(p_c, 16, true).lpad(4, "0");
 	}
 
-	static String quote(const String &p_text) {
-		const bool multiline = p_text.contains_char('\n');
+	// Strings with line breaks become multi-line strings, except keys (p_allow_multiline false).
+	static String quote(const String &p_text, bool p_allow_multiline = true) {
+		const bool multiline = p_allow_multiline && p_text.contains_char('\n');
 		String result = multiline ? "\"\"\"\n" : "\"";
 		for (int i = 0; i < p_text.length(); i++) {
 			const char32_t c = p_text[i];
@@ -1047,7 +1048,7 @@ struct TOMLWriter {
 
 	static String key(const Variant &p_key) {
 		const String text = p_key;
-		return is_bare_key(text) ? text : quote(text);
+		return is_bare_key(text) ? text : quote(text, false);
 	}
 
 	static String number(double p_value) {

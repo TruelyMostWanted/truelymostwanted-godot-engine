@@ -467,8 +467,10 @@ TEST_CASE("[TOML] Stringify keeps key order and reads back") {
 	tags.push_back("a");
 	tags.push_back("b");
 	data["tags"] = tags;
+	data["odd\nkey"] = 1;
 
 	const String text = TOML::stringify(data);
+	CHECK(text.contains("\"odd\\nkey\" = 1\n"));
 	CHECK(text.begins_with("name = \"Game\"\n\"$type\" = \"Settings\"\nvolume = 0.1\n"));
 	CHECK(text.contains("\n[window]\nwidth = 1280\nscale = 1.5\nintegral = 2.0\n"));
 	CHECK(text.contains("\n[[players]]\nname = \"Ann\"\n\n[players.pos]\nx = 1\n"));
@@ -490,6 +492,7 @@ TEST_CASE("[TOML] Stringify keeps key order and reads back") {
 	CHECK(int(Dictionary(Dictionary(players_back[0])["pos"])["x"]) == 1);
 	CHECK(String(Dictionary(players_back[1])["name"]) == "Line\nbreak");
 	CHECK(Dictionary(back["empty"]).is_empty());
+	CHECK(int(back["odd\nkey"]) == 1);
 
 	// Objects can't be written.
 	Dictionary invalid;
