@@ -61,6 +61,8 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_package.h"
+#include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
 #include "core/io/resource_database.h"
 #include "core/io/resource_format_binary.h"
@@ -123,6 +125,7 @@ static ResourceTextSerializer *_resource_text_serializer = nullptr;
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
 static FilesManifestServer *_files_manifest_server = nullptr;
+static PckPackageServer *_pck_package_server = nullptr;
 static ResourceDatabase *_resource_database = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
@@ -367,6 +370,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(PckPackage);
+	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
 	GDREGISTER_CLASS(PreloadList);
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
@@ -393,6 +398,7 @@ void register_core_types() {
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
 	_files_manifest_server = memnew(FilesManifestServer);
+	_pck_package_server = memnew(PckPackageServer);
 	_resource_database = memnew(ResourceDatabase);
 	_os = memnew(CoreBind::OS);
 	_engine = memnew(CoreBind::Engine);
@@ -450,6 +456,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("PckPackageServer", PckPackageServer::get_singleton(), "PckPackageServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceDatabase", ResourceDatabase::get_singleton(), "ResourceDatabase"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
@@ -499,6 +506,7 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_pck_package_server);
 	memdelete(_files_manifest_server);
 	memdelete(_path_prefix_server);
 

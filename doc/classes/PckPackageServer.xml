@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PckPackageServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads, edits, builds, mounts and unmounts [code].pck[/code] files.
+	</brief_description>
+	<description>
+		[PckPackageServer] is the one place for everything about [code].pck[/code] files. It opens a pack and lists its content without mounting it ([method open]), reads and verifies single files, builds a new pack from a [PckPackage] ([method build]), mounts and unmounts packs, and tells which pack provides a [code]res://[/code] file ([method get_pack_of]). Mods, DLC, patches and level editors use it to inspect and change packs at runtime.
+		[codeblocks]
+		[gdscript]
+		# Inspect a pack without mounting it.
+		var package := PckPackageServer.open("user://mods/level_pack.pck")
+		for entry in package.get_entries():
+			print(entry.path, " ", entry.size)
+		print(PckPackageServer.read_file(package, "res://levels/readme.txt").get_string_from_utf8())
+
+		# Mount it, use it, unmount it.
+		PckPackageServer.mount("user://mods/level_pack.pck")
+		print(PckPackageServer.get_pack_of("res://levels/readme.txt")) # user://mods/level_pack.pck
+		PckPackageServer.unmount("user://mods/level_pack.pck")
+		[/gdscript]
+		[csharp]
+		// Inspect a pack without mounting it.
+		PckPackage package = PckPackageServer.Open("user://mods/level_pack.pck");
+		foreach (Godot.Collections.Dictionary entry in package.GetEntries())
+		{
+		    GD.Print(entry["path"], " ", entry["size"]);
+		}
+		GD.Print(PckPackageServer.ReadFile(package, "res://levels/readme.txt").GetStringFromUtf8());
+
+		// Mount it, use it, unmount it.
+		PckPackageServer.Mount("user://mods/level_pack.pck");
+		GD.Print(PckPackageServer.GetPackOf("res://levels/readme.txt")); // user://mods/level_pack.pck
+		PckPackageServer.Unmount("user://mods/level_pack.pck");
+		[/csharp]
+		[/codeblocks]
+		Pack paths can use any path prefix registered with [PathPrefixServer], for example [code]exec://mods/a.pck[/code].
+		[b]Encryption keys:[/b] a key is a [String] of 64 hexadecimal characters (256 bits), as used by [PCKPacker]. An empty key means the script encryption key compiled into the engine.
+		[b]Platforms:[/b] all methods work on every platform. On Android, iOS and the Web, packs can only be written to [code]user://[/code]. On the Web, packs are read from the main pack or from [code]user://[/code] (IndexedDB); files written there are persisted asynchronously.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="build">
+			<return type="int" enum="Error" />
+			<param index="0" name="package" type="PckPackage" />
+			<param index="1" name="target_path" type="String" />
+			<param index="2" name="key" type="String" default="&quot;&quot;" />
+			<description>
+				Writes [param package] as a new pack to [param target_path], using [PCKPacker]. The pack uses the current format, [member PckPackage.alignment] and [member PckPackage.encrypted_directory]. Encrypted entries stay encrypted and are encrypted again with [param key]; an empty [param key] uses the key the package was opened with.
+				Building onto the pack the package was read from is allowed: the new pack is written to a temporary file first, then replaces the old one, and the package is read again from the new file.
+				Returns [constant ERR_BUSY] if [param target_path] is mounted (unmount it first), and [constant ERR_UNAVAILABLE] if the package has delta patches, which can't be rebuilt.
+			</description>
+		</method>
+		<method name="get_mounted" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the paths of all mounted packs in mount order: the main pack of the project (also when it is embedded in the executable, or the sparse pack [code]res://assets.sparsepck[/code] on Android), packs mounted with [method mount] and packs loaded with [method ProjectSettings.load_resource_pack]. The project folder used by the editor is not a pack and is not listed.
+			</description>
+		</method>
+		<method name="get_pack_of" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="res_path" type="String" />
+			<description>
+				Returns the path of the mounted pack that provides [param res_path], as given to [method mount]. If several packs provide the same path, it is the pack whose file is used. Returns an empty [String] if the file does not come from a pack, for example project files in the editor or files inside an Android APK.
+			</description>
+		</method>
+		<method name="is_main_pack" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if [param path] is mounted as the main pack of the project. Main packs can't be unmounted.
+			</description>
+		</method>
+		<method name="is_mounted" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if the pack [param path] is mounted.
+			</description>
+		</method>
+		<method name="mount">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="replace_files" type="bool" default="true" />
+			<param index="2" name="offset" type="int" default="0" />
+			<description>
+				Mounts the [code].pck[/code] or [code].zip[/code] file [param path] into [code]res://[/code] and emits [signal pack_mounted]. If [param replace_files] is [code]true[/code], files of this pack replace files with the same path from earlier packs. [param offset] is the position of the pack inside the file (only for [code].pck[/code] files). This is the same as [method ProjectSettings.load_resource_pack], which calls this method.
+				Returns [constant ERR_FILE_NOT_FOUND] if the file does not exist and [constant ERR_FILE_UNRECOGNIZED] if it is not a pack this engine can mount (for example a pack of a newer engine version). These errors are not printed, so that games can probe for optional packs.
+				[b]Note:[/b] Encrypted packs are mounted with the script encryption key compiled into the engine.
+			</description>
+		</method>
+		<method name="open">
+			<return type="PckPackage" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="key" type="String" default="&quot;&quot;" />
+			<param index="2" name="offset" type="int" default="0" />
+			<description>
+				Reads the header and the file list of the pack [param path] and returns them as a [PckPackage]. The pack is not mounted and no file data is read. [param key] decrypts an encrypted file list and encrypted files. [param offset] is the position of the pack inside the file; with [code]0[/code], a pack appended to the end of the file (a self-contained executable) is found as well.
+				Pack format versions 2 to 4 are read, also from packs written by a newer engine version. Returns [code]null[/code] and prints an error if the file can't be read, is not a pack, or the key is wrong.
+			</description>
+		</method>
+		<method name="read_file">
+			<return type="PackedByteArray" />
+			<param index="0" name="package" type="PckPackage" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Returns the data of the file [param path] in [param package], decrypted with the key the package was opened with. For files added in memory, returns their pending data. Returns an empty array and prints an error if the file is missing, is a removal entry, or can't be decrypted (wrong key).
+			</description>
+		</method>
+		<method name="unmount">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Unmounts the pack [param path] and emits [signal pack_unmounted]. Its files disappear from [code]res://[/code]; files of earlier packs that it replaced are available again, and files it removed come back. The file list is rebuilt from the remaining packs in their mount order, so unmounting takes as long as reading the file lists of all remaining packs.
+				Returns [constant ERR_DOES_NOT_EXIST] if the pack is not mounted and [constant ERR_UNAVAILABLE] for the main pack of the project or if called from another thread than the main thread.
+				[b]Note:[/b] Resources that were already loaded from the pack stay valid in memory and in the resource cache; they are not freed. Files that are open stay readable. Don't unmount a pack while a threaded load (see [method ResourceLoader.load_threaded_request]) reads from it.
+			</description>
+		</method>
+		<method name="verify">
+			<return type="int" enum="Error" />
+			<param index="0" name="package" type="PckPackage" />
+			<description>
+				Reads every file of [param package] from its pack and compares it with the MD5 sum stored in the pack. Returns [constant OK] if all files match, [constant ERR_FILE_CORRUPT] for the first file that does not match, or the error of a file that can't be read. Removal entries, delta patches and files added in memory are skipped.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="pack_mounted">
+			<param index="0" name="path" type="String" />
+			<description>
+				Emitted on the main thread after the pack [param path] was mounted with [method mount] or [method ProjectSettings.load_resource_pack].
+			</description>
+		</signal>
+		<signal name="pack_unmounted">
+			<param index="0" name="path" type="String" />
+			<description>
+				Emitted on the main thread after the pack [param path] was unmounted with [method unmount].
+			</description>
+		</signal>
+	</signals>
+</class>
