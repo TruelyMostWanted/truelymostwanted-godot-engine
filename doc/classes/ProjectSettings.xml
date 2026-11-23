@@ -1237,6 +1237,9 @@
 		<member name="filesystem/import/fbx2gltf/enabled.web" type="bool" setter="" getter="" default="false">
 			Override for [member filesystem/import/fbx2gltf/enabled] on the Web where FBX2glTF can't easily be accessed from Godot.
 		</member>
+		<member name="filesystem/manifests/autoload" type="Dictionary" setter="" getter="" default="{}">
+			File manifests that [FilesManifestServer] registers on first use: names as keys, paths of [FilesManifest] resources as values.
+		</member>
 		<member name="filesystem/path_prefixes/defaults" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [PathPrefixServer] registers [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] at startup (on the Web only [code]temp://[/code]). They can still be replaced or removed with [method PathPrefixServer.register_prefix] and [method PathPrefixServer.unregister_prefix].
 		</member>
