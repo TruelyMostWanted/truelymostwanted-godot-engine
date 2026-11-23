@@ -95,9 +95,9 @@ protected:
 	static void _bind_methods() {}
 
 	virtual Ref<Resource> _create_default_settings() const override {
-		Ref<TestDomainSettings> settings;
-		settings.instantiate();
-		return settings;
+		Ref<TestDomainSettings> default_settings;
+		default_settings.instantiate();
+		return default_settings;
 	}
 
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override {
@@ -181,9 +181,9 @@ protected:
 	static void _bind_methods() {}
 
 	virtual Ref<Resource> _create_default_settings() const override {
-		Ref<TestListSettings> settings;
-		settings.instantiate();
-		return settings;
+		Ref<TestListSettings> default_settings;
+		default_settings.instantiate();
+		return default_settings;
 	}
 
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override {

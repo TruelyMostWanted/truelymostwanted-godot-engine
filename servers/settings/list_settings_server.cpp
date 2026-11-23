@@ -61,8 +61,8 @@ String ListSettingsServer::_get_default_extension() {
 		return format;
 	}
 	String error;
-	const Ref<Resource> defaults = get_default_settings();
-	if (defaults.is_valid() && ResourceTextSerializer::check_csv(defaults, error) == OK) {
+	const Ref<Resource> default_settings = get_default_settings();
+	if (default_settings.is_valid() && ResourceTextSerializer::check_csv(default_settings, error) == OK) {
 		return "csv";
 	}
 	if (!format_warned_csv) {
