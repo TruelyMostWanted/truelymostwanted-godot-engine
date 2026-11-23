@@ -1,0 +1,121 @@
+# Truely-Run-Agentic-Project · truelymostwanted-godot-engine
+
+Die eine Datei, mit der dieses Projekt geführt wird: Parameter, Ableitungen, Plattform und der Stand für die nächste Session. `/truely-run-agentic-project Mode=Resume` liest sie und setzt fort; den Rest (Commits seit dem letzten Stand, offene Issues) liest es frisch aus Git und von der Plattform. Bei einem Widerspruch gilt die Plattform. Nur der Project-Agent bzw. der Orchestrator schreibt diese Datei.
+
+**Dieses Projekt ist eine Engine-Fork, kein Spiel.** Der Skill liefert nur die Orchestrierung (Ebenen, Board, Wache, Resume, Kosten, Caveman). Ordnerstruktur, Konventionen und Ablauf kommen aus dem Repository:
+- Regeln: [`AGENTS.md`](../AGENTS.md), [`truely/CONVENTIONS.md`](../truely/CONVENTIONS.md), [`truely/FEATURE-WORKFLOW.md`](../truely/FEATURE-WORKFLOW.md). Es gibt **kein** `.agents/CONVENTIONS.md`, kein `godot-project/`, kein `upstream` godot-core-systems.
+- Reihenfolge und Abhängigkeiten: Tracker-Issue #32.
+- `.agents/state/` (Wissen je Issue, Datei-Index, Kosten) bleibt lokal (`.gitignore`); nur diese Datei ist versioniert. Das Repository ist öffentlich.
+
+## Abweichungen vom Skill (Besitzer, 2026-11-23)
+
+| Skill | Hier |
+|---|---|
+| Branch `<nr>-<name>` von `main` | Branch `<nn>-feature\|refactoring\|bug\|concept-<name>` von `truely-godot-engine`, Nummer mindestens zweistellig |
+| Project-Agent mergt lokal mit `--no-ff` und löscht den Branch | Project-Agent pusht den Feature-Branch **bei Abschluss**, wartet auf **grüne GitHub Actions**, dann PR nach `truely-godot-engine` und `gh pr merge --squash` **ohne `--delete-branch`**. **Feature-Branches werden nie gelöscht**, weder auf GitHub noch lokal. Nur der Worktree wird entfernt. |
+| Issue-Agent committet im Branch | gleich: **beliebig oft** committen, nie pushen; der pre-commit-Hook muss durchlaufen |
+| `.agents/CONVENTIONS.md`, C# 15, `core/` von godot-core-systems | `truely/CONVENTIONS.md`: C++17-Server als Singletons, Resources, Bindings, `doc/classes/`, keine Nodes; die Godot-Quellen dürfen geändert werden (upstream-freundlich, eigene Dateien bevorzugt) |
+| Issues aus Goals anlegen | Issues #1–#31 existieren schon; neue Funde als eigenes Issue nach `.github/ISSUE_TEMPLATE/` |
+| Concept-Issues setzen um | Concept-Issues (#4, #6, #13, #14, #31) liefern einen Vorschlag als Kommentar; **entscheidet der Besitzer** |
+| Abnahme: Akzeptanzkriterien | dazu die fünf festen Abnahmepunkte (C++ API, Bindings, Doku inkl. Wiki, Test-Build, GDScript- und C#-Test im Testprojekt) |
+
+## Parameter
+
+Bei `Start` geschrieben; danach nur über „setze X = Y“, mit Datum unter „Änderungen“.
+
+```ini
+MODE='Start'
+GOALS='existing GitHub issues #1-#31, order and dependencies from tracker #32'
+CONVENTIONS='AGENTS.md + truely/CONVENTIONS.md + truely/FEATURE-WORKFLOW.md'
+HOST_PARAMETER=''
+REPO_PARAMETER='TruelyMostWanted/truelymostwanted-godot-engine'
+APPROVAL='Checkpoints'
+CHECKPOINTS='Milestone,Concept'
+MAX_ISSUE_AGENTS='2'
+MAX_ISSUES_PER_AGENT='2'
+ALLOW_TEAMS_PER_ISSUE='false'
+MIRROR_GIT_ISSUES='false'
+USE_CAVEMAN='true'
+```
+
+Änderungen:
+- 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
+
+## Abgeleitet
+
+```ini
+PROJECT_NAME='truelymostwanted-godot-engine'
+LOCAL_PATH='P:/Projects/GitHub/truelymostwanted-godot-engine'
+BASE_BRANCH='truely-godot-engine'
+TECH='Godot 4.8 beta engine fork, C++17 without exceptions, SCons; C# glue .NET 11, Godot.NET.Sdk 4.8.0-beta from local NuGet'
+BUILD_COMMAND='./truely/build.ps1 module_mono_enabled=yes'
+GLUE_COMMAND='./bin/godot.windows.editor.x86_64.mono.exe --headless --generate-mono-glue modules/mono/glue'
+ASSEMBLIES_COMMAND='python modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin --godot-platform=windows --push-nupkgs-local P:/Projects/GitHub/nuget-local'
+TEST_PROJECT='P:/Projects/GitHub/godot-custom-build-project'
+TEST_COMMAND='./godot-project/checks/run-checks.ps1 -Godot <worktree>/bin/godot.windows.editor.x86_64.mono.exe -Feature <feature-branch>'
+SCONS_CACHE='P:/scons-cache (env TRUELY_SCONS_CACHE, limit 40 GiB)'
+MAX_PARALLEL_ENGINE_BUILDS='1'
+PROCESS_PATTERN='scons*|godot*|cl.exe|link.exe'
+UPSTREAM='https://github.com/godotengine/godot.git (fetch only, push disabled)'
+WIKI='https://github.com/TruelyMostWanted/truelymostwanted-godot-engine.wiki.git'
+TEST_BUDGET='300s (engine build excluded)'
+PROCESS_LIMIT='90m for scons, 8m otherwise'
+OBSERVATION_INTERVAL='5m'
+MAX_CONTEXT_SIZE='35%'
+MAX_AGENT_STEPS='100'
+MAX_PARALLELISM_LIMIT='85%'
+ISSUE_AGENT_MODEL='opus-medium'
+TRACK_AGENT_COSTS='true'
+LANGUAGE='de'
+ISSUE_LANGUAGE='en'
+```
+
+## Plattform
+
+```ini
+PLATFORM='github'
+HOST='github.com'
+OWNER='TruelyMostWanted'
+REPO='TruelyMostWanted/truelymostwanted-godot-engine'
+PROJECT_NUMBER='5'
+PROJECT_ID='PVT_kwHOArNCm84Bsymv'
+BOARD_NAME='Truely Godot Engine'
+BOARD_URL='https://github.com/users/TruelyMostWanted/projects/5'
+STATUS_FIELD_ID='PVTSSF_lAHOArNCm84Bsymvzhq_C1Q'
+OPT_BACKLOG='f26ba37e'
+OPT_PLANNING='60aa0e0c'
+OPT_NEEDS_BUGFIX='d5b733fb'
+OPT_WORK_IN_PROGRESS='c87261e6'
+OPT_REVIEW='dba19b8b'
+OPT_COMPLETED='2663aaea'
+```
+
+## Stand
+
+```ini
+LAST_INTEGRATED_COMMIT='a986b9f911'
+CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
+UPDATED='2026-11-23'
+```
+
+**In Arbeit:** –
+
+## Übergabe
+
+**Zuerst fortsetzen:** Welle 1: #1 dann #2 (ein Issue-Agent, beide in `core/io/resource_*`), parallel #4 (Konzept, kein Build).
+
+**Wellen Phase 1:** W1 #1→#2 ‖ #4 · W2 #3 ‖ #6 · W3 #5 · W4 #7 · W5 #8 ‖ #9 · W6 #10. `core/io/resource_loader.*` und `core/register_core_types.cpp` sind Anhänge-Dateien: nie zwei Issues parallel darauf.
+
+**Fragen an den Besitzer:** –
+
+**Am Bildschirm zu prüfen (manual):** –
+
+**Regeln, neu:** –
+
+**Fallen:**
+- `P:/Projects/GitHub/nuget-local` fehlte am 2026-11-23: der erste volle Mono-Build (Glue + Assemblies) legt ihn an.
+- Der vorhandene Build in `bin/` ist ein `dev`-Build ohne SCons-Cache; der erste Build mit Cache füllt `P:/scons-cache`.
+- Alter Branch `origin/feature-resource-paths-retrieval` (ohne Nummer) ist ein Vorläufer von `01-feature-resource-paths-retrieval`; nicht löschen.
+- Auf P: waren am 2026-11-23 nur 115 GB frei; höchstens ein Engine-Build gleichzeitig.
+
+**Wache und Eingriffe:** –

@@ -60,5 +60,6 @@ Wird ein PR in Godot gemergt, kommt er über `master` ohnehin in die eigene Engi
 
 - **PRs auf GitHub:** Vor dem Absenden das *base repository* prüfen: `TruelyMostWanted/truelymostwanted-godot-engine` für interne PRs, `godotengine/godot` nur für Beiträge. `gh` ist per `gh repo set-default` auf den Fork eingestellt.
 - **PR-Branches aktuell halten:** Bei Konflikten mit Godot den PR-Branch per Rebase auf `upstream/master` bringen (`git rebase upstream/master`), dann `git push --force-with-lease`.
+- **Gemeinsamer SCons-Cache:** Ist `TRUELY_SCONS_CACHE` gesetzt (einmal pro Rechner: `setx TRUELY_SCONS_CACHE P:\scons-cache`), hängt `build.ps1` `cache_path=<Ordner>` und `cache_limit=40` (GiB, änderbar über `TRUELY_SCONS_CACHE_LIMIT`) an. Alle Arbeitsbäume, auch die Git-Worktrees der Agenten, nutzen dann dieselben Objektdateien und bauen nur, was sich geändert hat.
 - **Versionskennung:** `build.ps1` setzt `BUILD_NAME` und optional `GODOT_VERSION_STATUS` über Umgebungsvariablen. `version.py` bleibt unverändert, damit beim Sync keine Konflikte entstehen.
 - **Konflikte beim Sync:** `git rerere` ist aktiv. Ein einmal gelöster Konflikt wird beim nächsten Merge automatisch wieder so gelöst.

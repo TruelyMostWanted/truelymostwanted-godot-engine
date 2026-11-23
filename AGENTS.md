@@ -15,6 +15,7 @@ nutzbar aus GDScript, C# und GDExtension.
 | [`truely/CONVENTIONS.md`](truely/CONVENTIONS.md) | Regeln für Code (Server als C++-Singletons, keine Nodes, Namen, Bindings, Doku) und für Issues (Englisch, Vorlagen, Labels, fünf Abnahmepunkte) |
 | [`truely/FEATURE-WORKFLOW.md`](truely/FEATURE-WORKFLOW.md) | Ablauf pro Issue: Feature-Branch, Commits, Mono-Build, Testprojekt, Wiki, Push, CI, Squash-Merge |
 | [`truely/README.md`](truely/README.md) | Branches (`master`, `truely-godot-engine`, PR- und Feature-Branches), Remotes, Sync mit Godot, `build.ps1` |
+| [`.agents/project.md`](.agents/project.md) | Arbeit mit Agenten (Truely-Run-Agentic-Project): Parameter, Abweichungen vom Skill, Board-IDs, Stand und Übergabe; Fortsetzen mit `Mode=Resume` |
 | Tracker-Issue (`flag: tracker`) | Reihenfolge und Abhängigkeiten der laufenden Issues: `gh issue list --label "flag: tracker"` |
 
 ## Repository

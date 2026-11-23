@@ -396,3 +396,7 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 *.generated.props
+
+# Truely: local agent state and agent worktrees
+/.agents/state/
+/.claude/worktrees/

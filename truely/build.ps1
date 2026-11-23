@@ -33,6 +33,13 @@ try {
     $env:BUILD_NAME = $BuildName
     if ($Status) { $env:GODOT_VERSION_STATUS = $Status } else { Remove-Item Env:GODOT_VERSION_STATUS -ErrorAction SilentlyContinue }
 
+    # Shared SCons cache for all working trees (git worktrees of agents reuse the objects).
+    # Set TRUELY_SCONS_CACHE once per machine, e.g. setx TRUELY_SCONS_CACHE P:\scons-cache
+    $hasCache = @($SconsArgs | Where-Object { $_ -like 'cache_path=*' }).Count -gt 0
+    if ($env:TRUELY_SCONS_CACHE -and -not $hasCache) {
+        $limit = if ($env:TRUELY_SCONS_CACHE_LIMIT) { $env:TRUELY_SCONS_CACHE_LIMIT } else { '40' }
+        $SconsArgs = @($SconsArgs) + @("cache_path=$($env:TRUELY_SCONS_CACHE)", "cache_limit=$limit")
+    }
     $jobs = [Environment]::ProcessorCount
     Write-Host "==> scons platform=$Platform target=$Target (BUILD_NAME=$BuildName) $SconsArgs" -ForegroundColor Cyan
     & scons "platform=$Platform" "target=$Target" "-j$jobs" @SconsArgs

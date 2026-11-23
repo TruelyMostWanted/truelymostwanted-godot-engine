@@ -527,3 +527,4 @@
 # Truely Godot Engine (fork-specific)
 
 /truely/                                      @TruelyMostWanted
+/.agents/                                     @TruelyMostWanted
