@@ -127,6 +127,14 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="get_manifest_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<description>
+				Returns all paths described by [param manifest]: the files in its [member FilesManifest.folder_paths] that match [member FilesManifest.extensions] and [member FilesManifest.type_hint], then its [member FilesManifest.file_paths], without duplicates. The paths are in their canonical form (see [method PathPrefixServer.resolve]); use them as keys for [method load_threaded_get_status] and [method load_threaded_get].
+				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_non_existing_folders] is [code]true[/code] and the folder is writable.
+			</description>
+		</method>
 		<method name="get_recognized_extensions_for_type">
 			<return type="PackedStringArray" />
 			<param index="0" name="type" type="String" />
@@ -185,6 +193,30 @@
 				[b]Note:[/b] Relative paths will be prefixed with [code]"res://"[/code] before loading, to avoid unexpected results make sure your paths are absolute.
 			</description>
 		</method>
+		<method name="load_manifest">
+			<return type="Dictionary" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<param index="1" name="cache_mode" type="int" enum="ResourceLoader.CacheMode" default="1" />
+			<description>
+				Loads all resources described by [param manifest] (see [method get_manifest_paths]) on the calling thread and returns a [Dictionary] that maps each path to its [Resource]. Paths that fail to load print an error and are left out. If [member FilesManifest.type_hint] is a built-in class, it is passed to the loaders as type hint.
+				[codeblocks]
+				[gdscript]
+				var manifest: FilesManifest = load("res://data/items.tres")
+				var items := ResourceLoader.load_manifest(manifest)
+				for path in items:
+					print(path, ": ", items[path])
+				[/gdscript]
+				[csharp]
+				var manifest = GD.Load&lt;FilesManifest&gt;("res://data/items.tres");
+				Godot.Collections.Dictionary items = ResourceLoader.LoadManifest(manifest);
+				foreach (var (path, resource) in items)
+				{
+				    GD.Print(path, ": ", resource);
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="load_threaded_get">
 			<return type="Resource" />
 			<param index="0" name="path" type="String" />
@@ -212,6 +244,38 @@
 			<description>
 				Loads the resource using threads. If [param use_sub_threads] is [code]true[/code], multiple threads will be used to load the resource, which makes loading faster, but may affect the main thread (and thus cause game slowdowns).
 				The [param cache_mode] parameter defines whether and how the cache should be used or updated when loading the resource.
+			</description>
+		</method>
+		<method name="load_threaded_request_manifest">
+			<return type="int" enum="Error" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<param index="1" name="use_sub_threads" type="bool" default="false" />
+			<param index="2" name="cache_mode" type="int" enum="ResourceLoader.CacheMode" default="1" />
+			<description>
+				Starts a threaded load (see [method load_threaded_request]) for every path described by [param manifest]. Query the progress of each path with [method load_threaded_get_status] and get the resources with [method load_threaded_get], using the paths returned by [method get_manifest_paths]. Returns [constant OK] if all requests were started, otherwise the first error; the other paths are still requested.
+				[codeblocks]
+				[gdscript]
+				var paths := ResourceLoader.get_manifest_paths(manifest)
+				ResourceLoader.load_threaded_request_manifest(manifest)
+				# Later, for example in _process():
+				for path in paths:
+					if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
+						var resource := ResourceLoader.load_threaded_get(path)
+				[/gdscript]
+				[csharp]
+				string[] paths = ResourceLoader.GetManifestPaths(manifest);
+				ResourceLoader.LoadThreadedRequestManifest(manifest);
+				// Later, for example in _Process():
+				foreach (string path in paths)
+				{
+				    if (ResourceLoader.LoadThreadedGetStatus(path) == ResourceLoader.ThreadLoadStatus.Loaded)
+				    {
+				        Resource resource = ResourceLoader.LoadThreadedGet(path);
+				    }
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] In builds without threads (the default Web export), the worker thread pool runs each request on the calling thread, so this method blocks until all resources are loaded, like [method load_manifest].
 			</description>
 		</method>
 		<method name="remove_resource_format_loader">
