@@ -3,12 +3,12 @@
     Baut die eigene Engine-Version (Editor oder Export-Templates) mit SCons.
 
 .DESCRIPTION
-    Kennzeichnet den Build als eigene Version, ohne version.py zu ändern
+    Kennzeichnet den Build als eigene Version, ohne version.py zu aendern
     (so entstehen beim Upstream-Sync keine Konflikte):
       BUILD_NAME           -> z. B. "v4.7.dev.truely.<hash>"
       GODOT_VERSION_STATUS -> optional, z. B. "truely" statt "dev"/"stable"
 
-    Zusätzliche SCons-Optionen werden einfach angehängt, z. B. module_mono_enabled=yes.
+    Zusaetzliche SCons-Optionen werden einfach angehaengt, z. B. module_mono_enabled=yes.
     Lokale Dauer-Optionen kannst du in custom.py im Repo-Root ablegen (ist in .gitignore).
 
 .EXAMPLE

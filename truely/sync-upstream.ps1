@@ -7,12 +7,12 @@
     2. spult master per Fast-forward auf upstream/master vor und pusht ihn nach origin
     3. merged master in truely-godot-engine (nur mit -MergeIntoEngine)
 
-    master bleibt dabei eine reine Kopie von upstream. Eigene Commits gehören
-    ausschließlich auf truely-godot-engine bzw. auf Feature-Branches.
+    master bleibt dabei eine reine Kopie von upstream. Eigene Commits gehoeren
+    ausschliesslich auf truely-godot-engine bzw. auf Feature-Branches.
 
 .PARAMETER MergeIntoEngine
-    master zusätzlich in truely-godot-engine mergen. Läuft in dem Worktree, in dem
-    truely-godot-engine ausgecheckt ist (oder wechselt temporär dorthin).
+    master zusaetzlich in truely-godot-engine mergen. Laeuft in dem Worktree, in dem
+    truely-godot-engine ausgecheckt ist (oder wechselt temporaer dorthin).
 
 .PARAMETER Push
     Ergebnis nach origin pushen.
@@ -74,7 +74,7 @@ $engineDir = Get-WorktreeOf $EngineBranch
 
 $switchedBack = $null
 if (-not $engineDir) {
-    if (git status --porcelain --untracked-files=no) { throw 'Arbeitsverzeichnis hat Änderungen - bitte erst committen oder stashen.' }
+    if (git status --porcelain --untracked-files=no) { throw 'Arbeitsverzeichnis hat Aenderungen - bitte erst committen oder stashen.' }
     $switchedBack = $current
     Invoke-Git switch $EngineBranch
     $engineDir = (Get-Location).Path
@@ -82,13 +82,13 @@ if (-not $engineDir) {
 
 Push-Location $engineDir
 try {
-    if (git status --porcelain --untracked-files=no) { throw "Worktree $engineDir hat uncommittete Änderungen." }
+    if (git status --porcelain --untracked-files=no) { throw "Worktree $engineDir hat uncommittete Aenderungen." }
     Write-Host "==> $EngineBranch <- master  (in $engineDir)" -ForegroundColor Cyan
     & git merge master --no-edit
     if ($LASTEXITCODE -ne 0) {
         Write-Host ''
-        Write-Host "Merge-Konflikte in $engineDir. Lösen, dann 'git add <dateien>' und 'git commit --no-edit'." -ForegroundColor Yellow
-        Write-Host '(rerere ist aktiv: einmal gelöste Konflikte werden beim nächsten Mal automatisch wiederverwendet.)' -ForegroundColor Yellow
+        Write-Host "Merge-Konflikte in $engineDir. Loesen, dann 'git add <dateien>' und 'git commit --no-edit'." -ForegroundColor Yellow
+        Write-Host '(rerere ist aktiv: einmal geloeste Konflikte werden beim naechsten Mal automatisch wiederverwendet.)' -ForegroundColor Yellow
         $switchedBack = $null   # nicht wegwechseln, solange der Merge offen ist
         exit 1
     }
