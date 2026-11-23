@@ -122,6 +122,7 @@ UPDATED='2026-11-23'
 **Regeln, neu:** –
 
 **Fallen:**
+- Batch-CI 1 scheiterte nur an `--doctool`: `>` in Codebeispielen der XML muss `&gt;` sein (#48). Vor jedem Stapel `--doctool` auf `truely-godot-engine` prüfen; Agenten-Aussagen „kein Diff“ beziehen sich nur auf ihren Branch.
 - Auf diesem Rechner fehlen die Abhängigkeiten für AccessKit und D3D12: lokal immer `accesskit=no d3d12=no` (die CI baut mit allem). Die SCons-Meldung „ANGLE deps missing“ ist keine Warnung.
 - `build.ps1` hatte positionelle Parameter (`module_mono_enabled=yes` landete in `-Target`); seit 2026-11-23 behoben.
 - Agenten in Worktrees dürfen nicht nach `.agents/state/` im Hauptbaum schreiben: `knowledge.md` im Scratchpad unter `issues/<N>/`, der Orchestrator kopiert sie.
