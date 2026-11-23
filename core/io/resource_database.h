@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "core/io/files_manifest.h"
 #include "core/io/preload_list.h"
 #include "core/io/resource.h"
 #include "core/object/object.h"
@@ -39,6 +38,7 @@
 #include "core/os/rw_lock.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
+#include "core/templates/local_vector.h"
 #include "core/templates/pair.h"
 #include "core/variant/typed_array.h"
 
@@ -54,62 +54,53 @@ class ResourceDatabase : public Object {
 	struct Entry {
 		Ref<Resource> resource;
 		// Other keys that lead to this entry (list keys, requested paths that differ from the resource path).
-		Vector<String> aliases;
+		LocalVector<String> aliases;
 	};
 
-	struct ManifestSource {
-		Ref<FilesManifest> manifest;
-		// Primary keys of the entries that were loaded from this manifest.
-		HashSet<String> keys;
-	};
-
-	// One preload of paths, synchronous or on a worker thread.
+	// One preload of a list, synchronous or on a worker thread.
 	struct Job {
 		uint64_t id = 0;
 		Ref<PreloadList> list;
 		// Requested path and type hint, in load order.
-		Vector<Pair<String, String>> paths;
-		// Manifest instance ID per path index, 0 for list paths.
-		Vector<uint64_t> path_manifests;
-		// Alias -> target (path or key), applied after all paths are loaded.
-		Vector<Pair<String, String>> keys;
+		LocalVector<Pair<String, String>> paths;
+		// Key -> path, applied after all paths are loaded.
+		LocalVector<Pair<String, String>> keys;
 		Error error = OK;
-		bool threaded = false;
 		WorkerThreadPool::TaskID task_id = WorkerThreadPool::INVALID_TASK_ID;
 	};
 
 	mutable RWLock lock;
 	HashMap<String, Entry> entries;
-	HashMap<String, String> aliases;
-	HashMap<uint64_t, ManifestSource> manifest_sources;
+	HashMap<String, String> aliases; // Alias -> primary key.
 
-	Mutex jobs_mutex;
+	mutable Mutex jobs_mutex;
 	HashMap<uint64_t, Job *> jobs;
 	uint64_t next_job_id = 1;
 	bool finished = false;
 
 	static String _normalize_key(const String &p_key);
-	static String _normalize_path(const String &p_path, Error *r_error = nullptr);
-	static bool _matches_pattern(const String &p_key, const String &p_pattern_lower);
+	static bool _matches_pattern(const String &p_key, const Vector<String> &p_parts);
 	static bool _matches_type(const Ref<Resource> &p_resource, const StringName &p_type);
+	static Vector<String> _split_pattern(const String &p_pattern);
 	static uint64_t _estimate_variant_size(const Variant &p_value, HashSet<ObjectID> &r_visited, int p_depth);
+	static void _job_task(void *p_userdata);
 
 	// Callers hold the lock.
-	const String *_resolve(const String &p_key) const;
-	bool _entry_matches(const String &p_key, const Entry &p_entry, const String &p_pattern_lower, const StringName &p_type) const;
+	// Primary key for a key or alias, empty if unknown.
+	String _resolve(const String &p_key) const;
+	bool _entry_matches(const String &p_key, const Entry &p_entry, const Vector<String> &p_parts, const StringName &p_type) const;
 	void _add_alias(const String &p_alias, const String &p_primary);
-	void _erase_entry(const String &p_primary);
-	void _store(const String &p_key, const Ref<Resource> &p_resource);
+	// Moves the resource of the entry into `r_released`, so that it is freed after the lock is dropped.
+	void _erase_entry(const String &p_primary, LocalVector<Ref<Resource>> &r_released);
+	void _store(const String &p_key, const Ref<Resource> &p_resource, LocalVector<Ref<Resource>> &r_released);
 
-	// Stores a loaded resource under its resource path; `p_requested` becomes an alias if it differs.
-	String _store_loaded(const String &p_requested, const Ref<Resource> &p_resource, uint64_t p_manifest_id);
-	void _apply_keys(const Vector<Pair<String, String>> &p_keys);
-	void _collect_manifest(const Ref<FilesManifest> &p_manifest, Job *r_job);
-
+	// Loads one path and stores it under its resource path; `p_requested` becomes an alias if it differs.
+	Error _load_and_store(const String &p_requested, const String &p_type_hint);
+	void _apply_keys(const LocalVector<Pair<String, String>> &p_keys);
+	Error _collect(const Ref<PreloadList> &p_list, Job *r_job);
 	void _run_job(Job *p_job);
-	void _run_job_task(Job *p_job);
 	void _job_done(uint64_t p_job_id);
-	void _emit_preload_finished(const Ref<PreloadList> &p_list, Error p_error);
+	void _emit_preload_finished(const Ref<PreloadList> &p_list, int p_error);
 
 protected:
 	static void _bind_methods();
@@ -117,17 +108,12 @@ protected:
 public:
 	static ResourceDatabase *get_singleton();
 
-	// Loads everything a list names. With `p_use_threads`, the paths load on worker threads and the
-	// call returns at once; without, it returns when all paths are loaded. `preload_finished` follows
-	// on the main thread in both cases. Returns the first error found while starting (or loading).
+	// Loads everything a list names. With `p_use_threads` (and threads available), the paths load
+	// on a worker thread and the call returns at once; otherwise it returns when all paths are loaded.
+	// `preload_finished` follows on the main thread in both cases.
 	Error preload_list(const Ref<PreloadList> &p_list, bool p_use_threads = true);
 	// Loads one path now and stores it; `p_key` becomes an extra key for it.
 	Error preload_path(const String &p_path, const String &p_key = String());
-	// Brings the entries of a manifest up to date: loads paths it lists now, removes entries it no
-	// longer lists. For servers that watch manifests (call from any thread, runs synchronously).
-	Error refresh_manifest(const Ref<FilesManifest> &p_manifest);
-	// Removes all entries loaded from a manifest and forgets the manifest. Returns the number removed.
-	int remove_manifest(const Ref<FilesManifest> &p_manifest);
 
 	Error insert(const String &p_key, const Ref<Resource> &p_resource);
 	bool insert_if_absent(const String &p_key, const Ref<Resource> &p_resource);
@@ -145,10 +131,10 @@ public:
 	bool is_preloading() const;
 
 	// Preloads the lists of `filesystem/resources/preload_lists` synchronously. Called once at startup
-	// (not in the editor).
+	// of a game (not in the editor).
 	void preload_project_lists();
-	// Waits for running preloads and drops every entry. Called before the servers shut down, so that
-	// stored resources are freed while their servers still exist.
+	// Waits for running preloads and drops every entry. Called before scenes, scripts and servers
+	// shut down, so that stored resources are freed while their servers still exist.
 	void finish();
 
 	ResourceDatabase();

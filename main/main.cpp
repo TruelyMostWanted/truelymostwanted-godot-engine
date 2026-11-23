@@ -46,6 +46,7 @@
 #include "core/io/file_access_zip.h"
 #include "core/io/image.h"
 #include "core/io/image_loader.h"
+#include "core/io/resource_database.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
@@ -4541,6 +4542,8 @@ int Main::start() {
 		ResourceSaver::add_custom_savers();
 
 		if (!project_manager && !editor) { // game
+			// `filesystem/resources/preload_lists`: before the autoloads, which may use the stored resources.
+			ResourceDatabase::get_singleton()->preload_project_lists();
 			if (!game_path.is_empty() || !script.is_empty()) {
 				//autoload
 				OS::get_singleton()->benchmark_begin_measure("Startup", "Load Autoloads");
@@ -5294,6 +5297,8 @@ void Main::cleanup(bool p_force) {
 		}
 	}
 
+	// Frees the stored resources while scripts and servers still exist.
+	ResourceDatabase::get_singleton()->finish();
 	ResourceLoader::clear_thread_load_tasks();
 
 	ResourceLoader::remove_custom_loaders();
