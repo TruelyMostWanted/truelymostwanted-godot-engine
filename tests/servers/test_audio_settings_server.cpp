@@ -147,7 +147,8 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Defaults come from the bus layout, va
 	CHECK(server->get_entry_count() == 2);
 
 	// The default stays the layout value.
-	CHECK(Array(server->get_default_value("buses")).size() == 2);
+	const Array default_buses = server->get_default_value("buses");
+	CHECK(default_buses.size() == 2);
 	server->reset_to_defaults();
 	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-6.0));
 	CHECK_FALSE(audio_server->is_bus_mute(1));
@@ -193,7 +194,8 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Saved volumes are applied on startup 
 		CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-20.0));
 		CHECK(audio_server->is_bus_mute(1));
 		CHECK(server->get_bus_volume_db("Music") == doctest::Approx(-20.0));
-		CHECK(Array(server->get_default_value("buses")).size() == 2);
+		const Array default_buses = server->get_default_value("buses");
+		CHECK(default_buses.size() == 2);
 		CHECK_FALSE(server->is_dirty());
 		CHECK_FALSE(server->has_unsaved_changes());
 		memdelete(server);
