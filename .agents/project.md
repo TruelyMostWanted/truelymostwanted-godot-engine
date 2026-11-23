@@ -43,6 +43,9 @@ USE_CAVEMAN='true'
 - 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
 - 2026-11-23: Besitzer: **Wiki-Seiten sind immer Pflicht**, für jedes umgesetzte Issue (auch Refactorings ohne neue API) Guide-Seite und Klassenreferenz jeder betroffenen Klasse; Concept-Entscheidungen auf der Seite `Design-Decisions`. Jede Seite mit nummeriertem Inhaltsverzeichnis (`python truely/wiki-toc.py <wiki-ordner>` vor jedem Wiki-Push). Der Orchestrator veröffentlicht sie sofort nach dem Bericht des Agenten (Status „in review“ auf `Home`), nach dem Merge Status „done“.
 - 2026-11-23: Besitzer: **Testcode vorab:** Für jedes Feature schreibt ein (günstiger) Agent die GDScript- und C#-Checks im Testprojekt schon vor dem Engine-Build, auf dem Feature-Branch gleichen Namens, und pusht ihn. Nach `main` des Testprojekts erst nach dem Merge in `truely-godot-engine` und dem Engine-Build; dann dort testen.
+- 2026-11-23: Besitzer: **CI in Stapeln (#46):** keine CI auf Feature-Branches und PRs; Merge, sobald lokal grün; volle CI nur auf `truely-godot-engine`, etwa ein Lauf je fünf Features; rot → Bug-Issue und Fix-Branch.
+- 2026-11-23 (ca. 13:35): Besitzer: **Wochenlimit 97 %: keine neuen Agenten.** Die laufenden (#11, #14) zu Ende laufen lassen. Neue Agenten erst nach Freigabe des Besitzers.
+- 2026-11-23: Besitzer: **Features parallel** auf eigenen Branches; Auswahl nach getrennten Dateien (gemeinsame Registrierungsdateien nur mit wenigen Zeilen an anderer Stelle), weil `truely-godot-engine` nie in Feature-Branches gemergt wird. Weiter höchstens 2 Agenten (Wochenlimit), höchstens ein Engine-Build gleichzeitig.
 - 2026-11-23: Besitzer: Wochenlimit bei 95 %. Höchstens 2 Agenten gleichzeitig, bevorzugt ein Issue nach dem anderen in der Reihenfolge von Tracker #32. MAX_ISSUE_AGENTS=1, MAX_ISSUES_PER_AGENT=1.
 
 ## Abgeleitet
@@ -97,7 +100,7 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='a986b9f911'
+LAST_INTEGRATED_COMMIT='6a30858649'
 CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
@@ -106,7 +109,7 @@ UPDATED='2026-11-23'
 
 ## Übergabe
 
-**Zuerst fortsetzen:** #1, dann #2 (ein Issue-Agent, läuft). Danach der Reihe nach, je ein Agent: #39 (läuft) → #37 → #34 → #5 → #7 → #35 → #36 → #8 → #9 → #10.
+**Zuerst fortsetzen:** Stapel 1 gemergt (#38, #46, #1, #2, #3, #39, #11); CI-Lauf auf `truely-godot-engine` prüfen; Testprojekt-Branches 01, 02, 03, 39, 11 nach `main` des Testprojekts und dort testen; Wiki-Status „done“. Danach je ein Agent (nach Freigabe, Wochenlimit): #37 → #34 → #5 → #7 → #35 → #36 → #8 → #9 → #10; Checks vorab liegen für #37 und #34 im Testprojekt.
 
 **Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin, #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
 
