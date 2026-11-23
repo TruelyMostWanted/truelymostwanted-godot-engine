@@ -502,6 +502,9 @@
 			If [code]true[/code], text-to-speech support is enabled on startup, otherwise it is enabled the first time any TTS method is used. See also [method DisplayServer.tts_get_voices] and [method DisplayServer.tts_speak].
 			[b]Note:[/b] Enabling TTS can cause additional idle CPU usage and interfere with the sleep mode, so consider disabling it if TTS is not used.
 		</member>
+		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.load_layout].
+		</member>
 		<member name="audio/video/video_delay_compensation_ms" type="int" setter="" getter="" default="0">
 			Setting to hardcode audio delay when playing video. Best to leave this unchanged unless you know what you are doing.
 		</member>
