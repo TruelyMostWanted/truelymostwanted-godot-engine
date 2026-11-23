@@ -61,9 +61,11 @@
 #include "core/io/path_prefix_server.h"
 #include "core/io/pck_packer.h"
 #include "core/io/resource_format_binary.h"
+#include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
@@ -72,6 +74,7 @@
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
 #include "core/io/xml_parser.h"
+#include "core/io/xml_writer.h"
 #include "core/math/a_star.h"
 #include "core/math/a_star_grid_2d.h"
 #include "core/math/expression.h"
@@ -106,6 +109,13 @@ static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<GDExtensionResourceLoader> resource_loader_gdextension;
 static Ref<ResourceFormatSaverJSON> resource_saver_json;
 static Ref<ResourceFormatLoaderJSON> resource_loader_json;
+static Ref<ResourceFormatLoaderResourceJSON> resource_loader_resource_json;
+static Ref<ResourceFormatSaverResourceJSON> resource_saver_resource_json;
+static Ref<ResourceFormatLoaderResourceINI> resource_loader_resource_ini;
+static Ref<ResourceFormatSaverResourceINI> resource_saver_resource_ini;
+static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
+static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
+static ResourceTextSerializer *_resource_text_serializer = nullptr;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
@@ -256,6 +266,15 @@ void register_core_types() {
 		ResourceLoader::add_resource_format_loader(resource_format_loader_crypto);
 	}
 
+	// Resource text formats (JSON, INI, CSV). The JSON loader comes before ResourceFormatLoaderJSON,
+	// which takes all JSON files without a "$type" key.
+	resource_loader_resource_json.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_json);
+	resource_loader_resource_ini.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_ini);
+	resource_loader_resource_csv.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_csv);
+
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		resource_saver_json.instantiate();
 		ResourceSaver::add_resource_format_saver(resource_saver_json);
@@ -263,6 +282,13 @@ void register_core_types() {
 		resource_loader_json.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_json);
 	}
+
+	resource_saver_resource_json.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_json);
+	resource_saver_resource_ini.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_ini);
+	resource_saver_resource_csv.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_csv);
 
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
@@ -279,6 +305,7 @@ void register_core_types() {
 	GDREGISTER_VIRTUAL_CLASS(CoreBind::Logger);
 
 	GDREGISTER_CLASS(XMLParser);
+	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
 	GDREGISTER_CLASS(RegExMatch);
 	GDREGISTER_CLASS(RegEx);
@@ -294,6 +321,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(RandomNumberGenerator);
 	GDREGISTER_ABSTRACT_CLASS(SeedServer);
 	seed_server = memnew(SeedServer);
+	GDREGISTER_ABSTRACT_CLASS(ResourceTextSerializer);
+	_resource_text_serializer = memnew(ResourceTextSerializer);
 #ifndef DISABLE_DEPRECATED
 	GDREGISTER_CLASS(PackedDataContainer);
 	GDREGISTER_ABSTRACT_CLASS(PackedDataContainerRef);
@@ -379,6 +408,7 @@ void register_core_settings() {
 	GLOBAL_DEF("threading/worker_pool/low_priority_thread_ratio", 0.3);
 
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
+	ResourceTextSerializer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -406,6 +436,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
 
 	OS::get_singleton()->benchmark_end_measure("Core", "Register Singletons");
@@ -461,6 +492,7 @@ void unregister_core_types() {
 	memdelete(resource_uid);
 
 	memdelete(seed_server);
+	memdelete(_resource_text_serializer);
 
 	memdelete(ip);
 
@@ -493,6 +525,19 @@ void unregister_core_types() {
 		ResourceLoader::remove_resource_format_loader(resource_format_loader_crypto);
 		resource_format_loader_crypto.unref();
 	}
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_json);
+	resource_loader_resource_json.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_json);
+	resource_saver_resource_json.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_ini);
+	resource_loader_resource_ini.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_ini);
+	resource_saver_resource_ini.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_csv);
+	resource_loader_resource_csv.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_csv);
+	resource_saver_resource_csv.unref();
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_json);
