@@ -227,7 +227,7 @@ TEST_CASE("[PathPrefixServer] resolve_engine_path() follows the chain to an engi
 	REQUIRE(server->register_prefix_folder("unittestcyclea://", "unittestcycleb://") == OK);
 	REQUIRE(server->register_prefix_folder("unittestcycleb://", "unittestcyclea://") == OK);
 	CHECK(server->resolve_engine_path("unittestcyclea://a.txt") == "unittestcyclea://a.txt");
-	server->globalize("unittestcyclea://a.txt"); // Must return.
+	CHECK_FALSE(server->globalize("unittestcyclea://a.txt").is_empty()); // Must return.
 
 	// Unavailable prefixes are not followed.
 	PackedStringArray platforms;
