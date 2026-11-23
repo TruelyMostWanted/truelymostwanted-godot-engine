@@ -321,13 +321,15 @@ String TtsServer::resolve_voice(const Ref<TtsPersona> &p_persona) const {
 	if (!wanted.is_empty()) {
 		for (int i = 0; i < voices.size(); i++) {
 			const Dictionary &voice = voices[i];
-			if (String(voice.get("id", String())) == wanted) {
-				return wanted;
+			const String id = voice.get("id", String());
+			if (id == wanted) {
+				return id;
 			}
 		}
 		for (int i = 0; i < voices.size(); i++) {
 			const Dictionary &voice = voices[i];
-			if (String(voice.get("name", String())) == wanted) {
+			const String name = voice.get("name", String());
+			if (name == wanted) {
 				return voice.get("id", String());
 			}
 		}
