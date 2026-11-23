@@ -130,7 +130,7 @@ String ResourceFormatLoaderTextTree::get_resource_type(const String &p_path) con
 
 String ResourceFormatLoaderTextTree::get_resource_script_class(const String &p_path) const {
 	String script_class;
-	_get_file_type(p_path, &script_class);
+	[[maybe_unused]] const String type = _get_file_type(p_path, &script_class);
 	return script_class;
 }
 
