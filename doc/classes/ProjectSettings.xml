@@ -3636,6 +3636,27 @@
 			- 8×8 = rgb(255, 255, 0) - #ffff00 - Not supported on most hardware
 			[/codeblock]
 		</member>
+		<member name="settings/apply/confirmation_timeout" type="float" setter="" getter="" default="15.0">
+			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_pending] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
+		</member>
+		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
+		</member>
+		<member name="settings/startup/custom_servers" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Scripts of the settings servers of your game: paths to [code].gd[/code] or [code].cs[/code] files (or the names of global classes) whose class extends [SettingsServer]. [SettingsServerManager] creates one instance of each in [constant SettingsServer.APPLY_PHASE_SCENE], registers it and frees it when the game exits. Not used in the editor and the project manager.
+		</member>
+		<member name="settings/storage/autosave" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_pending]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
+		</member>
+		<member name="settings/storage/folder" type="String" setter="" getter="" default="&quot;user://settings&quot;">
+			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
+		</member>
+		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
+			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_save_as_csv]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+		</member>
+		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
+		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">
 			The ratio of [WorkerThreadPool]'s threads that will be reserved for low-priority tasks. For example, if 10 threads are available and this value is set to [code]0.3[/code], 3 of the worker threads will be reserved for low-priority tasks. The actual value won't exceed the number of CPU cores minus one, and if possible, at least one worker thread will be dedicated to low-priority tasks.
 		</member>

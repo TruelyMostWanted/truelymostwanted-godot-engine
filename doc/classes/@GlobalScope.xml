@@ -1675,6 +1675,9 @@
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
 		</member>
+		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
+			The [SettingsServerManager] singleton.
+		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
