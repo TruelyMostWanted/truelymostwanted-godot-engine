@@ -147,6 +147,7 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Returns the resource type associated with a given resource path.
+				Only the loaders that may recognize the path are asked: those whose [method ResourceFormatLoader._get_recognized_extensions] contain the path's extension, and those that recognize paths in another way (for example by implementing [method ResourceFormatLoader._recognize_path], or by an [code].import[/code] file).
 			</description>
 		</method>
 		<method name="get_resource_uid">
@@ -283,6 +284,26 @@
 				[/csharp]
 				[/codeblocks]
 				[b]Note:[/b] In builds without threads (the default Web export), the worker thread pool runs each request on the calling thread, so this method blocks until all resources are loaded, like [method load_manifest].
+			</description>
+		</method>
+		<method name="refresh_format_index">
+			<return type="void" />
+			<description>
+				Reads the recognized extensions of every registered [ResourceFormatLoader] again and rebuilds the index that finds loaders by the extension of a path.
+				The list of a loader is read when it is added with [method add_resource_format_loader]. Call this method after a loader implemented in a script, in C# or in a GDExtension changes the list returned by [method ResourceFormatLoader._get_recognized_extensions], or after its script changed. Until then, paths with a newly added extension do not reach the loader. Removing and adding the loader again has the same effect.
+				Loaders implemented in C++ do not need this: their lists are read again automatically when new resource classes register their extensions.
+				[codeblocks]
+				[gdscript]
+				my_loader.extensions.append("mydata")
+				ResourceLoader.refresh_format_index()
+				print(ResourceLoader.exists("res://level.mydata")) # Asks my_loader.
+				[/gdscript]
+				[csharp]
+				myLoader.Extensions.Add("mydata");
+				ResourceLoader.RefreshFormatIndex();
+				GD.Print(ResourceLoader.Exists("res://level.mydata")); // Asks myLoader.
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="register_extension">
