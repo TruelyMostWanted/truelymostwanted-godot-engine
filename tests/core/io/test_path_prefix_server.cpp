@@ -50,6 +50,7 @@ TEST_CASE("[PathPrefixServer] Engine prefixes are registered and locked") {
 		ERR_PRINT_OFF;
 		const String before = server->globalize(String(prefix) + "a/b.txt");
 		CHECK(server->register_prefix_folder(prefix, "C:/somewhere") == ERR_LOCKED);
+		CHECK(server->register_prefix_folder(prefix, String(prefix) + "x") == ERR_LOCKED);
 		CHECK(server->unregister_prefix(prefix) == ERR_LOCKED);
 		CHECK(server->globalize(String(prefix) + "a/b.txt") == before);
 		ERR_PRINT_ON;

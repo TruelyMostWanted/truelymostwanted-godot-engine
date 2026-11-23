@@ -515,6 +515,7 @@ Error PathPrefixServer::register_prefix_callable(const String &p_prefix, const C
 Error PathPrefixServer::register_prefix_folder(const String &p_prefix, const String &p_folder, const PackedStringArray &p_platforms) {
 	ERR_FAIL_COND_V_MSG(p_folder.is_empty(), ERR_INVALID_PARAMETER, "The folder of a path prefix must not be empty.");
 	const String prefix = normalize_prefix(p_prefix);
+	ERR_FAIL_COND_V_MSG(is_prefix_locked(prefix), ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
 	ERR_FAIL_COND_V_MSG(p_folder.to_lower().begins_with(prefix), ERR_INVALID_PARAMETER, vformat("The folder of the path prefix '%s' must not use the same prefix.", prefix));
 	return _register(prefix, create_folder_logic(p_folder), p_platforms, false);
 }
