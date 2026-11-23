@@ -207,6 +207,7 @@ Vorbild: [Custom resource format loaders](https://docs.godotengine.org/en/4.4/co
 | Schritte | eine Überschrift pro Schritt der Benutzung (z. B. „Registering a prefix“, „Loading a resource“), jeweils mit GDScript, C# und C++ (GDExtension) |
 | Limitations | was nicht geht, Plattform-Unterschiede (aus „Feasibility to check“) |
 
+- **Wiki-Seiten sind immer Pflicht**, für jedes umgesetzte Issue, auch für Refactorings ohne neue API (Guide-Seite und Klassenreferenz jeder betroffenen Klasse). Entscheidungen aus Concept-Issues stehen auf der Seite `Design-Decisions`.
 - Die Seite `Home` listet alle Features mit Status, `_Sidebar` verlinkt Guides und Klassenreferenzen.
 - Das Wiki ist ein eigenes Git-Repository: `https://github.com/TruelyMostWanted/truelymostwanted-godot-engine.wiki.git`.
 
