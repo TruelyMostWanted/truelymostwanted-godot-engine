@@ -103,19 +103,19 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='1cec1b7c7a'
+LAST_INTEGRATED_COMMIT='e87125ff1b'
 CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
 
-**In Arbeit:** – Agenten für #5, #8, #9 wurden beim Session-Ende gestoppt (Budget). Teilarbeit liegt ungepusht in den Worktrees unter `.claude/worktrees/agent-*` (Branches `05-feature-resource-text-formats`, `08-feature-files-manifest-server`, `09-feature-resource-database`, falls angelegt) und in `C:/Users/larsc/AppData/Local/Temp/claude/scratch/issues/<N>/`. Beim Fortsetzen: je Worktree `git log`/`git status` prüfen, dann mit frischem Agenten „setze fort“ auf dem Branch. Board steht noch auf WIP.
+**In Arbeit:** – #5 gemergt und geschlossen. #8 und #9: WIP-Commits auf ihren Branches (gepusht, ungebaut, nur Teile: `files_manifest_server.h`; `preload_list.*`, `resource_database.h`). Fortsetzen mit frischem Agenten auf dem Branch. Board #8/#9: WIP.
 
 ## Übergabe
 
 **Zuerst fortsetzen:**
-1. Berichte von #5, #8, #9 lesen; je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
+1. #8, #9 fortsetzen (WIP auf den Branches), dann je Issue nacheinander: je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
 2. CI 45215922124 (Stapel #37 + #34) prüfen. macOS/iOS bekamen schon zweimal keinen Runner (abgebrochen ohne Schritt) – Infrastruktur, kein Code-Fehler.
-3. Danach: #35, #36 (brauchen #5), #10, #53 (Folge von #34), #13, Phase 3 ab #15, Phase 5 #50, #51.
+3. Danach: #35, #36 (jetzt frei, #5 ist gemergt), #10, #53 (Folge von #34), #13, Phase 3 ab #15, Phase 5 #50, #51.
 4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39.
 5. Reste alter Agent-Worktrees unter `.claude/worktrees/agent-a46…`, `agent-ad63…`, `agent-ad82…`, `agent-afea…` (abgemeldet, Löschen scheiterte an langen Pfaden; Löschen per `Remove-Item \?\…` braucht die Freigabe des Besitzers). Alte Testprojekt-Worktrees im Scratch der vorigen Session (`git -C …/godot-custom-build-project worktree list`).
 
@@ -130,6 +130,7 @@ UPDATED='2026-11-23'
 **Regeln, neu:** –
 
 **Fallen:**
+- Erster `--import` des Testprojekts nach dem Merge von #5 stürzte einmal ab (Access Violation, Exit -1073741819), danach nicht reproduzierbar. Beobachten.
 - Agent-Worktrees belegen ihren Branch: vor `git switch <branch>` im Hauptbaum `git -C .claude/worktrees/<agent> switch --detach`. Testprojekt-Worktrees im Scratch brauchen die Junction `scratch/issues/<N>/nuget-local` → `P:/Projects/GitHub/nuget-local` (relativer Pfad in `nuget.config`).
 - **`run-checks.ps1` mit der GUI-Exe meldete immer PASSED** (PowerShell wartet nicht, kein Exit-Code; GD und C# liefen gleichzeitig). Seit Testprojekt `95830a0` nimmt das Skript die `.console.exe` daneben; Branches ohne diesen Fix: `-Godot …mono.console.exe` direkt übergeben. Stapel 1 wurde damit erneut geprüft: grün.
 - C#-Checks: den von `GetCachedRef()` u. Ä. gelieferten Wrapper nicht `using`/`Dispose()` – er ist mit gehaltenen Referenzen geteilt und gibt die Ressource frei.
