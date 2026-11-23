@@ -205,10 +205,13 @@ TEST_CASE("[TtsServer] Utterance events become signals on the main thread") {
 
 	MessageQueue::get_singleton()->flush();
 
-	SIGNAL_CHECK("utterance_started", { { 7 } });
-	SIGNAL_CHECK("utterance_boundary", { { 7, 5 } });
-	SIGNAL_CHECK("utterance_ended", { { 7 } });
-	SIGNAL_CHECK("utterance_canceled", { { 8 } });
+	const Array started_args = { { 7 } };
+	const Array boundary_args = { { 7, 5 } };
+	const Array canceled_args = { { 8 } };
+	SIGNAL_CHECK("utterance_started", started_args);
+	SIGNAL_CHECK("utterance_boundary", boundary_args);
+	SIGNAL_CHECK("utterance_ended", started_args);
+	SIGNAL_CHECK("utterance_canceled", canceled_args);
 
 	ERR_PRINT_OFF;
 	server->post_utterance_event(DisplayServerEnums::TTS_UTTERANCE_MAX, 9, 0);
