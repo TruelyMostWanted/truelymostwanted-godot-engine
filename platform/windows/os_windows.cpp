@@ -1281,6 +1281,34 @@ Dictionary OS_Windows::get_memory_info() const {
 	return meminfo;
 }
 
+uint64_t OS_Windows::get_process_memory_usage() const {
+	PROCESS_MEMORY_COUNTERS pmc = {};
+	pmc.cb = sizeof(pmc);
+	if (!GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+		return 0;
+	}
+	return static_cast<uint64_t>(pmc.WorkingSetSize);
+}
+
+Dictionary OS_Windows::get_process_memory_info() const {
+	Dictionary meminfo;
+
+	meminfo["resident"] = -1;
+	meminfo["private"] = -1;
+	meminfo["peak"] = -1;
+	meminfo["heap"] = -1;
+
+	PROCESS_MEMORY_COUNTERS_EX pmc = {};
+	pmc.cb = sizeof(pmc);
+	if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&pmc), sizeof(pmc))) {
+		meminfo["resident"] = static_cast<int64_t>(pmc.WorkingSetSize);
+		meminfo["private"] = static_cast<int64_t>(pmc.PrivateUsage);
+		meminfo["peak"] = static_cast<int64_t>(pmc.PeakWorkingSetSize);
+	}
+
+	return meminfo;
+}
+
 Dictionary OS_Windows::execute_with_pipe(const String &p_path, const List<String> &p_arguments, bool p_blocking) {
 #define CLEAN_PIPES \
 	if (pipe_in[0] != 0) { \
