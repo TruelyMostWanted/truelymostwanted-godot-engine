@@ -56,7 +56,9 @@ git switch -c 03-feature-path-prefix-server
 - Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
 - Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
 - Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
-- Ist die CI eines Stapels rot: Bug-Issue, Fix-Branch, Merge wie ein Feature. `truely-godot-engine` wird nicht zurückgesetzt.
+- **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
+- Damit das selten nötig ist, prüft der Orchestrator **vor** dem Merge eines Features auf dessen Branch auch das, was die CI prüft und lokal geht: `--doctool --headless` ohne Diff, pre-commit-Hooks, Unit-Tests.
+- Ein eigenes Bug-Issue mit eigenem Branch nur für Fehler, die zu keinem Feature gehören (z. B. CI, Werkzeuge). `truely-godot-engine` wird nie zurückgesetzt.
 
 ### 2.5 Mergen
 
