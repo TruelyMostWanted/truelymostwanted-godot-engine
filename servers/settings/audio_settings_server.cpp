@@ -38,7 +38,7 @@
 #include "servers/audio/audio_server.h"
 #include "servers/settings/audio_settings.h"
 
-static const char *DEFAULT_DEVICE = "Default";
+static constexpr const char *DEFAULT_DEVICE = "Default";
 
 AudioSettingsServer *AudioSettingsServer::singleton = nullptr;
 
