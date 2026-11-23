@@ -339,7 +339,7 @@ public:
 
 	// Errors printed by the last load finished on this thread (`load()`, `load_threaded_get()`),
 	// empty if it succeeded. Read right after the call; any later load on the thread replaces it.
-	static inline thread_local String last_load_error_message;
+	static thread_local String last_load_error_message;
 
 	static void resource_changed_connect(Resource *p_source, const Callable &p_callable, uint32_t p_flags);
 	static void resource_changed_disconnect(Resource *p_source, const Callable &p_callable);
