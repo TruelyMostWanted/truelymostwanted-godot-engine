@@ -211,5 +211,6 @@ public:
 	static bool has(const String &p_path);
 	static Ref<Resource> get_ref(const String &p_path);
 	static void get_cached_resources(List<Ref<Resource>> *p_resources);
+	static void get_cached_paths(List<String> *r_paths);
 	static int get_cached_resource_count();
 };
