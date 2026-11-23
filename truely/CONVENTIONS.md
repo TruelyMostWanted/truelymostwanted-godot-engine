@@ -69,7 +69,19 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 
 ---
 
-## 2. Issues
+## 2. Branches
+
+- **Feature-Branches tragen als Präfix die Nummer ihres Issues, mindestens zweistellig:** `<nn>-<art>-<kurzname>`, alles klein mit Bindestrichen.
+  - Issue #1 → `01-feature-resource-paths-retrieval`
+  - Issue #3 → `03-feature-path-prefix-server`
+  - Issue #123 → `123-feature-…`
+  - `<art>` folgt dem Typ des Issues: `feature`, `refactoring`, `bug`, `concept`.
+- Derselbe Name gilt für den Feature-Ordner im Testprojekt (`res://03-feature-path-prefix-server/`) und für die Guide-Seite im Wiki.
+- Feature-Branches zweigen von `truely-godot-engine` ab und werden **nie gelöscht**. PR-Branches für Beiträge an Godot zweigen von `master` ab (siehe `README.md`).
+
+---
+
+## 3. Issues
 
 - **Sprache:** Issues, Titel, Commits und Code-Kommentare auf **Englisch**, die Unterhaltung mit dem Nutzer auf Deutsch.
 - **Vorlagen:** `.github/ISSUE_TEMPLATE/`. Über die CLI wird der Body als Markdown mit genau den Überschriften der Vorlage geschrieben.

@@ -34,10 +34,11 @@ Issue (Englisch, Vorlage)
 ```powershell
 git switch truely-godot-engine
 git pull
-git switch -c feature-resource-paths-server
+git switch -c 03-feature-path-prefix-server
 ```
 
 - **Ein Branch pro Issue**, abgezweigt von `truely-godot-engine`.
+- **Name:** `<issue-nummer>-feature-<kurzname>`, die Nummer mindestens zweistellig: Issue #3 → `03-feature-path-prefix-server`, Issue #1 → `01-feature-resource-paths-retrieval`, Issue #123 → `123-feature-…`. Für Refactorings und Bugs `…-refactoring-…` bzw. `…-bug-…`.
 - Beiträge an Godot selbst (Upstream-PRs) zweigen dagegen von `master` ab. Siehe [`README.md`](README.md).
 
 ### 2.2 Committen
@@ -51,14 +52,14 @@ git switch -c feature-resource-paths-server
 - Jeder Push startet die volle CI mit allen Plattformen. Reine Änderungen an Vorlagen oder Doku dürfen `[skip ci]` in der Commit-Message tragen.
 
 ```powershell
-git push -u origin feature-resource-paths-server
+git push -u origin 03-feature-path-prefix-server
 ```
 
 ### 2.4 CI abwarten
 
 ```powershell
 gh run watch                      # den laufenden Lauf verfolgen
-gh run list --branch feature-resource-paths-server -L 3
+gh run list --branch 03-feature-path-prefix-server -L 3
 ```
 
 Erst weitermachen, wenn der Lauf **grün** ist. Ist er rot, den Fehler im Feature-Branch beheben, committen, pushen und wieder abwarten.
@@ -68,7 +69,7 @@ Erst weitermachen, wenn der Lauf **grün** ist. Ist er rot, den Fehler im Featur
 Bei grüner CI: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature.
 
 ```powershell
-gh pr create --base truely-godot-engine --head feature-resource-paths-server --fill
+gh pr create --base truely-godot-engine --head 03-feature-path-prefix-server --fill
 gh pr merge --squash              # OHNE --delete-branch
 ```
 
@@ -130,7 +131,7 @@ godot-custom-build-project/
     ├── nuget.config                     Godot-Pakete nur aus ../../nuget-local
     ├── checks/                          FeatureCheck (GDScript) + FeatureCheckCs (C#), new-feature.ps1, run-checks.ps1
     ├── _feature-template/               Vorlage für neue Feature-Ordner
-    └── feature-resource-paths-server/
+    └── 03-feature-path-prefix-server/
         ├── scripts/gd/                  Checks in GDScript
         ├── scripts/cs/                  Checks in C#
         ├── scenes/                      check_gd.tscn, check_cs.tscn und weitere Testszenen
@@ -141,7 +142,7 @@ godot-custom-build-project/
 Neuen Feature-Ordner anlegen:
 
 ```powershell
-./godot-project/checks/new-feature.ps1 -Name feature-resource-paths-server
+./godot-project/checks/new-feature.ps1 -Name 03-feature-path-prefix-server
 ```
 
 ### 4.3 C#-Anbindung an den Custom-Build
@@ -161,7 +162,7 @@ Neuen Feature-Ordner anlegen:
 - Jede Check-Szene läuft headless und endet mit **Exit-Code 0 (bestanden) oder 1 (fehlgeschlagen)**.
 
 ```powershell
-./godot-project/checks/run-checks.ps1 -Godot P:/Projects/GitHub/truelymostwanted-godot-engine/bin/godot.windows.editor.x86_64.mono.exe -Feature feature-resource-paths-server
+./godot-project/checks/run-checks.ps1 -Godot P:/Projects/GitHub/truelymostwanted-godot-engine/bin/godot.windows.editor.x86_64.mono.exe -Feature 03-feature-path-prefix-server
 ```
 
 - `run-checks.ps1` baut vorher das C#-Projekt (`dotnet build`), importiert das Projekt und gibt eine Tabelle aus.
@@ -196,7 +197,7 @@ Codebeispiele zeigen immer **GDScript, C# und GDExtension (C++, godot-cpp)** nac
 
 ### 5.2 Guide: eine Seite pro Feature
 
-Vorbild: [Custom resource format loaders](https://docs.godotengine.org/en/4.4/contributing/development/core_and_modules/custom_resource_format_loaders.html). Seitenname wie der Feature-Branch, zum Beispiel `feature-resource-paths-server`.
+Vorbild: [Custom resource format loaders](https://docs.godotengine.org/en/4.4/contributing/development/core_and_modules/custom_resource_format_loaders.html). Seitenname wie der Feature-Branch, zum Beispiel `03-feature-path-prefix-server`.
 
 | Abschnitt | Inhalt |
 |---|---|

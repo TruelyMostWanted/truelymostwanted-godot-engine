@@ -36,7 +36,7 @@ als native Engine-Features, nutzbar aus GDScript, C# und GDExtension.
 ## Arbeitsablauf in Kurzform
 
 1. **Issue** suchen oder anlegen (`gh issue list --state all --search "<Stichwort>"`), nach Vorlage, auf Englisch.
-2. **Feature-Branch** von `truely-godot-engine` (Beiträge an Godot selbst: PR-Branch von `master`).
+2. **Feature-Branch** von `truely-godot-engine`, Name mit der Issue-Nummer als Präfix (mindestens zweistellig): `03-feature-path-prefix-server`. Beiträge an Godot selbst: PR-Branch von `master`.
 3. **Implementieren** nach `CONVENTIONS.md`, **beliebig oft committen**. Der pre-commit-Hook muss durchlaufen.
 4. **Mono-Build**, dann im Testprojekt `new-feature.ps1 -Name <feature-branch>` und Checks in GDScript und C# schreiben und ausführen.
 5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (`<feature-branch>`), Beispiele in GDScript, C# und C++ (GDExtension).
