@@ -32,6 +32,7 @@
 
 #include "core/io/resource.h"
 #include "core/object/gdvirtual.gen.h"
+#include "core/os/mutex.h"
 
 class ResourceFormatSaver : public RefCounted {
 	GDCLASS(ResourceFormatSaver, RefCounted);
@@ -58,13 +59,23 @@ public:
 typedef void (*ResourceSavedCallback)(Ref<Resource> p_resource, const String &p_path);
 typedef ResourceUID::ID (*ResourceSaverGetResourceIDForPath)(const String &p_path, bool p_generate);
 
-class ResourceSaver {
-	enum {
-		MAX_SAVERS = 64
-	};
+// Immutable snapshot of the registered format savers, in lookup order (first match wins).
+// Copying it is cheap: the list is copy-on-write and shared with every copy until a change replaces it.
+// Keep it a struct, so that lookup data built from the same formats can be added later.
+struct ResourceSaverFormatSnapshot {
+	Vector<Ref<ResourceFormatSaver>> formats;
 
-	static Ref<ResourceFormatSaver> saver[MAX_SAVERS];
-	static int saver_count;
+	const Ref<ResourceFormatSaver> *begin() const { return formats.ptr(); }
+	const Ref<ResourceFormatSaver> *end() const { return formats.ptr() + formats.size(); }
+};
+
+class ResourceSaver {
+	// Registered formats, without a size limit. Every change builds a new snapshot under `savers_mutex`.
+	// Readers take the current snapshot from `_get_savers()` and iterate it without a lock,
+	// so other threads may add or remove formats meanwhile.
+	static ResourceSaverFormatSnapshot savers;
+	static Mutex savers_mutex;
+	static ResourceSaverFormatSnapshot _get_savers();
 	static bool timestamp_on_save;
 	static ResourceSavedCallback save_callback;
 	static ResourceSaverGetResourceIDForPath save_get_id_for_path;

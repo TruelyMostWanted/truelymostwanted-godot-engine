@@ -34,6 +34,7 @@
 #include "core/io/resource_loader_constants.h"
 #include "core/object/gdvirtual.gen.h"
 #include "core/object/worker_thread_pool.h"
+#include "core/os/mutex.h"
 #include "core/os/thread.h"
 
 namespace CoreBind {
@@ -100,13 +101,19 @@ typedef void (*DependencyErrorNotify)(const String &p_loading, const String &p_w
 typedef Error (*ResourceLoaderImport)(const String &p_path);
 typedef void (*ResourceLoadedCallback)(Ref<Resource> p_resource, const String &p_path);
 
+// Immutable snapshot of the registered format loaders, in lookup order (first match wins).
+// Copying it is cheap: the list is copy-on-write and shared with every copy until a change replaces it.
+// Keep it a struct, so that lookup data built from the same formats can be added later.
+struct ResourceLoaderFormatSnapshot {
+	Vector<Ref<ResourceFormatLoader>> formats;
+
+	const Ref<ResourceFormatLoader> *begin() const { return formats.ptr(); }
+	const Ref<ResourceFormatLoader> *end() const { return formats.ptr() + formats.size(); }
+};
+
 class ResourceLoader {
 	friend class LoadToken;
 	friend class CoreBind::ResourceLoader;
-
-	enum {
-		MAX_LOADERS = 64
-	};
 
 	struct ThreadLoadTask;
 
@@ -153,8 +160,12 @@ private:
 
 	static Ref<Resource> _load_complete_inner(LoadToken &p_load_token, Error *r_error, MutexLock<SafeBinaryMutex<BINARY_MUTEX_TAG>> &p_thread_load_lock);
 
-	static Ref<ResourceFormatLoader> loader[MAX_LOADERS];
-	static int loader_count;
+	// Registered formats, without a size limit. Every change builds a new snapshot under `loaders_mutex`.
+	// Readers take the current snapshot from `_get_loaders()` and iterate it without a lock,
+	// so other threads may add or remove formats meanwhile.
+	static ResourceLoaderFormatSnapshot loaders;
+	static Mutex loaders_mutex;
+	static ResourceLoaderFormatSnapshot _get_loaders();
 	static bool timestamp_on_load;
 
 	static void *err_notify_ud;
