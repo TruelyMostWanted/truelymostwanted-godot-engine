@@ -96,6 +96,10 @@ public:
 	void set_margins(const TypedDictionary<StringName, Rect2i> &p_margins);
 	TypedDictionary<StringName, Rect2i> get_margins() const;
 
+	// Storage only: the text resource format sorts dictionary keys, so the order of the regions is saved separately.
+	void _set_region_order(const PackedStringArray &p_order);
+	PackedStringArray _get_region_order() const;
+
 	Error set_region(const StringName &p_name, const Rect2i &p_rect);
 	void remove_region(const StringName &p_name);
 	Error rename_region(const StringName &p_from, const StringName &p_to);

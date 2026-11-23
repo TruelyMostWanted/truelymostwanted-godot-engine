@@ -413,6 +413,29 @@ Rect2i TextureAtlas::get_region(const StringName &p_name) const {
 	return region->rect;
 }
 
+void TextureAtlas::_set_region_order(const PackedStringArray &p_order) {
+	// Regions named in the order first, in that order; the rest keep their current order.
+	HashMap<StringName, Region> ordered;
+	ordered.reserve(regions.size());
+	for (const String &region_name : p_order) {
+		const StringName key = region_name;
+		const Region *region = regions.getptr(key);
+		if (region != nullptr && !ordered.has(key)) {
+			ordered.insert(key, *region);
+		}
+	}
+	for (const KeyValue<StringName, Region> &E : regions) {
+		if (!ordered.has(E.key)) {
+			ordered.insert(E.key, E.value);
+		}
+	}
+	regions = ordered;
+}
+
+PackedStringArray TextureAtlas::_get_region_order() const {
+	return get_region_names();
+}
+
 PackedStringArray TextureAtlas::get_region_names() const {
 	PackedStringArray names;
 	names.resize(regions.size());
@@ -1036,6 +1059,8 @@ void TextureAtlas::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_regions", "regions"), &TextureAtlas::set_regions);
 	ClassDB::bind_method(D_METHOD("get_regions"), &TextureAtlas::get_regions);
 	ClassDB::bind_method(D_METHOD("set_margins", "margins"), &TextureAtlas::set_margins);
+	ClassDB::bind_method(D_METHOD("_set_region_order", "order"), &TextureAtlas::_set_region_order);
+	ClassDB::bind_method(D_METHOD("_get_region_order"), &TextureAtlas::_get_region_order);
 	ClassDB::bind_method(D_METHOD("get_margins"), &TextureAtlas::get_margins);
 
 	ClassDB::bind_method(D_METHOD("set_region", "name", "rect"), &TextureAtlas::set_region);
@@ -1070,4 +1095,5 @@ void TextureAtlas::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "filter_clip"), "set_filter_clip", "is_filter_clip");
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "regions", PROPERTY_HINT_DICTIONARY_TYPE, "StringName;Rect2i"), "set_regions", "get_regions");
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "margins", PROPERTY_HINT_DICTIONARY_TYPE, "StringName;Rect2i"), "set_margins", "get_margins");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "region_order", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE), "_set_region_order", "_get_region_order");
 }

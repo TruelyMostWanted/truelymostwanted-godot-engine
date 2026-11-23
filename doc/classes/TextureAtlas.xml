@@ -240,6 +240,9 @@
 		<member name="margins" type="Dictionary[StringName, Rect2i]" setter="set_margins" getter="get_margins" default="{}">
 			The margins of the regions that have one (see [method set_region_margin]). Setting this property resets all other margins to zero; names of unknown regions are ignored with an error.
 		</member>
+		<member name="region_order" type="PackedStringArray" setter="_set_region_order" getter="_get_region_order" default="PackedStringArray()">
+			The names of the regions in their order. Only used when saving and loading, because the text resource format sorts the keys of [member regions]; use [method get_region_names] instead.
+		</member>
 		<member name="regions" type="Dictionary[StringName, Rect2i]" setter="set_regions" getter="get_regions" default="{}">
 			The regions: sprite name to rectangle [code](x, y, width, height)[/code] in pixels of [member texture], in insertion order. Setting this property replaces all regions; invalid entries are skipped with an error. Regions that keep their name keep their margin and their [AtlasTexture].
 			[b]Note:[/b] The returned dictionary is a copy. Use [method set_region] and [method remove_region] to change single regions.
