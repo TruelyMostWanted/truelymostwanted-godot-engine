@@ -17,7 +17,7 @@ Branches und Remotes in [`README.md`](README.md).
 | **Zwei Sprachen** | Jedes Feature wird in **GDScript und C#** getestet, mit einem **Mono-Build** (Testprojekt [godot-custom-build-project](https://github.com/TruelyMostWanted/godot-custom-build-project)). |
 | **Cross-Plattform und Web** | Jedes Feature wird für Windows, Linux, macOS, Android, iOS **und den Web-Export** entworfen. Benutzbarkeit und Performance werden pro Plattform bedacht. Der Web-Export ist standardmäßig single-threaded, hat Dateien nur in `user://` (IndexedDB, asynchron gespeichert) und im PCK, keinen Ordner der ausführbaren Datei, keine Prozesse und wenig Speicher. Was pro Plattform geht, langsamer ist oder fehlt, steht im Issue unter „Platforms“. |
 | **Stil des Engine-Codes** | Tabs, clang-format, `p_` für Parameter, `r_` für Rückgabeparameter, keine Exceptions (`disable_exceptions=yes`), C++17. |
-| **Thread-Sicherheit** | Wo Loader-Threads oder OS-Callbacks beteiligt sind: Locks (`Mutex`, `RWLock`), Signale werden auf dem Main-Thread gesendet (`call_deferred`). |
+| **Thread-Sicherheit** | Wo Loader-Threads oder OS-Callbacks beteiligt sind: Locks (`Mutex`, `RWLock`), Signale werden auf dem Main-Thread gesendet (`call_deferred`). **Nie** `ERR_*`, `WARN_*` oder `print_*` aufrufen, während ein Lock gehalten wird: Ausgeben nimmt den globalen Lock (TSAN-Fehler #60); Fehler unter dem Lock sammeln, nach dem Freigeben ausgeben. Kein `ResourceLoader::load()` in einem `WorkerThreadPool`-Task, der auf sich selbst wartet (#9: eigener `Thread`). |
 | **Upstream-freundlich** | Eigene Dateien statt großer Änderungen in bestehenden Dateien, wo es geht. Das hält den Sync mit Godot (`sync-upstream.ps1`) konfliktarm. |
 
 ### 1.2 Namen
