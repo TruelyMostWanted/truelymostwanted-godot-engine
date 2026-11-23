@@ -180,6 +180,21 @@ Vector<String> ResourceLoader::list_directory(const String &p_directory) {
 	return ::ResourceLoader::list_directory(p_directory);
 }
 
+PackedStringArray ResourceLoader::get_manifest_paths(const Ref<FilesManifest> &p_manifest) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), PackedStringArray());
+	return p_manifest->get_paths();
+}
+
+Dictionary ResourceLoader::load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), Dictionary());
+	return p_manifest->load_resources(ResourceFormatLoader::CacheMode(p_cache_mode));
+}
+
+Error ResourceLoader::load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads, CacheMode p_cache_mode) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), ERR_INVALID_PARAMETER);
+	return p_manifest->load_threaded_request_resources(p_use_sub_threads, ResourceFormatLoader::CacheMode(p_cache_mode));
+}
+
 void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("load_threaded_request", "path", "type_hint", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request, DEFVAL(""), DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_get_status", "path", "progress"), &ResourceLoader::load_threaded_get_status, DEFVAL_ARRAY);
@@ -201,6 +216,9 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_resource_uid", "path"), &ResourceLoader::get_resource_uid);
 	ClassDB::bind_method(D_METHOD("get_resource_type", "path"), &ResourceLoader::get_resource_type);
 	ClassDB::bind_method(D_METHOD("list_directory", "directory_path"), &ResourceLoader::list_directory);
+	ClassDB::bind_method(D_METHOD("get_manifest_paths", "manifest"), &ResourceLoader::get_manifest_paths);
+	ClassDB::bind_method(D_METHOD("load_manifest", "manifest", "cache_mode"), &ResourceLoader::load_manifest, DEFVAL(CACHE_MODE_REUSE));
+	ClassDB::bind_method(D_METHOD("load_threaded_request_manifest", "manifest", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request_manifest, DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
 
 	BIND_ENUM_CONSTANT(THREAD_LOAD_INVALID_RESOURCE);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);

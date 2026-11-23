@@ -32,7 +32,7 @@ HOST_PARAMETER=''
 REPO_PARAMETER='TruelyMostWanted/truelymostwanted-godot-engine'
 APPROVAL='Autonomous'
 CHECKPOINTS=''
-MAX_ISSUE_AGENTS='1'
+MAX_ISSUE_AGENTS='3'
 MAX_ISSUES_PER_AGENT='1'
 ALLOW_TEAMS_PER_ISSUE='false'
 MIRROR_GIT_ISSUES='false'
@@ -49,6 +49,7 @@ USE_CAVEMAN='true'
 - 2026-11-23 (ca. 13:35): Besitzer: **Wochenlimit 97 %: keine neuen Agenten.** Die laufenden (#11, #14) zu Ende laufen lassen. Neue Agenten erst nach Freigabe des Besitzers.
 - 2026-11-23: Besitzer: **Features parallel** auf eigenen Branches; Auswahl nach getrennten Dateien (gemeinsame Registrierungsdateien nur mit wenigen Zeilen an anderer Stelle), weil `truely-godot-engine` nie in Feature-Branches gemergt wird. Weiter höchstens 2 Agenten (Wochenlimit), höchstens ein Engine-Build gleichzeitig.
 - 2026-11-23: Besitzer: Wochenlimit bei 95 %. Höchstens 2 Agenten gleichzeitig, bevorzugt ein Issue nach dem anderen in der Reihenfolge von Tracker #32. MAX_ISSUE_AGENTS=1, MAX_ISSUES_PER_AGENT=1.
+- 2026-11-23 (Abend): Besitzer: Resume mit **Decision=FullAutonomous** und **UseCaveman=true** (Chat knapp, ohne Füllwörter). Erst selbst nacheinander (#37, #34), dann: **3 Issues parallel** mit Agenten auf Feature-Branches; Agenten implementieren und schreiben den Testcode im Testprojekt-Branch, **ohne Engine-Build**; Build, Test und Merge macht der Orchestrator danach nacheinander. MAX_ISSUE_AGENTS=3.
 
 ## Abgeleitet
 
@@ -102,34 +103,36 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='488eee09dc'
+LAST_INTEGRATED_COMMIT='1cec1b7c7a'
 CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
 UPDATED='2026-11-23'
 ```
 
-**In Arbeit:** – (kein Agent läuft, keine offenen Feature-Branches mit ungemergter Arbeit)
+**In Arbeit:** – Agenten für #5, #8, #9 wurden beim Session-Ende gestoppt (Budget). Teilarbeit liegt ungepusht in den Worktrees unter `.claude/worktrees/agent-*` (Branches `05-feature-resource-text-formats`, `08-feature-files-manifest-server`, `09-feature-resource-database`, falls angelegt) und in `C:/Users/larsc/AppData/Local/Temp/claude/scratch/issues/<N>/`. Beim Fortsetzen: je Worktree `git log`/`git status` prüfen, dann mit frischem Agenten „setze fort“ auf dem Branch. Board steht noch auf WIP.
 
 ## Übergabe
 
-**Zuerst fortsetzen:** Stapel 1 ist gemergt und abgeschlossen (#38, #46, #1, #2, #3, #39, #11, #48; Wiki „done“; Checks auf `main` des Testprojekts grün). Offen in dieser Reihenfolge:
-1. CI-Lauf 45199284329 auf `truely-godot-engine`: 17/20 grün, macOS/iOS bekamen keinen Runner (Infrastruktur). Einmal `gh run rerun 45199284329 --failed`; echter Fehler → Fix auf dem Feature-Branch.
-2. #37 (Filter für gecachte Pfade, baut auf #1): Checks vorab liegen im Testprojekt-Branch `37-feature-cached-paths-filters`. Engine-Branch `37-feature-cached-paths-filters` von `truely-godot-engine`.
-3. #34 (Endungs-Index, baut auf #2): Checks vorab im Testprojekt-Branch `34-feature-loader-extension-index`.
-4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39 auf einem neuen Testprojekt-Branch.
-5. Danach: #5 → #7 → #35 → #36 → #8 → #9 → #10; Phase 2: #12, #13; Phase 3 ab #15 (Konzept #14 entschieden); Phase 5: #50, #51 (TextureAtlas).
-6. Alte Agent-Worktrees unter `.claude/worktrees/` entfernen (`git worktree remove --force <pfad>`; die Branches sind gepusht und bleiben).
+**Zuerst fortsetzen:**
+1. Berichte von #5, #8, #9 lesen; je Issue nacheinander: `issue-comment.md` ins Issue, Branch bauen (Mono, `tests=yes`), Fehler auf dem Branch beheben, Unit-Tests, `--doctool`, Glue + NuGet, Checks im Testprojekt-Branch (Console-Exe), Wiki aus den Entwürfen, Squash-Merge, Checks nach `main` des Testprojekts. Gemeinsame Dateien (`register_core_types.cpp`, `resource_loader.*`, `core_bind.*`): beim zweiten Merge Konflikte auf dem Branch lösen (`git merge truely-godot-engine` nur nach einem Merge, siehe FEATURE-WORKFLOW 2.5).
+2. CI 45215922124 (Stapel #37 + #34) prüfen. macOS/iOS bekamen schon zweimal keinen Runner (abgebrochen ohne Schritt) – Infrastruktur, kein Code-Fehler.
+3. Danach: #35, #36 (brauchen #5), #10, #53 (Folge von #34), #13, Phase 3 ab #15, Phase 5 #50, #51.
+4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39.
+5. Reste alter Agent-Worktrees unter `.claude/worktrees/agent-a46…`, `agent-ad63…`, `agent-ad82…`, `agent-afea…` (abgemeldet, Löschen scheiterte an langen Pfaden; Löschen per `Remove-Item \?\…` braucht die Freigabe des Besitzers). Alte Testprojekt-Worktrees im Scratch der vorigen Session (`git -C …/godot-custom-build-project worktree list`).
 
-**Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin, #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
+**Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin (umgesetzt; Skript-/Binary-Loader in #53), #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
 
-**Anhänge-Dateien:** `core/io/resource_loader.*`, `resource_saver.*`, `core/core_bind.*`, `core/register_core_types.cpp`: nie zwei Issues parallel darauf.
+**Anhänge-Dateien:** `core/io/resource_loader.*`, `resource_saver.*`, `core/core_bind.*`, `core/register_core_types.cpp`: parallel nur mit wenigen Zeilen an anderer Stelle.
 
 **Fragen an den Besitzer:** –
 
-**Am Bildschirm zu prüfen (manual):** –
+**Am Bildschirm zu prüfen (manual):** #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
 
 **Regeln, neu:** –
 
 **Fallen:**
+- Agent-Worktrees belegen ihren Branch: vor `git switch <branch>` im Hauptbaum `git -C .claude/worktrees/<agent> switch --detach`. Testprojekt-Worktrees im Scratch brauchen die Junction `scratch/issues/<N>/nuget-local` → `P:/Projects/GitHub/nuget-local` (relativer Pfad in `nuget.config`).
+- **`run-checks.ps1` mit der GUI-Exe meldete immer PASSED** (PowerShell wartet nicht, kein Exit-Code; GD und C# liefen gleichzeitig). Seit Testprojekt `95830a0` nimmt das Skript die `.console.exe` daneben; Branches ohne diesen Fix: `-Godot …mono.console.exe` direkt übergeben. Stapel 1 wurde damit erneut geprüft: grün.
+- C#-Checks: den von `GetCachedRef()` u. Ä. gelieferten Wrapper nicht `using`/`Dispose()` – er ist mit gehaltenen Referenzen geteilt und gibt die Ressource frei.
 - Batch-CI 1 scheiterte nur an `--doctool`: `>` in Codebeispielen der XML muss `&gt;` sein (#48). Vor jedem Stapel `--doctool` auf `truely-godot-engine` prüfen; Agenten-Aussagen „kein Diff“ beziehen sich nur auf ihren Branch.
 - Auf diesem Rechner fehlen die Abhängigkeiten für AccessKit und D3D12: lokal immer `accesskit=no d3d12=no` (die CI baut mit allem). Die SCons-Meldung „ANGLE deps missing“ ist keine Warnung.
 - `build.ps1` hatte positionelle Parameter (`module_mono_enabled=yes` landete in `-Target`); seit 2026-11-23 behoben.

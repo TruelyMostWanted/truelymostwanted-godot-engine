@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/debugger/engine_profiler.h"
+#include "core/io/files_manifest.h"
 #include "core/io/logger.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -91,6 +92,10 @@ public:
 	String get_resource_type(const String &p_path);
 
 	Vector<String> list_directory(const String &p_directory);
+
+	PackedStringArray get_manifest_paths(const Ref<FilesManifest> &p_manifest);
+	Dictionary load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode = CACHE_MODE_REUSE);
+	Error load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads = false, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 
 	ResourceLoader() { singleton = this; }
 };

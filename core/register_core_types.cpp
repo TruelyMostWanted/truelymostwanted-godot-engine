@@ -48,6 +48,7 @@
 #include "core/io/config_file.h"
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
+#include "core/io/files_manifest.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
@@ -357,6 +358,7 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(IP);
 	GDREGISTER_CLASS(CoreBind::Geometry2D);
 	GDREGISTER_CLASS(CoreBind::Geometry3D);
+	GDREGISTER_CLASS(FilesManifest);
 	GDREGISTER_CLASS(PathInfo);
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);

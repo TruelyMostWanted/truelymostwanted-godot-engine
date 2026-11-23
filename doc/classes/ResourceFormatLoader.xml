@@ -48,6 +48,7 @@
 			<return type="PackedStringArray" />
 			<description>
 				Gets the list of extensions for files this loader is able to read.
+				[b]Note:[/b] The engine's built-in loaders with a fixed list of extensions are found through an index by extension. A loader that implements this method or [method _recognize_path] in a script, in C# or in a GDExtension can return a different answer on every call, so it is asked for every path that is loaded or checked.
 			</description>
 		</method>
 		<method name="_get_resource_script_class" qualifiers="virtual const">
