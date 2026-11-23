@@ -29,10 +29,10 @@ GOALS='existing GitHub issues #1-#31, order and dependencies from tracker #32'
 CONVENTIONS='AGENTS.md + truely/CONVENTIONS.md + truely/FEATURE-WORKFLOW.md'
 HOST_PARAMETER=''
 REPO_PARAMETER='TruelyMostWanted/truelymostwanted-godot-engine'
-APPROVAL='Checkpoints'
-CHECKPOINTS='Milestone,Concept'
-MAX_ISSUE_AGENTS='2'
-MAX_ISSUES_PER_AGENT='2'
+APPROVAL='Autonomous'
+CHECKPOINTS=''
+MAX_ISSUE_AGENTS='1'
+MAX_ISSUES_PER_AGENT='1'
 ALLOW_TEAMS_PER_ISSUE='false'
 MIRROR_GIT_ISSUES='false'
 USE_CAVEMAN='true'
@@ -40,6 +40,8 @@ USE_CAVEMAN='true'
 
 Änderungen:
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
+- 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
+- 2026-11-23: Besitzer: Wochenlimit bei 95 %. Höchstens 2 Agenten gleichzeitig, bevorzugt ein Issue nach dem anderen in der Reihenfolge von Tracker #32. MAX_ISSUE_AGENTS=1, MAX_ISSUES_PER_AGENT=1.
 
 ## Abgeleitet
 
@@ -102,9 +104,11 @@ UPDATED='2026-11-23'
 
 ## Übergabe
 
-**Zuerst fortsetzen:** Welle 1: #1 dann #2 (ein Issue-Agent, beide in `core/io/resource_*`), parallel #4 (Konzept, kein Build).
+**Zuerst fortsetzen:** #1, dann #2 (ein Issue-Agent, läuft). Danach der Reihe nach, je ein Agent: #34 → #3 → #5 → #7 → #35 → #36 → #8 → #9 → #10.
 
-**Wellen Phase 1:** W1 #1→#2 ‖ #4 · W2 #3 ‖ #6 · W3 #5 · W4 #7 · W5 #8 ‖ #9 · W6 #10. `core/io/resource_loader.*` und `core/register_core_types.cpp` sind Anhänge-Dateien: nie zwei Issues parallel darauf.
+**Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin, #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
+
+**Anhänge-Dateien:** `core/io/resource_loader.*`, `resource_saver.*`, `core/core_bind.*`, `core/register_core_types.cpp`: nie zwei Issues parallel darauf.
 
 **Fragen an den Besitzer:** –
 
