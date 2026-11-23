@@ -45,6 +45,7 @@
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
+#include "scene/audio/audio_mixer_server.h"
 #include "scene/audio/audio_stream_player.h"
 #include "scene/debugger/scene_debugger.h"
 #include "scene/gui/aspect_ratio_container.h"
@@ -113,6 +114,8 @@
 #include "scene/main/window.h"
 #include "scene/resources/animation_library.h"
 #include "scene/resources/atlas_texture.h"
+#include "scene/resources/audio/audio_mixer_channel.h"
+#include "scene/resources/audio/audio_mixer_layout.h"
 #include "scene/resources/audio/audio_stream.h"
 #include "scene/resources/audio/audio_stream_microphone.h"
 #include "scene/resources/audio/audio_stream_polyphonic.h"
@@ -380,6 +383,8 @@
 #include "scene/resources/3d/sphere_shape_3d.h"
 #include "scene/resources/3d/world_boundary_shape_3d.h"
 #endif // PHYSICS_3D_DISABLED
+
+static AudioMixerServer *audio_mixer_server = nullptr;
 
 static Ref<ResourceFormatSaverText> resource_saver_text;
 static Ref<ResourceFormatLoaderText> resource_loader_text;
@@ -1052,6 +1057,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioStreamGenerator);
 	GDREGISTER_ABSTRACT_CLASS(AudioStreamGeneratorPlayback);
 	GDREGISTER_ABSTRACT_CLASS(AudioStreamPlaybackPolyphonic);
+	GDREGISTER_CLASS(AudioMixerChannel);
+	GDREGISTER_CLASS(AudioMixerLayout);
 
 	OS::get_singleton()->yield(); // may take time to init
 
@@ -1358,6 +1365,11 @@ void unregister_scene_types() {
 
 	SceneDebugger::deinitialize();
 
+	if (audio_mixer_server) {
+		memdelete(audio_mixer_server);
+		audio_mixer_server = nullptr;
+	}
+
 	if constexpr (GD_IS_CLASS_ENABLED(TextureLayered)) {
 		ResourceLoader::remove_resource_format_loader(resource_loader_texture_layered);
 		resource_loader_texture_layered.unref();
@@ -1426,6 +1438,10 @@ void register_scene_singletons() {
 	GDREGISTER_CLASS(ThemeDB);
 
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ThemeDB", ThemeDB::get_singleton()));
+
+	GDREGISTER_CLASS(AudioMixerServer);
+	audio_mixer_server = memnew(AudioMixerServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioMixerServer", AudioMixerServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }

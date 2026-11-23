@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioMixerLayout" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A list of [AudioMixerChannel] definitions for the [AudioMixerServer].
+	</brief_description>
+	<description>
+		An [AudioMixerLayout] holds the channel definitions of a project. Edit it in the Inspector, save it as a [code].tres[/code] file and set its path in the project setting [code]audio/mixer/default_layout[/code]; the [AudioMixerServer] loads it on its first use. A layout can also be loaded at any time with [method AudioMixerServer.load_layout].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_channel">
+			<return type="void" />
+			<param index="0" name="channel" type="AudioMixerChannel" />
+			<description>
+				Appends [param channel] to [member channels].
+			</description>
+		</method>
+		<method name="find_channel" qualifiers="const">
+			<return type="AudioMixerChannel" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the first channel whose [member AudioMixerChannel.channel_name] is [param name], or [code]null[/code] if there is none.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="channels" type="AudioMixerChannel[]" setter="set_channels" getter="get_channels" default="[]">
+			The channel definitions. If two channels have the same name, the later one replaces the earlier one when the layout is loaded.
+		</member>
+	</members>
+</class>
