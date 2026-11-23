@@ -46,7 +46,12 @@ PckPackageServer *PckPackageServer::get_singleton() {
 }
 
 static bool _same_pack_path(const String &p_a, const String &p_b) {
-	return p_a == p_b || p_a.simplify_path() == p_b.simplify_path();
+	if (p_a == p_b || p_a.simplify_path() == p_b.simplify_path()) {
+		return true;
+	}
+	// `user://a.pck` and the OS path of the same file.
+	const ProjectSettings *project_settings = ProjectSettings::get_singleton();
+	return project_settings && project_settings->globalize_path(p_a).simplify_path() == project_settings->globalize_path(p_b).simplify_path();
 }
 
 void PckPackageServer::_emit_deferred(const StringName &p_signal, const String &p_path) {
