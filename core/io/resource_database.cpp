@@ -368,8 +368,9 @@ void ResourceDatabase::_job_done(uint64_t p_job_id) {
 		job = *found;
 		jobs.erase(p_job_id);
 	}
-	if (job->task_id != WorkerThreadPool::INVALID_TASK_ID) {
-		WorkerThreadPool::get_singleton()->wait_for_task_completion(job->task_id);
+	if (job->thread) {
+		job->thread->wait_to_finish();
+		memdelete(job->thread);
 	}
 	_emit_preload_finished(job->list, job->error);
 	memdelete(job);
@@ -418,7 +419,7 @@ Error ResourceDatabase::preload_list(const Ref<PreloadList> &p_list, bool p_use_
 	bool threaded = false;
 #ifdef THREADS_ENABLED
 	// Without threads (default Web export) or with a single core, load synchronously.
-	threaded = p_use_threads && !job->paths.is_empty() && WorkerThreadPool::get_singleton() && OS::get_singleton()->get_processor_count() > 1;
+	threaded = p_use_threads && !job->paths.is_empty() && OS::get_singleton()->get_processor_count() > 1;
 #else
 	(void)p_use_threads;
 #endif
@@ -428,7 +429,8 @@ Error ResourceDatabase::preload_list(const Ref<PreloadList> &p_list, bool p_use_
 		job->error = first_error;
 		job->id = next_job_id++;
 		jobs.insert(job->id, job);
-		job->task_id = WorkerThreadPool::get_singleton()->add_native_task(&ResourceDatabase::_job_task, job, false, "ResourceDatabase preload");
+		job->thread = memnew(Thread);
+		job->thread->start(&ResourceDatabase::_job_task, job);
 		return first_error;
 	}
 
@@ -624,8 +626,9 @@ void ResourceDatabase::finish() {
 		jobs.clear();
 	}
 	for (Job *job : pending) {
-		if (job->task_id != WorkerThreadPool::INVALID_TASK_ID && WorkerThreadPool::get_singleton()) {
-			WorkerThreadPool::get_singleton()->wait_for_task_completion(job->task_id);
+		if (job->thread) {
+			job->thread->wait_to_finish();
+			memdelete(job->thread);
 		}
 		memdelete(job);
 	}

@@ -33,9 +33,9 @@
 #include "core/io/preload_list.h"
 #include "core/io/resource.h"
 #include "core/object/object.h"
-#include "core/object/worker_thread_pool.h"
 #include "core/os/mutex.h"
 #include "core/os/rw_lock.h"
+#include "core/os/thread.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
@@ -66,7 +66,9 @@ class ResourceDatabase : public Object {
 		// Key -> path, applied after all paths are loaded.
 		LocalVector<Pair<String, String>> keys;
 		Error error = OK;
-		WorkerThreadPool::TaskID task_id = WorkerThreadPool::INVALID_TASK_ID;
+		// A plain thread, not a WorkerThreadPool task: `ResourceLoader::load()` inside a pool task
+		// spawns its own sub-task and keeps its load task registered (resources leak at exit).
+		Thread *thread = nullptr;
 	};
 
 	mutable RWLock lock;
