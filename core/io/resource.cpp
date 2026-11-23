@@ -910,12 +910,6 @@ void ResourceCache::_get_cached_paths_filtered(List<String> *r_paths, const F &p
 	}
 }
 
-// Returns the file part of a cached path, without the "::<id>" of a built-in sub-resource.
-static String _cached_path_get_file(const String &p_path) {
-	const int sep = p_path.find("::");
-	return sep < 0 ? p_path : p_path.substr(0, sep);
-}
-
 void ResourceCache::get_cached_paths(List<String> *r_paths) {
 	_get_cached_paths_filtered(r_paths, [](const String &, const Resource *) { return true; });
 }
@@ -949,10 +943,30 @@ void ResourceCache::get_cached_paths_for_type(const StringName &p_type, bool p_e
 }
 
 void ResourceCache::get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths) {
-	const String extension = p_extension.begins_with(".") ? p_extension.substr(1) : p_extension;
+	const String extension = (p_extension.begins_with(".") ? p_extension.substr(1) : p_extension).to_lower();
+	const int ext_len = extension.length();
+	const char32_t *ext = extension.ptr();
 
-	_get_cached_paths_filtered(r_paths, [&extension](const String &p_path, const Resource *) {
-		return _cached_path_get_file(p_path).get_extension().nocasecmp_to(extension) == 0;
+	// Compares in place, without allocating a string per cached path.
+	_get_cached_paths_filtered(r_paths, [ext, ext_len](const String &p_path, const Resource *) {
+		const int sep = p_path.find("::");
+		const int file_end = sep < 0 ? p_path.length() : sep;
+		const int dot = file_end > 0 ? p_path.rfind_char('.', file_end - 1) : -1;
+		const int slash = file_end > 0 ? p_path.rfind_char('/', file_end - 1) : -1;
+		if (dot < 0 || dot < slash) {
+			// No extension in the file name.
+			return ext_len == 0;
+		}
+		if (file_end - dot - 1 != ext_len) {
+			return false;
+		}
+		const char32_t *path = p_path.ptr() + dot + 1;
+		for (int i = 0; i < ext_len; i++) {
+			if (String::char_lowercase(path[i]) != ext[i]) {
+				return false;
+			}
+		}
+		return true;
 	});
 }
 
@@ -966,7 +980,16 @@ void ResourceCache::get_cached_paths_in_directory(const String &p_directory, boo
 		if (!p_path.begins_with(directory)) {
 			return false;
 		}
-		return p_recursive || _cached_path_get_file(p_path).find_char('/', directory.length()) < 0;
+		if (p_recursive) {
+			return true;
+		}
+		// Direct child: no further '/' in the file part (the "::<id>" of a sub-resource is not part of it).
+		const int slash = p_path.find_char('/', directory.length());
+		if (slash < 0) {
+			return true;
+		}
+		const int sep = p_path.find("::", directory.length());
+		return sep >= 0 && sep < slash;
 	});
 }
 

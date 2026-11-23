@@ -684,6 +684,16 @@ TEST_CASE("[Resource] Filtering cached paths") {
 		paths.clear();
 		ResourceCache::get_cached_paths_with_extension("", &paths);
 		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/deeper/plain" }));
+
+		// A dot in a directory name is not an extension.
+		Ref<Resource> dotted_dir = memnew(Resource);
+		dotted_dir->set_path(root + "v1.tres/plain");
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("tres", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "a.tres", root + "a.tres::Resource_x1" }));
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("", &paths);
+		CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "sub/deeper/plain", root + "v1.tres/plain" }));
 	}
 
 	SUBCASE("By directory") {
