@@ -79,6 +79,10 @@ public:
 	virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions) const;
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const;
+	// True if recognize_path() matches only the suffixes from get_recognized_extensions() and that list never changes
+	// while the loader is registered. ResourceLoader then finds the loader through its extension index;
+	// otherwise the loader is asked for every path.
+	virtual bool recognizes_path_by_extension() const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	virtual String get_resource_type(const String &p_path) const;
@@ -102,10 +106,62 @@ typedef Error (*ResourceLoaderImport)(const String &p_path);
 typedef void (*ResourceLoadedCallback)(Ref<Resource> p_resource, const String &p_path);
 
 // Immutable snapshot of the registered format loaders, in lookup order (first match wins).
-// Copying it is cheap: the list is copy-on-write and shared with every copy until a change replaces it.
-// Keep it a struct, so that lookup data built from the same formats can be added later.
+// Copying it is cheap: the list and its index are copy-on-write and shared with every copy until a change replaces them.
 struct ResourceLoaderFormatSnapshot {
 	Vector<Ref<ResourceFormatLoader>> formats;
+
+	// Index by extension, built by `build_index()`. For each lower-case extension key (the part after the last dot
+	// of a recognized extension), the positions of the loaders that recognize it, ascending.
+	Vector<String> index_extensions; // Sorted.
+	Vector<uint32_t> index_offsets; // Positions of `index_extensions[i]` are `index_positions[index_offsets[i]..index_offsets[i + 1]]`.
+	Vector<uint32_t> index_positions;
+	// Loaders that do not recognize paths by extension only (see `ResourceFormatLoader::recognizes_path_by_extension()`), ascending.
+	Vector<uint32_t> always_asked;
+
+	void build_index();
+
+	// The loaders that may recognize a path, in registration order: the indexed loaders for the path's last extension
+	// and the always-asked loaders. Each candidate must still be checked with `recognize_path()`.
+	// The range refers to this snapshot, which must outlive it.
+	class Candidates {
+		const ResourceLoaderFormatSnapshot *snapshot = nullptr;
+		const uint32_t *indexed = nullptr;
+		uint32_t indexed_count = 0;
+
+	public:
+		class Iterator {
+			const ResourceLoaderFormatSnapshot *snapshot = nullptr;
+			const uint32_t *indexed = nullptr;
+			const uint32_t *indexed_end = nullptr;
+			const uint32_t *asked = nullptr;
+			const uint32_t *asked_end = nullptr;
+
+			_FORCE_INLINE_ bool _take_indexed() const { return asked == asked_end || (indexed != indexed_end && *indexed < *asked); }
+
+		public:
+			Iterator(const ResourceLoaderFormatSnapshot *p_snapshot, const uint32_t *p_indexed, const uint32_t *p_indexed_end, const uint32_t *p_asked, const uint32_t *p_asked_end) :
+					snapshot(p_snapshot), indexed(p_indexed), indexed_end(p_indexed_end), asked(p_asked), asked_end(p_asked_end) {}
+
+			const Ref<ResourceFormatLoader> &operator*() const { return snapshot->formats[_take_indexed() ? *indexed : *asked]; }
+			Iterator &operator++() {
+				if (_take_indexed()) {
+					indexed++;
+				} else {
+					asked++;
+				}
+				return *this;
+			}
+			bool operator!=(const Iterator &p_other) const { return indexed != p_other.indexed || asked != p_other.asked; }
+		};
+
+		Candidates(const ResourceLoaderFormatSnapshot *p_snapshot, const uint32_t *p_indexed, uint32_t p_indexed_count) :
+				snapshot(p_snapshot), indexed(p_indexed), indexed_count(p_indexed_count) {}
+
+		Iterator begin() const;
+		Iterator end() const;
+	};
+
+	Candidates candidates_for(const String &p_path) const;
 
 	const Ref<ResourceFormatLoader> *begin() const { return formats.ptr(); }
 	const Ref<ResourceFormatLoader> *end() const { return formats.ptr() + formats.size(); }
@@ -272,6 +328,8 @@ public:
 
 	static void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions);
 	static void add_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader, bool p_at_front = false);
+	// The registered loaders and their extension index, for tests and diagnostics.
+	static ResourceLoaderFormatSnapshot get_format_snapshot() { return _get_loaders(); }
 	static void remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader);
 	static void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	static String get_resource_type(const String &p_path);
