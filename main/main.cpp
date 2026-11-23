@@ -5298,7 +5298,9 @@ void Main::cleanup(bool p_force) {
 	}
 
 	// Frees the stored resources while scripts and servers still exist.
-	ResourceDatabase::get_singleton()->finish();
+	if (ResourceDatabase::get_singleton()) {
+		ResourceDatabase::get_singleton()->finish();
+	}
 	ResourceLoader::clear_thread_load_tasks();
 
 	ResourceLoader::remove_custom_loaders();
