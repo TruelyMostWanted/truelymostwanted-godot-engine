@@ -165,11 +165,11 @@ Error PckPackageServer::mount(const String &p_path, bool p_replace_files, uint64
 	if (!packed_data || packed_data->is_disabled()) {
 		return ERR_UNAVAILABLE;
 	}
-	// `res://` as a directory source is reserved for the engine.
-	ERR_FAIL_COND_V_MSG(p_path.is_empty() || p_path == "res://", ERR_INVALID_PARAMETER, vformat("Invalid pack path \"%s\".", p_path));
-
-	// Like `ProjectSettings.load_resource_pack()`, a missing or unknown file is reported by the return value only,
-	// so that games can probe for optional packs.
+	// Like `ProjectSettings.load_resource_pack()`, errors are reported by the return value only,
+	// so that games can probe for optional packs. `res://` as a directory source is reserved for the engine.
+	if (p_path.is_empty() || p_path == "res://") {
+		return ERR_INVALID_PARAMETER;
+	}
 	bool ok = false;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	if (project_settings) {
@@ -210,7 +210,7 @@ Error PckPackageServer::unmount(const String &p_path) {
 		}
 	}
 	if (replay_err != OK) {
-		WARN_PRINT(vformat("Pack \"%s\" was unmounted, but at least one of the remaining packs could not be read again (error %d). Its files are no longer available.", p_path, replay_err));
+		WARN_PRINT(vformat("Pack \"%s\" was unmounted, but at least one of the remaining packs could not be read again (%s). Its files are no longer available.", p_path, error_names[replay_err]));
 	}
 
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
