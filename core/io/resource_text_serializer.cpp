@@ -2114,7 +2114,7 @@ Error ResourceTextSerializer::check_csv(const Ref<Resource> &p_resource, String 
 			r_error = vformat("%s can't be saved as CSV: element %d of '%s' is null.", type, i, list_info.name);
 			return ERR_INVALID_DATA;
 		}
-		if (get_type_name(element.ptr()) != element_type || element->get_script() != Variant(list.get_typed_script())) {
+		if (get_type_name(element.ptr()) != element_type || element->get_script().get_validated_object() != list.get_typed_script().get_validated_object()) {
 			r_error = vformat("%s can't be saved as CSV: element %d of '%s' is a %s, not a %s.", type, i, list_info.name, get_type_name(element.ptr()), element_type);
 			return ERR_INVALID_DATA;
 		}
