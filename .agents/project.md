@@ -40,6 +40,7 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
 - 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
 - 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
@@ -104,21 +105,30 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='e17517d82c'
-CURRENT_MILESTONE='Phase 3 · Settings'
+LAST_INTEGRATED_COMMIT='d0b5c8e63e'
+CURRENT_MILESTONE='Phase 3 · Settings / Phase 4 · Packs and streaming'
 UPDATED='2026-11-24'
 ```
 
-**In Arbeit (Agenten, ohne Build):** #53 (`53-feature-loader-index-scripts`), #68 (`68-feature-xml-and-unified-serializer`), #16 (`16-feature-audio-settings`); Concepts #13, #31 (Entwurf `scratch/issues/<N>/issue-comment.md` + `followups/`).
+Gemergt seit dem letzten Stand: #60, #9, #10, #36, #35, #50, #15, #53, #77, #68, #16, #74. Concepts entschieden und geschlossen: #13 (→ #74–#76), #31 (→ #77–#80), #65 (→ #83–#86), #66 (→ #87–#91).
+
+**Fertig von Agenten, wartet auf Integration (ungebaut):**
+- #51 `51-feature-texture-atlas-editor` – Achtung Regel: die neuen Laufzeit-Methoden in `TextureAtlas` (Commit 62388e1ead) gehören auf Branch `50-feature-texture-atlas` (cherry-pick dort, erneut squash-mergen), Editor-Teil bleibt auf 51. Fund: Fehlertext „region region_name“ in `set_regions()` (#50-Branch).
+- #70 `70-feature-load-result` – Wiki-Seiten ResourceLoader/Saver/FormatLoader sind volle Kopien: gegen Live-Stand abgleichen.
+- #87 auf Branch `03-feature-path-prefix-server` (Engine); Testprojekt-Branch `03-feature-path-prefix-server-87` → `03-feature-path-prefix-server` vorspulen (alter Worktree der Vor-Session blockiert ihn).
+- #83 auf Branch `10-feature-pck-package-server` (Engine); Testprojekt-Branch `83-pck-package-resource` → `10-feature-pck-package-server` vorspulen.
+- #89 `89-feature-streaming-assets-export-plugin` (berührt `editor/editor_node.cpp`, `.github/CODEOWNERS`).
+- #78 `78-feature-performance-recorder` (Overhead-Tabelle aus Check-Ausgabe „recorder_time“ ins Issue).
+
+**Laufende Agenten:** #17 (Sprache), #95 (glTF/GLB/FBX-Loader), #96 (Font-Loader + Shader-Checks).
+
+**Danach:** #84 (nach #83, gleiche Dateien), #85/#86 (nach #83), #88 (nach #87), #90, #91; #75 (nach #74), #76; #79/#80 (nach #78); #93 SerializerOptions (Branch 05, alle Aufrufer); #73 Formatklassen; #71 (Branch 15); #18–#30 Settings-Domänen nach Muster #16; Fund #16: `AudioServer.set_bus_layout()` setzt Bus-Werte zurück (Issue anlegen, Branch 16).
+
+**Testprojekt:** C# kompiliert alle Feature-Ordner zusammen; Änderungen an Checks mehrerer Features in einem kombinierten Hilfs-Worktree testen (Branches zusammenführen), dann je Branch committen. Vor `git merge main` in Test-Worktrees die ungetrackten `.uid`/`.import` anderer Features löschen.
 
 ## Übergabe
 
-**Zuerst fortsetzen:**
-1. Berichte der laufenden Agenten integrieren, je Issue nacheinander: Branch im Hauptbaum, `git merge truely-godot-engine`, Build (Mono, `tests=yes`), Unit-Tests einzeln + gesamt, Glue, Assemblies, `--doctool`, Checks im Testprojekt-Worktree (`scratch/issues/<N>/testproject`, Junction `nuget-local`), Issue-Kommentar, PR + Squash-Merge, Wiki (`scratch/wiki`, `wiki-toc.py`), Testprojekt-Branch pushen und in `main` mergen, Board.
-2. Concepts #13, #31: Entwurf prüfen, als Kommentar posten, Folge-Issues anlegen.
-3. Danach: #70 (nach #53, gleiche Dateien), #71 (SettingsServer-Folgepunkte), Settings-Domänen #17–#30 (Muster aus #16), #51 (Atlas-Editor inkl. Inspector aus #50).
-4. Batch-CI 45272798826 (nach #15; enthält #9, #10, #35, #36, #50, #15) prüfen. macOS/iOS bekommen weiterhin keinen Runner (Infrastruktur).
-5. Reste alter Agent-Worktrees unter `.claude/worktrees/` (abgemeldet bzw. detached; Löschen braucht Freigabe des Besitzers).
+**Zuerst fortsetzen:** die Integrationsliste oben (je Issue: Branch, `git merge truely-godot-engine`, Build mit Tests, Volltests, Glue, Assemblies, `--doctool`, Checks, Kommentar, PR + Squash-Merge, Wiki, Testprojekt).
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 
