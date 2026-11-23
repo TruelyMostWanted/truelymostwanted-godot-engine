@@ -16,6 +16,7 @@
     ./truely/build.ps1 -Target template_release         # Export-Template
     ./truely/build.ps1 -Status truely module_mono_enabled=yes
 #>
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [ValidateSet('editor', 'template_debug', 'template_release')]
     [string]$Target = 'editor',

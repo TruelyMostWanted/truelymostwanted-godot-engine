@@ -50,7 +50,7 @@ PROJECT_NAME='truelymostwanted-godot-engine'
 LOCAL_PATH='P:/Projects/GitHub/truelymostwanted-godot-engine'
 BASE_BRANCH='truely-godot-engine'
 TECH='Godot 4.8 beta engine fork, C++17 without exceptions, SCons; C# glue .NET 11, Godot.NET.Sdk 4.8.0-beta from local NuGet'
-BUILD_COMMAND='./truely/build.ps1 module_mono_enabled=yes'
+BUILD_COMMAND='powershell -NoProfile -ExecutionPolicy Bypass -File truely/build.ps1 module_mono_enabled=yes accesskit=no d3d12=no cache_path=P:/scons-cache cache_limit=40'  # tests: add tests=yes
 GLUE_COMMAND='./bin/godot.windows.editor.x86_64.mono.exe --headless --generate-mono-glue modules/mono/glue'
 ASSEMBLIES_COMMAND='python modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin --godot-platform=windows --push-nupkgs-local P:/Projects/GitHub/nuget-local'
 TEST_PROJECT='P:/Projects/GitHub/godot-custom-build-project'
@@ -117,6 +117,10 @@ UPDATED='2026-11-23'
 **Regeln, neu:** –
 
 **Fallen:**
+- Auf diesem Rechner fehlen die Abhängigkeiten für AccessKit und D3D12: lokal immer `accesskit=no d3d12=no` (die CI baut mit allem). Die SCons-Meldung „ANGLE deps missing“ ist keine Warnung.
+- `build.ps1` hatte positionelle Parameter (`module_mono_enabled=yes` landete in `-Target`); seit 2026-11-23 behoben.
+- Agenten in Worktrees dürfen nicht nach `.agents/state/` im Hauptbaum schreiben: `knowledge.md` im Scratchpad unter `issues/<N>/`, der Orchestrator kopiert sie.
+- Testprojekt: Branches brauchen `git -c core.longpaths=true`; `nuget-local` enthält immer die Pakete des zuletzt gebauten Branches, vor C#-Checks auf dem eigenen Branch neu bauen.
 - `P:/Projects/GitHub/nuget-local` fehlte am 2026-11-23: der erste volle Mono-Build (Glue + Assemblies) legt ihn an.
 - Der vorhandene Build in `bin/` ist ein `dev`-Build ohne SCons-Cache; der erste Build mit Cache füllt `P:/scons-cache`.
 - Alter Branch `origin/feature-resource-paths-retrieval` (ohne Nummer) ist ein Vorläufer von `01-feature-resource-paths-retrieval`; nicht löschen.
