@@ -834,8 +834,15 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 }
 
 String ResourceLoader::_validate_local_path(const String &p_path) {
-	// A registered prefix that resolves into `res://`, `user://` or `uid://` loads like that path (cache, UIDs, remaps, PCK).
-	const String path = PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
+	// A registered prefix that resolves into `res://` or `uid://` loads like that path (cache, UIDs, remaps, PCK).
+	// Prefixes into `user://` keep their own resource path, so that saved references stay portable.
+	String path = p_path;
+	if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+		const String engine_path = PathPrefixServer::get_singleton()->resolve_engine_path(p_path);
+		if (engine_path.begins_with("res://") || engine_path.begins_with("uid://")) {
+			path = engine_path;
+		}
+	}
 	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(path);
 	if (uid != ResourceUID::INVALID_ID) {
 		return ResourceUID::get_singleton()->get_id_path(uid);
