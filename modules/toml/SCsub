@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+Import("env")
+Import("env_modules")
+
+env_toml = env_modules.Clone()
+
+# Own TOML 1.0 reader and writer, no third-party code.
+env_toml.add_source_files(env.modules_sources, "*.cpp")
