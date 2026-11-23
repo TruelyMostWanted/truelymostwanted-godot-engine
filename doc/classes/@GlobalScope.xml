@@ -1657,6 +1657,9 @@
 		<member name="RenderingServer" type="RenderingServer" setter="" getter="">
 			The [RenderingServer] singleton.
 		</member>
+		<member name="ResourceDatabase" type="ResourceDatabase" setter="" getter="">
+			The [ResourceDatabase] singleton.
+		</member>
 		<member name="ResourceLoader" type="ResourceLoader" setter="" getter="">
 			The [ResourceLoader] singleton.
 		</member>
