@@ -440,55 +440,55 @@ static void _math_to_components(const Variant &p_value, LocalVector<double> &r_c
 	switch (p_value.get_type()) {
 		case Variant::VECTOR2: {
 			const Vector2 v = p_value;
-			r_components = { _plain_real(v.x), _plain_real(v.y) };
+			r_components = LocalVector<double>{ _plain_real(v.x), _plain_real(v.y) };
 		} break;
 		case Variant::VECTOR2I: {
 			const Vector2i v = p_value;
-			r_components = { double(v.x), double(v.y) };
+			r_components = LocalVector<double>{ double(v.x), double(v.y) };
 			r_integer = true;
 		} break;
 		case Variant::RECT2: {
 			const Rect2 v = p_value;
-			r_components = { _plain_real(v.position.x), _plain_real(v.position.y), _plain_real(v.size.x), _plain_real(v.size.y) };
+			r_components = LocalVector<double>{ _plain_real(v.position.x), _plain_real(v.position.y), _plain_real(v.size.x), _plain_real(v.size.y) };
 		} break;
 		case Variant::RECT2I: {
 			const Rect2i v = p_value;
-			r_components = { double(v.position.x), double(v.position.y), double(v.size.x), double(v.size.y) };
+			r_components = LocalVector<double>{ double(v.position.x), double(v.position.y), double(v.size.x), double(v.size.y) };
 			r_integer = true;
 		} break;
 		case Variant::VECTOR3: {
 			const Vector3 v = p_value;
-			r_components = { _plain_real(v.x), _plain_real(v.y), _plain_real(v.z) };
+			r_components = LocalVector<double>{ _plain_real(v.x), _plain_real(v.y), _plain_real(v.z) };
 		} break;
 		case Variant::VECTOR3I: {
 			const Vector3i v = p_value;
-			r_components = { double(v.x), double(v.y), double(v.z) };
+			r_components = LocalVector<double>{ double(v.x), double(v.y), double(v.z) };
 			r_integer = true;
 		} break;
 		case Variant::TRANSFORM2D: {
 			const Transform2D v = p_value;
-			r_components = { _plain_real(v.columns[0].x), _plain_real(v.columns[0].y), _plain_real(v.columns[1].x), _plain_real(v.columns[1].y), _plain_real(v.columns[2].x), _plain_real(v.columns[2].y) };
+			r_components = LocalVector<double>{ _plain_real(v.columns[0].x), _plain_real(v.columns[0].y), _plain_real(v.columns[1].x), _plain_real(v.columns[1].y), _plain_real(v.columns[2].x), _plain_real(v.columns[2].y) };
 		} break;
 		case Variant::VECTOR4: {
 			const Vector4 v = p_value;
-			r_components = { _plain_real(v.x), _plain_real(v.y), _plain_real(v.z), _plain_real(v.w) };
+			r_components = LocalVector<double>{ _plain_real(v.x), _plain_real(v.y), _plain_real(v.z), _plain_real(v.w) };
 		} break;
 		case Variant::VECTOR4I: {
 			const Vector4i v = p_value;
-			r_components = { double(v.x), double(v.y), double(v.z), double(v.w) };
+			r_components = LocalVector<double>{ double(v.x), double(v.y), double(v.z), double(v.w) };
 			r_integer = true;
 		} break;
 		case Variant::PLANE: {
 			const Plane v = p_value;
-			r_components = { _plain_real(v.normal.x), _plain_real(v.normal.y), _plain_real(v.normal.z), _plain_real(v.d) };
+			r_components = LocalVector<double>{ _plain_real(v.normal.x), _plain_real(v.normal.y), _plain_real(v.normal.z), _plain_real(v.d) };
 		} break;
 		case Variant::QUATERNION: {
 			const Quaternion v = p_value;
-			r_components = { _plain_real(v.x), _plain_real(v.y), _plain_real(v.z), _plain_real(v.w) };
+			r_components = LocalVector<double>{ _plain_real(v.x), _plain_real(v.y), _plain_real(v.z), _plain_real(v.w) };
 		} break;
 		case Variant::AABB: {
 			const ::AABB v = p_value;
-			r_components = { _plain_real(v.position.x), _plain_real(v.position.y), _plain_real(v.position.z), _plain_real(v.size.x), _plain_real(v.size.y), _plain_real(v.size.z) };
+			r_components = LocalVector<double>{ _plain_real(v.position.x), _plain_real(v.position.y), _plain_real(v.position.z), _plain_real(v.size.x), _plain_real(v.size.y), _plain_real(v.size.z) };
 		} break;
 		case Variant::BASIS: {
 			const Basis v = p_value;
@@ -522,7 +522,7 @@ static void _math_to_components(const Variant &p_value, LocalVector<double> &r_c
 		} break;
 		case Variant::COLOR: {
 			const Color v = p_value;
-			r_components = { _plain_float32(v.r), _plain_float32(v.g), _plain_float32(v.b), _plain_float32(v.a) };
+			r_components = LocalVector<double>{ _plain_float32(v.r), _plain_float32(v.g), _plain_float32(v.b), _plain_float32(v.a) };
 		} break;
 		default: {
 			r_components.clear();
