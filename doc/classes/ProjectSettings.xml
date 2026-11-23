@@ -1243,6 +1243,9 @@
 		<member name="filesystem/path_prefixes/defaults" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [PathPrefixServer] registers [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] at startup (on the Web only [code]temp://[/code]). They can still be replaced or removed with [method PathPrefixServer.register_prefix] and [method PathPrefixServer.unregister_prefix].
 		</member>
+		<member name="filesystem/resources/preload_lists" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Paths of [PreloadList] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
+		</member>
 		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
 			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. See [ResourceTextSerializer].
 		</member>
