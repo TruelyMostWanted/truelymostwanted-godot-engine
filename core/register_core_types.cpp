@@ -76,6 +76,7 @@
 #include "core/math/a_star_grid_2d.h"
 #include "core/math/expression.h"
 #include "core/math/random_number_generator.h"
+#include "core/math/seed_server.h"
 #include "core/math/triangle_mesh.h"
 #include "core/object/class_db.h"
 #include "core/object/script_backtrace.h"
@@ -131,6 +132,7 @@ extern void register_global_constants();
 extern void unregister_global_constants();
 
 static ResourceUID *resource_uid = nullptr;
+static SeedServer *seed_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -290,6 +292,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(AStarGrid2D);
 	GDREGISTER_CLASS(EncodedObjectAsID);
 	GDREGISTER_CLASS(RandomNumberGenerator);
+	GDREGISTER_ABSTRACT_CLASS(SeedServer);
+	seed_server = memnew(SeedServer);
 #ifndef DISABLE_DEPRECATED
 	GDREGISTER_CLASS(PackedDataContainer);
 	GDREGISTER_ABSTRACT_CLASS(PackedDataContainerRef);
@@ -391,6 +395,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("IP", IP::get_singleton(), "IP"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Geometry2D", CoreBind::Geometry2D::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Geometry3D", CoreBind::Geometry3D::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("SeedServer", SeedServer::get_singleton(), "SeedServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceLoader", CoreBind::ResourceLoader::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceSaver", CoreBind::ResourceSaver::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", CoreBind::Marshalls::get_singleton()));
@@ -454,6 +459,8 @@ void unregister_core_types() {
 	memdelete(gdextension_manager);
 
 	memdelete(resource_uid);
+
+	memdelete(seed_server);
 
 	memdelete(ip);
 
