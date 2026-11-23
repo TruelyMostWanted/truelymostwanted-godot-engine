@@ -65,10 +65,12 @@
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
 #include "core/io/resource_database.h"
+#include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
+#include "core/io/resource_result.h"
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
@@ -175,6 +177,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(Time);
 	_time = memnew(Time);
 	ResourceLoader::initialize();
+	ResourceErrorCapture::initialize();
 
 	Variant::register_types();
 
@@ -376,6 +379,8 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
+	GDREGISTER_CLASS(ResourceLoadResult);
+	GDREGISTER_CLASS(ResourceSaveResult);
 	GDREGISTER_CLASS(CoreBind::OS);
 	GDREGISTER_CLASS(CoreBind::Engine);
 	GDREGISTER_CLASS(CoreBind::Special::ClassDB);
@@ -578,6 +583,7 @@ void unregister_core_types() {
 		resource_loader_gdextension.unref();
 	}
 
+	ResourceErrorCapture::finalize();
 	ResourceLoader::finalize();
 
 	ClassDB::cleanup_defaults();
