@@ -52,6 +52,9 @@ struct MixerReset {
 		if (AudioMixerServer::get_singleton()) {
 			AudioMixerServer::get_singleton()->reset();
 		}
+		// Stopped playbacks are removed by the audio thread on its next mix step; give it time,
+		// so the streams are not reported as leaked at exit.
+		OS::get_singleton()->delay_usec(100000);
 	}
 };
 
