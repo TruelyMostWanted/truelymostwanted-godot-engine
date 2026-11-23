@@ -523,3 +523,7 @@
 
 /thirdparty/                                  @godotengine/buildsystem
 /thirdparty/jolt_physics/                     @godotengine/buildsystem @godotengine/jolt-physics
+
+# Truely Godot Engine (fork-specific)
+
+/truely/                                      @TruelyMostWanted
