@@ -265,7 +265,7 @@ TEST_CASE("[ResourceTextSerializer] JSON round trip as text") {
 	REQUIRE(serializer != nullptr);
 	const Ref<TextFormatSettings> settings = make_settings();
 
-	const String text = serializer->resource_to_json(settings);
+	const String text = serializer->serialize(settings, "json");
 	CHECK(text.contains("\"$type\": \"TextFormatSettings\""));
 	CHECK(text.contains("\"$format_version\": 1"));
 	// Enums as names, colors as #rrggbbaa, keys in property order.
@@ -277,12 +277,12 @@ TEST_CASE("[ResourceTextSerializer] JSON round trip as text") {
 	// Nested resources of the declared type have no type key.
 	CHECK(text.count("\"$type\"") == 1);
 
-	check_settings(serializer->json_to_resource(text));
+	check_settings(serializer->deserialize(text, "json"));
 
-	const String numbers = serializer->resource_to_json(settings, { { "enums_as_names", false }, { "indent", "" } });
+	const String numbers = serializer->serialize(settings, "json", { { "enums_as_names", false }, { "indent", "" } });
 	CHECK(numbers.contains("\"quality\":2"));
 	CHECK_FALSE(numbers.contains("\n"));
-	check_settings(serializer->json_to_resource(numbers));
+	check_settings(serializer->deserialize(numbers, "json"));
 }
 
 TEST_CASE("[ResourceTextSerializer] Dictionary tree") {
@@ -343,7 +343,7 @@ TEST_CASE("[ResourceTextSerializer] Hand-edited file with missing and unknown ke
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	const String text = "{\"$type\": \"TextFormatEntry\", \"name\": \"Dana\", \"level\": \"7\", \"enabled\": \"no\", \"mode\": \"happy\", \"colour\": \"blue\"}";
 	ERR_PRINT_OFF;
-	const Ref<TextFormatEntry> entry = serializer->json_to_resource(text);
+	const Ref<TextFormatEntry> entry = serializer->deserialize(text, "json");
 	ERR_PRINT_ON;
 	REQUIRE(entry.is_valid());
 	CHECK(entry->get_entry_name() == "Dana");
@@ -356,7 +356,7 @@ TEST_CASE("[ResourceTextSerializer] Hand-edited file with missing and unknown ke
 
 	// A value of the wrong type keeps the default too.
 	ERR_PRINT_OFF;
-	const Ref<TextFormatEntry> wrong = serializer->json_to_resource("{\"$type\": \"TextFormatEntry\", \"level\": \"many\"}");
+	const Ref<TextFormatEntry> wrong = serializer->deserialize("{\"$type\": \"TextFormatEntry\", \"level\": \"many\"}", "json");
 	ERR_PRINT_ON;
 	REQUIRE(wrong.is_valid());
 	CHECK(wrong->get_level() == 1);
@@ -366,17 +366,17 @@ TEST_CASE("[ResourceTextSerializer] Wrong types and errors") {
 	register_test_classes();
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	ERR_PRINT_OFF;
-	CHECK(serializer->json_to_resource("{\"name\": \"no type\"}").is_null());
-	CHECK(serializer->json_to_resource("{\"$type\": \"NoSuchClass\"}").is_null());
-	CHECK(serializer->json_to_resource("not json").is_null());
+	CHECK(serializer->deserialize("{\"name\": \"no type\"}", "json").is_null());
+	CHECK(serializer->deserialize("{\"$type\": \"NoSuchClass\"}", "json").is_null());
+	CHECK(serializer->deserialize("not json", "json").is_null());
 	// The file holds a TextFormatEntry, but a TextFormatSettings is expected.
-	CHECK(serializer->json_to_resource("{\"$type\": \"TextFormatEntry\"}", "TextFormatSettings").is_null());
+	CHECK(serializer->deserialize("{\"$type\": \"TextFormatEntry\"}", "json", "TextFormatSettings").is_null());
 
 	// A resource that contains itself can't be written.
 	Ref<Resource> cyclic;
 	cyclic.instantiate();
 	cyclic->set_meta("self", cyclic);
-	CHECK(serializer->resource_to_json(cyclic).is_empty());
+	CHECK(serializer->serialize(cyclic, "json").is_empty());
 	cyclic->remove_meta("self");
 	ERR_PRINT_ON;
 }
@@ -386,24 +386,24 @@ TEST_CASE("[ResourceTextSerializer] INI round trip") {
 	const Ref<TextFormatSettings> settings = make_settings();
 
 	SUBCASE("Variant syntax") {
-		const String text = serializer->resource_to_ini(settings);
+		const String text = serializer->serialize(settings, "ini");
 		CHECK(text.begins_with("[root]\n$type=\"TextFormatSettings\"\n"));
 		CHECK(text.contains("[root/main]"));
 		CHECK(text.contains("[root/entries/0]"));
 		CHECK(text.contains("[root/entries/1]"));
 		CHECK(text.contains("quality=\"High\""));
 		CHECK(text.contains("cell=Vector3i(1, -2, 3)"));
-		check_settings(serializer->ini_to_resource(text));
+		check_settings(serializer->deserialize(text, "ini"));
 	}
 
 	SUBCASE("Plain values") {
-		const String text = serializer->resource_to_ini(settings, { { "plain", true } });
+		const String text = serializer->serialize(settings, "ini", { { "plain", true } });
 		CHECK(text.contains("$type=TextFormatSettings\n"));
 		CHECK(text.contains("quality=High\n"));
 		CHECK(text.contains("cell=1, -2, 3\n"));
 		CHECK(text.contains("name=Ann\n"));
 		CHECK(text.contains("tint=#ff0000ff\n"));
-		check_settings(serializer->ini_to_resource(text));
+		check_settings(serializer->deserialize(text, "ini"));
 	}
 
 	SUBCASE("Through ResourceSaver and ResourceLoader") {
@@ -430,7 +430,7 @@ TEST_CASE("[ResourceTextSerializer] Hand-written plain INI") {
 						"name=Eve\n"
 						"offset=(3, 4)\n";
 	ERR_PRINT_OFF;
-	const Ref<TextFormatSettings> settings = serializer->ini_to_resource(text);
+	const Ref<TextFormatSettings> settings = serializer->deserialize(text, "ini");
 	ERR_PRINT_ON;
 	REQUIRE(settings.is_valid());
 	CHECK(settings->get_volume() == 0.25);
@@ -444,7 +444,7 @@ TEST_CASE("[ResourceTextSerializer] Hand-written plain INI") {
 	CHECK(entry->get_level() == 1);
 
 	// Without [root], the keys before the first section and the type hint are used.
-	const Ref<TextFormatEntry> loose = serializer->ini_to_resource("name=Finn\nlevel=4\n", "TextFormatEntry");
+	const Ref<TextFormatEntry> loose = serializer->deserialize("name=Finn\nlevel=4\n", "ini", "TextFormatEntry");
 	REQUIRE(loose.is_valid());
 	CHECK(loose->get_entry_name() == "Finn");
 	CHECK(loose->get_level() == 4);
@@ -461,12 +461,12 @@ TEST_CASE("[ResourceTextSerializer] CSV round trip") {
 	list->set_entries(entries);
 	CHECK(serializer->can_save_as_csv(list));
 
-	const String text = serializer->resource_to_csv(list);
+	const String text = serializer->serialize(list, "csv");
 	CHECK(text.begins_with("name,level,speed,enabled,mode,offset,tint\n"));
 	CHECK(text.contains("\"Cleo, \"\"the\"\" 2nd\""));
 	CHECK(text.contains("Happy"));
 
-	const Ref<TextFormatList> loaded = serializer->csv_to_resource(text, "TextFormatList");
+	const Ref<TextFormatList> loaded = serializer->deserialize(text, "csv", "TextFormatList");
 	REQUIRE(loaded.is_valid());
 	const TypedArray<TextFormatEntry> loaded_entries = loaded->get_entries();
 	REQUIRE(loaded_entries.size() == 2);
@@ -474,9 +474,9 @@ TEST_CASE("[ResourceTextSerializer] CSV round trip") {
 	check_entry(loaded_entries[1], "Cleo, \"the\" 2nd", 2, 6);
 
 	SUBCASE("Other delimiter") {
-		const String semicolons = serializer->resource_to_csv(list, { { "delimiter", ";" } });
+		const String semicolons = serializer->serialize(list, "csv", { { "delimiter", ";" } });
 		CHECK(semicolons.begins_with("name;level;"));
-		const Ref<TextFormatList> back = serializer->csv_to_resource(semicolons, "TextFormatList", { { "delimiter", ";" } });
+		const Ref<TextFormatList> back = serializer->deserialize(semicolons, "csv", "TextFormatList", { { "delimiter", ";" } });
 		REQUIRE(back.is_valid());
 		CHECK(back->get_entries().size() == 2);
 	}
@@ -495,7 +495,7 @@ TEST_CASE("[ResourceTextSerializer] CSV round trip") {
 	}
 
 	SUBCASE("Missing columns keep defaults") {
-		const Ref<TextFormatList> partial = serializer->csv_to_resource("name\r\nGus\r\n\r\nHal\r\n", "TextFormatList");
+		const Ref<TextFormatList> partial = serializer->deserialize("name\r\nGus\r\n\r\nHal\r\n", "csv", "TextFormatList");
 		REQUIRE(partial.is_valid());
 		const TypedArray<TextFormatEntry> partial_entries = partial->get_entries();
 		REQUIRE(partial_entries.size() == 2);
@@ -512,7 +512,7 @@ TEST_CASE("[ResourceTextSerializer] Resources that do not fit CSV") {
 
 	const String path = TestUtils::get_temp_path("text_formats_unfit.csv");
 	ERR_PRINT_OFF;
-	CHECK(serializer->resource_to_csv(settings).is_empty());
+	CHECK(serializer->serialize(settings, "csv").is_empty());
 	CHECK(ResourceSaver::save(Ref<Resource>(settings), path) == ERR_INVALID_DATA);
 	ERR_PRINT_ON;
 	CHECK_FALSE(FileAccess::exists(path));
@@ -535,13 +535,13 @@ TEST_CASE("[ResourceTextSerializer] Precision of floats and colors") {
 	entry->set_tint(Color(0.123f, 0.5f, 1.5f, 1.0f)); // Not exact as #rrggbbaa.
 	entry->set_offset(Vector2(0.1, 1e-7));
 
-	const Ref<TextFormatEntry> json = serializer->json_to_resource(serializer->resource_to_json(entry));
+	const Ref<TextFormatEntry> json = serializer->deserialize(serializer->serialize(entry, "json"), "json");
 	REQUIRE(json.is_valid());
 	CHECK(json->get_speed() == entry->get_speed());
 	CHECK(json->get_tint() == entry->get_tint());
 	CHECK(json->get_offset() == entry->get_offset());
 
-	const Ref<TextFormatEntry> ini = serializer->ini_to_resource(serializer->resource_to_ini(entry, { { "plain", true } }));
+	const Ref<TextFormatEntry> ini = serializer->deserialize(serializer->serialize(entry, "ini", { { "plain", true } }), "ini");
 	REQUIRE(ini.is_valid());
 	CHECK(ini->get_speed() == entry->get_speed());
 	CHECK(ini->get_tint() == entry->get_tint());

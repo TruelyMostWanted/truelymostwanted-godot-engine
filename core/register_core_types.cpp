@@ -120,6 +120,8 @@ static Ref<ResourceFormatLoaderResourceINI> resource_loader_resource_ini;
 static Ref<ResourceFormatSaverResourceINI> resource_saver_resource_ini;
 static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
 static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
+static Ref<ResourceFormatLoaderResourceXML> resource_loader_resource_xml;
+static Ref<ResourceFormatSaverResourceXML> resource_saver_resource_xml;
 static ResourceTextSerializer *_resource_text_serializer = nullptr;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
@@ -282,6 +284,8 @@ void register_core_types() {
 	ResourceLoader::add_resource_format_loader(resource_loader_resource_ini);
 	resource_loader_resource_csv.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_resource_csv);
+	resource_loader_resource_xml.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_xml);
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		resource_saver_json.instantiate();
@@ -297,6 +301,8 @@ void register_core_types() {
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_ini);
 	resource_saver_resource_csv.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_csv);
+	resource_saver_resource_xml.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
@@ -564,6 +570,10 @@ void unregister_core_types() {
 	resource_loader_resource_csv.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_resource_csv);
 	resource_saver_resource_csv.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_xml);
+	resource_loader_resource_xml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_xml);
+	resource_saver_resource_xml.unref();
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_json);
