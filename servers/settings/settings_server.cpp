@@ -753,6 +753,10 @@ Error SettingsServer::apply() {
 
 Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	_ensure_initialized();
+	if (in_startup) {
+		// The stored state needs no confirmation.
+		return apply();
+	}
 	ERR_FAIL_COND_V_MSG(confirmation_active, ERR_BUSY, vformat("Settings domain \"%s\" already waits for a confirmation.", get_domain()));
 	const PackedStringArray names = _get_changed_names(settings, applied);
 	if (names.is_empty()) {
