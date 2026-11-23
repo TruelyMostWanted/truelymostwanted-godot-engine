@@ -187,7 +187,8 @@ bool FilesManifest::_type_matches(const String &p_path) const {
 	if (hint.is_empty()) {
 		return true;
 	}
-	const String type = ResourceLoader::get_resource_type(p_path);
+	// In exported builds, text resources may be converted to binary and reached through a `.remap` file.
+	const String type = ResourceLoader::get_resource_type(ResourceLoader::path_remap(p_path));
 	// Files whose type is only known after loading are kept.
 	return type.is_empty() || ClassDB::is_parent_class(type, hint);
 }
