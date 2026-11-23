@@ -11,7 +11,7 @@
 		class_name ModsPrefix
 		extends PathPrefix
 
-		func _globalize(path: String) -> String:
+		func _globalize(path: String) -&gt; String:
 			return OS.get_executable_path().get_base_dir().path_join("mods").path_join(path.trim_prefix("mods://"))
 		[/gdscript]
 		[csharp]
