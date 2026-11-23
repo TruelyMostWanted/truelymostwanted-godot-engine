@@ -1,0 +1,67 @@
+name: Refactoring
+description: Restructure existing code without changing its behavior (or with a deliberately listed change).
+title: "[Refactoring] "
+labels: ["type: refactoring"]
+body:
+  - type: textarea
+    id: current
+    attributes:
+      label: Current state
+      description: How is it built today, and what is the problem with it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: target
+    attributes:
+      label: Target state
+      description: How should it look afterwards? Name the new structure, types, folders.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: behavior
+    attributes:
+      label: Behavior change
+      options:
+        - None · pure restructuring
+        - Yes · listed under "Target state"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Core · core/ (Variant, Object, I/O, math)
+        - Scene · scene/ (nodes, resources, GUI)
+        - Servers · servers/ (rendering, physics, audio, navigation, text)
+        - Editor · editor/
+        - Modules · modules/ (GDScript, glTF, …)
+        - .NET · modules/mono (C# bindings)
+        - Platform & drivers · platform/, drivers/
+        - Third-party · thirdparty/
+        - Build & CI · SCons, .github/, misc/
+        - Tests · tests/
+        - Docs · doc/ (class reference)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] Build succeeds without errors or warnings
+        - [ ] Existing save files and resources still load
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, commits, documents.

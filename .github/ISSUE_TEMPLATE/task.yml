@@ -1,0 +1,40 @@
+name: Task
+description: Work that is neither feature nor bug, e.g. publishing, marketing, store pages, screenshots, organization.
+title: "[Task] "
+labels: ["type: task"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What is done when this task is done, in one or two sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      description: The steps; each one checkable.
+      value: |
+        - [ ]
+    validations:
+      required: true
+
+  - type: input
+    id: due
+    attributes:
+      label: Due
+      description: Date or event (e.g. "before the demo on Steam Next Fest"), if any.
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: What exists afterwards and where (files, links, store fields).
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Store guidelines, required sizes, related issues.

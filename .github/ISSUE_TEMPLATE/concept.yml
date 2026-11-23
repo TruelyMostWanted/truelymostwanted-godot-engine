@@ -1,0 +1,66 @@
+name: Concept
+description: Concept, research or brainstorming. Reasoning and a recommendation, no implementation.
+title: "[Concept] "
+labels: ["type: concept"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A concept issue creates clarity before anything is built: questions, approaches, comparison, recommendation.
+        Nothing is implemented here. If the recommendation is yes, the follow-up issues are listed (not created).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: The idea or the question in two or three sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why it is worth thinking about now; who asked.
+    validations:
+      required: true
+
+  - type: textarea
+    id: questions
+    attributes:
+      label: Questions
+      description: What has to be answered before a decision.
+      value: |
+        1.
+    validations:
+      required: true
+
+  - type: textarea
+    id: approaches
+    attributes:
+      label: Approaches
+      description: The approaches to compare (benefit, effort, risk, view of the user), including "do nothing" or a simpler alternative.
+      value: |
+        ### A ·
+        ### B ·
+        ### C · No change / simpler alternative
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] The questions are answered in this issue
+        - [ ] The approaches are compared
+        - [ ] Recommendation with reasons (yes / no / later, and what first)
+        - [ ] If yes: follow-up issues listed with order and dependencies
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, documents, links.
