@@ -7,6 +7,7 @@
 		The [PathPrefixServer] keeps a table of path prefixes. Each prefix is resolved by logic, a [PathPrefix] or a [Callable], that turns a prefixed path into a real path on the current platform. [FileAccess], [DirAccess], [ResourceLoader], [ResourceSaver] and [method ProjectSettings.globalize_path] resolve every registered prefix.
 		The engine prefixes are registered first and are locked: [code]res://[/code], [code]user://[/code], [code]uid://[/code], [code]pipe://[/code] and [code]exec://[/code]. [code]exec://[/code] is the folder of the executable in an exported project (on macOS the folder that contains the [code].app[/code] bundle) and the project folder in the editor. It is not available on Android, iOS and the Web.
 		If [member ProjectSettings.filesystem/path_prefixes/defaults] is enabled, [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] are registered at startup for the OS folders of [method OS.get_data_dir], [method OS.get_config_dir], [method OS.get_cache_dir] and [method OS.get_temp_dir]. They can be replaced or removed. On the Web only [code]temp://[/code] is registered, because the other folders are not persistent there.
+		A prefix whose folder is inside [code]res://[/code] or [code]user://[/code] (for example [code]register_prefix_folder("streaming://", "res://streaming_assets")[/code]) is passed on as that engine path by [method FileAccess.open], [method FileAccess.file_exists], [method DirAccess.open], [method DirAccess.dir_exists_absolute], [method DirAccess.make_dir_absolute], [method DirAccess.make_dir_recursive_absolute], [method DirAccess.remove_absolute] and [ResourceLoader] (see [method resolve_engine_path]). It therefore reads from the PCK in exported projects, also on Android, iOS and the Web, and loaded resources share the cache with the [code]res://[/code] path. [method FileAccess.get_path] of such a file returns the engine path.
 		[method resolve] returns a [PathInfo] with all forms of a path. [method resolve_safe] does the same for untrusted paths from players, mods or the network.
 		[codeblocks]
 		[gdscript]
@@ -123,7 +124,7 @@
 			<param index="4" name="is_available" type="Callable" default="Callable()" />
 			<description>
 				Registers a prefix whose logic is given as callables: [param globalize] receives the prefixed path and returns the real path, [param localize] receives a real path and returns the prefixed path or an empty string, [param is_available] returns a [bool]. See [method register_prefix] for [param prefix] and [param platforms].
-				[b]Note:[/b] The callables can be called from any thread and must be thread-safe.
+				[b]Note:[/b] The callables can be called from any thread and must be thread-safe. They must not load resources, because [ResourceLoader] may call them while it holds its internal lock.
 			</description>
 		</method>
 		<method name="register_prefix_folder">
@@ -140,6 +141,15 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Resolves [param path] into a [PathInfo]. [param path] is a prefixed path, an OS path below a known prefix, or a path relative to [code]res://[/code]. Separators ([code]\\[/code] to [code]/[/code]), the case of the prefix and [code].[/code]/[code]..[/code] segments are normalized. An unknown prefix gives an invalid result instead of the unchanged input.
+			</description>
+		</method>
+		<method name="resolve_engine_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Follows the prefix chain of [param path] until it reaches [code]res://[/code], [code]user://[/code] or [code]uid://[/code], and returns that path with [code].[/code]/[code]..[/code] segments resolved. For example [code]streaming://levels/a.json[/code] returns [code]res://streaming_assets/levels/a.json[/code] after [code]register_prefix_folder("streaming://", "res://streaming_assets")[/code]. A prefix whose folder uses another prefix is followed through it (at most 8 steps).
+				Returns [param path] unchanged if it has no registered prefix, if a prefix in the chain is unavailable, or if the chain ends in an OS path or loops. Engine paths are returned unchanged.
+				[FileAccess], [DirAccess] and [ResourceLoader] call this method, so that a prefix that points into [code]res://[/code] reads from the PCK in exported projects.
 			</description>
 		</method>
 		<method name="resolve_safe" qualifiers="const">

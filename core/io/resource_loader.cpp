@@ -35,6 +35,7 @@
 #include "core/core_bind.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/path_prefix_server.h"
 #include "core/io/resource_importer.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
@@ -833,13 +834,15 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 }
 
 String ResourceLoader::_validate_local_path(const String &p_path) {
-	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(p_path);
+	// A registered prefix that resolves into `res://`, `user://` or `uid://` loads like that path (cache, UIDs, remaps, PCK).
+	const String path = PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
+	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(path);
 	if (uid != ResourceUID::INVALID_ID) {
 		return ResourceUID::get_singleton()->get_id_path(uid);
-	} else if (p_path.is_relative_path()) {
-		return ("res://" + p_path).simplify_path();
+	} else if (path.is_relative_path()) {
+		return ("res://" + path).simplify_path();
 	} else {
-		return ProjectSettings::get_singleton()->localize_path(p_path);
+		return ProjectSettings::get_singleton()->localize_path(path);
 	}
 }
 
