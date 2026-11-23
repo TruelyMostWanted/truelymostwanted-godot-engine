@@ -62,7 +62,9 @@ gh run watch                      # den laufenden Lauf verfolgen
 gh run list --branch 03-feature-path-prefix-server -L 3
 ```
 
-Erst weitermachen, wenn der Lauf **grün** ist. Ist er rot, den Fehler im Feature-Branch beheben, committen, pushen und wieder abwarten.
+Erst weitermachen, wenn der Lauf **grün** ist.
+
+**Richtung:** Features gehen nach `truely-godot-engine`, nie umgekehrt. `truely-godot-engine` wird **nicht** in einen fertigen Feature-Branch gemergt, um die CI grün zu bekommen. Hat die Basis einen CI-Fix bekommen, den der Branch noch nicht hat: PR öffnen. Die CI des PR (`pull_request`) läuft auf dem Merge-Ergebnis aus Feature und aktueller Basis und ist dann das Tor für den Squash-Merge. Ist er rot, den Fehler im Feature-Branch beheben, committen, pushen und wieder abwarten.
 
 ### 2.5 Mergen
 
