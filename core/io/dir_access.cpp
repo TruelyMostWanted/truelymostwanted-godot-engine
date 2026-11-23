@@ -32,6 +32,7 @@
 
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
+#include "core/io/path_prefix_server.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
@@ -143,6 +144,9 @@ Error DirAccess::make_dir_recursive(const String &p_dir) {
 	}
 
 	full_dir = full_dir.replace_char('\\', '/');
+	if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(full_dir)) {
+		full_dir = PathPrefixServer::get_singleton()->globalize(full_dir);
+	}
 
 	String base;
 
@@ -209,6 +213,10 @@ String DirAccess::fix_path(const String &p_path) const {
 
 		} break;
 		case ACCESS_FILESYSTEM: {
+			if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+				// Prefixes other than the engine ones (`exec://`, `appdata://`, registered ones).
+				return PathPrefixServer::get_singleton()->globalize(p_path);
+			}
 			return p_path;
 		} break;
 		case ACCESS_MAX:

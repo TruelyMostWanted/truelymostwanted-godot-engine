@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PathInfo" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		All forms and facts of one path, as resolved by [PathPrefixServer].
+	</brief_description>
+	<description>
+		A [PathInfo] is returned by [method PathPrefixServer.resolve] and [method PathPrefixServer.resolve_safe]. It holds the path as given, its canonical prefixed form, its OS path and the facts of its prefix, so that callers do not have to compute them one by one. It is read-only after creation.
+		[codeblocks]
+		[gdscript]
+		var info := PathPrefixServer.resolve("USER://saves\\a.json")
+		if info.valid:
+			print(info.local_path)  # user://saves/a.json
+			print(info.global_path) # The OS path inside the user data folder.
+		else:
+			push_error(info.error_message)
+		[/gdscript]
+		[csharp]
+		PathInfo info = PathPrefixServer.Resolve("USER://saves\\a.json");
+		if (info.Valid)
+		{
+		    GD.Print(info.LocalPath); // user://saves/a.json
+		    GD.Print(info.GlobalPath); // The OS path inside the user data folder.
+		}
+		else
+		{
+		    GD.PushError(info.ErrorMessage);
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="exists" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if a file or a folder exists at this path. This touches the file system. Returns [code]false[/code] if the path is not [member valid].
+			</description>
+		</method>
+		<method name="is_dir" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if a folder exists at this path. This touches the file system. Returns [code]false[/code] if the path is not [member valid].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="available" type="bool" setter="" getter="is_available" default="false">
+			[code]true[/code] if the prefix of the path works on this platform and in this build.
+		</member>
+		<member name="base_dir" type="String" setter="" getter="get_base_dir" default="&quot;&quot;">
+			The folder of the path in its local form, for example [code]user://saves[/code] for [code]user://saves/a.json[/code]. Directly below a prefix this is the prefix itself.
+		</member>
+		<member name="error" type="int" setter="" getter="get_error" enum="Error" default="3">
+			[constant OK] if the path is [member valid], otherwise the reason: [constant ERR_FILE_BAD_PATH] for unknown prefixes, [code]..[/code] segments that leave the root, absolute paths in [method PathPrefixServer.resolve_safe] and paths outside the allowed roots; [constant ERR_UNAVAILABLE] for prefixes that do not work on this platform; [constant ERR_FILE_NO_PERMISSION] for read-only paths that were requested for writing; [constant ERR_INVALID_PARAMETER] for an empty path.
+		</member>
+		<member name="error_message" type="String" setter="" getter="get_error_message" default="&quot;&quot;">
+			A readable description of [member error]. Empty if the path is [member valid].
+		</member>
+		<member name="extension" type="String" setter="" getter="get_extension" default="&quot;&quot;">
+			The extension of [member file_name] without the dot, for example [code]json[/code].
+		</member>
+		<member name="file_name" type="String" setter="" getter="get_file_name" default="&quot;&quot;">
+			The last segment of the path, for example [code]a.json[/code].
+		</member>
+		<member name="global_path" type="String" setter="" getter="get_global_path" default="&quot;&quot;">
+			The path in the file system of the OS, with [code]/[/code] as separator. Empty where there is no such path, for example for [code]res://[/code] files inside a PCK.
+			[b]Note:[/b] On the Web, [code]user://[/code] maps to the in-browser file system ([code]/userfs/...[/code]), which is not a path on the user's disk.
+		</member>
+		<member name="local_path" type="String" setter="" getter="get_local_path" default="&quot;&quot;">
+			The canonical prefixed form: the prefix in lowercase, [code]/[/code] as separator, [code].[/code] and [code]..[/code] resolved. Use it to compare paths and as a cache key. Empty for a global path that is not below any prefix.
+		</member>
+		<member name="locked" type="bool" setter="" getter="is_locked" default="false">
+			[code]true[/code] if the prefix is one of the engine prefixes ([code]res://[/code], [code]user://[/code], [code]uid://[/code], [code]pipe://[/code], [code]exec://[/code]), which cannot be changed.
+		</member>
+		<member name="prefix" type="String" setter="" getter="get_prefix" default="&quot;&quot;">
+			The canonical prefix, for example [code]user://[/code]. Empty for a global path that is not below any prefix.
+		</member>
+		<member name="read_only" type="bool" setter="" getter="is_read_only" default="false">
+			[code]true[/code] if the prefix cannot be written to, for example [code]res://[/code] in an exported project.
+		</member>
+		<member name="relative_path" type="String" setter="" getter="get_relative_path" default="&quot;&quot;">
+			The part after the prefix, for example [code]saves/a.json[/code].
+		</member>
+		<member name="source_path" type="String" setter="" getter="get_source_path" default="&quot;&quot;">
+			The path exactly as it was given.
+		</member>
+		<member name="valid" type="bool" setter="" getter="is_valid" default="false">
+			[code]true[/code] if the path was resolved. If [code]false[/code], see [member error] and [member error_message].
+		</member>
+	</members>
+</class>
