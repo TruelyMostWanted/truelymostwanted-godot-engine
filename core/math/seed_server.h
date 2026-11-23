@@ -57,7 +57,7 @@ class SeedServer : public Object {
 	static int32_t _noise_seed(uint64_t p_derived);
 	static Ref<RandomNumberGenerator> _create_rng(uint64_t p_global_seed, const String &p_name);
 	static bool _apply_noise_seed(const Ref<Resource> &p_noise, uint64_t p_global_seed, const String &p_name);
-	static PackedStringArray _sorted_names(const LocalVector<String> &p_names);
+	static PackedStringArray _sorted_names(LocalVector<String> &r_names);
 
 	void _reseed_locked();
 	void _emit_seed_changed(int64_t p_seed);

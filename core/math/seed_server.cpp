@@ -82,11 +82,10 @@ bool SeedServer::_apply_noise_seed(const Ref<Resource> &p_noise, uint64_t p_glob
 	return valid;
 }
 
-PackedStringArray SeedServer::_sorted_names(const LocalVector<String> &p_names) {
-	LocalVector<String> names = p_names;
-	names.sort();
+PackedStringArray SeedServer::_sorted_names(LocalVector<String> &r_names) {
+	r_names.sort();
 	PackedStringArray result;
-	for (const String &name : names) {
+	for (const String &name : r_names) {
 		result.push_back(name);
 	}
 	return result;
