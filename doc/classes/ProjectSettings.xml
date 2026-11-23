@@ -1240,6 +1240,18 @@
 		<member name="filesystem/path_prefixes/defaults" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [PathPrefixServer] registers [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] at startup (on the Web only [code]temp://[/code]). They can still be replaced or removed with [method PathPrefixServer.register_prefix] and [method PathPrefixServer.unregister_prefix].
 		</member>
+		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
+			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. See [ResourceTextSerializer].
+		</member>
+		<member name="filesystem/resources/text_formats/enums_as_names" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], enum properties are written as their names into [code].json[/code], [code].ini[/code] and [code].csv[/code] resource files. If [code]false[/code], they are written as numbers. Both are read. See [ResourceTextSerializer].
+		</member>
+		<member name="filesystem/resources/text_formats/ini_plain_values" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [code].ini[/code] resource files are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. See [ResourceTextSerializer].
+		</member>
+		<member name="filesystem/resources/text_formats/json_indent" type="String" setter="" getter="" default="&quot;  &quot;">
+			The indentation of [code].json[/code] resource files. An empty string writes each file on one line. See [ResourceTextSerializer].
+		</member>
 		<member name="gui/common/auto_focus_strategy" type="int" setter="" getter="" default="0">
 			Determines what strategy to use when inferring the top/left/right/bottom [Control] to focus if no neighbor is defined.
 			- [b]Legacy[/b] is the old focus strategy up until Godot 4.8. It shouldn't be used for new projects, as the new default (Balloon) yields more intuitive results.
