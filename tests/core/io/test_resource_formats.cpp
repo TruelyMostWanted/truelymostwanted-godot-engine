@@ -324,51 +324,59 @@ TEST_CASE("[ResourceLoader] Extension index finds the same loaders as asking eve
 }
 
 // Run with --test --test-case="*Extension index measurement*" --no-skip; prints the time to resolve the loaders of 10,000 paths.
+// The extra loaders are added at the front, so a lookup that asks every loader has to pass them.
 TEST_CASE("[ResourceLoader] Extension index measurement" * doctest::skip()) {
 	List<String> builtin_extensions;
 	ResourceLoader::get_recognized_extensions_for_type("", &builtin_extensions);
-	Vector<String> paths;
-	for (int i = 0; paths.size() < 10000; i++) {
+	Vector<String> recognized;
+	for (int i = 0; recognized.size() < 10000; i++) {
 		for (const String &E : builtin_extensions) {
-			paths.push_back(vformat("res://measure/%d.%s", i, E));
+			recognized.push_back(vformat("res://measure/%d.%s", i, E));
 		}
 	}
-	paths.resize(10000);
+	recognized.resize(10000);
+	Vector<String> unrecognized;
+	for (int i = 0; i < 10000; i++) {
+		unrecognized.push_back(vformat("res://measure/%d.nosuchext", i));
+	}
 
 	for (int extra : { 0, 100 }) {
 		Vector<Ref<IndexTestLoader>> added;
 		for (int i = 0; i < extra; i++) {
 			added.push_back(make_index_loader({ vformat("extra%d", i) }));
-			ResourceLoader::add_resource_format_loader(added[i]);
+			ResourceLoader::add_resource_format_loader(added[i], true);
 		}
 		const ResourceLoaderFormatSnapshot snapshot = ResourceLoader::get_format_snapshot();
 
-		int found_all = 0;
-		uint64_t start = Time::get_singleton()->get_ticks_usec();
-		for (const String &path : paths) {
-			for (const Ref<ResourceFormatLoader> &format_loader : snapshot) {
-				if (format_loader->recognize_path(path)) {
-					found_all++;
-					break;
+		for (int set = 0; set < 2; set++) {
+			const Vector<String> &paths = set == 0 ? recognized : unrecognized;
+			int found_all = 0;
+			uint64_t start = Time::get_singleton()->get_ticks_usec();
+			for (const String &path : paths) {
+				for (const Ref<ResourceFormatLoader> &format_loader : snapshot) {
+					if (format_loader->recognize_path(path)) {
+						found_all++;
+						break;
+					}
 				}
 			}
-		}
-		const uint64_t all_usec = Time::get_singleton()->get_ticks_usec() - start;
+			const uint64_t all_usec = Time::get_singleton()->get_ticks_usec() - start;
 
-		int found_index = 0;
-		start = Time::get_singleton()->get_ticks_usec();
-		for (const String &path : paths) {
-			for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(path)) {
-				if (format_loader->recognize_path(path)) {
-					found_index++;
-					break;
+			int found_index = 0;
+			start = Time::get_singleton()->get_ticks_usec();
+			for (const String &path : paths) {
+				for (const Ref<ResourceFormatLoader> &format_loader : snapshot.candidates_for(path)) {
+					if (format_loader->recognize_path(path)) {
+						found_index++;
+						break;
+					}
 				}
 			}
-		}
-		const uint64_t index_usec = Time::get_singleton()->get_ticks_usec() - start;
+			const uint64_t index_usec = Time::get_singleton()->get_ticks_usec() - start;
 
-		print_line(vformat("10000 paths, %d loaders (%d extra): asking every loader %d usec, extension index %d usec", snapshot.formats.size(), extra, all_usec, index_usec));
-		CHECK(found_all == found_index);
+			print_line(vformat("10000 %s paths, %d loaders (%d extra at the front): asking every loader %d usec, extension index %d usec", set == 0 ? "recognized" : "unrecognized", snapshot.formats.size(), extra, all_usec, index_usec));
+			CHECK(found_all == found_index);
+		}
 
 		for (const Ref<IndexTestLoader> &loader : added) {
 			ResourceLoader::remove_resource_format_loader(loader);
