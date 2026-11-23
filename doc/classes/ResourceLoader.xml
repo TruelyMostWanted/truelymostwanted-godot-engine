@@ -294,12 +294,12 @@
 				Loaders implemented in C++ do not need this: their lists are read again automatically when new resource classes register their extensions.
 				[codeblocks]
 				[gdscript]
-				my_loader.extensions.append("mydata")
+				my_loader.extensions = PackedStringArray(["mydata"])
 				ResourceLoader.refresh_format_index()
 				print(ResourceLoader.exists("res://level.mydata")) # Asks my_loader.
 				[/gdscript]
 				[csharp]
-				myLoader.Extensions.Add("mydata");
+				myLoader.Extensions = ["mydata"];
 				ResourceLoader.RefreshFormatIndex();
 				GD.Print(ResourceLoader.Exists("res://level.mydata")); // Asks myLoader.
 				[/csharp]
