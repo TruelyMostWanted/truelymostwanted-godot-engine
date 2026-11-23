@@ -40,6 +40,7 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24: 5-Stunden-Limit bei 95 %: keine neuen Agenten; laufende mit WIP gestoppt.
 - 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
 - 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
@@ -120,7 +121,8 @@ Gemergt seit dem letzten Stand: #60, #9, #10, #36, #35, #50, #15, #53, #77, #68,
 - #89 `89-feature-streaming-assets-export-plugin` (berührt `editor/editor_node.cpp`, `.github/CODEOWNERS`).
 - #78 `78-feature-performance-recorder` (Overhead-Tabelle aus Check-Ausgabe „recorder_time“ ins Issue).
 
-**Laufende Agenten:** #17 (Sprache), #95 (glTF/GLB/FBX-Loader), #96 (Font-Loader + Shader-Checks).
+**Gestoppt bei 95 % des 5-Stunden-Limits (2026-11-24):** #17 (`17-feature-language-settings`; Besitzer: `LanguageSettings.xml` fertigstellen lassen), #95 (`95-feature-scene-format-loaders`), #96 (`96-feature-font-format-loaders`) mit WIP-Commit und `scratch/issues/<N>/knowledge.md`; mit frischem Agenten fortsetzen.
+- #87 in Arbeit im Hauptbaum: Branch `03-feature-path-prefix-server` gebaut (0/0), Prefix-Tests 9/9, Volltests 1575/1575, Glue/Assemblies 0, doctool ohne Diff; offen: Checks (Testprojekt-Branch `03-feature-path-prefix-server` auf `-87` vorgespult), Kommentar, Merge.
 
 **Danach:** #84 (nach #83, gleiche Dateien), #85/#86 (nach #83), #88 (nach #87), #90, #91; #75 (nach #74), #76; #79/#80 (nach #78); #93 SerializerOptions (Branch 05, alle Aufrufer); #73 Formatklassen; #71 (Branch 15); #18–#30 Settings-Domänen nach Muster #16; Fund #16: `AudioServer.set_bus_layout()` setzt Bus-Werte zurück (Issue anlegen, Branch 16).
 
