@@ -126,7 +126,7 @@ class TextureAtlasCanvas : public Control {
 	StringName _region_at(const Vector2 &p_texture) const;
 	int _handle_at(const Vector2 &p_screen) const;
 	void _handle_positions(const Rect2i &p_rect, Vector2 r_points[8]) const;
-	void _draw();
+	void _draw_canvas();
 
 protected:
 	void _notification(int p_what);

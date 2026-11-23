@@ -483,7 +483,7 @@ void TextureAtlasCanvas::fit() {
 	queue_redraw();
 }
 
-void TextureAtlasCanvas::_draw() {
+void TextureAtlasCanvas::_draw_canvas() {
 	const Ref<TextureAtlas> atlas = editor->get_atlas();
 	if (atlas.is_null()) {
 		return;
@@ -547,7 +547,7 @@ void TextureAtlasCanvas::_draw() {
 void TextureAtlasCanvas::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_DRAW: {
-			_draw();
+			_draw_canvas();
 		} break;
 	}
 }
@@ -652,8 +652,12 @@ void TextureAtlasCanvas::gui_input(const Ref<InputEvent> &p_event) {
 		drag_mode = DRAG_NONE;
 		drag_handle = -1;
 		if (finished == DRAG_CREATE) {
-			const Rect2i rect = _clamp_to_texture(drag_new_rect);
-			if (drag_new_rect.size.x > 0 && drag_new_rect.size.y > 0) {
+			Rect2i rect = drag_new_rect;
+			const Ref<Texture2D> texture = atlas->get_sheet_texture();
+			if (texture.is_valid()) {
+				rect = rect.intersection(Rect2i(Point2i(), Size2i(texture->get_size())));
+			}
+			if (rect.size.x > 0 && rect.size.y > 0) {
 				const String name = editor->make_new_region_name();
 				if (!name.is_empty()) {
 					TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
