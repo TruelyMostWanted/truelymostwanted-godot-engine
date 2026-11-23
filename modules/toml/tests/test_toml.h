@@ -574,4 +574,16 @@ TEST_CASE("[TOML] Through ResourceSaver and ResourceLoader") {
 	DirAccess::remove_absolute(path);
 }
 
+TEST_CASE("[TOML] Registered as text format \"toml\"") {
+	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
+	REQUIRE(serializer != nullptr);
+	CHECK(serializer->get_formats().has("toml"));
+	CHECK(serializer->has_format("toml"));
+
+	const Ref<TOMLTestSettings> settings = make_toml_settings();
+	const String text = serializer->serialize(settings, "toml");
+	CHECK(text == TOML::serialize(settings));
+	check_toml_settings(serializer->deserialize(text, "toml"));
+}
+
 } // namespace TestTOML
