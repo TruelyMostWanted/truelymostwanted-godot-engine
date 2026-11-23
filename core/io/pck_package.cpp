@@ -36,7 +36,6 @@
 #include "core/io/file_access_pack.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
-#include "core/version.h"
 
 // Smallest directory entry: path length, offset, size, MD5 and flags.
 static constexpr uint64_t PCK_MIN_ENTRY_SIZE = 4 + 8 + 8 + 16 + 4;
@@ -348,9 +347,4 @@ void PckPackage::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "engine_version"), "", "get_engine_version");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "alignment", PROPERTY_HINT_RANGE, "1,4096,1,or_greater"), "set_alignment", "get_alignment");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encrypted_directory"), "set_encrypted_directory", "is_encrypted_directory");
-}
-
-PckPackage::PckPackage() {
-	format_version = PACK_FORMAT_VERSION;
-	engine_version = vformat("%d.%d.%d", GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR, GODOT_VERSION_PATCH);
 }

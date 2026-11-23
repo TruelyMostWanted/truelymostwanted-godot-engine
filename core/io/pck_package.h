@@ -57,6 +57,7 @@ public:
 	};
 
 private:
+	// Empty, and 0 for the format, until a pack is read with `open_pack()`.
 	String path;
 	int format_version = 0;
 	String engine_version;
@@ -103,6 +104,4 @@ public:
 	Error remove_file(const String &p_path);
 	Error rename_file(const String &p_from, const String &p_to);
 	Error mark_removal(const String &p_path);
-
-	PckPackage();
 };

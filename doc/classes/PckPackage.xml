@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PckPackage" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The directory of one [code].pck[/code] file, with edits in memory.
+	</brief_description>
+	<description>
+		A [PckPackage] holds the file list of a pack. [method PckPackageServer.open] reads it from a [code].pck[/code] file without mounting the pack; [code]PckPackage.new()[/code] creates an empty pack. Files can be added, removed and renamed in memory, and [method PckPackageServer.build] writes the result as a new pack. Reading file data, verifying and building go through [PckPackageServer].
+		Paths inside a package can be given with or without [code]res://[/code]; they are always listed with [code]res://[/code].
+		[codeblocks]
+		[gdscript]
+		var package := PckPackageServer.open("user://mods/level_pack.pck")
+		if package:
+			package.add_file_from_buffer("res://levels/extra.txt", "Hello".to_utf8_buffer())
+			package.remove_file("res://levels/old.tscn")
+			PckPackageServer.build(package, "user://mods/level_pack_v2.pck")
+		[/gdscript]
+		[csharp]
+		PckPackage package = PckPackageServer.Open("user://mods/level_pack.pck");
+		if (package != null)
+		{
+		    package.AddFileFromBuffer("res://levels/extra.txt", "Hello".ToUtf8Buffer());
+		    package.RemoveFile("res://levels/old.tscn");
+		    PckPackageServer.Build(package, "user://mods/level_pack_v2.pck");
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] A [PckPackage] is not thread-safe. Use one package from one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="target_path" type="String" />
+			<param index="1" name="source_path" type="String" />
+			<param index="2" name="encrypt" type="bool" default="false" />
+			<description>
+				Adds the file [param source_path] to the package as [param target_path], or replaces the entry with that path. The data is read from [param source_path] when the pack is built, so the file must still exist then. If [param encrypt] is [code]true[/code], the file is encrypted with the key given to [method PckPackageServer.build].
+				Returns [constant ERR_FILE_NOT_FOUND] if [param source_path] can't be opened, and [constant ERR_INVALID_PARAMETER] if [param target_path] is empty or a folder.
+			</description>
+		</method>
+		<method name="add_file_from_buffer">
+			<return type="int" enum="Error" />
+			<param index="0" name="target_path" type="String" />
+			<param index="1" name="data" type="PackedByteArray" />
+			<param index="2" name="encrypt" type="bool" default="false" />
+			<description>
+				Adds [param data] to the package as the file [param target_path], or replaces the entry with that path. If [param encrypt] is [code]true[/code], the file is encrypted with the key given to [method PckPackageServer.build].
+			</description>
+		</method>
+		<method name="get_entries" qualifiers="const">
+			<return type="Dictionary[]" />
+			<description>
+				Returns one [Dictionary] per entry, in pack order, with these keys:
+				- [code skip-lint]path[/code]: the path of the file, with [code]res://[/code].
+				- [code]size[/code]: the size of the file data in bytes (before encryption).
+				- [code]offset[/code]: the position of the data in the pack file, or [code]0[/code] for pending entries.
+				- [code]md5[/code]: the MD5 sum of the file data as a hexadecimal [String].
+				- [code]encrypted[/code]: [code]true[/code] if the file data is encrypted.
+				- [code]removal[/code]: [code]true[/code] for a removal entry (see [method mark_removal]).
+				- [code]delta[/code]: [code]true[/code] if the entry is a delta patch of a file in an earlier pack.
+				- [code]pending[/code]: [code]true[/code] if the entry was added in memory and is not in a pack file yet.
+			</description>
+		</method>
+		<method name="get_file_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of entries, including removal entries.
+			</description>
+		</method>
+		<method name="get_paths" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the paths of all files in pack order, with [code]res://[/code]. Removal entries are not included.
+			</description>
+		</method>
+		<method name="has_file" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if the package has an entry for [param path], including a removal entry.
+			</description>
+		</method>
+		<method name="mark_removal">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Adds a removal entry for [param path], or replaces the entry with that path. When the built pack is mounted, [param path] disappears from [code]res://[/code], even if an earlier pack provides it. Use it for patch packs that delete files.
+			</description>
+		</method>
+		<method name="remove_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Removes the entry for [param path] from the package. The built pack will not contain the file. Returns [constant ERR_DOES_NOT_EXIST] if there is no such entry.
+			</description>
+		</method>
+		<method name="rename_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="from" type="String" />
+			<param index="1" name="to" type="String" />
+			<description>
+				Moves the entry [param from] to the path [param to]. The renamed entry moves to the end of the pack order. Returns [constant ERR_DOES_NOT_EXIST] if [param from] is not in the package, and [constant ERR_ALREADY_EXISTS] if [param to] is.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="alignment" type="int" setter="set_alignment" getter="get_alignment" default="32">
+			The alignment of file data in bytes, used by [method PckPackageServer.build]. The pack format does not store it: [method PckPackageServer.open] detects it from the file offsets (the largest power of two up to 4096 that divides all of them).
+		</member>
+		<member name="encrypted_directory" type="bool" setter="set_encrypted_directory" getter="is_encrypted_directory" default="false">
+			If [code]true[/code], the file list of the pack is encrypted. Read from the pack by [method PckPackageServer.open], and used by [method PckPackageServer.build].
+		</member>
+		<member name="engine_version" type="String" setter="" getter="get_engine_version" default="&quot;&quot;">
+			The engine version that wrote the pack, for example [code]"4.8.0"[/code]. Empty for a package that was not read from a pack.
+		</member>
+		<member name="format_version" type="int" setter="" getter="get_format_version" default="0">
+			The version of the pack format: [code]2[/code], [code]3[/code] or [code]4[/code]. [code]0[/code] for a package that was not read from a pack. [method PckPackageServer.build] always writes the current format.
+		</member>
+		<member name="path" type="String" setter="" getter="get_path" default="&quot;&quot;">
+			The path of the pack file the package was read from. Empty for a new package.
+		</member>
+	</members>
+</class>
