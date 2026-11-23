@@ -545,7 +545,7 @@ bool ResourceDatabase::has_resource(const String &p_key_or_path) const {
 
 int ResourceDatabase::count() const {
 	RWLockRead read_lock(lock);
-	return entries.size();
+	return int(entries.size());
 }
 
 TypedArray<Resource> ResourceDatabase::select(const String &p_pattern, const StringName &p_type) const {
