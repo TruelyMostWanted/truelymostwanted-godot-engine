@@ -242,6 +242,10 @@ void SettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings)
 	GDVIRTUAL_CALL(_read_from_engine, p_settings);
 }
 
+void SettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	GDVIRTUAL_CALL(_value_applied, p_name, p_value);
+}
+
 Variant SettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant ret;
 	if (GDVIRTUAL_CALL(_validate_value, p_name, p_value, ret)) {
@@ -490,7 +494,7 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 		if (had_override) {
 			PackedStringArray names;
 			names.push_back(p_name);
-			_push_values(names);
+			_notify_values_applied(names, _push_values(names));
 		}
 		return;
 	}
@@ -601,7 +605,7 @@ bool SettingsServer::_has_flag(const PackedStringArray &p_names, SettingFlags p_
 	return false;
 }
 
-void SettingsServer::_push_values(const PackedStringArray &p_names) {
+Ref<Resource> SettingsServer::_push_values(const PackedStringArray &p_names) {
 	const Ref<Resource> effective = _effective_settings();
 	PackedStringArray unbound;
 	for (const String &name : p_names) {
@@ -640,6 +644,13 @@ void SettingsServer::_push_values(const PackedStringArray &p_names) {
 	}
 	if (!unbound.is_empty()) {
 		_apply_settings(effective, unbound);
+	}
+	return effective;
+}
+
+void SettingsServer::_notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective) {
+	for (const String &name : p_names) {
+		_notify_value_applied(name, p_effective->get(name));
 	}
 }
 
@@ -756,7 +767,7 @@ void SettingsServer::set_session_override(const StringName &p_name, const Varian
 	session_overrides[p_name] = _validate(p_name, p_value);
 	PackedStringArray names;
 	names.push_back(p_name);
-	_push_values(names);
+	_notify_values_applied(names, _push_values(names));
 }
 
 void SettingsServer::clear_session_override(const StringName &p_name) {
@@ -768,8 +779,9 @@ void SettingsServer::clear_session_override(const StringName &p_name) {
 	names.push_back(p_name);
 	const Ref<Resource> pending = settings;
 	settings = applied;
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	settings = pending;
+	_notify_values_applied(names, effective);
 }
 
 bool SettingsServer::has_session_override(const StringName &p_name) const {
@@ -818,9 +830,10 @@ Error SettingsServer::apply() {
 	if (!in_startup && !confirmation_active && _has_flag(names, SETTING_FLAG_CONFIRM)) {
 		return apply_with_confirmation();
 	}
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	if (!in_startup && !confirmation_active) {
 		unsaved = true;
@@ -850,9 +863,10 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	confirmation_backup = copy_settings(applied);
 	confirmation_active = true;
 	confirmation_deadline_msec = OS::get_singleton()->get_ticks_msec() + uint64_t(MAX(timeout, 0.0) * 1000.0);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	_set_confirmation_processing(true);
 	emit_signal(SNAME("confirmation_requested"), timeout);
@@ -880,10 +894,11 @@ void SettingsServer::cancel_confirmation() {
 	confirmation_backup.unref();
 	const PackedStringArray names = _get_changed_names(backup, applied);
 	settings = copy_settings(backup);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	confirmation_active = false;
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	for (const String &name : names) {
 		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
 	}
@@ -1308,6 +1323,7 @@ void SettingsServer::_bind_methods() {
 	GDVIRTUAL_BIND(_validate_value, "name", "value");
 	GDVIRTUAL_BIND(_migrate, "from_version", "data");
 	GDVIRTUAL_BIND(_is_value_supported, "name");
+	GDVIRTUAL_BIND(_value_applied, "name", "value");
 }
 
 SettingsServer::SettingsServer() {

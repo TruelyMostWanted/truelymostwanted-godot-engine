@@ -91,9 +91,15 @@ public:
 	ApplyPhase phase = APPLY_PHASE_SERVERS;
 	int apply_calls = 0;
 	PackedStringArray last_applied;
+	// "name=value" per _notify_value_applied() call.
+	PackedStringArray notified;
 
 protected:
 	static void _bind_methods() {}
+
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override {
+		notified.push_back(vformat("%s=%s", p_name, p_value));
+	}
 
 	virtual Ref<Resource> _create_default_settings() const override {
 		Ref<TestDomainSettings> default_settings;
@@ -1017,6 +1023,74 @@ TEST_CASE("[SettingsServer] settings_changed names all values changed by one ope
 
 	SIGNAL_UNWATCH(server, "settings_changed");
 	memdelete(server);
+}
+
+TEST_CASE("[SettingsServer] _notify_value_applied() runs once per value that reaches the engine") {
+	TestSetup setup;
+	const String path = temp_file("notify_applied.ini");
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->set_file_path(path);
+
+	// Immediate mode: once per change, with the applied value already readable.
+	server->set_value("volume", 0.25);
+	CHECK(server->notified == PackedStringArray({ "volume=0.25" }));
+	CHECK(double(server->get_applied_value("volume")) == doctest::Approx(0.25));
+	// An unchanged value does not reach the engine again.
+	server->set_value("volume", 0.25);
+	CHECK(server->notified.size() == 1);
+
+	// Manual mode: pending changes are not applied; apply() notifies each changed value once.
+	server->notified.clear();
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	server->set_value("volume", 0.75);
+	server->set_value("quality", 2);
+	CHECK(server->notified.is_empty());
+	server->revert();
+	CHECK(server->notified.is_empty());
+	server->set_value("quality", 2);
+	CHECK(server->apply() == OK);
+	CHECK(server->notified == PackedStringArray({ "quality=2" }));
+
+	// reset_to_defaults() in manual mode waits for apply().
+	server->notified.clear();
+	server->reset_to_defaults();
+	CHECK(server->notified.is_empty());
+	CHECK(server->apply() == OK);
+	CHECK(server->notified.size() == 2);
+	CHECK(server->notified.has("volume=0.5"));
+	CHECK(server->notified.has("quality=1"));
+
+	// Confirmation: notified when applied and for the restored value on cancel, not on confirm.
+	server->notified.clear();
+	server->set_apply_mode(SettingsServer::APPLY_MODE_IMMEDIATE);
+	server->set_setting_flags("quality", SettingsServer::SETTING_FLAG_CONFIRM);
+	server->set_value("quality", 0);
+	CHECK(server->notified == PackedStringArray({ "quality=0" }));
+	server->cancel_confirmation();
+	CHECK(server->notified == PackedStringArray({ "quality=0", "quality=1" }));
+	server->notified.clear();
+	server->set_value("quality", 2);
+	server->confirm_changes();
+	CHECK(server->notified == PackedStringArray({ "quality=2" }));
+
+	// Session overrides reach the engine too.
+	server->notified.clear();
+	server->set_session_override("volume", 0.1);
+	CHECK(server->notified == PackedStringArray({ "volume=0.1" }));
+	server->clear_session_override("volume");
+	CHECK(server->notified == PackedStringArray({ "volume=0.1", "volume=0.5" }));
+
+	// Startup: load + apply notifies the values of the file that differ from the defaults.
+	CHECK(server->save() == OK);
+	memdelete(server);
+	// A fresh engine: the defaults are captured from it.
+	TestEngine::volume = 0.5;
+	TestEngine::quality = 1;
+	TestDomainServer *restarted = memnew(TestDomainServer);
+	restarted->set_file_path(path);
+	restarted->startup();
+	CHECK(restarted->notified == PackedStringArray({ "quality=2" }));
+	memdelete(restarted);
 }
 
 } // namespace TestSettingsServer
