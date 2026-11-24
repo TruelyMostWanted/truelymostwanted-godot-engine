@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoQualitySettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for 3D scaling (FSR), mesh LOD, anti-aliasing, variable rate shading and occlusion culling.
+	</brief_description>
+	<description>
+		[VideoQualitySettingsServer] is the settings domain [code]"video_quality"[/code]: it stores the 3D scaling ([member Viewport.scaling_3d_mode], [member Viewport.scaling_3d_scale], [member Viewport.fsr_sharpness]), the mesh LOD threshold ([member Viewport.mesh_lod_threshold]), the anti-aliasing ([member Viewport.msaa_2d], [member Viewport.msaa_3d], [member Viewport.screen_space_aa], [member Viewport.use_taa], [member Viewport.use_debanding]), variable rate shading ([member Viewport.vrs_mode]) and occlusion culling ([member Viewport.use_occlusion_culling], [method RenderingServer.viewport_set_occlusion_rays_per_thread], [method RenderingServer.viewport_set_occlusion_culling_build_quality]) for the player. Every value takes effect at once on the root viewport. The settings resource is a [VideoQualitySettings]; the file is [code]user://settings/video_quality.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]).
+		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the root viewport exists and before the main scene is loaded. Values set earlier wait until then. The defaults are the project settings ([member ProjectSettings.rendering/scaling_3d/mode], [member ProjectSettings.rendering/anti_aliasing/quality/msaa_3d], [member ProjectSettings.rendering/mesh_lod/lod_change/threshold_pixels], [member ProjectSettings.rendering/vrs/mode], [member ProjectSettings.rendering/occlusion_culling/use_occlusion_culling] and the others), with their feature overrides such as [code].mobile[/code].
+		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and to every [Viewport] in the group [method get_viewport_group], for example a [SubViewport] that renders the 3D world of a pixel-art game.
+		[b]Renderers:[/b] the Compatibility renderer (default in the Web export) only scales with Bilinear or Nearest and has no FSR, FXAA/SMAA, TAA, debanding or variable rate shading. The Mobile renderer has no FSR and no TAA. Variable rate shading needs GPU support, MetalFX needs Metal (macOS, iOS), occlusion culling needs the [code]raycast[/code] module. [method SettingsServer.is_value_supported] returns [code]false[/code] for such values and [method get_unsupported_setting_names] lists them, so that a settings menu can gray them out. Such values are still stored, but not pushed; a warning names them once. A 3D scaling mode the renderer can't use is stored, and bilinear scaling is used.
+		Values out of range are clamped with a warning: [code]scaling_3d_scale[/code] [code]0.1[/code] to [code]2.0[/code], [code]fsr_sharpness[/code] [code]0[/code] to [code]2[/code], [code]mesh_lod_threshold[/code] [code]0[/code] to [code]1024[/code], [code]occlusion_rays_per_thread[/code] [code]1[/code] to [code]2048[/code]. An enum value out of range is replaced by the default.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			$RenderScale.value = VideoQualitySettingsServer.get_scaling_3d_scale()
+			$Msaa.selected = VideoQualitySettingsServer.get_msaa_3d()
+			$Taa.disabled = not VideoQualitySettingsServer.is_value_supported(&amp;"use_taa")
+
+		func _on_render_scale_value_changed(value):
+			VideoQualitySettingsServer.set_scaling_3d_scale(value)
+
+		func _on_msaa_item_selected(index):
+			VideoQualitySettingsServer.set_msaa_3d(index as Viewport.MSAA)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GetNode&lt;HSlider&gt;("RenderScale").Value = VideoQualitySettingsServer.GetScaling3DScale();
+		    GetNode&lt;OptionButton&gt;("Msaa").Selected = (int)VideoQualitySettingsServer.GetMsaa3D();
+		    // Methods of the base class are called through Singleton.
+		    GetNode&lt;CheckBox&gt;("Taa").Disabled = !VideoQualitySettingsServer.Singleton.IsValueSupported("use_taa");
+		}
+
+		private void OnMsaaItemSelected(long index)
+		{
+		    VideoQualitySettingsServer.SetMsaa3D((Viewport.Msaa)index);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]VideoQualitySettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]VideoQualitySettingsServer.Singleton[/code].
+		[b]Note:[/b] A game that sets these properties on the root viewport itself overwrites the player's values until they are applied again. The domain is never applied to the editor itself.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_viewport">
+			<return type="void" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Adds a further viewport (for example a [SubViewport] that renders the 3D world) that gets the per-viewport values at once and every later change, like the root viewport. The two global occlusion values are not per viewport. A freed viewport is dropped on its own. See also [method get_viewport_group].
+			</description>
+		</method>
+		<method name="get_fsr_sharpness" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending FSR sharpness. See [member VideoQualitySettings.fsr_sharpness].
+			</description>
+		</method>
+		<method name="get_mesh_lod_threshold" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending mesh LOD threshold. See [member VideoQualitySettings.mesh_lod_threshold].
+			</description>
+		</method>
+		<method name="get_msaa_2d" qualifiers="const">
+			<return type="int" enum="Viewport.MSAA" />
+			<description>
+				Returns the pending 2D MSAA mode. See [member VideoQualitySettings.msaa_2d].
+			</description>
+		</method>
+		<method name="get_msaa_3d" qualifiers="const">
+			<return type="int" enum="Viewport.MSAA" />
+			<description>
+				Returns the pending 3D MSAA mode. See [member VideoQualitySettings.msaa_3d].
+			</description>
+		</method>
+		<method name="get_occlusion_culling_build_quality" qualifiers="const">
+			<return type="int" enum="RenderingServer.ViewportOcclusionCullingBuildQuality" />
+			<description>
+				Returns the pending occlusion culling BVH build quality. See [member VideoQualitySettings.occlusion_culling_build_quality].
+			</description>
+		</method>
+		<method name="get_occlusion_rays_per_thread" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending number of occlusion rays per thread. See [member VideoQualitySettings.occlusion_rays_per_thread].
+			</description>
+		</method>
+		<method name="get_scaling_3d_mode" qualifiers="const">
+			<return type="int" enum="Viewport.Scaling3DMode" />
+			<description>
+				Returns the pending 3D scaling mode. See [member VideoQualitySettings.scaling_3d_mode].
+			</description>
+		</method>
+		<method name="get_scaling_3d_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending 3D render scale. See [member VideoQualitySettings.scaling_3d_scale].
+			</description>
+		</method>
+		<method name="get_screen_space_aa" qualifiers="const">
+			<return type="int" enum="Viewport.ScreenSpaceAA" />
+			<description>
+				Returns the pending screen-space anti-aliasing mode. See [member VideoQualitySettings.screen_space_aa].
+			</description>
+		</method>
+		<method name="get_unsupported_setting_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the values the current renderer, hardware or build ignores, for example to gray out their options in a settings menu. See [method SettingsServer.is_value_supported].
+			</description>
+		</method>
+		<method name="get_viewport_group" qualifiers="static">
+			<return type="StringName" />
+			<description>
+				Returns the group [code]&amp;"video_quality_settings"[/code]. Every [Viewport] in this group gets the per-viewport values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
+			</description>
+		</method>
+		<method name="get_vrs_mode" qualifiers="const">
+			<return type="int" enum="Viewport.VRSMode" />
+			<description>
+				Returns the pending variable rate shading mode. See [member VideoQualitySettings.vrs_mode].
+			</description>
+		</method>
+		<method name="has_viewport" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Returns [code]true[/code] if [param viewport] was added with [method add_viewport].
+			</description>
+		</method>
+		<method name="is_renderer_supported" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the current renderer, hardware and build use the value [param name]. Unlike [method SettingsServer.is_value_supported], it does not check that the domain has the value.
+			</description>
+		</method>
+		<method name="is_scaling_3d_mode_supported" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="mode" type="int" enum="Viewport.Scaling3DMode" />
+			<description>
+				Returns [code]true[/code] if the current renderer and hardware can use the 3D scaling [param mode]. Bilinear and Nearest always work; FSR 1.0 and FSR 2.2 need the Forward+ renderer; MetalFX Spatial needs Metal, MetalFX Temporal Metal and the Forward+ renderer. Use it to hide the modes a settings menu can't offer.
+			</description>
+		</method>
+		<method name="is_using_debanding" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending debanding. See [member VideoQualitySettings.use_debanding].
+			</description>
+		</method>
+		<method name="is_using_occlusion_culling" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending occlusion culling. See [member VideoQualitySettings.use_occlusion_culling].
+			</description>
+		</method>
+		<method name="is_using_taa" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending temporal anti-aliasing. See [member VideoQualitySettings.use_taa].
+			</description>
+		</method>
+		<method name="remove_viewport">
+			<return type="void" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Removes a viewport added with [method add_viewport]. It keeps its current values.
+			</description>
+		</method>
+		<method name="set_fsr_sharpness">
+			<return type="void" />
+			<param index="0" name="sharpness" type="float" />
+			<description>
+				Sets the FSR sharpness. See [member VideoQualitySettings.fsr_sharpness].
+			</description>
+		</method>
+		<method name="set_mesh_lod_threshold">
+			<return type="void" />
+			<param index="0" name="pixels" type="float" />
+			<description>
+				Sets the mesh LOD threshold. See [member VideoQualitySettings.mesh_lod_threshold].
+			</description>
+		</method>
+		<method name="set_msaa_2d">
+			<return type="void" />
+			<param index="0" name="msaa" type="int" enum="Viewport.MSAA" />
+			<description>
+				Sets the 2D MSAA mode. See [member VideoQualitySettings.msaa_2d].
+			</description>
+		</method>
+		<method name="set_msaa_3d">
+			<return type="void" />
+			<param index="0" name="msaa" type="int" enum="Viewport.MSAA" />
+			<description>
+				Sets the 3D MSAA mode. See [member VideoQualitySettings.msaa_3d].
+			</description>
+		</method>
+		<method name="set_occlusion_culling_build_quality">
+			<return type="void" />
+			<param index="0" name="quality" type="int" enum="RenderingServer.ViewportOcclusionCullingBuildQuality" />
+			<description>
+				Sets the occlusion culling BVH build quality. See [member VideoQualitySettings.occlusion_culling_build_quality].
+			</description>
+		</method>
+		<method name="set_occlusion_rays_per_thread">
+			<return type="void" />
+			<param index="0" name="rays_per_thread" type="int" />
+			<description>
+				Sets the number of occlusion rays per thread. See [member VideoQualitySettings.occlusion_rays_per_thread].
+			</description>
+		</method>
+		<method name="set_scaling_3d_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="Viewport.Scaling3DMode" />
+			<description>
+				Sets the 3D scaling mode. See [member VideoQualitySettings.scaling_3d_mode].
+			</description>
+		</method>
+		<method name="set_scaling_3d_scale">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Sets the 3D render scale. See [member VideoQualitySettings.scaling_3d_scale].
+			</description>
+		</method>
+		<method name="set_screen_space_aa">
+			<return type="void" />
+			<param index="0" name="screen_space_aa" type="int" enum="Viewport.ScreenSpaceAA" />
+			<description>
+				Sets the screen-space anti-aliasing mode. See [member VideoQualitySettings.screen_space_aa].
+			</description>
+		</method>
+		<method name="set_use_debanding">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+				Sets the debanding. See [member VideoQualitySettings.use_debanding].
+			</description>
+		</method>
+		<method name="set_use_occlusion_culling">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+				Sets the occlusion culling. See [member VideoQualitySettings.use_occlusion_culling].
+			</description>
+		</method>
+		<method name="set_use_taa">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+				Sets the temporal anti-aliasing. See [member VideoQualitySettings.use_taa].
+			</description>
+		</method>
+		<method name="set_vrs_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="Viewport.VRSMode" />
+			<description>
+				Sets the variable rate shading mode. See [member VideoQualitySettings.vrs_mode].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="fsr_sharpness_changed">
+			<param index="0" name="sharpness" type="float" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.fsr_sharpness] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="mesh_lod_threshold_changed">
+			<param index="0" name="threshold" type="float" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.mesh_lod_threshold] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="msaa_2d_changed">
+			<param index="0" name="msaa" type="int" enum="Viewport.MSAA" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.msaa_2d] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="msaa_3d_changed">
+			<param index="0" name="msaa" type="int" enum="Viewport.MSAA" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.msaa_3d] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] that renders the game.
+			</description>
+		</signal>
+		<signal name="scaling_3d_mode_changed">
+			<param index="0" name="mode" type="int" enum="Viewport.Scaling3DMode" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.scaling_3d_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="scaling_3d_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.scaling_3d_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				The render scale of 3D. Use it for viewports that the domain does not manage, for example a [SubViewport] that renders the game.
+			</description>
+		</signal>
+		<signal name="screen_space_aa_changed">
+			<param index="0" name="mode" type="int" enum="Viewport.ScreenSpaceAA" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.screen_space_aa] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="use_debanding_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.use_debanding] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="use_taa_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoQualitySettings.use_taa] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
+</class>

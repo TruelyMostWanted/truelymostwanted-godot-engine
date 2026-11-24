@@ -41,6 +41,7 @@ TEST_FORCE_LINK(test_engine_settings_server)
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestEngineSettingsServer {
@@ -56,7 +57,7 @@ struct TestSetup {
 	int low_processor_sleep = 6900;
 
 	explicit TestSetup(bool p_allow_simulation = true) {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		ProjectSettings::get_singleton()->set_setting("settings/engine/allow_simulation_values", p_allow_simulation);
 		// The test runner does not define the physics project settings; use the engine defaults, like a project does.
 		if (!ProjectSettings::get_singleton()->has_setting("physics/common/physics_ticks_per_second")) {
@@ -83,7 +84,7 @@ struct TestSetup {
 		engine->set_physics_jitter_fix(jitter_fix);
 		OS::get_singleton()->set_low_processor_usage_mode(low_processor);
 		OS::get_singleton()->set_low_processor_usage_mode_sleep_usec(low_processor_sleep);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 		ProjectSettings::get_singleton()->set_setting("settings/engine/allow_simulation_values", false);
 	}
 };
@@ -314,6 +315,40 @@ TEST_CASE("[EngineSettingsServer] Session overrides reach the engine but are nev
 
 	server->clear_session_override("max_fps");
 	CHECK(engine->get_max_fps() == 120);
+	memdelete(server);
+}
+
+TEST_CASE("[EngineSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	EngineSettingsServer *server = memnew(EngineSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "max_fps_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("max_fps", 30);
+	SIGNAL_CHECK_FALSE("max_fps_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 30 } };
+	SIGNAL_CHECK("max_fps_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("max_fps_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("max_fps");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("max_fps_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("max_fps_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "max_fps_changed");
 	memdelete(server);
 }
 
