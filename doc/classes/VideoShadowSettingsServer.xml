@@ -179,4 +179,31 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="directional_shadow_atlas_size_changed">
+			<param index="0" name="size" type="int" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.directional_shadow_atlas_size] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="directional_soft_shadow_filter_quality_changed">
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.directional_soft_shadow_filter_quality] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="positional_shadow_atlas_size_changed">
+			<param index="0" name="size" type="int" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.positional_shadow_atlas_size] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] with omni or spot light shadows.
+			</description>
+		</signal>
+		<signal name="positional_soft_shadow_filter_quality_changed">
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.positional_soft_shadow_filter_quality] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>

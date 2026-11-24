@@ -467,7 +467,29 @@ RenderingServerEnums::ShadowQuality VideoShadowSettingsServer::get_positional_so
 	return RenderingServerEnums::ShadowQuality(int(get_value(SNAME("positional_soft_shadow_filter_quality"))));
 }
 
+void VideoShadowSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"directional_shadow_atlas_size",
+		"directional_soft_shadow_filter_quality",
+		"positional_shadow_atlas_size",
+		"positional_soft_shadow_filter_quality",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoShadowSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("directional_shadow_atlas_size_changed", PropertyInfo(Variant::INT, "size")));
+	ADD_SIGNAL(MethodInfo("directional_soft_shadow_filter_quality_changed", PropertyInfo(Variant::INT, "quality", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "RenderingServer.ShadowQuality")));
+	ADD_SIGNAL(MethodInfo("positional_shadow_atlas_size_changed", PropertyInfo(Variant::INT, "size")));
+	ADD_SIGNAL(MethodInfo("positional_soft_shadow_filter_quality_changed", PropertyInfo(Variant::INT, "quality", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "RenderingServer.ShadowQuality")));
+
 	ClassDB::bind_method(D_METHOD("set_directional_shadow_atlas_size", "size"), &VideoShadowSettingsServer::set_directional_shadow_atlas_size);
 	ClassDB::bind_method(D_METHOD("get_directional_shadow_atlas_size"), &VideoShadowSettingsServer::get_directional_shadow_atlas_size);
 	ClassDB::bind_method(D_METHOD("set_directional_shadow_16_bits", "enabled"), &VideoShadowSettingsServer::set_directional_shadow_16_bits);
