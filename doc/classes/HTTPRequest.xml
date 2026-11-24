@@ -6,6 +6,7 @@
 	<description>
 		A node with the ability to send HTTP requests. Uses [HTTPClient] internally.
 		Can be used to make HTTP requests, i.e. download or upload files or web content via HTTP.
+		A request can also be described by an [HTTPRequestTarget] resource and sent with [method request_target]. The result of every request is also delivered as an [HTTPResponse] through [signal response_received].
 		[b]Warning:[/b] See the notes and warnings on [HTTPClient] for limitations, especially regarding TLS security.
 		[b]Note:[/b] When exporting to Android, make sure to enable the [code]INTERNET[/code] permission in the Android export preset before exporting the project or using remote deploy. Otherwise, network communication of any kind will be blocked by Android.
 		[b]Example:[/b] Contact a REST API and print one of its returned fields:
@@ -206,6 +207,16 @@
 				Returns [constant OK] if request is successfully created. (Does not imply that the server has responded), [constant ERR_UNCONFIGURED] if not in the tree, [constant ERR_BUSY] if still processing previous request, [constant ERR_INVALID_PARAMETER] if given string is not a valid URL format, or [constant ERR_CANT_CONNECT] if not using thread and the [HTTPClient] cannot connect to host.
 			</description>
 		</method>
+		<method name="request_target">
+			<return type="int" enum="Error" />
+			<param index="0" name="target" type="HTTPRequestTarget" />
+			<param index="1" name="variables" type="Dictionary" default="{}" />
+			<description>
+				Sends the request described by [param target]: [method HTTPRequestTarget.build_url], [method HTTPRequestTarget.build_headers] and [method HTTPRequestTarget.build_body] are called with [param variables] to fill the [code]{name}[/code] placeholders, and the method of [member HTTPRequestTarget.method] is used. The target's [member HTTPRequestTarget.timeout], [member HTTPRequestTarget.accept_gzip] and [member HTTPRequestTarget.max_redirects] replace the node's [member timeout], [member accept_gzip] and [member max_redirects] for this request only; the node's properties do not change.
+				When the request is completed, [signal request_completed] and then [signal response_received] are emitted; [member HTTPResponse.target] is [param target].
+				Returns the same errors as [method request], and [constant ERR_INVALID_PARAMETER] if [param target] is [code]null[/code].
+			</description>
+		</method>
 		<method name="set_http_proxy">
 			<return type="void" />
 			<param index="0" name="host" type="String" />
@@ -276,6 +287,12 @@
 			<param index="3" name="body" type="PackedByteArray" />
 			<description>
 				Emitted when a request is completed.
+			</description>
+		</signal>
+		<signal name="response_received">
+			<param index="0" name="response" type="HTTPResponse" />
+			<description>
+				Emitted after [signal request_completed] for every completed request, with the same values as a typed [HTTPResponse]. For requests sent with [method request_target], [member HTTPResponse.target] is the sent [HTTPRequestTarget].
 			</description>
 		</signal>
 	</signals>

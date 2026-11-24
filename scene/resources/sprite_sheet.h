@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  texture_atlas.h                                                       */
+/*  sprite_sheet.h                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -31,18 +31,22 @@
 #pragma once
 
 #include "core/io/resource.h"
+#include "core/io/resource_text_serializer.h"
+#include "core/io/serializer_options.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
+#include "core/variant/typed_array.h"
 #include "core/variant/typed_dictionary.h"
 #include "scene/resources/atlas_texture.h"
 
+class Image;
 class SpriteFrames;
 
 // One sprite sheet (any Texture2D) with named regions of any size. Every region is available as an
 // AtlasTexture that references the atlas texture and is kept in sync with the atlas.
-// Like other resources, a TextureAtlas is not thread-safe: use it from one thread at a time.
-class TextureAtlas : public Resource {
-	GDCLASS(TextureAtlas, Resource);
+// Like other resources, a SpriteSheet is not thread-safe: use it from one thread at a time.
+class SpriteSheet : public Resource {
+	GDCLASS(SpriteSheet, Resource);
 
 public:
 	// One region read from a text file or an import, before it is applied.
@@ -56,7 +60,7 @@ private:
 	struct Region {
 		Rect2i rect;
 		Rect2i margin;
-		Ref<AtlasTexture> texture; // Created on the first get_texture() call.
+		Ref<AtlasTexture> texture; // Created on the first get_region_texture() call.
 	};
 
 	Ref<Texture2D> texture;
@@ -69,6 +73,9 @@ private:
 	static Error _check_rect(const String &p_name, const Rect2i &p_rect, const Ref<Texture2D> &p_texture, String &r_error);
 	static Error _check_margin(const String &p_name, const Rect2i &p_margin, String &r_error);
 	String _get_written_texture_path() const;
+	String _write_json(const String &p_indent) const;
+	String _write_csv() const;
+	String _write_ini() const;
 	Error _load_entries(Error p_parse_error, const String &p_texture_path, const LocalVector<Entry> &p_entries, const String &p_error, const String &p_format);
 
 protected:
@@ -80,6 +87,11 @@ public:
 	static String texture_packer_name_to_region_name(const String &p_file_name);
 	// Splits "walk_10" into "walk" and 10. Returns -1 (and the whole name) if the name does not end with a number.
 	static int split_trailing_number(const String &p_name, String &r_base);
+
+	// Auto slice: boxes around groups of touching opaque pixels, sorted in rows (top to bottom, left to right).
+	static TypedArray<Rect2i> detect_sprite_rects(const Ref<Image> &p_image, float p_alpha_threshold = 0.1f);
+	// Grid slice: all cells fully inside the area, row by row.
+	static TypedArray<Rect2i> make_grid_rects(const Vector2i &p_area_size, const Vector2i &p_cell_size, const Vector2i &p_separation = Vector2i(), const Vector2i &p_offset = Vector2i());
 
 	void set_texture(const Ref<Texture2D> &p_texture);
 	Ref<Texture2D> get_sheet_texture() const;
@@ -109,23 +121,24 @@ public:
 	int get_region_count() const;
 	void clear_regions();
 
+	String make_unique_region_name(const String &p_prefix) const;
+	PackedStringArray add_regions(const TypedArray<Rect2i> &p_rects, const String &p_prefix = "sprite_");
+	PackedStringArray auto_slice(const String &p_prefix = "sprite_", float p_alpha_threshold = 0.1f);
+
 	Error set_region_margin(const StringName &p_name, const Rect2i &p_margin);
 	Rect2i get_region_margin(const StringName &p_name) const;
 
-	Ref<AtlasTexture> get_texture(const StringName &p_name);
+	Ref<AtlasTexture> get_region_texture(const StringName &p_name);
 	Ref<SpriteFrames> create_sprite_frames(const String &p_prefix = String(), double p_fps = 5.0);
 
-	// Fixed text layouts (see the class reference).
-	String save_as_json(const String &p_indent = "\t") const;
-	Error load_from_json(const String &p_text);
-	String save_as_csv() const;
-	Error load_from_csv(const String &p_text);
-	String save_as_ini() const;
-	Error load_from_ini(const String &p_text);
+	// Fixed text layouts (see the class reference): FORMAT_JSON, FORMAT_CSV and FORMAT_INI; other formats are ERR_UNAVAILABLE.
+	Error load_from_text(const String &p_text, ResourceTextSerializer::Format p_format);
+	String to_text(ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>()) const;
 	// TexturePacker JSON (Hash or Array). `meta.image` is relative to `p_base_dir`.
 	Error import_texture_packer_json(const String &p_text, const String &p_base_dir = String());
 
-	// By extension: .json (own layout, or TexturePacker if it has a "frames" key), .csv, .ini.
+	// By extension (ResourceTextSerializer::get_format_for_extension()): .json (own layout, or TexturePacker if it
+	// has a "frames" key), .csv, .ini.
 	Error load_from_file(const String &p_path);
 	Error save_to_file(const String &p_path) const;
 

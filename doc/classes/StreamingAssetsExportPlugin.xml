@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="StreamingAssetsExportPlugin" inherits="EditorExportPlugin" api_type="editor" keywords="streaming, assets, export, raw, folder" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Built-in export plugin that ships the streaming assets folder unchanged with an export.
+	</brief_description>
+	<description>
+		The editor registers one instance of this export plugin. It is active when the project setting [code]filesystem/streaming_assets/enabled[/code] is [code]true[/code], and handles the folder set in [code]filesystem/streaming_assets/source_folder[/code] (default [code]"res://streaming_assets"[/code]):
+		- Every file below the folder is skipped by the regular export, together with its [code].import[/code] remap and its imported artifacts. The files are never converted.
+		- [b]External[/b] (Windows and Linux/BSD, mode [code]raw[/code]): after the export, the folder is copied unchanged to [code]filesystem/streaming_assets/target_folder[/code] (default [code]"{exe_name}_Data/StreamingAssets"[/code]), relative to the folder of the exported executable or, for "Export PCK/ZIP only", of the [code].pck[/code]. A previous copy is removed first. [code]{exe_name}[/code] is replaced by the base name of the export file.
+		- [b]Embed[/b] (Android, Web, macOS and iOS for now, [code].zip[/code] exports, and any other platform, with [code]filesystem/streaming_assets/fallback[/code] set to [code]embed[/code]): the files are added unchanged to the main pack at their [code]res://[/code] paths.
+		- [b]None[/b] (the same platforms, with the fallback set to [code]none[/code]): the files are not shipped.
+		Files and folders whose name starts with [code].[/code] (such as [code].gdignore[/code]), [code]*.import[/code] and [code]*.uid[/code] files, and symbolic links to folders are never shipped.
+		The settings are read per export preset, so feature tag overrides such as [code]filesystem/streaming_assets/fallback.web[/code] apply. When a setting does not exist, its default is used. The [code]pack[/code] mode is not available yet: the folder is then exported in [code]raw[/code] mode and a warning is shown.
+		The export log lists the number of files and their total size, and the chosen placement. The static helpers below expose the rules the plugin uses, for example to check a project before exporting it:
+		[codeblocks]
+		[gdscript]
+		var files = StreamingAssetsExportPlugin.collect_files("res://streaming_assets")
+		var target = StreamingAssetsExportPlugin.expand_template("{exe_name}_Data/StreamingAssets", "MyGame")
+		print(files.size(), " files go to ", target) # MyGame_Data/StreamingAssets
+		[/gdscript]
+		[csharp]
+		string[] files = StreamingAssetsExportPlugin.CollectFiles("res://streaming_assets");
+		string target = StreamingAssetsExportPlugin.ExpandTemplate("{exe_name}_Data/StreamingAssets", "MyGame");
+		GD.Print(files.Length, " files go to ", target); // MyGame_Data/StreamingAssets
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] This class is only available in editor builds. It cannot be instantiated from scripts.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="collect_files" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="folder" type="String" />
+			<description>
+				Returns the paths of all files below [param folder] that the plugin ships, relative to [param folder] and sorted. Subfolders are walked recursively. Entries for which [method is_file_excluded] returns [code]true[/code], hidden entries and symbolic links to folders are left out. [param folder] can be a [code]res://[/code] path or an absolute path. Returns an empty array if the folder does not exist.
+			</description>
+		</method>
+		<method name="expand_template" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="template" type="String" />
+			<param index="1" name="exe_name" type="String" />
+			<description>
+				Expands the placeholders in [param template] with [method StreamingAssetsServer.expand_template], the same helper the runtime uses to find the folder: [code]{exe_name}[/code], [code]{app_name}[/code] and [code]{version}[/code]. Other placeholders are left unchanged. The plugin passes the base name of the export file without its extension, for example [code]"MyGame"[/code] for [code]MyGame.exe[/code].
+			</description>
+		</method>
+		<method name="is_file_excluded" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if a file or folder with the name [param name] is never shipped: empty names, names that start with [code].[/code], and names that end with [code].import[/code] or [code].uid[/code].
+			</description>
+		</method>
+		<method name="is_path_in_folder" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="folder" type="String" />
+			<description>
+				Returns [code]true[/code] if [param path] is [param folder] itself or lies below it. Both paths are simplified first, and a trailing slash of [param folder] is ignored. A bare prefix such as [code]"res://"[/code] or an empty [param folder] never matches. The plugin uses this to skip the files of the source folder.
+			</description>
+		</method>
+		<method name="is_valid_target_folder" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="folder" type="String" />
+			<description>
+				Returns [code]true[/code] if [param folder] can be used as the expanded target folder: it must be relative and not empty, and none of its components may be empty, [code].[/code], [code]..[/code] or contain a placeholder brace or a [code]:[/code]. Backslashes count as slashes, and a trailing slash is allowed. The plugin refuses an invalid target, because it removes the old content of the target before copying.
+			</description>
+		</method>
+		<method name="resolve_placement" qualifiers="static">
+			<return type="int" enum="StreamingAssetsExportPlugin.Placement" />
+			<param index="0" name="features" type="PackedStringArray" />
+			<param index="1" name="export_path" type="String" />
+			<param index="2" name="fallback" type="int" enum="StreamingAssetsExportPlugin.Fallback" />
+			<description>
+				Returns where the plugin puts the streaming assets for an export with the given [param features] (the export features of the preset) to [param export_path]. Returns [constant PLACEMENT_EXTERNAL] if [param features] contains [code]"pc"[/code] but not [code]"macos"[/code] and [param export_path] does not end with [code].zip[/code]. Otherwise returns [constant PLACEMENT_NONE] if [param fallback] is [constant FALLBACK_NONE], and [constant PLACEMENT_EMBED] if not.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="MODE_RAW" value="0" enum="Mode">
+			The files are copied unchanged and read at runtime through [code]streaming://[/code]. Value [code]raw[/code] of [code]filesystem/streaming_assets/mode[/code].
+		</constant>
+		<constant name="MODE_PACK" value="1" enum="Mode">
+			The folder is exported as a second pack. Value [code]pack[/code] of [code]filesystem/streaming_assets/mode[/code]. Not available yet: the plugin exports the folder in [constant MODE_RAW] instead.
+		</constant>
+		<constant name="FALLBACK_EMBED" value="0" enum="Fallback">
+			On platforms without an external folder, the files are embedded unchanged into the main pack. Value [code]embed[/code] of [code]filesystem/streaming_assets/fallback[/code].
+		</constant>
+		<constant name="FALLBACK_NONE" value="1" enum="Fallback">
+			On platforms without an external folder, the files are not shipped. Value [code]none[/code] of [code]filesystem/streaming_assets/fallback[/code].
+		</constant>
+		<constant name="PLACEMENT_EXTERNAL" value="0" enum="Placement">
+			The folder is copied next to the export after it was written.
+		</constant>
+		<constant name="PLACEMENT_EMBED" value="1" enum="Placement">
+			The files are embedded unchanged into the main pack at their [code]res://[/code] paths.
+		</constant>
+		<constant name="PLACEMENT_NONE" value="2" enum="Placement">
+			The files are left out of the export.
+		</constant>
+	</constants>
+</class>

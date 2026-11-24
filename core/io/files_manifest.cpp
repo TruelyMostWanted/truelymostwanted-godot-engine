@@ -152,13 +152,13 @@ bool FilesManifest::is_recursive() const {
 	return recursive;
 }
 
-void FilesManifest::set_create_non_existing_folders(bool p_create) {
-	create_non_existing_folders = p_create;
+void FilesManifest::set_create_missing_folders(bool p_create) {
+	create_missing_folders = p_create;
 	emit_changed();
 }
 
-bool FilesManifest::is_create_non_existing_folders() const {
-	return create_non_existing_folders;
+bool FilesManifest::is_create_missing_folders() const {
+	return create_missing_folders;
 }
 
 bool FilesManifest::matches_extension(const String &p_path) const {
@@ -242,7 +242,7 @@ PackedStringArray FilesManifest::get_paths(Error *r_error) const {
 		}
 
 		if (!DirAccess::dir_exists_absolute(folder)) {
-			if (!create_non_existing_folders) {
+			if (!create_missing_folders) {
 				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist.", folder));
 				if (first_error == OK) {
 					first_error = ERR_FILE_NOT_FOUND;
@@ -337,8 +337,8 @@ void FilesManifest::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_file_paths"), &FilesManifest::get_file_paths);
 	ClassDB::bind_method(D_METHOD("set_recursive", "recursive"), &FilesManifest::set_recursive);
 	ClassDB::bind_method(D_METHOD("is_recursive"), &FilesManifest::is_recursive);
-	ClassDB::bind_method(D_METHOD("set_create_non_existing_folders", "create"), &FilesManifest::set_create_non_existing_folders);
-	ClassDB::bind_method(D_METHOD("is_create_non_existing_folders"), &FilesManifest::is_create_non_existing_folders);
+	ClassDB::bind_method(D_METHOD("set_create_missing_folders", "create"), &FilesManifest::set_create_missing_folders);
+	ClassDB::bind_method(D_METHOD("is_create_missing_folders"), &FilesManifest::is_create_missing_folders);
 	ClassDB::bind_method(D_METHOD("matches_extension", "path"), &FilesManifest::matches_extension);
 	ClassDB::bind_static_method("FilesManifest", D_METHOD("normalize_extension", "extension"), &FilesManifest::normalize_extension);
 
@@ -347,5 +347,5 @@ void FilesManifest::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "folder_paths", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:", Variant::STRING, PROPERTY_HINT_DIR)), "set_folder_paths", "get_folder_paths");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "file_paths", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:", Variant::STRING, PROPERTY_HINT_FILE)), "set_file_paths", "get_file_paths");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "recursive"), "set_recursive", "is_recursive");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "create_non_existing_folders"), "set_create_non_existing_folders", "is_create_non_existing_folders");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "create_missing_folders"), "set_create_missing_folders", "is_create_missing_folders");
 }

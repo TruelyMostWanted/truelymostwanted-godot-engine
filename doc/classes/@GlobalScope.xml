@@ -1606,6 +1606,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
+			The [InputSettingsServer] singleton.
+		</member>
 		<member name="JavaClassWrapper" type="JavaClassWrapper" setter="" getter="">
 			The [JavaClassWrapper] singleton.
 			[b]Note:[/b] Only implemented on Android.
@@ -1613,6 +1616,9 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
+		</member>
+		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
+			The [KeyBindingSettingsServer] singleton.
 		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
@@ -1650,6 +1656,9 @@
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
+		</member>
+		<member name="PerformanceRecorder" type="PerformanceRecorder" setter="" getter="">
+			The [PerformanceRecorder] singleton.
 		</member>
 		<member name="PhysicsServer2D" type="PhysicsServer2D" setter="" getter="">
 			The [PhysicsServer2D] singleton.
@@ -1690,6 +1699,12 @@
 		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
 			The [SettingsServerManager] singleton.
 		</member>
+		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
+			The [StreamingAssetsServer] singleton.
+		</member>
+		<member name="TTSServer" type="TTSServer" setter="" getter="">
+			The [TTSServer] singleton.
+		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
@@ -1705,8 +1720,8 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
-		<member name="TtsServer" type="TtsServer" setter="" getter="">
-			The [TtsServer] singleton.
+		<member name="VideoWindowSettingsServer" type="VideoWindowSettingsServer" setter="" getter="">
+			The [VideoWindowSettingsServer] singleton.
 		</member>
 		<member name="WorkerThreadPool" type="WorkerThreadPool" setter="" getter="">
 			The [WorkerThreadPool] singleton.
