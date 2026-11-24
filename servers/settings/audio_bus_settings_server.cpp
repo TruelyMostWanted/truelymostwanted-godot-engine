@@ -662,7 +662,8 @@ void AudioBusSettingsServer::_notify_value_applied(const StringName &p_name, con
 		const bool mute = entry->get(SNAME("mute"));
 		const bool solo = entry->get(SNAME("solo"));
 		if ((stored & AudioBusSettingsRow::STORED_VOLUME) && (old_entry.is_null() || !Math::is_equal_approx(float(old_entry->get(SNAME("volume_db"))), volume_db))) {
-			emit_signal(SNAME("bus_volume_changed"), StringName(bus_name), volume_db);
+			// The 32-bit member reads back as -12.300000190734863; the signal carries -12.3 (#189).
+			emit_signal(SNAME("bus_volume_changed"), StringName(bus_name), snap_property_value(entry.ptr(), SNAME("volume_db"), double(volume_db)));
 		}
 		if ((stored & AudioBusSettingsRow::STORED_MUTE) && (old_entry.is_null() || bool(old_entry->get(SNAME("mute"))) != mute)) {
 			emit_signal(SNAME("bus_mute_changed"), StringName(bus_name), mute);
