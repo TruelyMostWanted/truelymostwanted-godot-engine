@@ -1329,7 +1329,7 @@ String TOML::stringify(const Dictionary &p_data) {
 	return text;
 }
 
-String TOML::serialize(const Ref<Resource> &p_resource, const Dictionary &p_options) {
+String TOML::serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options) {
 	String text;
 	String error;
 	if (write_resource(p_resource, ResourceTextSerializer::get_options(p_options), text, error) != OK) {
@@ -1339,7 +1339,8 @@ String TOML::serialize(const Ref<Resource> &p_resource, const Dictionary &p_opti
 	return text;
 }
 
-Ref<Resource> TOML::deserialize(const String &p_text, const String &p_type_hint) {
+Ref<Resource> TOML::deserialize(const String &p_text, const StringName &p_type_hint, const Ref<SerializerOptions> &p_options) {
+	// Reading has no options yet; the parameter matches ResourceTextSerializer.deserialize().
 	Ref<Resource> resource;
 	String error;
 	if (parse_resource(p_text, p_type_hint, resource, error) != OK) {
@@ -1358,6 +1359,6 @@ void TOML::_bind_methods() {
 
 	ClassDB::bind_static_method("TOML", D_METHOD("parse_string", "text"), &TOML::parse_string);
 	ClassDB::bind_static_method("TOML", D_METHOD("stringify", "data"), &TOML::stringify);
-	ClassDB::bind_static_method("TOML", D_METHOD("serialize", "resource", "options"), &TOML::serialize, DEFVAL(Dictionary()));
-	ClassDB::bind_static_method("TOML", D_METHOD("deserialize", "text", "type_hint"), &TOML::deserialize, DEFVAL(String()));
+	ClassDB::bind_static_method("TOML", D_METHOD("serialize", "resource", "options"), &TOML::serialize, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_static_method("TOML", D_METHOD("deserialize", "text", "type_hint", "options"), &TOML::deserialize, DEFVAL(StringName()), DEFVAL(Ref<SerializerOptions>()));
 }

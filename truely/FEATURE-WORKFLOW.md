@@ -11,7 +11,7 @@ Gilt für jedes Feature- und Refactoring-Issue. Branches und Remotes stehen in [
 
 Die Regeln für Code und Issues stehen in [`CONVENTIONS.md`](CONVENTIONS.md). Kurz:
 - Neue Systeme sind **keine Nodes**, sondern C++-Singletons (Server) und `Resource`s (Daten), gebunden in `_bind_methods()`.
-- C# bekommt die API über den generierten Glue: `TtsServer` (statisch) und `TtsServerInstance`.
+- C# bekommt die API über den generierten Glue: `TTSServer` (statisch) und `TTSServerInstance`.
 - Jedes Feature hat Klassenreferenz, Wiki-Seite und Checks in GDScript und C# (Mono-Build).
 - Issues auf Englisch, nach Vorlage, mit „Feasibility to check“ und den fünf Abnahmepunkten.
 
@@ -181,12 +181,12 @@ Die Seiten folgen dem Aufbau der **offiziellen Godot-Docs**. Es gibt zwei Arten 
 
 ### 5.1 Klassenreferenz: eine Seite pro Klasse
 
-Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TtsServer`.
+Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TTSServer`.
 Inhalt wie `doc/classes/<Klasse>.xml`, in dieser Reihenfolge:
 
 | Abschnitt | Inhalt |
 |---|---|
-| Kopf | `# TtsServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
+| Kopf | `# TTSServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
 | Description | ausführliche Beschreibung, bei Bedarf mit Beispielen |
 | Tutorials | Links zu den Guide-Seiten des Features |
 | Properties | Tabelle: Typ, Name, Default |

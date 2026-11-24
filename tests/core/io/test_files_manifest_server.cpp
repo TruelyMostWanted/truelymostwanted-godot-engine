@@ -60,14 +60,17 @@ TEST_CASE("[FilesManifestServer] Register, edit, validate, watch") {
 	CHECK(server->add_folder("fms_test", root.path_join("a")) == ERR_ALREADY_EXISTS);
 	CHECK(server->add_extension("fms_test", "TRES") == OK);
 	CHECK(manifest->get_extensions() == PackedStringArray({ ".tres" }));
-	CHECK(server->get_paths("fms_test").size() == 1);
+	CHECK(server->get_file_paths("fms_test").size() == 1);
 
 	CHECK(server->add_folder("fms_test", root.path_join("missing")) == OK);
 	CHECK(server->add_extension("fms_test", "nosuchext") == OK);
-	Dictionary result = server->validate("fms_test");
-	CHECK(PackedStringArray(result["missing_folders"]).size() == 1);
-	CHECK(PackedStringArray(result["unknown_extensions"]) == PackedStringArray({ ".nosuchext" }));
-	CHECK_FALSE(bool(result["valid"]));
+	Ref<FilesManifestValidation> result = server->validate("fms_test");
+	REQUIRE(result.is_valid());
+	CHECK(result->get_missing_folders().size() == 1);
+	CHECK(result->get_missing_files().is_empty());
+	CHECK(result->get_unknown_extensions() == PackedStringArray({ ".nosuchext" }));
+	CHECK(result->get_error() == ERR_FILE_NOT_FOUND);
+	CHECK_FALSE(result->is_valid());
 	CHECK(server->create_missing_folders("fms_test") == OK);
 	CHECK(DirAccess::dir_exists_absolute(root.path_join("missing")));
 

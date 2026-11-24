@@ -113,20 +113,20 @@ public:
 	// Loads everything a list names. With `p_use_threads` (and threads available), the paths load
 	// on a worker thread and the call returns at once; otherwise it returns when all paths are loaded.
 	// `preload_finished` follows on the main thread in both cases.
-	Error preload_list(const Ref<PreloadList> &p_list, bool p_use_threads = true);
+	Error preload_from_list(const Ref<PreloadList> &p_list, bool p_use_threads = true);
 	// Loads one path now and stores it; `p_key` becomes an extra key for it.
-	Error preload_path(const String &p_path, const String &p_key = String());
+	Error preload_resource(const String &p_path, const String &p_key = String());
 
-	Error insert(const String &p_key, const Ref<Resource> &p_resource);
-	bool insert_if_absent(const String &p_key, const Ref<Resource> &p_resource);
-	int remove(const String &p_pattern);
+	Error add_resource(const String &p_key, const Ref<Resource> &p_resource);
+	bool add_resource_if_missing(const String &p_key, const Ref<Resource> &p_resource);
+	int remove_matching(const String &p_pattern);
 	void clear();
 
 	Ref<Resource> get_resource(const String &p_key_or_path) const;
 	bool has_resource(const String &p_key_or_path) const;
-	int count() const;
-	TypedArray<Resource> select(const String &p_pattern = String(), const StringName &p_type = StringName()) const;
-	PackedStringArray select_keys(const String &p_pattern = String(), const StringName &p_type = StringName()) const;
+	int get_entry_count() const;
+	TypedArray<Resource> find_resources(const String &p_pattern = String(), const StringName &p_type = StringName()) const;
+	PackedStringArray find_keys(const String &p_pattern = String(), const StringName &p_type = StringName()) const;
 
 	// Estimated CPU-side bytes of the stored resources (stored properties, each resource counted once).
 	int64_t get_memory_usage() const;

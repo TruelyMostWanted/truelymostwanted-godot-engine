@@ -32,7 +32,7 @@
 
 #include "core/object/class_db.h"
 
-void TtsPersona::set_persona_name(const String &p_name) {
+void TTSPersona::set_persona_name(const StringName &p_name) {
 	if (persona_name == p_name) {
 		return;
 	}
@@ -40,11 +40,11 @@ void TtsPersona::set_persona_name(const String &p_name) {
 	emit_changed();
 }
 
-String TtsPersona::get_persona_name() const {
+StringName TTSPersona::get_persona_name() const {
 	return persona_name;
 }
 
-void TtsPersona::set_voice(const String &p_voice) {
+void TTSPersona::set_voice(const String &p_voice) {
 	if (voice == p_voice) {
 		return;
 	}
@@ -52,11 +52,11 @@ void TtsPersona::set_voice(const String &p_voice) {
 	emit_changed();
 }
 
-String TtsPersona::get_voice() const {
+String TTSPersona::get_voice() const {
 	return voice;
 }
 
-void TtsPersona::set_language(const String &p_language) {
+void TTSPersona::set_language(const String &p_language) {
 	if (language == p_language) {
 		return;
 	}
@@ -64,11 +64,11 @@ void TtsPersona::set_language(const String &p_language) {
 	emit_changed();
 }
 
-String TtsPersona::get_language() const {
+String TTSPersona::get_language() const {
 	return language;
 }
 
-void TtsPersona::set_volume(int p_volume) {
+void TTSPersona::set_volume(int p_volume) {
 	const int clamped = CLAMP(p_volume, 0, 100);
 	if (volume == clamped) {
 		return;
@@ -77,11 +77,11 @@ void TtsPersona::set_volume(int p_volume) {
 	emit_changed();
 }
 
-int TtsPersona::get_volume() const {
+int TTSPersona::get_volume() const {
 	return volume;
 }
 
-void TtsPersona::set_pitch(float p_pitch) {
+void TTSPersona::set_pitch(float p_pitch) {
 	const float clamped = CLAMP(p_pitch, 0.0f, 2.0f);
 	if (pitch == clamped) {
 		return;
@@ -90,11 +90,11 @@ void TtsPersona::set_pitch(float p_pitch) {
 	emit_changed();
 }
 
-float TtsPersona::get_pitch() const {
+float TTSPersona::get_pitch() const {
 	return pitch;
 }
 
-void TtsPersona::set_rate(float p_rate) {
+void TTSPersona::set_rate(float p_rate) {
 	const float clamped = CLAMP(p_rate, 0.1f, 10.0f);
 	if (rate == clamped) {
 		return;
@@ -103,11 +103,11 @@ void TtsPersona::set_rate(float p_rate) {
 	emit_changed();
 }
 
-float TtsPersona::get_rate() const {
+float TTSPersona::get_rate() const {
 	return rate;
 }
 
-void TtsPersona::set_interrupt(bool p_interrupt) {
+void TTSPersona::set_interrupt(bool p_interrupt) {
 	if (interrupt == p_interrupt) {
 		return;
 	}
@@ -115,27 +115,27 @@ void TtsPersona::set_interrupt(bool p_interrupt) {
 	emit_changed();
 }
 
-bool TtsPersona::is_interrupt() const {
+bool TTSPersona::is_interrupt() const {
 	return interrupt;
 }
 
-void TtsPersona::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_persona_name", "name"), &TtsPersona::set_persona_name);
-	ClassDB::bind_method(D_METHOD("get_persona_name"), &TtsPersona::get_persona_name);
-	ClassDB::bind_method(D_METHOD("set_voice", "voice"), &TtsPersona::set_voice);
-	ClassDB::bind_method(D_METHOD("get_voice"), &TtsPersona::get_voice);
-	ClassDB::bind_method(D_METHOD("set_language", "language"), &TtsPersona::set_language);
-	ClassDB::bind_method(D_METHOD("get_language"), &TtsPersona::get_language);
-	ClassDB::bind_method(D_METHOD("set_volume", "volume"), &TtsPersona::set_volume);
-	ClassDB::bind_method(D_METHOD("get_volume"), &TtsPersona::get_volume);
-	ClassDB::bind_method(D_METHOD("set_pitch", "pitch"), &TtsPersona::set_pitch);
-	ClassDB::bind_method(D_METHOD("get_pitch"), &TtsPersona::get_pitch);
-	ClassDB::bind_method(D_METHOD("set_rate", "rate"), &TtsPersona::set_rate);
-	ClassDB::bind_method(D_METHOD("get_rate"), &TtsPersona::get_rate);
-	ClassDB::bind_method(D_METHOD("set_interrupt", "interrupt"), &TtsPersona::set_interrupt);
-	ClassDB::bind_method(D_METHOD("is_interrupt"), &TtsPersona::is_interrupt);
+void TTSPersona::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_persona_name", "persona_name"), &TTSPersona::set_persona_name);
+	ClassDB::bind_method(D_METHOD("get_persona_name"), &TTSPersona::get_persona_name);
+	ClassDB::bind_method(D_METHOD("set_voice", "voice"), &TTSPersona::set_voice);
+	ClassDB::bind_method(D_METHOD("get_voice"), &TTSPersona::get_voice);
+	ClassDB::bind_method(D_METHOD("set_language", "language"), &TTSPersona::set_language);
+	ClassDB::bind_method(D_METHOD("get_language"), &TTSPersona::get_language);
+	ClassDB::bind_method(D_METHOD("set_volume", "volume"), &TTSPersona::set_volume);
+	ClassDB::bind_method(D_METHOD("get_volume"), &TTSPersona::get_volume);
+	ClassDB::bind_method(D_METHOD("set_pitch", "pitch"), &TTSPersona::set_pitch);
+	ClassDB::bind_method(D_METHOD("get_pitch"), &TTSPersona::get_pitch);
+	ClassDB::bind_method(D_METHOD("set_rate", "rate"), &TTSPersona::set_rate);
+	ClassDB::bind_method(D_METHOD("get_rate"), &TTSPersona::get_rate);
+	ClassDB::bind_method(D_METHOD("set_interrupt", "interrupt"), &TTSPersona::set_interrupt);
+	ClassDB::bind_method(D_METHOD("is_interrupt"), &TTSPersona::is_interrupt);
 
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "name"), "set_persona_name", "get_persona_name");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "persona_name"), "set_persona_name", "get_persona_name");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "voice"), "set_voice", "get_voice");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "language", PROPERTY_HINT_LOCALE_ID), "set_language", "get_language");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "volume", PROPERTY_HINT_RANGE, "0,100,1"), "set_volume", "get_volume");

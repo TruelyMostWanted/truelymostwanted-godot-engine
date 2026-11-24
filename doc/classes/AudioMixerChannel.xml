@@ -19,19 +19,19 @@
 			The name of the channel, used as key in all [AudioMixerServer] methods. It must not be empty.
 		</member>
 		<member name="default_fade_time" type="float" setter="set_default_fade_time" getter="get_default_fade_time" default="0.0">
-			The cross-fade time in seconds used by [method AudioMixerServer.next], [method AudioMixerServer.previous] and [method AudioMixerServer.change_index] when their [code]fade_time[/code] is negative, and by [member stop_on_scene_change]. [code]0.0[/code] switches at once.
+			The cross-fade time in seconds used by [method AudioMixerServer.play_next], [method AudioMixerServer.play_previous] and [method AudioMixerServer.set_queue_index] when their [code]fade_time[/code] is negative, and by [member stop_on_scene_change]. [code]0.0[/code] switches at once.
 		</member>
-		<member name="loop_entry" type="bool" setter="set_loop_entry" getter="is_loop_entry" default="false">
+		<member name="loop_current_entry" type="bool" setter="set_loop_current_entry" getter="is_loop_current_entry" default="false">
 			If [code]true[/code], the current entry starts again when it ends instead of advancing the queue. The restart happens in the next frame; for a seamless loop, use the loop setting of the stream itself (for example [member AudioStreamWAV.loop_mode]).
+		</member>
+		<member name="max_polyphony" type="int" setter="set_max_polyphony" getter="get_max_polyphony" default="1">
+			The maximum number of one-shots started with [method AudioMixerServer.play_one_shot] that play at the same time on this channel. When another one starts, the oldest one is stopped. Ranges from [code]1[/code] to [code]128[/code].
 		</member>
 		<member name="pause_with_tree" type="bool" setter="set_pause_with_tree" getter="is_pause_with_tree" default="false">
 			If [code]true[/code], the channel pauses while [member SceneTree.paused] is [code]true[/code] and resumes with the tree. If [code]false[/code], the channel keeps playing, for example music in a pause menu. Has no effect when the main loop is not a [SceneTree].
 		</member>
 		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
 			The pitch and tempo of the channel, as in [member AudioStreamPlayer.pitch_scale]. Must be greater than [code]0.0[/code].
-		</member>
-		<member name="polyphony" type="int" setter="set_polyphony" getter="get_polyphony" default="1">
-			The maximum number of one-shots started with [method AudioMixerServer.play_one_shot] that play at the same time on this channel. When another one starts, the oldest one is stopped. Ranges from [code]1[/code] to [code]128[/code].
 		</member>
 		<member name="preload_next" type="bool" setter="set_preload_next" getter="is_preload_next" default="false">
 			If [code]true[/code], the next queue entry given as a path is loaded in the background (with [method ResourceLoader.load_threaded_request]) while the current entry plays, so switching does not block. Not used in [constant QUEUE_MODE_SHUFFLE]. In exports without threads (the default Web export), the load still runs on the main thread, only earlier.

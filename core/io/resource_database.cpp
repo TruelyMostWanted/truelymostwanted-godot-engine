@@ -380,7 +380,7 @@ void ResourceDatabase::_emit_preload_finished(const Ref<PreloadList> &p_list, in
 	emit_signal(SNAME("preload_finished"), p_list, p_error);
 }
 
-Error ResourceDatabase::preload_list(const Ref<PreloadList> &p_list, bool p_use_threads) {
+Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p_use_threads) {
 	ERR_FAIL_COND_V_MSG(p_list.is_null(), ERR_INVALID_PARAMETER, "The preload list is null.");
 	bool is_finished = false;
 	{
@@ -406,7 +406,7 @@ Error ResourceDatabase::preload_list(const Ref<PreloadList> &p_list, bool p_use_
 			}
 			continue;
 		}
-		insert(key, resource);
+		add_resource(key, resource);
 	}
 
 	Job *job = memnew(Job);
@@ -443,7 +443,7 @@ Error ResourceDatabase::preload_list(const Ref<PreloadList> &p_list, bool p_use_
 	return first_error;
 }
 
-Error ResourceDatabase::preload_path(const String &p_path, const String &p_key) {
+Error ResourceDatabase::preload_resource(const String &p_path, const String &p_key) {
 	ERR_FAIL_COND_V_MSG(p_path.is_empty(), ERR_INVALID_PARAMETER, "The path to preload is empty.");
 	const Error err = _load_and_store(p_path, String());
 	if (err == OK && !p_key.is_empty()) {
@@ -454,7 +454,7 @@ Error ResourceDatabase::preload_path(const String &p_path, const String &p_key) 
 	return err;
 }
 
-Error ResourceDatabase::insert(const String &p_key, const Ref<Resource> &p_resource) {
+Error ResourceDatabase::add_resource(const String &p_key, const Ref<Resource> &p_resource) {
 	ERR_FAIL_COND_V_MSG(p_key.is_empty(), ERR_INVALID_PARAMETER, "The key can't be empty.");
 	ERR_FAIL_COND_V_MSG(p_resource.is_null(), ERR_INVALID_PARAMETER, "The resource is null.");
 	const String key = _normalize_key(p_key);
@@ -475,7 +475,7 @@ Error ResourceDatabase::insert(const String &p_key, const Ref<Resource> &p_resou
 	return OK;
 }
 
-bool ResourceDatabase::insert_if_absent(const String &p_key, const Ref<Resource> &p_resource) {
+bool ResourceDatabase::add_resource_if_missing(const String &p_key, const Ref<Resource> &p_resource) {
 	ERR_FAIL_COND_V_MSG(p_key.is_empty(), false, "The key can't be empty.");
 	ERR_FAIL_COND_V_MSG(p_resource.is_null(), false, "The resource is null.");
 	const String key = _normalize_key(p_key);
@@ -498,7 +498,7 @@ bool ResourceDatabase::insert_if_absent(const String &p_key, const Ref<Resource>
 	return true;
 }
 
-int ResourceDatabase::remove(const String &p_pattern) {
+int ResourceDatabase::remove_matching(const String &p_pattern) {
 	const Vector<String> parts = _split_pattern(p_pattern);
 	LocalVector<Ref<Resource>> released;
 	{
@@ -545,12 +545,12 @@ bool ResourceDatabase::has_resource(const String &p_key_or_path) const {
 	return !_resolve(key).is_empty();
 }
 
-int ResourceDatabase::count() const {
+int ResourceDatabase::get_entry_count() const {
 	RWLockRead read_lock(lock);
 	return int(entries.size());
 }
 
-TypedArray<Resource> ResourceDatabase::select(const String &p_pattern, const StringName &p_type) const {
+TypedArray<Resource> ResourceDatabase::find_resources(const String &p_pattern, const StringName &p_type) const {
 	const Vector<String> parts = _split_pattern(p_pattern);
 	TypedArray<Resource> result;
 	RWLockRead read_lock(lock);
@@ -562,7 +562,7 @@ TypedArray<Resource> ResourceDatabase::select(const String &p_pattern, const Str
 	return result;
 }
 
-PackedStringArray ResourceDatabase::select_keys(const String &p_pattern, const StringName &p_type) const {
+PackedStringArray ResourceDatabase::find_keys(const String &p_pattern, const StringName &p_type) const {
 	const Vector<String> parts = _split_pattern(p_pattern);
 	PackedStringArray result;
 	RWLockRead read_lock(lock);
@@ -611,7 +611,7 @@ void ResourceDatabase::preload_project_lists() {
 			ERR_PRINT(vformat("ResourceDatabase: can't load the preload list \"%s\" named in \"filesystem/resources/preload_lists\".", path));
 			continue;
 		}
-		preload_list(list, false);
+		preload_from_list(list, false);
 	}
 }
 
@@ -636,24 +636,24 @@ void ResourceDatabase::finish() {
 }
 
 void ResourceDatabase::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("preload_list", "list", "use_threads"), &ResourceDatabase::preload_list, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("preload_path", "path", "key"), &ResourceDatabase::preload_path, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("preload_from_list", "list", "use_threads"), &ResourceDatabase::preload_from_list, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("preload_resource", "path", "key"), &ResourceDatabase::preload_resource, DEFVAL(String()));
 
-	ClassDB::bind_method(D_METHOD("insert", "key", "resource"), &ResourceDatabase::insert);
-	ClassDB::bind_method(D_METHOD("insert_if_absent", "key", "resource"), &ResourceDatabase::insert_if_absent);
-	ClassDB::bind_method(D_METHOD("remove", "pattern"), &ResourceDatabase::remove);
+	ClassDB::bind_method(D_METHOD("add_resource", "key", "resource"), &ResourceDatabase::add_resource);
+	ClassDB::bind_method(D_METHOD("add_resource_if_missing", "key", "resource"), &ResourceDatabase::add_resource_if_missing);
+	ClassDB::bind_method(D_METHOD("remove_matching", "pattern"), &ResourceDatabase::remove_matching);
 	ClassDB::bind_method(D_METHOD("clear"), &ResourceDatabase::clear);
 
 	ClassDB::bind_method(D_METHOD("get_resource", "key_or_path"), &ResourceDatabase::get_resource);
 	ClassDB::bind_method(D_METHOD("has_resource", "key_or_path"), &ResourceDatabase::has_resource);
-	ClassDB::bind_method(D_METHOD("count"), &ResourceDatabase::count);
-	ClassDB::bind_method(D_METHOD("select", "pattern", "type"), &ResourceDatabase::select, DEFVAL(String()), DEFVAL(StringName()));
-	ClassDB::bind_method(D_METHOD("select_keys", "pattern", "type"), &ResourceDatabase::select_keys, DEFVAL(String()), DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("get_entry_count"), &ResourceDatabase::get_entry_count);
+	ClassDB::bind_method(D_METHOD("find_resources", "pattern", "type"), &ResourceDatabase::find_resources, DEFVAL(String()), DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("find_keys", "pattern", "type"), &ResourceDatabase::find_keys, DEFVAL(String()), DEFVAL(StringName()));
 
 	ClassDB::bind_method(D_METHOD("get_memory_usage"), &ResourceDatabase::get_memory_usage);
 	ClassDB::bind_method(D_METHOD("is_preloading"), &ResourceDatabase::is_preloading);
 
-	ADD_SIGNAL(MethodInfo("preload_finished", PropertyInfo(Variant::OBJECT, "list", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), PropertyInfo(Variant::INT, "error")));
+	ADD_SIGNAL(MethodInfo("preload_finished", PropertyInfo(Variant::OBJECT, "list", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error")));
 }
 
 ResourceDatabase::ResourceDatabase() {

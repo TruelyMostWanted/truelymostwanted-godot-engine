@@ -471,8 +471,8 @@ void DisplayServer::tts_set_utterance_callback(DisplayServerEnums::TTSUtteranceE
 
 void DisplayServer::tts_post_utterance_event(DisplayServerEnums::TTSUtteranceEvent p_event, int64_t p_id, int p_pos) {
 	ERR_FAIL_INDEX(p_event, DisplayServerEnums::TTS_UTTERANCE_MAX);
-	if (TtsServer::get_singleton()) {
-		TtsServer::get_singleton()->post_utterance_event(p_event, p_id, p_pos);
+	if (TTSServer::get_singleton()) {
+		TTSServer::get_singleton()->post_utterance_event(p_event, p_id, p_pos);
 	}
 	switch (p_event) {
 		case DisplayServerEnums::TTS_UTTERANCE_STARTED:
