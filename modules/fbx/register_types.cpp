@@ -31,8 +31,10 @@
 #include "register_types.h"
 
 #include "fbx_document.h"
+#include "resource_format_fbx.h"
 
 #include "core/config/engine.h"
+#include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
 
 #include "modules/gltf/extensions/gltf_document_extension_convert_importer_mesh.h"
@@ -58,6 +60,8 @@ static void _editor_init() {
 }
 #endif // TOOLS_ENABLED
 
+static Ref<ResourceFormatLoaderFBX> resource_loader_fbx;
+
 #define FBX_REGISTER_DOCUMENT_EXTENSION(m_doc_ext_class) \
 	Ref<m_doc_ext_class> extension_##m_doc_ext_class; \
 	extension_##m_doc_ext_class.instantiate(); \
@@ -71,6 +75,10 @@ void initialize_fbx_module(ModuleInitializationLevel p_level) {
 		if (!is_editor) {
 			FBX_REGISTER_DOCUMENT_EXTENSION(GLTFDocumentExtensionConvertImporterMesh);
 		}
+
+		// ResourceLoader for `.fbx` files that are not imported (user://, kept files). No saver: ufbx is read-only.
+		resource_loader_fbx.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_fbx);
 	}
 
 #ifdef TOOLS_ENABLED
@@ -91,5 +99,7 @@ void uninitialize_fbx_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	ResourceLoader::remove_resource_format_loader(resource_loader_fbx);
+	resource_loader_fbx.unref();
 	FBXDocument::unregister_all_gltf_document_extensions();
 }

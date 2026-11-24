@@ -22,6 +22,32 @@
 		var texture = load("res://icon.svg")
 		var image = texture.get_image()
 		[/codeblock]
+		[b]Runtime loading and saving:[/b] Image files without an import (for example in [code]user://[/code], in a mod folder, at an absolute path or in a PCK as raw files) are loaded with [method ResourceLoader.load] as [ImageTexture]: PNG, JPEG (.jpg, .jpeg), WebP, BMP, TGA, SVG (at scale 1.0), OpenEXR and Radiance HDR. KTX (.ktx, .ktx2) and DDS files are loaded as textures by their own loaders. With the type hint [code]"Image"[/code], all these formats return the [Image] itself instead. The resource cache, [method ResourceLoader.load_threaded_request] and [method ResourceLoader.exists] work as for other resources. Image files under [code]res://[/code] that have a [code].import[/code] file are still loaded through their importer, unless the importer is [code]keep[/code] or [code]skip[/code].
+		[method ResourceSaver.save] writes an [ImageTexture] or an [Image] to .png, .jpg, .jpeg, .webp, .exr and .dds files. Encoder options (JPEG and WebP quality, lossy WebP, grayscale EXR) are set with an [ImageSaveOptions] attached to the resource.
+		[codeblocks]
+		[gdscript]
+		# Load an image file without import at runtime.
+		var texture = ResourceLoader.load("user://screenshots/shot.png") as ImageTexture
+		var image = ResourceLoader.load("user://screenshots/shot.png", "Image", ResourceLoader.CACHE_MODE_IGNORE) as Image
+
+		# Save it as a JPEG file with quality 0.9.
+		var options = ImageSaveOptions.new()
+		options.jpg_quality = 0.9
+		options.attach_to(texture)
+		ResourceSaver.save(texture, "user://screenshots/shot.jpg")
+		[/gdscript]
+		[csharp]
+		// Load an image file without import at runtime.
+		var texture = ResourceLoader.Load&lt;ImageTexture&gt;("user://screenshots/shot.png");
+		var image = ResourceLoader.Load&lt;Image&gt;("user://screenshots/shot.png", "Image", ResourceLoader.CacheMode.Ignore);
+
+		// Save it as a JPEG file with quality 0.9.
+		var options = new ImageSaveOptions();
+		options.JpgQuality = 0.9f;
+		options.AttachTo(texture);
+		ResourceSaver.Save(texture, "user://screenshots/shot.jpg");
+		[/csharp]
+		[/codeblocks]
 		An [ImageTexture] is not meant to be operated from within the editor interface directly, and is mostly useful for rendering images on screen dynamically via code. If you need to generate images procedurally from within the editor, consider saving and importing images as custom texture resources implementing a new [EditorImportPlugin].
 		[b]Note:[/b] The maximum texture size is 16384×16384 pixels due to graphics hardware limitations.
 	</description>

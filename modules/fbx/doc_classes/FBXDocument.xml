@@ -6,6 +6,7 @@
 	<description>
 		The FBXDocument handles FBX documents. It provides methods to append data from buffers or files, generate scenes, and register/unregister document extensions.
 		When exporting FBX from Blender, use the "FBX Units Scale" option. The "FBX Units Scale" option sets the correct scale factor and avoids manual adjustments when re-importing into Blender, such as through glTF export.
+		[b]Note:[/b] [ResourceLoader] loads [code].fbx[/code] files that are not imported by the editor (for example from [code]user://[/code]) as a [PackedScene], with the [code]filesystem/scene_formats/*[/code] project settings. Saving FBX files is not supported.
 	</description>
 	<tutorials>
 	</tutorials>

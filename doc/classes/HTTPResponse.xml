@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="HTTPResponse" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The typed result of a request sent by [HTTPRequest].
+	</brief_description>
+	<description>
+		[HTTPResponse] holds the result of one request sent by an [HTTPRequest] node: the [member result] of the transfer, the HTTP [member status_code], the response [member headers] and the [member body]. It is passed to [signal HTTPRequest.response_received] after every completed request, including requests started with [method HTTPRequest.request] and [method HTTPRequest.request_raw]. All properties are read-only.
+		[codeblocks]
+		[gdscript]
+		func _on_response_received(response: HTTPResponse):
+			if response.is_success():
+				var data = response.get_json()
+				print(data)
+			else:
+				print("Request failed: ", response.result, " ", response.status_code)
+		[/gdscript]
+		[csharp]
+		private void OnResponseReceived(HttpResponse response)
+		{
+			if (response.IsSuccess())
+			{
+				Variant data = response.GetJson();
+				GD.Print(data);
+			}
+			else
+			{
+				GD.Print("Request failed: ", response.Result, " ", response.StatusCode);
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_header" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="default" type="String" default="&quot;&quot;" />
+			<description>
+				Returns the value of the response header [param name], compared without case, or [param default] if the response has no such header.
+			</description>
+		</method>
+		<method name="get_json" qualifiers="const">
+			<return type="Variant" />
+			<description>
+				Parses the [member body] as JSON and returns the result, or [code]null[/code] if the body is empty or not valid JSON. No error is printed for a body that is not JSON.
+			</description>
+		</method>
+		<method name="get_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the [member body] decoded as UTF-8 text.
+			</description>
+		</method>
+		<method name="is_success" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [member result] is [constant HTTPRequest.RESULT_SUCCESS] and [member status_code] is between [code]200[/code] and [code]299[/code].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="body" type="PackedByteArray" setter="" getter="get_body">
+			The response body. It is already decompressed if the server sent it compressed. It is empty if [member HTTPRequest.download_file] was set.
+		</member>
+		<member name="headers" type="Dictionary" setter="" getter="get_headers">
+			The response headers as lower-case names mapped to values. Values of repeated headers are joined with [code]", "[/code]. See [member raw_headers] for the unchanged lines.
+		</member>
+		<member name="raw_headers" type="PackedStringArray" setter="" getter="get_raw_headers">
+			The response header lines as received, as in [signal HTTPRequest.request_completed].
+		</member>
+		<member name="result" type="int" setter="" getter="get_result" enum="HTTPRequest.Result">
+			The result of the transfer. Only [constant HTTPRequest.RESULT_SUCCESS] means that a response arrived; the other values describe why the request failed.
+		</member>
+		<member name="status_code" type="int" setter="" getter="get_status_code">
+			The HTTP status code of the response, for example [code]200[/code] or [code]404[/code]. It is [code]0[/code] if no response arrived.
+		</member>
+		<member name="target" type="HTTPRequestTarget" setter="" getter="get_target">
+			The [HTTPRequestTarget] that was sent with [method HTTPRequest.request_target], or [code]null[/code] for requests started with [method HTTPRequest.request] or [method HTTPRequest.request_raw].
+		</member>
+	</members>
+</class>
