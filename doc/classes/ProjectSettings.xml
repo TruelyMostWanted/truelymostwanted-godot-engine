@@ -3742,11 +3742,11 @@
 		<member name="settings/paths/engine_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"engine"[/code] settings domain ([EngineSettingsServer]), for example [code]user://settings/engine.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/engine.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
+		<member name="settings/paths/input_map_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"input_map"[/code] settings domain ([InputMapSettingsServer]), for example [code]user://settings/input_map.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/input_map.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
 		<member name="settings/paths/input_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"input"[/code] settings domain ([InputSettingsServer]), for example [code]user://settings/input.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/input.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
-		</member>
-		<member name="settings/paths/key_bindings_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
-			The file of the [code]"key_bindings"[/code] settings domain ([KeyBindingSettingsServer]), for example [code]user://settings/key_bindings.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/key_bindings.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
 		<member name="settings/paths/language_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"language"[/code] settings domain ([LanguageSettingsServer]), for example [code]user://settings/language.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/language.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
