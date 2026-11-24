@@ -284,7 +284,8 @@ StringName TTSPersonaSettingsServer::get_default_persona() const {
 PackedStringArray TTSPersonaSettingsServer::get_missing_voice_personas() const {
 	PackedStringArray names;
 	const TypedArray<Resource> entries = get_entries();
-	for (const int index : _find_missing_voices(entries)) {
+	const PackedInt32Array missing = _find_missing_voices(entries);
+	for (const int index : missing) {
 		const Ref<TTSPersonaSettings> entry = entries[index];
 		names.push_back(entry->get_persona_name());
 	}
