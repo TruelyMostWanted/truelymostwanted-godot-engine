@@ -214,14 +214,9 @@ TEST_CASE("[XML] Errors with line numbers") {
 	CHECK(xml->get_data().is_empty());
 
 	// Trailing whitespace after the root is not a second root.
-	CHECK(xml->parse("<a/>
-
-") == OK);
-	CHECK(xml->parse("<a/>
-") == OK);
-	CHECK(xml->parse("<a>x</a>
-
-") == OK);
+	CHECK(xml->parse("<a/>\n\n") == OK);
+	CHECK(xml->parse("<a/>\r\n") == OK);
+	CHECK(xml->parse("<a>x</a>\n \n") == OK);
 	CHECK(Dictionary(xml->get_data())["text"] == "x");
 
 	Dictionary invalid;
