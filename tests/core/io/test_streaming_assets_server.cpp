@@ -279,7 +279,7 @@ TEST_CASE("[StreamingAssetsServer] Command line override") {
 	ERR_PRINT_OFF;
 	server->configure(config);
 	ERR_PRINT_ON;
-	CHECK(server->get_location() == Server::LOCATION_EMBEDDED);
+	CHECK(server->get_location() == Server::LOCATION_SOURCE_FOLDER); // A missing override falls back to the source folder.
 	_reset();
 }
 

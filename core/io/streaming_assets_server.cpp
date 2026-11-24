@@ -306,6 +306,11 @@ void StreamingAssetsServer::configure(const Configuration &p_config) {
 			new_root = _strip_trailing_slash(p_config.override_folder);
 		} else {
 			errors.push_back(vformat("The streaming assets folder \"%s\" given on the command line does not exist.", p_config.override_folder));
+			if (p_config.from_source) {
+				// Running from the project: fall back to the source folder.
+				new_location = LOCATION_SOURCE_FOLDER;
+				new_root = new_source_folder;
+			}
 		}
 	} else if (p_config.from_source) {
 		new_location = LOCATION_SOURCE_FOLDER;
