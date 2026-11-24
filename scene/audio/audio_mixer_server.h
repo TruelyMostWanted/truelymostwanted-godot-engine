@@ -37,6 +37,9 @@
 #include "scene/resources/audio/audio_mixer_layout.h"
 #include "scene/resources/audio/audio_stream.h"
 
+class AudioCommand;
+class AudioCommandList;
+class AudioCommandRegistry;
 class AudioServer;
 
 // Global audio channels (music, ambience, voice, ...) that live outside the scene tree.
@@ -120,6 +123,7 @@ private:
 	AudioServer *callback_server = nullptr;
 	uint64_t last_tick_usec = 0;
 	bool default_layout_checked = false;
+	AudioCommandRegistry *command_registry = nullptr; // Data-driven commands, see scene/audio/audio_command.h.
 
 	static void _update_callback(void *p_self);
 	void _ensure_callback();
@@ -164,7 +168,7 @@ public:
 	static AudioMixerServer *get_singleton();
 
 	// Channels.
-	void load_layout(const Ref<AudioMixerLayout> &p_layout);
+	void apply_layout(const Ref<AudioMixerLayout> &p_layout);
 	void add_channel(const Ref<AudioMixerChannel> &p_channel);
 	void remove_channel(const StringName &p_channel);
 	bool has_channel(const StringName &p_channel) const;
@@ -189,10 +193,10 @@ public:
 	void dequeue(const StringName &p_channel, int p_index = -1);
 	void clear_queue(const StringName &p_channel);
 	PackedStringArray get_queue(const StringName &p_channel) const;
-	void change_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
-	void next(const StringName &p_channel, float p_fade_time = -1.0f);
-	void previous(const StringName &p_channel, float p_fade_time = -1.0f);
-	int get_index(const StringName &p_channel) const;
+	void set_queue_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
+	void play_next(const StringName &p_channel, float p_fade_time = -1.0f);
+	void play_previous(const StringName &p_channel, float p_fade_time = -1.0f);
+	int get_queue_index(const StringName &p_channel) const;
 
 	// Mixing.
 	void fade_in(const StringName &p_channel, float p_time, FadeCurve p_curve = FADE_CURVE_LINEAR);
@@ -204,8 +208,18 @@ public:
 	float get_channel_volume_db(const StringName &p_channel) const;
 	void set_channel_pitch_scale(const StringName &p_channel, float p_pitch_scale);
 	float get_channel_pitch_scale(const StringName &p_channel) const;
-	void switch_clip(const StringName &p_channel, const StringName &p_clip);
+	void switch_to_clip(const StringName &p_channel, const StringName &p_clip);
 	Ref<AudioStreamPlayback> get_channel_playback(const StringName &p_channel) const;
+
+	// Commands (AudioCommand, AudioCommandList), implemented by AudioCommandRegistry.
+	Error execute(const Ref<AudioCommand> &p_command);
+	Error execute_list(const Ref<AudioCommandList> &p_list);
+	Error register_commands(const Ref<AudioCommandList> &p_list);
+	void unregister_commands(const Ref<AudioCommandList> &p_list);
+	bool has_command(const StringName &p_name) const;
+	Error execute_named(const StringName &p_name);
+	Error execute_group(const StringName &p_group);
+	PackedStringArray get_command_names() const;
 
 	// C++ only: advances fades, end-of-stream detection and queues by p_delta seconds.
 	// Called every frame from AudioServer::update(); unit tests call it directly.

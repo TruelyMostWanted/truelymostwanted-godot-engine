@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		[AudioMixerServer] plays audio on named channels (for example [code]music[/code], [code]ambience[/code], [code]voice[/code] and [code]sfx[/code]) without nodes, so music keeps playing across [method SceneTree.change_scene_to_file] and the pause menu. Each channel is defined by an [AudioMixerChannel], plays on an existing audio bus, has a queue of streams with a cursor, and supports fades, cross-fades and overlapping one-shots.
-		Channels come from the [AudioMixerLayout] set in the project setting [code]audio/mixer/default_layout[/code] (loaded on first use), from [method load_layout] or from [method add_channel].
+		Channels come from the [AudioMixerLayout] set in the project setting [code]audio/mixer/default_layout[/code] (loaded on first use), from [method apply_layout] or from [method add_channel].
 		Streams can be given as an [AudioStream] or as a path. Queue entries given as a path are loaded when they start and released when they no longer play, so only the current entry (and, with [member AudioMixerChannel.preload_next], the next one) is kept in memory.
 		The volume of a voice is its fade gain (see [method get_fade_gain]) times the channel volume (see [method set_channel_volume_db]) times the volume of its bus. The mixer never changes buses or bus volumes.
 		[codeblocks]
@@ -24,7 +24,7 @@
 			AudioMixerServer.play(&amp;"music")
 
 		func _on_level_started():
-			AudioMixerServer.next(&amp;"music") # Cross-fades for 2 seconds.
+			AudioMixerServer.play_next(&amp;"music") # Cross-fades for 2 seconds.
 
 		func _on_channel_started(channel, index, stream_path):
 			print("%s plays entry %d: %s" % [channel, index, stream_path])
@@ -47,7 +47,7 @@
 
 		private void OnLevelStarted()
 		{
-			AudioMixerServer.Next("music"); // Cross-fades for 2 seconds.
+			AudioMixerServer.PlayNext("music"); // Cross-fades for 2 seconds.
 		}
 
 		private void OnChannelStarted(StringName channel, long index, string streamPath)
@@ -56,6 +56,7 @@
 		}
 		[/csharp]
 		[/codeblocks]
+		Channels can also be controlled by data: an [AudioCommand] describes one action (play, stop, toggle, fade, enqueue, ...), an [AudioCommandList] holds many and saves as [code].tres[/code], JSON, INI or CSV. [method execute] runs a command; [method register_commands] makes the commands of a list callable by name ([method execute_named]) and by group ([method execute_group]). The project setting [code]audio/mixer/default_commands[/code] registers a list at startup.
 		[b]Note:[/b] All methods must be called on the main thread, like the playback API of [AudioServer] that the mixer uses. Signals are emitted on the main thread.
 		[b]Note:[/b] The mixer updates fades, detects the end of streams and advances queues once per frame, when the [AudioServer] updates on the main thread (also while the [SceneTree] is paused). The next queue entry therefore starts up to one frame after the previous one ended. For gapless sequences, put an [AudioStreamPlaylist] into one queue entry.
 		[b]Note:[/b] On the Web, streams play as samples by default (project setting [code]audio/general/default_playback_type.web[/code]). Fades work for samples too; browsers start audio only after the first user input.
@@ -70,13 +71,11 @@
 				Adds [param channel] under its [member AudioMixerChannel.channel_name]. If a channel with that name exists, its definition is replaced; its voices keep playing with the new volume and pitch, and its queue is kept.
 			</description>
 		</method>
-		<method name="change_index">
+		<method name="apply_layout">
 			<return type="void" />
-			<param index="0" name="channel" type="StringName" />
-			<param index="1" name="index" type="int" />
-			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<param index="0" name="layout" type="AudioMixerLayout" />
 			<description>
-				Moves the queue cursor of [param channel] to [param index]. If the channel is playing, it cross-fades (with [constant FADE_CURVE_EQUAL_POWER]) to that entry over [param fade_time] seconds; a negative [param fade_time] uses [member AudioMixerChannel.default_fade_time], [code]0.0[/code] switches at once. If the channel is not playing, only the cursor moves and [method play] starts there.
+				Stops and removes all channels, then adds the channels of [param layout].
 			</description>
 		</method>
 		<method name="clear_queue">
@@ -101,7 +100,7 @@
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="index" type="int" default="-1" />
 			<description>
-				Removes the queue entry at [param index] of [param channel], or the last entry if [param index] is negative. If the removed entry is the current one, it keeps playing, and the cursor moves to the entry before it, so [method next] plays the entry that followed.
+				Removes the queue entry at [param index] of [param channel], or the last entry if [param index] is negative. If the removed entry is the current one, it keeps playing, and the cursor moves to the entry before it, so [method play_next] plays the entry that followed.
 			</description>
 		</method>
 		<method name="enqueue">
@@ -111,6 +110,50 @@
 			<param index="2" name="at" type="int" default="-1" />
 			<description>
 				Adds [param stream] (an [AudioStream] or a path) to the queue of [param channel], at position [param at] or at the end if [param at] is negative or past the end. A path is not loaded until the entry plays.
+			</description>
+		</method>
+		<method name="execute">
+			<return type="int" enum="Error" />
+			<param index="0" name="command" type="AudioCommand" />
+			<description>
+				Runs [param command] on its channel and returns [constant OK], then emits [signal command_executed]. [method execute] calls the same methods as code does ([method play], [method stop], [method enqueue], [method cross_fade], ...); see [enum AudioCommand.Command] for which properties each command uses.
+				A command that cannot run changes nothing, prints one error that names the command, and returns an error code: [constant ERR_INVALID_PARAMETER] (no channel, missing [member AudioCommand.stream_path] or [member AudioCommand.clip_name], pitch scale not above [code]0[/code]), [constant ERR_DOES_NOT_EXIST] (unknown channel, nothing to play), [constant ERR_FILE_NOT_FOUND] (the stream file does not exist), [constant ERR_FILE_UNRECOGNIZED] (the file is not an [AudioStream]), [constant ERR_PARAMETER_RANGE_ERROR] (no queue entry at [member AudioCommand.queue_index]) or [constant ERR_UNAVAILABLE] (the channel is not playing, or its stream is not an [AudioStreamInteractive]). Other channels are not affected.
+				A stream is loaded on first use through the resource cache: it stays in memory while it plays (or while an [AudioCommandList] keeps it with [method AudioCommandList.preload_streams]) and is freed afterwards.
+			</description>
+		</method>
+		<method name="execute_group">
+			<return type="int" enum="Error" />
+			<param index="0" name="group" type="StringName" />
+			<description>
+				Runs all registered commands whose [member AudioCommand.group] is [param group], in the order they were registered, for example all ambience commands of a forest. Every command runs even if one fails; returns the first error, or [constant ERR_DOES_NOT_EXIST] if no registered command has that group.
+			</description>
+		</method>
+		<method name="execute_list">
+			<return type="int" enum="Error" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Runs all commands of [param list] in order, without registering them. Every command runs even if one fails; returns the first error.
+			</description>
+		</method>
+		<method name="execute_named">
+			<return type="int" enum="Error" />
+			<param index="0" name="command_name" type="StringName" />
+			<description>
+				Runs the registered command named [param command_name] (see [method register_commands]). Returns [constant ERR_DOES_NOT_EXIST] and prints an error if no command has that name.
+				[codeblocks]
+				[gdscript]
+				# A soundboard button: one TOGGLE command per button.
+				func _on_pad_pressed(pad_name):
+					AudioMixerServer.execute_named(pad_name)
+				[/gdscript]
+				[csharp]
+				// A soundboard button: one Toggle command per button.
+				private void OnPadPressed(StringName padName)
+				{
+					AudioMixerServer.ExecuteNamed(padName);
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="fade_in">
@@ -165,18 +208,17 @@
 				Returns the current volume of [param channel] in decibels, including the progress of a volume fade started with [method set_channel_volume_db].
 			</description>
 		</method>
+		<method name="get_command_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all registered commands, in the order they were registered. Commands without a name are registered too (for [method execute_group]) but are not listed.
+			</description>
+		</method>
 		<method name="get_fade_gain" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="channel" type="StringName" />
 			<description>
 				Returns the fade gain of the current voice of [param channel], from [code]0.0[/code] (silent) to [code]1.0[/code] (full volume), or [code]0.0[/code] if it is not playing.
-			</description>
-		</method>
-		<method name="get_index" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="channel" type="StringName" />
-			<description>
-				Returns the queue cursor of [param channel]: the index of the current or last played entry, or [code]-1[/code] if no entry has played yet.
 			</description>
 		</method>
 		<method name="get_playback_position" qualifiers="const">
@@ -193,6 +235,13 @@
 				Returns the paths of the queue entries of [param channel]. Entries added as an [AudioStream] without a path are returned as empty strings.
 			</description>
 		</method>
+		<method name="get_queue_index" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the queue cursor of [param channel]: the index of the current or last played entry, or [code]-1[/code] if no entry has played yet.
+			</description>
+		</method>
 		<method name="get_voice_count" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="channel" type="StringName" />
@@ -205,6 +254,13 @@
 			<param index="0" name="channel" type="StringName" />
 			<description>
 				Returns [code]true[/code] if a channel named [param channel] exists.
+			</description>
+		</method>
+		<method name="has_command" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="command_name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a command named [param command_name] is registered.
 			</description>
 		</method>
 		<method name="is_fading" qualifiers="const">
@@ -228,21 +284,6 @@
 				Returns [code]true[/code] if [param channel] has a current voice, also while it is paused. Voices that fade out and one-shots do not count.
 			</description>
 		</method>
-		<method name="load_layout">
-			<return type="void" />
-			<param index="0" name="layout" type="AudioMixerLayout" />
-			<description>
-				Stops and removes all channels, then adds the channels of [param layout].
-			</description>
-		</method>
-		<method name="next">
-			<return type="void" />
-			<param index="0" name="channel" type="StringName" />
-			<param index="1" name="fade_time" type="float" default="-1.0" />
-			<description>
-				Moves to the next queue entry of [param channel] like [method change_index]. At the last entry, it starts again at the first one in [constant AudioMixerChannel.QUEUE_MODE_LOOP_QUEUE], picks a random other entry in [constant AudioMixerChannel.QUEUE_MODE_SHUFFLE], and does nothing in [constant AudioMixerChannel.QUEUE_MODE_STOP].
-			</description>
-		</method>
 		<method name="pause">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -259,6 +300,14 @@
 				Plays on [param channel] from [param from_position] seconds and stops the voices playing there. If [param stream] is [code]null[/code], plays the queue entry at the cursor (or the first entry); otherwise plays [param stream] (an [AudioStream] or a path) directly, without changing the queue. Resumes a paused channel. Emits [signal channel_started].
 			</description>
 		</method>
+		<method name="play_next">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Moves to the next queue entry of [param channel] like [method set_queue_index]. At the last entry, it starts again at the first one in [constant AudioMixerChannel.QUEUE_MODE_LOOP_QUEUE], picks a random other entry in [constant AudioMixerChannel.QUEUE_MODE_SHUFFLE], and does nothing in [constant AudioMixerChannel.QUEUE_MODE_STOP].
+			</description>
+		</method>
 		<method name="play_one_shot">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -266,15 +315,33 @@
 			<param index="2" name="volume_db" type="float" default="0.0" />
 			<param index="3" name="pitch_scale" type="float" default="1.0" />
 			<description>
-				Plays [param stream] (an [AudioStream] or a path) once on [param channel], next to the current voice, with an extra volume and pitch. At most [member AudioMixerChannel.polyphony] one-shots play at a time; the oldest one is stopped when another starts. One-shots emit no signals.
+				Plays [param stream] (an [AudioStream] or a path) once on [param channel], next to the current voice, with an extra volume and pitch. At most [member AudioMixerChannel.max_polyphony] one-shots play at a time; the oldest one is stopped when another starts. One-shots emit no signals.
 			</description>
 		</method>
-		<method name="previous">
+		<method name="play_previous">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="fade_time" type="float" default="-1.0" />
 			<description>
-				Moves to the previous queue entry of [param channel] like [method change_index]. At the first entry, it moves to the last one, except in [constant AudioMixerChannel.QUEUE_MODE_STOP], where it does nothing.
+				Moves to the previous queue entry of [param channel] like [method set_queue_index]. At the first entry, it moves to the last one, except in [constant AudioMixerChannel.QUEUE_MODE_STOP], where it does nothing.
+			</description>
+		</method>
+		<method name="register_commands">
+			<return type="int" enum="Error" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Registers the commands of [param list], so they can run by name with [method execute_named] and by group with [method execute_group]. The commands are kept by reference: later changes to a command take effect, but a changed [member AudioCommand.command_name] needs a new registration. If a name is already registered by another command, the new command replaces it and a warning is printed (so a later list, for example a mod, can override a command on purpose).
+				A CSV file has no type of its own, so load it with the type hint [code]"AudioCommandList"[/code]:
+				[codeblocks]
+				[gdscript]
+				var board = ResourceLoader.load("user://soundboard.csv", "AudioCommandList")
+				AudioMixerServer.register_commands(board)
+				[/gdscript]
+				[csharp]
+				var board = ResourceLoader.Load&lt;AudioCommandList&gt;("user://soundboard.csv", "AudioCommandList");
+				AudioMixerServer.RegisterCommands(board);
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="remove_channel">
@@ -316,6 +383,15 @@
 				Sets the volume of [param channel] in decibels, at once or, if [param fade_time] is greater than [code]0.0[/code], linearly in decibels over [param fade_time] seconds. Emits [signal fade_finished] when a fade ends. The volume of the bus is not changed.
 			</description>
 		</method>
+		<method name="set_queue_index">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="index" type="int" />
+			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Moves the queue cursor of [param channel] to [param index]. If the channel is playing, it cross-fades (with [constant FADE_CURVE_EQUAL_POWER]) to that entry over [param fade_time] seconds; a negative [param fade_time] uses [member AudioMixerChannel.default_fade_time], [code]0.0[/code] switches at once. If the channel is not playing, only the cursor moves and [method play] starts there.
+			</description>
+		</method>
 		<method name="stop">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -331,12 +407,19 @@
 				Calls [method stop] on all channels.
 			</description>
 		</method>
-		<method name="switch_clip">
+		<method name="switch_to_clip">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="clip" type="StringName" />
 			<description>
 				Switches the current voice of [param channel] to the clip named [param clip], if the voice plays an [AudioStreamInteractive] (module [code]interactive_music[/code]). Prints an error for other streams.
+			</description>
+		</method>
+		<method name="unregister_commands">
+			<return type="void" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Removes the commands of [param list] from the registered commands. A name that another list registered later stays registered; a name that this list had replaced is not restored.
 			</description>
 		</method>
 	</methods>
@@ -354,6 +437,13 @@
 			<param index="2" name="stream_path" type="String" />
 			<description>
 				Emitted when a new current voice starts on [param channel], by a call or by the queue. [param index] is the queue index, or [code]-1[/code] if the stream was played directly. [param stream_path] is empty for streams without a path.
+			</description>
+		</signal>
+		<signal name="command_executed">
+			<param index="0" name="command_name" type="StringName" />
+			<param index="1" name="command" type="AudioCommand" />
+			<description>
+				Emitted after [param command] ran successfully through [method execute], [method execute_list], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
 			</description>
 		</signal>
 		<signal name="fade_finished">

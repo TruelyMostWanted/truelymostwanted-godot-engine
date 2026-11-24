@@ -50,6 +50,7 @@
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
 #include "core/io/files_manifest_server.h"
+#include "core/io/files_manifest_validation.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
@@ -76,6 +77,7 @@
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
+#include "core/io/serializer_options.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
 #include "core/io/streaming_assets_server.h"
@@ -350,6 +352,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(RandomNumberGenerator);
 	GDREGISTER_ABSTRACT_CLASS(SeedServer);
 	seed_server = memnew(SeedServer);
+	GDREGISTER_CLASS(SerializerOptions);
 	GDREGISTER_ABSTRACT_CLASS(ResourceTextSerializer);
 	_resource_text_serializer = memnew(ResourceTextSerializer);
 #ifndef DISABLE_DEPRECATED
@@ -391,6 +394,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(FilesManifestValidation);
 	GDREGISTER_CLASS(PckExtractResult);
 	GDREGISTER_CLASS(PckPackage);
 	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);

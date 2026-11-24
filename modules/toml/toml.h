@@ -70,6 +70,6 @@ public:
 
 	static Dictionary parse_string(const String &p_text);
 	static String stringify(const Dictionary &p_data);
-	static String serialize(const Ref<Resource> &p_resource, const Dictionary &p_options = Dictionary());
-	static Ref<Resource> deserialize(const String &p_text, const String &p_type_hint = String());
+	static String serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+	static Ref<Resource> deserialize(const String &p_text, const StringName &p_type_hint = StringName(), const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 };
