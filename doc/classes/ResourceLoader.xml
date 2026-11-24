@@ -7,6 +7,7 @@
 		A singleton used to load resource files from the filesystem.
 		It uses the many [ResourceFormatLoader] classes registered in the engine (either built-in or from a plugin) to load files into memory and convert them to a format that can be used by the engine.
 		[b]Note:[/b] You have to import the files into the engine first to load them using [method load]. If you want to load [Image]s at run-time, you may use [method Image.load]. If you want to import audio files, you can use the snippet described in [member AudioStreamMP3.data].
+		[b]Note:[/b] [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported (for example in [code]user://[/code], or kept with the "Keep File" import mode) load as a [PackedScene] without an import step, using the [code]filesystem/scene_formats/*[/code] project settings. Imported files keep loading as imported scenes.
 		[b]Note:[/b] Non-resource files such as plain text files cannot be read using [ResourceLoader]. Use [FileAccess] for those files instead, and be aware that non-resource files are not exported by default (see notes in the [FileAccess] class description for instructions on exporting them).
 	</description>
 	<tutorials>

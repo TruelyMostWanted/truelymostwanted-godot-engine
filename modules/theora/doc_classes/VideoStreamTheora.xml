@@ -6,6 +6,20 @@
 	<description>
 		[VideoStream] resource handling the [url=https://www.theora.org/]Ogg Theora[/url] video format with [code].ogv[/code] extension. The Theora codec is decoded on the CPU.
 		[b]Note:[/b] While Ogg Theora videos can also have a [code].ogg[/code] extension, you will have to rename the extension to [code].ogv[/code] to use those videos within Godot.
+		[b]Runtime loading:[/b] [code].ogv[/code] files are not imported. [method ResourceLoader.load] returns a [VideoStreamTheora] for any [code].ogv[/code] path, also outside the project (for example in [code]user://[/code], in a mod folder, at an absolute path or in a PCK), with the resource cache, [method ResourceLoader.load_threaded_request] and [method ResourceLoader.exists]. The resource only stores the path in [member VideoStream.file]: each playback opens the file and streams it, so the video is never held in memory as a whole, and the file must stay in place while it plays. Loading checks only that the file is an Ogg file; the Theora headers are read when playback starts. If an editor import plugin imports [code].ogv[/code] files (a [code].import[/code] file next to the video), those files are loaded through their importer, unless the import mode is "Keep File" or "Skip File".
+		[b]Note:[/b] [method ResourceSaver.save] cannot write [code].ogv[/code] files, because the engine has no Theora encoder at runtime (Movie Maker mode records [code].ogv[/code] files in the editor only).
+		[codeblocks]
+		[gdscript]
+		var video = ResourceLoader.load("user://videos/intro.ogv") as VideoStreamTheora
+		$VideoStreamPlayer.stream = video
+		$VideoStreamPlayer.play()
+		[/gdscript]
+		[csharp]
+		var video = ResourceLoader.Load&lt;VideoStreamTheora&gt;("user://videos/intro.ogv");
+		GetNode&lt;VideoStreamPlayer&gt;("VideoStreamPlayer").Stream = video;
+		GetNode&lt;VideoStreamPlayer&gt;("VideoStreamPlayer").Play();
+		[/csharp]
+		[/codeblocks]
 	</description>
 	<tutorials>
 	</tutorials>
