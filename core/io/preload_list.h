@@ -36,7 +36,7 @@
 #include "core/variant/typed_dictionary.h"
 
 // Names resources to keep in memory: direct references, paths and manifests, plus optional
-// keys (key -> path). `ResourceDatabase.preload_list()` loads them once and holds them.
+// keys (key -> path). `ResourceDatabase.preload_from_list()` loads them once and holds them.
 // All properties are stored, so a list can be saved as `.tres` and named in the project
 // setting `filesystem/resources/preload_lists`.
 class PreloadList : public Resource {

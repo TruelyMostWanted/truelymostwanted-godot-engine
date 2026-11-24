@@ -4,7 +4,7 @@
 		A resource that names resources to load once and keep in memory.
 	</brief_description>
 	<description>
-		A [PreloadList] names resources for [ResourceDatabase]: direct references ([member resources]), paths ([member paths]) and file manifests ([member manifests]), plus optional keys ([member keys]). Hand it to [method ResourceDatabase.preload_list], or save it as a resource and add its path to [member ProjectSettings.filesystem/resources/preload_lists] to preload it at startup.
+		A [PreloadList] names resources for [ResourceDatabase]: direct references ([member resources]), paths ([member paths]) and file manifests ([member manifests]), plus optional keys ([member keys]). Hand it to [method ResourceDatabase.preload_from_list], or save it as a resource and add its path to [member ProjectSettings.filesystem/resources/preload_lists] to preload it at startup.
 		[codeblocks]
 		[gdscript]
 		var list := PreloadList.new()
@@ -32,7 +32,7 @@
 	</methods>
 	<members>
 		<member name="keys" type="Dictionary[String, String]" setter="set_keys" getter="get_keys" default="{}">
-			Extra names for the preloaded resources: keys as keys, paths as values. A key can be used instead of the path in [method ResourceDatabase.get_resource] and matches patterns in [method ResourceDatabase.select]. Keys that are not paths are only known to [ResourceDatabase], not to [method ResourceLoader.load].
+			Extra names for the preloaded resources: keys as keys, paths as values. A key can be used instead of the path in [method ResourceDatabase.get_resource] and matches patterns in [method ResourceDatabase.find_resources]. Keys that are not paths are only known to [ResourceDatabase], not to [method ResourceLoader.load].
 		</member>
 		<member name="manifests" type="FilesManifest[]" setter="set_manifests" getter="get_manifests" default="[]">
 			File manifests whose files are preloaded. Their [member FilesManifest.type_hint] is used as the type hint when it is a native class.
