@@ -130,7 +130,7 @@ static Key _text_to_key(const String &p_text) {
 	}
 	Key key = find_keycode(p_text);
 	if (key == Key::NONE && p_text.length() == 1) {
-		key = static_cast<Key>(p_text.to_upper()[0]);
+		key = static_cast<Key>(char32_t(p_text.to_upper()[0]));
 	}
 	return key & KeyModifierMask::CODE_MASK;
 }
