@@ -175,9 +175,9 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	REQUIRE(serializer != nullptr);
 	const Ref<AudioCommandList> list = make_mixed_list();
-	CHECK(serializer->can_save_as_csv(list));
+	CHECK(serializer->can_serialize(list, ResourceTextSerializer::FORMAT_CSV));
 
-	const String csv = serializer->serialize(list, "csv");
+	const String csv = serializer->serialize(list, ResourceTextSerializer::FORMAT_CSV);
 	// One header row and one row per command; enums appear as names.
 	CHECK(csv.strip_edges().split("\n").size() == 7);
 	CHECK(csv.contains("Toggle"));
@@ -185,8 +185,8 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 	CHECK(csv.contains("Equal Power"));
 	CHECK(csv.contains("res://ambience/forest.ogg"));
 
-	const char *formats[] = { "csv", "json", "ini", "xml" };
-	for (const char *format : formats) {
+	const ResourceTextSerializer::Format formats[] = { ResourceTextSerializer::FORMAT_CSV, ResourceTextSerializer::FORMAT_JSON, ResourceTextSerializer::FORMAT_INI, ResourceTextSerializer::FORMAT_XML };
+	for (const ResourceTextSerializer::Format format : formats) {
 		CAPTURE(format);
 		const String text = serializer->serialize(list, format);
 		REQUIRE_FALSE(text.is_empty());
@@ -211,7 +211,7 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 	}
 
 	SUBCASE("Numbers load as well as names") {
-		const Ref<AudioCommandList> numeric = serializer->deserialize("command_name,command,channel,loop_mode\npad,4,board,-1\nbed,Fade In,ambience,1\n", "csv", "AudioCommandList");
+		const Ref<AudioCommandList> numeric = serializer->deserialize("command_name,command,channel,loop_mode\npad,4,board,-1\nbed,Fade In,ambience,1\n", ResourceTextSerializer::FORMAT_CSV, "AudioCommandList");
 		REQUIRE(numeric.is_valid());
 		REQUIRE(numeric->get_commands().size() == 2);
 		const Ref<AudioCommand> pad = numeric->find_command("pad");
