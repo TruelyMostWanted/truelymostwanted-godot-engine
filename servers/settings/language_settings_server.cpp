@@ -35,6 +35,7 @@
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/string/translation_server.h"
+#include "main/main.h"
 #include "scene/main/scene_tree.h"
 #include "servers/settings/language_settings.h"
 #include "servers/settings/settings_server_manager.h"
@@ -65,14 +66,8 @@ String LanguageSettingsServer::get_project_locale() {
 }
 
 String LanguageSettingsServer::get_command_line_locale() {
-	// The same arguments as Main::setup(); `--language` is applied there before this domain starts.
-	const List<String> args = OS::get_singleton()->get_cmdline_args();
-	for (const List<String>::Element *E = args.front(); E != nullptr; E = E->next()) {
-		if ((E->get() == "-l" || E->get() == "--language") && E->next() != nullptr) {
-			return E->next()->get().strip_edges();
-		}
-	}
-	return String();
+	// Main::setup() consumes `--language`/`-l`, so it is not in OS::get_cmdline_args().
+	return Main::get_locale_override().strip_edges();
 }
 
 PackedStringArray LanguageSettingsServer::get_available_locales() {
