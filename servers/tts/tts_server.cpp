@@ -100,12 +100,30 @@ String TTSServer::_get_unavailable_reason() const {
 	return String();
 }
 
+// The player's override first, then the persona of the game.
+Ref<TTSPersona> TTSServer::_get_persona_locked(const StringName &p_name) const {
+	const Ref<TTSPersona> *persona = persona_overrides.getptr(p_name);
+	if (persona == nullptr) {
+		persona = personas.getptr(p_name);
+	}
+	return persona != nullptr ? *persona : Ref<TTSPersona>();
+}
+
+// The player's default persona if it exists, then the default persona of the game.
+StringName TTSServer::_get_default_persona_name_locked() const {
+	if (!default_persona_override.is_empty() && (persona_overrides.has(default_persona_override) || personas.has(default_persona_override))) {
+		return default_persona_override;
+	}
+	if (!default_persona_name.is_empty() && (persona_overrides.has(default_persona_name) || personas.has(default_persona_name))) {
+		return default_persona_name;
+	}
+	return StringName();
+}
+
 Ref<TTSPersona> TTSServer::_get_default_persona_locked() const {
-	if (!default_persona_name.is_empty()) {
-		const Ref<TTSPersona> *persona = personas.getptr(default_persona_name);
-		if (persona != nullptr) {
-			return *persona;
-		}
+	const StringName persona_key = _get_default_persona_name_locked();
+	if (!persona_key.is_empty()) {
+		return _get_persona_locked(persona_key);
 	}
 	if (builtin_persona.is_null()) {
 		builtin_persona.instantiate();
@@ -172,6 +190,18 @@ int64_t TTSServer::speak(const String &p_text, const Ref<TTSPersona> &p_persona)
 	return id;
 }
 
+int64_t TTSServer::speak_with_persona(const String &p_text, const StringName &p_persona_name) {
+	Ref<TTSPersona> persona;
+	{
+		MutexLock lock(mutex);
+		persona = _get_persona_locked(p_persona_name);
+	}
+	if (persona.is_null() && !p_persona_name.is_empty()) {
+		WARN_PRINT(vformat("TTSServer: no persona named \"%s\"; the default persona is used.", p_persona_name));
+	}
+	return speak(p_text, persona);
+}
+
 void TTSServer::stop() {
 	{
 		MutexLock lock(mutex);
@@ -236,23 +266,25 @@ void TTSServer::remove_persona(const StringName &p_name) {
 
 bool TTSServer::has_persona(const StringName &p_name) const {
 	MutexLock lock(mutex);
-	return personas.has(p_name);
+	return persona_overrides.has(p_name) || personas.has(p_name);
 }
 
 Ref<TTSPersona> TTSServer::get_persona(const StringName &p_name) const {
 	MutexLock lock(mutex);
-	const Ref<TTSPersona> *persona = personas.getptr(p_name);
-	if (persona == nullptr) {
-		return Ref<TTSPersona>();
-	}
-	return *persona;
+	return _get_persona_locked(p_name);
 }
 
 TypedArray<TTSPersona> TTSServer::get_personas() const {
 	MutexLock lock(mutex);
 	TypedArray<TTSPersona> list;
 	for (const KeyValue<StringName, Ref<TTSPersona>> &E : personas) {
-		list.push_back(E.value);
+		list.push_back(_get_persona_locked(E.key));
+	}
+	// Personas the player created follow the personas of the game.
+	for (const KeyValue<StringName, Ref<TTSPersona>> &E : persona_overrides) {
+		if (!personas.has(E.key)) {
+			list.push_back(E.value);
+		}
 	}
 	return list;
 }
@@ -262,6 +294,11 @@ PackedStringArray TTSServer::get_persona_names() const {
 	PackedStringArray names;
 	for (const KeyValue<StringName, Ref<TTSPersona>> &E : personas) {
 		names.push_back(E.key);
+	}
+	for (const KeyValue<StringName, Ref<TTSPersona>> &E : persona_overrides) {
+		if (!personas.has(E.key)) {
+			names.push_back(E.key);
+		}
 	}
 	return names;
 }
@@ -276,7 +313,7 @@ void TTSServer::set_default_persona(const StringName &p_name) {
 	bool found = true;
 	{
 		MutexLock lock(mutex);
-		found = p_name.is_empty() || personas.has(p_name);
+		found = p_name.is_empty() || personas.has(p_name) || persona_overrides.has(p_name);
 		if (found) {
 			default_persona_name = p_name;
 		}
@@ -291,7 +328,63 @@ Ref<TTSPersona> TTSServer::get_default_persona() const {
 
 StringName TTSServer::get_default_persona_name() const {
 	MutexLock lock(mutex);
-	return default_persona_name;
+	return _get_default_persona_name_locked();
+}
+
+void TTSServer::set_persona_override(const Ref<TTSPersona> &p_persona) {
+	ERR_FAIL_COND_MSG(p_persona.is_null(), "Cannot add a null persona override.");
+	const StringName persona_key = p_persona->get_persona_name();
+	ERR_FAIL_COND_MSG(persona_key.is_empty(), "Cannot add a persona override without a name.");
+	MutexLock lock(mutex);
+	persona_overrides[persona_key] = p_persona;
+}
+
+void TTSServer::remove_persona_override(const StringName &p_name) {
+	MutexLock lock(mutex);
+	persona_overrides.erase(p_name);
+}
+
+bool TTSServer::has_persona_override(const StringName &p_name) const {
+	MutexLock lock(mutex);
+	return persona_overrides.has(p_name);
+}
+
+Ref<TTSPersona> TTSServer::get_persona_override(const StringName &p_name) const {
+	MutexLock lock(mutex);
+	const Ref<TTSPersona> *persona = persona_overrides.getptr(p_name);
+	return persona != nullptr ? *persona : Ref<TTSPersona>();
+}
+
+TypedArray<TTSPersona> TTSServer::get_persona_overrides() const {
+	MutexLock lock(mutex);
+	TypedArray<TTSPersona> list;
+	for (const KeyValue<StringName, Ref<TTSPersona>> &E : persona_overrides) {
+		list.push_back(E.value);
+	}
+	return list;
+}
+
+void TTSServer::clear_persona_overrides() {
+	MutexLock lock(mutex);
+	persona_overrides.clear();
+	default_persona_override = StringName();
+}
+
+Ref<TTSPersona> TTSServer::get_base_persona(const StringName &p_name) const {
+	MutexLock lock(mutex);
+	const Ref<TTSPersona> *persona = personas.getptr(p_name);
+	return persona != nullptr ? *persona : Ref<TTSPersona>();
+}
+
+void TTSServer::set_default_persona_override(const StringName &p_name) {
+	// Not checked: the game may add the persona later.
+	MutexLock lock(mutex);
+	default_persona_override = p_name;
+}
+
+StringName TTSServer::get_default_persona_override() const {
+	MutexLock lock(mutex);
+	return default_persona_override;
 }
 
 TypedArray<Dictionary> TTSServer::get_voices(const String &p_language) const {
@@ -362,6 +455,7 @@ void TTSServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_available"), &TTSServer::is_available);
 
 	ClassDB::bind_method(D_METHOD("speak", "text", "persona"), &TTSServer::speak, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("speak_with_persona", "text", "persona_name"), &TTSServer::speak_with_persona);
 	ClassDB::bind_method(D_METHOD("stop"), &TTSServer::stop);
 	ClassDB::bind_method(D_METHOD("pause"), &TTSServer::pause);
 	ClassDB::bind_method(D_METHOD("resume"), &TTSServer::resume);
@@ -381,6 +475,16 @@ void TTSServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_default_persona"), &TTSServer::get_default_persona);
 	ClassDB::bind_method(D_METHOD("get_default_persona_name"), &TTSServer::get_default_persona_name);
 
+	ClassDB::bind_method(D_METHOD("set_persona_override", "persona"), &TTSServer::set_persona_override);
+	ClassDB::bind_method(D_METHOD("remove_persona_override", "name"), &TTSServer::remove_persona_override);
+	ClassDB::bind_method(D_METHOD("has_persona_override", "name"), &TTSServer::has_persona_override);
+	ClassDB::bind_method(D_METHOD("get_persona_override", "name"), &TTSServer::get_persona_override);
+	ClassDB::bind_method(D_METHOD("get_persona_overrides"), &TTSServer::get_persona_overrides);
+	ClassDB::bind_method(D_METHOD("clear_persona_overrides"), &TTSServer::clear_persona_overrides);
+	ClassDB::bind_method(D_METHOD("get_base_persona", "name"), &TTSServer::get_base_persona);
+	ClassDB::bind_method(D_METHOD("set_default_persona_override", "name"), &TTSServer::set_default_persona_override);
+	ClassDB::bind_method(D_METHOD("get_default_persona_override"), &TTSServer::get_default_persona_override);
+
 	ClassDB::bind_method(D_METHOD("get_voices", "language"), &TTSServer::get_voices, DEFVAL(String()));
 	ClassDB::bind_method(D_METHOD("resolve_voice_id", "persona"), &TTSServer::resolve_voice_id, DEFVAL(Variant()));
 
@@ -397,5 +501,6 @@ TTSServer::TTSServer() {
 TTSServer::~TTSServer() {
 	singleton = nullptr;
 	personas.clear();
+	persona_overrides.clear();
 	builtin_persona.unref();
 }
