@@ -45,6 +45,7 @@ TEST_FORCE_LINK(test_video_effect_settings_server)
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_effect_settings.h"
 #include "servers/settings/video_effect_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 #ifndef _3D_DISABLED
@@ -387,5 +388,35 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] WorldEnvironment nodes in the 
 	memdelete(server);
 }
 #endif // _3D_DISABLED
+
+TEST_CASE("[VideoEffectSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "brightness_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("brightness", 1.5);
+	SIGNAL_CHECK_FALSE("brightness_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 1.5 } };
+	SIGNAL_CHECK("brightness_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("brightness_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("brightness");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("brightness_changed");
+	CHECK(server->apply() == OK);
+	const Array default_args = { { default_value } };
+	SIGNAL_CHECK("brightness_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "brightness_changed");
+	memdelete(server);
+}
 
 } // namespace TestVideoEffectSettingsServer
