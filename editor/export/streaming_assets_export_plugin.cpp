@@ -36,6 +36,7 @@
 #include "core/io/streaming_assets_server.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "editor/export/pck_package_exporter.h"
 
 // Guards against deep or cyclic folder structures (links are skipped, but junctions may not be detected).
 static constexpr int STREAMING_ASSETS_MAX_FOLDER_DEPTH = 64;
@@ -203,6 +204,12 @@ void StreamingAssetsExportPlugin::_reset() {
 void StreamingAssetsExportPlugin::_export_begin(const HashSet<String> &p_features, bool p_debug, const String &p_path, int p_flags) {
 	_reset();
 
+	// `PCKPackageExporter` notifies the export plugins when it builds a pack description outside an export.
+	// Such a pack holds the description's files only: the folder is neither embedded nor copied next to it.
+	if (PCKPackageExporter::is_building()) {
+		return;
+	}
+
 	if (!bool(_get_setting(SETTING_ENABLED, false))) {
 		return;
 	}
@@ -301,7 +308,8 @@ void StreamingAssetsExportPlugin::_export_file(const String &p_path, const Strin
 bool StreamingAssetsExportPlugin::_begin_customize_resources(const Ref<EditorExportPlatform> &p_platform, const Vector<String> &p_features) {
 	// Runs at the start of every `export_project_files()` call, right before the extra files
 	// of all plugins are written. Files added in `_export_begin()` would only reach the first call.
-	if (active && placement == PLACEMENT_EMBED) {
+	// A pack description built during this export (for example by another plugin) must not get the folder.
+	if (active && placement == PLACEMENT_EMBED && !PCKPackageExporter::is_building()) {
 		for (const String &file : files) {
 			const String res_path = source_folder.path_join(file);
 			Error err = OK;
