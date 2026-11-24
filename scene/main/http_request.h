@@ -33,6 +33,7 @@
 #include "core/io/http_client.h"
 #include "core/templates/safe_refcount.h"
 #include "scene/main/node.h"
+#include "scene/resources/http_request_target.h"
 
 class Thread;
 class Timer;
@@ -103,6 +104,12 @@ private:
 
 	double timeout = 0;
 
+	// Values of the running request: from the target for `request_target()`, else from the node.
+	bool request_accept_gzip = true;
+	int request_max_redirects = 8;
+	Ref<HTTPRequestTarget> next_target;
+	Ref<HTTPRequestTarget> active_target;
+
 	void _redirect_request(const String &p_new_url);
 
 	bool _is_content_header(const String &p_header) const;
@@ -134,6 +141,7 @@ protected:
 public:
 	Error request(const String &p_url, const Vector<String> &p_custom_headers = Vector<String>(), HTTPClient::Method p_method = HTTPClient::METHOD_GET, const String &p_request_data = ""); //connects to a full url and perform request
 	Error request_raw(const String &p_url, const Vector<String> &p_custom_headers = Vector<String>(), HTTPClient::Method p_method = HTTPClient::METHOD_GET, const Vector<uint8_t> &p_request_data_raw = Vector<uint8_t>()); //connects to a full url and perform request
+	Error request_target(const Ref<HTTPRequestTarget> &p_target, const Dictionary &p_variables = Dictionary());
 	void cancel_request();
 	HTTPClient::Status get_http_client_status() const;
 

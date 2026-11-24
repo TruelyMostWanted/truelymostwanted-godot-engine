@@ -502,6 +502,9 @@
 			If [code]true[/code], text-to-speech support is enabled on startup, otherwise it is enabled the first time any TTS method is used. See also [method DisplayServer.tts_get_voices] and [method DisplayServer.tts_speak].
 			[b]Note:[/b] Enabling TTS can cause additional idle CPU usage and interfere with the sleep mode, so consider disabling it if TTS is not used.
 		</member>
+		<member name="audio/mixer/default_commands" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to an [AudioCommandList] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
+		</member>
 		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
 			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.load_layout].
 		</member>
@@ -1262,16 +1265,66 @@
 			Paths of [PreloadList] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
 		</member>
 		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
-			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. See [ResourceTextSerializer].
+			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_delimiter].
+		</member>
+		<member name="filesystem/resources/text_formats/csv_headers" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].csv[/code] resource files start with a header row of property names. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_headers].
 		</member>
 		<member name="filesystem/resources/text_formats/enums_as_names" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], enum properties are written as their names into [code].json[/code], [code].ini[/code] and [code].csv[/code] resource files. If [code]false[/code], they are written as numbers. Both are read. See [ResourceTextSerializer].
 		</member>
+		<member name="filesystem/resources/text_formats/full_precision_floats" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the 32-bit floats of vectors, rectangles, transforms and colors are written with all digits into text resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.full_precision_floats].
+		</member>
+		<member name="filesystem/resources/text_formats/indent" type="String" setter="" getter="" default="&quot;  &quot;">
+			The indentation of [code].json[/code] and [code].xml[/code] resource files. An empty string writes each file on one line. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.indent].
+		</member>
 		<member name="filesystem/resources/text_formats/ini_plain_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [code].ini[/code] resource files are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. See [ResourceTextSerializer].
 		</member>
-		<member name="filesystem/resources/text_formats/json_indent" type="String" setter="" getter="" default="&quot;  &quot;">
-			The indentation of [code].json[/code] resource files. An empty string writes each file on one line. See [ResourceTextSerializer].
+		<member name="filesystem/resources/text_formats/sort_keys" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], keys are written in alphabetical order into [code].json[/code], [code].ini[/code], [code].xml[/code] and [code].toml[/code] resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.sort_keys].
+		</member>
+		<member name="filesystem/resources/text_formats/xml_declaration" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].xml[/code] resource files start with [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.xml_declaration].
+		</member>
+		<member name="filesystem/scene_formats/animation_fps" type="float" setter="" getter="" default="30.0">
+			The frame rate used to bake animations when [ResourceLoader] loads a [code].gltf[/code], [code].glb[/code] or [code].fbx[/code] file that is not imported by the editor (for example from [code]user://[/code]). Same as the [code]bake_fps[/code] parameter of [method GLTFDocument.generate_scene]. Read on every load.
+		</member>
+		<member name="filesystem/scene_formats/animation_trimming" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [ResourceLoader] trims the start and end of animations in [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported by the editor, where no keyframes change. Same as the [code]trimming[/code] parameter of [method GLTFDocument.generate_scene]. Read on every load.
+		</member>
+		<member name="filesystem/scene_formats/embedded_image_handling" type="int" setter="" getter="" default="3">
+			How [ResourceLoader] handles images embedded in [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported by the editor. Same values as [member GLTFState.handle_binary_image_mode]:
+			- [b]Discard All Textures[/b] loads the scene without textures.
+			- [b]Extract Textures[/b] saves images as separate files; only possible in the editor, at runtime it behaves like [b]Embed as Uncompressed[/b].
+			- [b]Embed as Basis Universal[/b] stores images as VRAM-compressed Basis Universal textures in the scene (smaller in video memory, slower to load).
+			- [b]Embed as Uncompressed[/b] stores images as lossless [ImageTexture]s in the scene (default).
+			Read on every load.
+		</member>
+		<member name="filesystem/scene_formats/import_animations" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [ResourceLoader] creates an [AnimationPlayer] with the animations of [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported by the editor. If [code]false[/code], animations are skipped. Same as [member GLTFState.create_animations]. Read on every load.
+		</member>
+		<member name="filesystem/scene_formats/remove_immutable_tracks" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [ResourceLoader] removes animation tracks whose value never changes from [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported by the editor. Same as the [code]remove_immutable_tracks[/code] parameter of [method GLTFDocument.generate_scene]. Read on every load.
+		</member>
+		<member name="filesystem/streaming_assets/enabled" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the folder [member filesystem/streaming_assets/source_folder] is shipped as streaming assets and can be read through the [code]streaming://[/code] path prefix. See [StreamingAssetsServer]. Read once at startup.
+		</member>
+		<member name="filesystem/streaming_assets/fallback" type="int" setter="" getter="" default="0">
+			What happens on platforms or exports without an external folder (Android, the Web, ZIP exports and app bundles that do not hold the folder). [code]0[/code] (Embed): the files stay in the main pack, and [code]streaming://[/code] points to [member filesystem/streaming_assets/source_folder] inside it. [code]1[/code] (None): the files are not shipped, and [code]streaming://[/code] is not available. The values match [enum StreamingAssetsServer.Fallback]. Use feature tags for per-platform values, for example [code]fallback.android[/code].
+		</member>
+		<member name="filesystem/streaming_assets/mode" type="int" setter="" getter="" default="0">
+			How the streaming assets are shipped. [code]0[/code] (Raw): the files are copied unchanged into the folder [member filesystem/streaming_assets/target_folder] and read with runtime loaders through [code]streaming://[/code]. [code]1[/code] (Pack): the folder is exported as a second pack named [member filesystem/streaming_assets/pack_file], which [StreamingAssetsServer] mounts at startup; the files keep their [code]res://[/code] paths. The values match [enum StreamingAssetsServer.Mode].
+		</member>
+		<member name="filesystem/streaming_assets/pack_file" type="String" setter="" getter="" default="&quot;{exe_name}.streaming.pck&quot;">
+			The file name of the streaming pack next to the main pack, used in [code]Pack[/code] mode. Placeholders are expanded with [method StreamingAssetsServer.expand_template]: [code]{exe_name}[/code], [code]{app_name}[/code] and [code]{version}[/code]. Must be a file name without folders.
+		</member>
+		<member name="filesystem/streaming_assets/source_folder" type="String" setter="" getter="" default="&quot;res://streaming_assets&quot;">
+			The folder of the project that holds the streaming assets. Must be a folder below [code]res://[/code]. In the editor and in games run from the editor, [code]streaming://[/code] points to this folder.
+		</member>
+		<member name="filesystem/streaming_assets/target_folder" type="String" setter="" getter="" default="&quot;{exe_name}_Data/StreamingAssets&quot;">
+			The folder that holds the streaming assets in [code]Raw[/code] mode, relative to the folder of the executable (Windows, Linux) or to the bundle resources (macOS, iOS). Placeholders are expanded with [method StreamingAssetsServer.expand_template]: [code]{exe_name}[/code] is the base name of the exported executable, for example [code]MyGame[/code] for [code]MyGame.exe[/code]. Must be a relative folder without [code].[/code] or [code]..[/code].
 		</member>
 		<member name="gui/common/auto_focus_strategy" type="int" setter="" getter="" default="0">
 			Determines what strategy to use when inferring the top/left/right/bottom [Control] to focus if no neighbor is defined.
@@ -3669,7 +3722,7 @@
 			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
 		</member>
 		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
-			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_save_as_csv]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_serialize]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
 		</member>
 		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
