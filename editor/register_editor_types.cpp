@@ -50,6 +50,8 @@
 #include "editor/export/editor_export_platform_extension.h"
 #include "editor/export/editor_export_platform_pc.h"
 #include "editor/export/editor_export_plugin.h"
+#include "editor/export/pck_export_plugin.h"
+#include "editor/export/pck_package_exporter.h"
 #include "editor/export/register_exporters.h"
 #include "editor/export/streaming_assets_export_plugin.h"
 #include "editor/file_system/editor_file_system.h"
@@ -184,6 +186,7 @@ void register_editor_types() {
 	GDREGISTER_CLASS(EditorExportPlatformExtension);
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
+	GDREGISTER_ABSTRACT_CLASS(PCKPackageExporter);
 
 	register_exporter_types();
 
@@ -250,6 +253,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<PackedSceneEditorPlugin>();
 	EditorPlugins::add_by_type<PCKExtractEditorPlugin>();
 	EditorPlugins::add_by_type<PCKPackageEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageExporterEditorPlugin>();
 	EditorPlugins::add_by_type<ResourcePreloaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderFileEditorPlugin>();
