@@ -569,7 +569,39 @@ int64_t AccessibilitySettingsServer::speak_control(Control *p_control) {
 	return tts_server->speak(text, persona);
 }
 
+void AccessibilitySettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"ui_scale",
+		"font_size_factor",
+		"focus_outline_width",
+		"speak_focused_controls",
+		"reduce_motion",
+		"reduce_transparency",
+		"colorblind_mode",
+		"subtitles_enabled",
+		"subtitle_scale",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void AccessibilitySettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("ui_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
+	ADD_SIGNAL(MethodInfo("font_size_factor_changed", PropertyInfo(Variant::FLOAT, "factor")));
+	ADD_SIGNAL(MethodInfo("focus_outline_width_changed", PropertyInfo(Variant::INT, "width")));
+	ADD_SIGNAL(MethodInfo("speak_focused_controls_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("reduce_motion_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("reduce_transparency_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("colorblind_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "AccessibilitySettingsServer.ColorblindMode")));
+	ADD_SIGNAL(MethodInfo("subtitles_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("subtitle_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
+
 	ClassDB::bind_method(D_METHOD("set_ui_scale", "scale"), &AccessibilitySettingsServer::set_ui_scale);
 	ClassDB::bind_method(D_METHOD("get_ui_scale"), &AccessibilitySettingsServer::get_ui_scale);
 	ClassDB::bind_method(D_METHOD("set_font_size_factor", "factor"), &AccessibilitySettingsServer::set_font_size_factor);

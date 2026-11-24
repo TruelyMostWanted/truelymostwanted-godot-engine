@@ -44,6 +44,7 @@ class AudioBusSettingsServer : public ListSettingsServer {
 	bool create_missing_buses = false;
 	HashSet<String> warned_buses; // Buses missing in the layout that were reported once.
 	bool pushing_buses = false; // Set while _apply_settings() changes AudioServer (add_bus() emits bus_layout_changed).
+	Array signaled_buses; // The bus entries the typed signals last reported (or read from the engine).
 
 	static Ref<AudioBusSettings> _make_entry_from_engine(int p_bus);
 	void _merge_layout_buses();
@@ -54,6 +55,9 @@ class AudioBusSettingsServer : public ListSettingsServer {
 
 protected:
 	static void _bind_methods();
+
+	// Compares the applied buses with the last reported ones and emits the typed bus signals.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;

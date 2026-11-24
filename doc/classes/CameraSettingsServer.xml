@@ -186,4 +186,53 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="far_changed">
+			<param index="0" name="far" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.far] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to adapt fog or level of detail to the view distance.
+			</description>
+		</signal>
+		<signal name="field_of_view_changed">
+			<param index="0" name="fov" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.field_of_view] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for cameras that the domain does not manage, for example a weapon camera.
+			</description>
+		</signal>
+		<signal name="head_bob_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.head_bob_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the head bob of the game by it.
+			</description>
+		</signal>
+		<signal name="keep_aspect_changed">
+			<param index="0" name="keep_aspect" type="int" enum="Camera3D.KeepAspect" />
+			<description>
+				Emitted once when a changed [member CameraSettings.keep_aspect] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="motion_blur_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.motion_blur_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the motion blur effect of the game by it.
+			</description>
+		</signal>
+		<signal name="near_changed">
+			<param index="0" name="near" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.near] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="shake_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member CameraSettings.shake_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the camera shake of the game by it.
+			</description>
+		</signal>
+	</signals>
 </class>

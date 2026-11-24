@@ -3751,8 +3751,14 @@
 		<member name="settings/paths/language_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"language"[/code] settings domain ([LanguageSettingsServer]), for example [code]user://settings/language.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/language.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
+		<member name="settings/paths/tts_personas_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"tts_personas"[/code] settings domain ([TTSPersonaSettingsServer]), for example [code]user://settings/tts_personas.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/tts_personas.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
 		<member name="settings/paths/video_effect_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_effect"[/code] settings domain ([VideoEffectSettingsServer]), for example [code]user://settings/video_effect.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_effect.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_preset_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_preset"[/code] settings domain ([VideoPresetSettingsServer]), for example [code]user://settings/video_preset.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_preset.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
 		<member name="settings/paths/video_quality_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_quality"[/code] settings domain ([VideoQualitySettingsServer]), for example [code]user://settings/video_quality.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_quality.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
@@ -3786,6 +3792,12 @@
 		</member>
 		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
+		</member>
+		<member name="settings/video_preset/presets" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The graphics presets of the project: [code].tres[/code] or [code].res[/code] files with a [VideoPreset]. A preset with the name of a built-in preset ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code], [code]"Ultra"[/code]) replaces it, other names are added after the built-in presets. Files that are no [VideoPreset] or have no name are ignored with an error. See [VideoPresetSettingsServer].
+		</member>
+		<member name="settings/video_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [VideoPresetSettingsServer] starts with the four built-in presets ([method VideoPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/video_preset/presets] exist.
 		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">
 			The ratio of [WorkerThreadPool]'s threads that will be reserved for low-priority tasks. For example, if 10 threads are available and this value is set to [code]0.3[/code], 3 of the worker threads will be reserved for low-priority tasks. The actual value won't exceed the number of CPU cores minus one, and if possible, at least one worker thread will be dedicated to low-priority tasks.

@@ -411,7 +411,35 @@ float CameraSettingsServer::get_motion_blur_intensity() const {
 	return get_value(SNAME("motion_blur_intensity"));
 }
 
+void CameraSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"field_of_view",
+		"keep_aspect",
+		"near",
+		"far",
+		"shake_intensity",
+		"head_bob_intensity",
+		"motion_blur_intensity",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void CameraSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("field_of_view_changed", PropertyInfo(Variant::FLOAT, "fov")));
+	ADD_SIGNAL(MethodInfo("keep_aspect_changed", PropertyInfo(Variant::INT, "keep_aspect", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Camera3D.KeepAspect")));
+	ADD_SIGNAL(MethodInfo("near_changed", PropertyInfo(Variant::FLOAT, "near")));
+	ADD_SIGNAL(MethodInfo("far_changed", PropertyInfo(Variant::FLOAT, "far")));
+	ADD_SIGNAL(MethodInfo("shake_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+	ADD_SIGNAL(MethodInfo("head_bob_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+	ADD_SIGNAL(MethodInfo("motion_blur_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+
 	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &CameraSettingsServer::set_enabled);
 	ClassDB::bind_method(D_METHOD("is_enabled"), &CameraSettingsServer::is_enabled);
 	ClassDB::bind_method(D_METHOD("set_field_of_view", "degrees"), &CameraSettingsServer::set_field_of_view);

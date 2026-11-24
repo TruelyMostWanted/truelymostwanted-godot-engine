@@ -43,6 +43,7 @@ TEST_FORCE_LINK(test_video_quality_settings_server)
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_quality_settings.h"
 #include "servers/settings/video_quality_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 #ifdef RD_ENABLED
@@ -372,6 +373,40 @@ TEST_CASE("[SceneTree][VideoQualitySettingsServer] Added viewports and viewports
 	memdelete(other);
 	memdelete(grouped);
 	memdelete(added);
+	memdelete(server);
+}
+
+TEST_CASE("[VideoQualitySettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "scaling_3d_scale_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("scaling_3d_scale", 0.5);
+	SIGNAL_CHECK_FALSE("scaling_3d_scale_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 0.5 } };
+	SIGNAL_CHECK("scaling_3d_scale_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("scaling_3d_scale_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("scaling_3d_scale");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("scaling_3d_scale_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("scaling_3d_scale_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "scaling_3d_scale_changed");
 	memdelete(server);
 }
 

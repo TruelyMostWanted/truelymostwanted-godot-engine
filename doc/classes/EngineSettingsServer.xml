@@ -181,4 +181,38 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="low_processor_mode_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member EngineSettings.low_processor_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="max_fps_changed">
+			<param index="0" name="fps" type="int" />
+			<description>
+				Emitted once when a changed [member EngineSettings.max_fps] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to show the frame rate limit in the HUD.
+			</description>
+		</signal>
+		<signal name="physics_interpolation_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member EngineSettings.physics_interpolation] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="physics_ticks_per_second_changed">
+			<param index="0" name="ticks" type="int" />
+			<description>
+				Emitted once when a changed [member EngineSettings.physics_ticks_per_second] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="time_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member EngineSettings.time_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for timers that ignore [member Engine.time_scale].
+			</description>
+		</signal>
+	</signals>
 </class>
