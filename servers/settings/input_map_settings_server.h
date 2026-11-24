@@ -107,9 +107,9 @@ public:
 	static InputMapSettingsServer *get_singleton();
 	static void register_settings();
 
-	// The text form of events: `Keyboard:Ctrl+S; KeyboardLabel:E; Mouse:Left; Gamepad:A@Any; GamepadAxis:LeftX-`
+	// The text form of events: `Keyboard:Ctrl+S; KeyboardLabel:E; Mouse:Left; Gamepad:A; Device1:GamepadAxis:LeftStickLeft`
 	// (InputMapSettingsEvent::to_text()). Events without a text form are skipped, and so are invalid items of the
-	// text; the names of version 2 (`Key:`, `PhysicalKey:`, `JoypadButton:`, ...) are read, too.
+	// text; the older names (`Key:`, `PhysicalKey:`, `JoypadButton:`, `@N`, ...) are read, too.
 	static String events_to_text(const TypedArray<InputEvent> &p_events);
 	static TypedArray<InputEvent> text_to_events(const String &p_text);
 
