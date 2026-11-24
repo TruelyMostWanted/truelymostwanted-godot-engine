@@ -1966,7 +1966,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				(arg == "--record-performance" ? record_performance_path : record_performance_profile) = N->get();
 				N = N->next();
 			} else {
-				OS::get_singleton()->print(vformat("Missing %s argument, aborting.\n", arg));
+				OS::get_singleton()->print("Missing %s argument, aborting.\n", arg.utf8().get_data());
 				goto error;
 			}
 		} else if (arg == "--disable-vsync") {
