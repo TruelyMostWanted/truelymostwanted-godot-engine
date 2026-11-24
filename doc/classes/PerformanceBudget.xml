@@ -37,6 +37,7 @@
 	</tutorials>
 	<methods>
 		<method name="add_rule">
+			<return type="void" />
 			<param index="0" name="rule" type="PerformanceBudgetRule" />
 			<description>
 				Appends [param rule] to [member rules].

@@ -81,7 +81,8 @@ String PerformanceBudgetRule::get_description() const {
 		case STATISTIC_MEAN:
 			return column + " mean";
 		case STATISTIC_PERCENTILE:
-			return column + " p" + String::num(percentile);
+			// p95, p99.9: no trailing ".0" for whole percentiles.
+			return column + " p" + (Math::is_equal_approx(percentile, Math::round(percentile)) ? itos(int64_t(Math::round(percentile))) : String::num(percentile));
 		case STATISTIC_HITCH_COUNT:
 			return "hitch count";
 		default:
