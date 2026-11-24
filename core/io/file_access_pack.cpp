@@ -39,11 +39,66 @@
 Error PackedData::add_pack(const String &p_path, bool p_replace_files, uint64_t p_offset, const Vector<uint8_t> &p_decryption_key) {
 	for (int i = 0; i < sources.size(); i++) {
 		if (sources[i]->try_open_pack(p_path, p_replace_files, p_offset, p_decryption_key)) {
+			PackInfo info;
+			info.path = p_path;
+			info.replace_files = p_replace_files;
+			info.offset = p_offset;
+			info.decryption_key = p_decryption_key;
+			packs.push_back(info);
 			return OK;
 		}
 	}
 
 	return ERR_FILE_UNRECOGNIZED;
+}
+
+Error PackedData::remove_pack(const String &p_path) {
+	Vector<PackInfo> remaining;
+	bool found = false;
+	for (const PackInfo &info : packs) {
+		if (info.path == p_path) {
+			found = true;
+		} else {
+			remaining.push_back(info);
+		}
+	}
+	if (!found) {
+		return ERR_DOES_NOT_EXIST;
+	}
+
+	// All packs are merged into one tree, and a replaced file keeps no trace of the file it replaced.
+	// So the tree is rebuilt from the remaining packs, in their original mount order.
+	packs.clear();
+	files.clear();
+	delta_patches.clear();
+	retired_roots.push_back(root);
+	root = memnew(PackedDir);
+	Error result = OK;
+	for (const PackInfo &info : remaining) {
+		const Error err = add_pack(info.path, info.replace_files, info.offset, info.decryption_key);
+		if (err != OK) {
+			result = err;
+		} else if (info.main_pack) {
+			packs.write[packs.size() - 1].main_pack = true;
+		}
+	}
+	return result;
+}
+
+void PackedData::mark_main_pack(const String &p_path) {
+	for (int i = 0; i < packs.size(); i++) {
+		if (packs[i].path == p_path) {
+			packs.write[i].main_pack = true;
+		}
+	}
+}
+
+String PackedData::get_pack_of(const String &p_path) {
+	HashMap<PathMD5, PackedFile, PathMD5>::Iterator E = files.find(_get_simplified_path(p_path));
+	if (!E) {
+		return String();
+	}
+	return E->value.pack;
 }
 
 void PackedData::add_path(const String &p_pkg_path, const String &p_path, uint64_t p_ofs, uint64_t p_size, const uint8_t *p_md5, PackSource *p_src, bool p_replace_files, bool p_encrypted, bool p_bundle, bool p_delta, const String &p_salt) {
@@ -182,6 +237,7 @@ void PackedData::_get_file_paths(PackedDir *p_dir, const String &p_parent_dir, H
 }
 
 void PackedData::clear() {
+	packs.clear();
 	files.clear();
 	delta_patches.clear();
 	_free_packed_dirs(root);
@@ -211,6 +267,9 @@ PackedData::~PackedData() {
 		memdelete(sources[i]);
 	}
 	_free_packed_dirs(root);
+	for (PackedDir *retired : retired_roots) {
+		_free_packed_dirs(retired);
+	}
 }
 
 //////////////////////////////////////////////////////////////////

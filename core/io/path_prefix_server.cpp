@@ -150,9 +150,23 @@ public:
 		String root;
 		switch (mode) {
 			case MODE_FOLDER: {
+				// Folders that point at each other (`a://` -> `b://` -> `a://`) would recurse without end:
+				// a folder logic that is already resolving its root on this thread has no root.
+				static thread_local const PathPrefixFolder *resolving[8] = {};
+				static thread_local int resolving_count = 0;
+				for (int i = 0; i < resolving_count; i++) {
+					if (resolving[i] == this) {
+						return String();
+					}
+				}
+				if (resolving_count >= 8) {
+					return String();
+				}
 				root = folder;
 				if (PathPrefixServer::get_singleton()) {
+					resolving[resolving_count++] = this;
 					root = PathPrefixServer::get_singleton()->globalize(folder);
+					resolving_count--;
 				}
 			} break;
 			case MODE_OS_PATH: {
@@ -186,6 +200,19 @@ public:
 		const String root = get_root();
 		if (root.is_empty()) {
 			return String();
+		}
+		const String rest = p_path.substr(p_prefix.length());
+		return rest.is_empty() ? root : root.path_join(rest);
+	}
+
+	virtual String forward_path(const String &p_prefix, const String &p_path) const override {
+		if (mode != MODE_FOLDER) {
+			return globalize_path(p_prefix, p_path);
+		}
+		// The folder as written (`res://streaming_assets`), not globalized: the server follows the chain.
+		String root = folder;
+		while (root.length() > 1 && root.ends_with("/") && !root.ends_with("://") && !root.ends_with(":/")) {
+			root = root.substr(0, root.length() - 1);
 		}
 		const String rest = p_path.substr(p_prefix.length());
 		return rest.is_empty() ? root : root.path_join(rest);
@@ -464,34 +491,39 @@ Error PathPrefixServer::_register(const String &p_prefix, const Ref<PathPrefix> 
 	ERR_FAIL_COND_V_MSG(p_logic.is_null(), ERR_INVALID_PARAMETER, "The logic of a path prefix must not be null.");
 	const String prefix = normalize_prefix(p_prefix);
 	ERR_FAIL_COND_V_MSG(!p_locked && !is_valid_prefix_name(prefix), ERR_INVALID_PARAMETER, vformat("Invalid path prefix '%s': use lowercase letters, digits and '_', followed by '://'. URL schemes such as 'http://' are reserved.", p_prefix));
+	// Errors are printed after the lock is released: printing takes the global lock,
+	// which other threads may hold while resolving paths through this server.
+	bool was_locked = false;
 	{
 		RWLockWrite write_lock(lock);
 		Entry *entry = prefixes.getptr(prefix);
 		if (entry && entry->locked) {
-			ERR_FAIL_V_MSG(ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
-		}
-		if (!entry) {
-			Entry new_entry;
-			new_entry.locked = p_locked;
-			new_entry.order = next_order++;
-			entry = &prefixes.insert(prefix, new_entry)->value;
-		}
-		bool replaced = false;
-		for (Registration &reg : entry->registrations) {
-			if (_same_platforms(reg.platforms, p_platforms)) {
-				reg.logic = p_logic;
-				replaced = true;
-				break;
+			was_locked = true;
+		} else {
+			if (!entry) {
+				Entry new_entry;
+				new_entry.locked = p_locked;
+				new_entry.order = next_order++;
+				entry = &prefixes.insert(prefix, new_entry)->value;
 			}
+			bool replaced = false;
+			for (Registration &reg : entry->registrations) {
+				if (_same_platforms(reg.platforms, p_platforms)) {
+					reg.logic = p_logic;
+					replaced = true;
+					break;
+				}
+			}
+			if (!replaced) {
+				Registration reg;
+				reg.platforms = p_platforms;
+				reg.logic = p_logic;
+				entry->registrations.push_back(reg);
+			}
+			_update_active(*entry);
 		}
-		if (!replaced) {
-			Registration reg;
-			reg.platforms = p_platforms;
-			reg.logic = p_logic;
-			entry->registrations.push_back(reg);
-		}
-		_update_active(*entry);
 	}
+	ERR_FAIL_COND_V_MSG(was_locked, ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
 	if (!p_locked) {
 		_emit_deferred(SNAME("prefix_registered"), prefix);
 	}
@@ -522,14 +554,22 @@ Error PathPrefixServer::register_prefix_folder(const String &p_prefix, const Str
 
 Error PathPrefixServer::unregister_prefix(const String &p_prefix, const PackedStringArray &p_platforms) {
 	const String prefix = normalize_prefix(p_prefix);
+	// Errors are printed after the lock is released (see _register()).
+	enum UnregisterResult {
+		UNREGISTER_OK,
+		UNREGISTER_MISSING,
+		UNREGISTER_LOCKED,
+		UNREGISTER_NO_PLATFORMS,
+	};
+	UnregisterResult result = UNREGISTER_OK;
 	{
 		RWLockWrite write_lock(lock);
 		Entry *entry = prefixes.getptr(prefix);
-		ERR_FAIL_NULL_V_MSG(entry, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' is not registered.", prefix));
-		if (entry->locked) {
-			ERR_FAIL_V_MSG(ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be unregistered.", prefix));
-		}
-		if (p_platforms.is_empty()) {
+		if (!entry) {
+			result = UNREGISTER_MISSING;
+		} else if (entry->locked) {
+			result = UNREGISTER_LOCKED;
+		} else if (p_platforms.is_empty()) {
 			prefixes.erase(prefix);
 		} else {
 			bool found = false;
@@ -540,14 +580,18 @@ Error PathPrefixServer::unregister_prefix(const String &p_prefix, const PackedSt
 					break;
 				}
 			}
-			ERR_FAIL_COND_V_MSG(!found, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' has no registration for these platforms.", prefix));
-			if (entry->registrations.is_empty()) {
+			if (!found) {
+				result = UNREGISTER_NO_PLATFORMS;
+			} else if (entry->registrations.is_empty()) {
 				prefixes.erase(prefix);
 			} else {
 				_update_active(*entry);
 			}
 		}
 	}
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_MISSING, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' is not registered.", prefix));
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_LOCKED, ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be unregistered.", prefix));
+	ERR_FAIL_COND_V_MSG(result == UNREGISTER_NO_PLATFORMS, ERR_DOES_NOT_EXIST, vformat("The path prefix '%s' has no registration for these platforms.", prefix));
 	_emit_deferred(SNAME("prefix_unregistered"), prefix);
 	return OK;
 }
@@ -627,6 +671,42 @@ String PathPrefixServer::globalize(const String &p_path) const {
 		ret = next->globalize_path(prefix, prefix + next_rest);
 	}
 	return ret;
+}
+
+String PathPrefixServer::resolve_engine_path(const String &p_path) const {
+	if (is_engine_fast_path(p_path)) {
+		return p_path;
+	}
+	String prefix;
+	String rest;
+	if (!split_prefix(p_path, prefix, rest)) {
+		return p_path;
+	}
+	String path = prefix + rest.replace_char('\\', '/');
+	// The same limits as in `globalize()`: at most 8 steps, and a step must change the prefix.
+	// Nothing is printed and no lock is held while a logic runs.
+	for (int depth = 0; depth < 8; depth++) {
+		Ref<PathPrefix> logic = _get_active(prefix);
+		if (logic.is_null() || !logic->is_available()) {
+			return p_path;
+		}
+		const String next = logic->forward_path(prefix, path);
+		if (next.begins_with("res://") || next.begins_with("user://")) {
+			return next.simplify_path();
+		}
+		if (next.begins_with("uid://")) {
+			return next;
+		}
+		String next_prefix;
+		String next_rest;
+		if (!split_prefix(next, next_prefix, next_rest) || next_prefix == prefix || is_engine_fast_path(next)) {
+			// An OS path, the same prefix again or `pipe://`: not an engine path.
+			return p_path;
+		}
+		prefix = next_prefix;
+		path = next_prefix + next_rest;
+	}
+	return p_path;
 }
 
 String PathPrefixServer::localize(const String &p_global_path) const {
@@ -871,6 +951,7 @@ void PathPrefixServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("globalize", "path"), &PathPrefixServer::globalize);
 	ClassDB::bind_method(D_METHOD("localize", "global_path"), &PathPrefixServer::localize);
+	ClassDB::bind_method(D_METHOD("resolve_engine_path", "path"), &PathPrefixServer::resolve_engine_path);
 	ClassDB::bind_method(D_METHOD("resolve", "path"), &PathPrefixServer::resolve);
 	ClassDB::bind_method(D_METHOD("resolve_safe", "path", "for_write", "allowed_roots"), &PathPrefixServer::resolve_safe, DEFVAL(PackedStringArray()));
 

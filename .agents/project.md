@@ -32,7 +32,7 @@ HOST_PARAMETER=''
 REPO_PARAMETER='TruelyMostWanted/truelymostwanted-godot-engine'
 APPROVAL='Autonomous'
 CHECKPOINTS=''
-MAX_ISSUE_AGENTS='1'
+MAX_ISSUE_AGENTS='5'
 MAX_ISSUES_PER_AGENT='1'
 ALLOW_TEAMS_PER_ISSUE='false'
 MIRROR_GIT_ISSUES='false'
@@ -40,6 +40,10 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24 (ca. 01:30): Besitzer, **voll autonom ohne Rückfragen**: alle Issues (Konzept, Design, Code, Wiki, Tests, Merge) selbst abarbeiten. Vorgaben: (1) Namen von Features/APIs aussagekräftig machen, Parameter und Typen nutzen (Enums statt Strings, typisierte Options-Klassen statt Dictionary, z. B. `ResourceTextSerializer`); was im Inspector bearbeitbar sein soll → `Resource`, Rest Backend/Server. (2) **Wiki zuerst**: Guides kurz, direkt, verständlich; Home/Sidebar nach Themen gruppiert (Text-Serialisierung, Settings, File I/O, Laden & Speichern von Ressourcen, Packs, Audio, Performance …), Klassenreferenz alphabetisch. (3) Neu: `HttpRequestTarget`-Resource für `HTTPRequest`; Input-Settings (#19) einfach für Spiele; Laufzeit-Loader/-Saver für typische Assets (Bilder, Audio, Video …), **je Ressource ein eigenes Issue und Branch**. (4) Session-Limit: auf automatische Fortsetzung warten. Caveman, sparsam.
+- 2026-11-24: 5-Stunden-Limit bei 95 %: keine neuen Agenten; laufende mit WIP gestoppt.
+- 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
+- 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
 - 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
 - 2026-11-23: Besitzer: **Wiki-Seiten sind immer Pflicht**, für jedes umgesetzte Issue (auch Refactorings ohne neue API) Guide-Seite und Klassenreferenz jeder betroffenen Klasse; Concept-Entscheidungen auf der Seite `Design-Decisions`. Jede Seite mit nummeriertem Inhaltsverzeichnis (`python truely/wiki-toc.py <wiki-ordner>` vor jedem Wiki-Push). Der Orchestrator veröffentlicht sie sofort nach dem Bericht des Agenten (Status „in review“ auf `Home`), nach dem Merge Status „done“.
@@ -49,6 +53,7 @@ USE_CAVEMAN='true'
 - 2026-11-23 (ca. 13:35): Besitzer: **Wochenlimit 97 %: keine neuen Agenten.** Die laufenden (#11, #14) zu Ende laufen lassen. Neue Agenten erst nach Freigabe des Besitzers.
 - 2026-11-23: Besitzer: **Features parallel** auf eigenen Branches; Auswahl nach getrennten Dateien (gemeinsame Registrierungsdateien nur mit wenigen Zeilen an anderer Stelle), weil `truely-godot-engine` nie in Feature-Branches gemergt wird. Weiter höchstens 2 Agenten (Wochenlimit), höchstens ein Engine-Build gleichzeitig.
 - 2026-11-23: Besitzer: Wochenlimit bei 95 %. Höchstens 2 Agenten gleichzeitig, bevorzugt ein Issue nach dem anderen in der Reihenfolge von Tracker #32. MAX_ISSUE_AGENTS=1, MAX_ISSUES_PER_AGENT=1.
+- 2026-11-23 (Abend): Besitzer: Resume mit **Decision=FullAutonomous** und **UseCaveman=true** (Chat knapp, ohne Füllwörter). Erst selbst nacheinander (#37, #34), dann: **3 Issues parallel** mit Agenten auf Feature-Branches; Agenten implementieren und schreiben den Testcode im Testprojekt-Branch, **ohne Engine-Build**; Build, Test und Merge macht der Orchestrator danach nacheinander. MAX_ISSUE_AGENTS=3.
 
 ## Abgeleitet
 
@@ -102,34 +107,43 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='488eee09dc'
-CURRENT_MILESTONE='Phase 1 · Resource I/O foundation'
-UPDATED='2026-11-23'
+LAST_INTEGRATED_COMMIT='30ad6d8ff9'
+CURRENT_MILESTONE='Resource formats, settings domains, API review'
+UPDATED='2026-11-24'
 ```
 
-**In Arbeit:** – (kein Agent läuft, keine offenen Feature-Branches mit ungemergter Arbeit)
+Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
+
+**Laufende Agenten:** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
+
+**Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
+
+**Achtung Stash:** `git stash list` hat `stash@{1}` „new feature for resoure-loader“ (vom Besitzer, alt, auf master) und `stash@{0}` „ACCIDENTAL …“ (versehentlich angewendete Kopie davon, mit Konfliktmarkern). Nichts verworfen; die Skripte nutzen keinen Stash mehr. Besitzer entscheidet über das Löschen.
+
+**Danach:** #99 restliche Umbenennungen je Feature-Branch (Reihenfolge in `scratch/issues/99/review.md`), #73 Formatklassen (nach #93), #85/#86 (PCK-Inspector/Exporter), #90/#91 (Apple-Bundles, Pack-Modus), #76, #79/#80, #71 (Branch 15), #121 (Import-Absturz), #122 (Bus-Layout, Branch 16), Settings-Domänen #18, #20–#30.
 
 ## Übergabe
 
-**Zuerst fortsetzen:** Stapel 1 ist gemergt und abgeschlossen (#38, #46, #1, #2, #3, #39, #11, #48; Wiki „done“; Checks auf `main` des Testprojekts grün). Offen in dieser Reihenfolge:
-1. CI-Lauf 45199284329 auf `truely-godot-engine`: 17/20 grün, macOS/iOS bekamen keinen Runner (Infrastruktur). Einmal `gh run rerun 45199284329 --failed`; echter Fehler → Fix auf dem Feature-Branch.
-2. #37 (Filter für gecachte Pfade, baut auf #1): Checks vorab liegen im Testprojekt-Branch `37-feature-cached-paths-filters`. Engine-Branch `37-feature-cached-paths-filters` von `truely-godot-engine`.
-3. #34 (Endungs-Index, baut auf #2): Checks vorab im Testprojekt-Branch `34-feature-loader-extension-index`.
-4. Nachtrag Testprojekt: Check mit Präfix (#3) für #39 auf einem neuen Testprojekt-Branch.
-5. Danach: #5 → #7 → #35 → #36 → #8 → #9 → #10; Phase 2: #12, #13; Phase 3 ab #15 (Konzept #14 entschieden); Phase 5: #50, #51 (TextureAtlas).
-6. Alte Agent-Worktrees unter `.claude/worktrees/` entfernen (`git worktree remove --force <pfad>`; die Branches sind gepusht und bleiben).
+**Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 
-**Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin, #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
+**Entschieden:** #4 und #6 (Kommentare „Decision“ in den Issues): #2 mit Copy-on-write-Snapshot, #34 Endungs-Index darin (umgesetzt; Skript-/Binary-Loader in #53), #5 JSON/INI/CSV im Core plus Plain-INI-Modus und XML-Writer, `.json` über Typ-Marker mit Durchfallen zum alten Loader, TOML als Modul (#36), YAML vorerst nicht.
 
-**Anhänge-Dateien:** `core/io/resource_loader.*`, `resource_saver.*`, `core/core_bind.*`, `core/register_core_types.cpp`: nie zwei Issues parallel darauf.
+**Anhänge-Dateien:** `core/io/resource_loader.*`, `resource_saver.*`, `core/core_bind.*`, `core/register_core_types.cpp`: parallel nur mit wenigen Zeilen an anderer Stelle.
 
 **Fragen an den Besitzer:** –
 
-**Am Bildschirm zu prüfen (manual):** –
+**Am Bildschirm zu prüfen (manual):** #10: Check „Haupt-PCK eines exportierten Builds“ nur im Export. #8: Export-Build mit `user://`/`exec://`-Ordnern, `res://` schreibgeschützt; danach #8 schließen. #12: `TtsServer.speak()` mit echten Stimmen unter Windows (GDScript und C#) und Fallback auf eine Stimme gleicher Sprache; dazu ohne `--headless` mit `audio/general/text_to_speech` an (Checks im Testprojekt `res://12-feature-tts-server/` machen das automatisch, wenn TTS verfügbar ist). Danach #12 schließen.
 
 **Regeln, neu:** –
 
 **Fallen:**
+- Testprojekt-Worktrees brauchen die Junction `scratch/issues/<N>/nuget-local` → sonst „Godot.NET.Sdk nicht gefunden“.
+- `.tres` sortiert Dictionary-Schlüssel: Reihenfolge separat speichern (#50 `region_order`).
+- doctest `const Array a = { { Variant(x) } }` wird flach: `push_back(Array({ ... }))` verwenden (#15).
+- Erster `--import` des Testprojekts nach dem Merge von #5 stürzte einmal ab (Access Violation, Exit -1073741819), danach nicht reproduzierbar. Beobachten.
+- Agent-Worktrees belegen ihren Branch: vor `git switch <branch>` im Hauptbaum `git -C .claude/worktrees/<agent> switch --detach`. Testprojekt-Worktrees im Scratch brauchen die Junction `scratch/issues/<N>/nuget-local` → `P:/Projects/GitHub/nuget-local` (relativer Pfad in `nuget.config`).
+- **`run-checks.ps1` mit der GUI-Exe meldete immer PASSED** (PowerShell wartet nicht, kein Exit-Code; GD und C# liefen gleichzeitig). Seit Testprojekt `95830a0` nimmt das Skript die `.console.exe` daneben; Branches ohne diesen Fix: `-Godot …mono.console.exe` direkt übergeben. Stapel 1 wurde damit erneut geprüft: grün.
+- C#-Checks: den von `GetCachedRef()` u. Ä. gelieferten Wrapper nicht `using`/`Dispose()` – er ist mit gehaltenen Referenzen geteilt und gibt die Ressource frei.
 - Batch-CI 1 scheiterte nur an `--doctool`: `>` in Codebeispielen der XML muss `&gt;` sein (#48). Vor jedem Stapel `--doctool` auf `truely-godot-engine` prüfen; Agenten-Aussagen „kein Diff“ beziehen sich nur auf ihren Branch.
 - Auf diesem Rechner fehlen die Abhängigkeiten für AccessKit und D3D12: lokal immer `accesskit=no d3d12=no` (die CI baut mit allem). Die SCons-Meldung „ANGLE deps missing“ ist keine Warnung.
 - `build.ps1` hatte positionelle Parameter (`module_mono_enabled=yes` landete in `-Target`); seit 2026-11-23 behoben.

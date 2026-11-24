@@ -426,6 +426,21 @@ Dictionary OS::get_memory_info() const {
 	return meminfo;
 }
 
+uint64_t OS::get_process_memory_usage() const {
+	return 0;
+}
+
+Dictionary OS::get_process_memory_info() const {
+	Dictionary meminfo;
+
+	meminfo["resident"] = -1;
+	meminfo["private"] = -1;
+	meminfo["peak"] = -1;
+	meminfo["heap"] = -1;
+
+	return meminfo;
+}
+
 void OS::yield() {
 }
 
