@@ -142,6 +142,24 @@ String PerformanceRecordingProfile::get_delimiter() const {
 	return delimiter;
 }
 
+void PerformanceRecordingProfile::set_hitch_threshold_usec(int p_usec) {
+	hitch_threshold_usec = MAX(0, p_usec);
+	emit_changed();
+}
+
+int PerformanceRecordingProfile::get_hitch_threshold_usec() const {
+	return hitch_threshold_usec;
+}
+
+void PerformanceRecordingProfile::set_write_summary_json(bool p_write) {
+	write_summary_json = p_write;
+	emit_changed();
+}
+
+bool PerformanceRecordingProfile::is_write_summary_json() const {
+	return write_summary_json;
+}
+
 void PerformanceRecordingProfile::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_builtins", "builtins"), &PerformanceRecordingProfile::set_builtins);
 	ClassDB::bind_method(D_METHOD("get_builtins"), &PerformanceRecordingProfile::get_builtins);
@@ -167,6 +185,10 @@ void PerformanceRecordingProfile::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_output_path"), &PerformanceRecordingProfile::get_output_path);
 	ClassDB::bind_method(D_METHOD("set_delimiter", "delimiter"), &PerformanceRecordingProfile::set_delimiter);
 	ClassDB::bind_method(D_METHOD("get_delimiter"), &PerformanceRecordingProfile::get_delimiter);
+	ClassDB::bind_method(D_METHOD("set_hitch_threshold_usec", "usec"), &PerformanceRecordingProfile::set_hitch_threshold_usec);
+	ClassDB::bind_method(D_METHOD("get_hitch_threshold_usec"), &PerformanceRecordingProfile::get_hitch_threshold_usec);
+	ClassDB::bind_method(D_METHOD("set_write_summary_json", "write"), &PerformanceRecordingProfile::set_write_summary_json);
+	ClassDB::bind_method(D_METHOD("is_write_summary_json"), &PerformanceRecordingProfile::is_write_summary_json);
 
 	ADD_GROUP("Columns", "");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "builtins", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:%s", Variant::INT, PROPERTY_HINT_ENUM, "Frame,Time Usec,Frame Time,Process Time,Physics Time,Physics Steps,Process Memory,Process Memory Peak,GPU Time,Recorder Time")), "set_builtins", "get_builtins");
@@ -183,6 +205,9 @@ void PerformanceRecordingProfile::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "flush_budget_usec", PROPERTY_HINT_RANGE, "0,16000,1,or_greater,suffix:usec"), "set_flush_budget_usec", "get_flush_budget_usec");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "output_path"), "set_output_path", "get_output_path");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "delimiter"), "set_delimiter", "get_delimiter");
+	ADD_GROUP("Summary", "");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "hitch_threshold_usec", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater,suffix:usec"), "set_hitch_threshold_usec", "get_hitch_threshold_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "write_summary_json"), "set_write_summary_json", "is_write_summary_json");
 }
 
 PerformanceRecordingProfile::PerformanceRecordingProfile() {
