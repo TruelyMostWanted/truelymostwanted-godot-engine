@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XML" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads and writes XML as dictionaries, and any [Resource] as XML.
+	</brief_description>
+	<description>
+		[XML] converts XML documents to [Dictionary] trees and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
+		A document is read into the [Dictionary] of its root element. Every element is a [Dictionary] with these keys:
+		- [code]"name"[/code]: the tag name ([String]).
+		- [code]"attributes"[/code]: a [Dictionary] of attribute name to value (both [String]).
+		- [code]"children"[/code]: an [Array] of child elements ([Dictionary]) and text nodes ([String]), in document order. This keeps mixed content such as [code]&lt;p&gt;Hello &lt;b&gt;big&lt;/b&gt; world&lt;/p&gt;[/code] in order.
+		- [code]"text"[/code]: the text of the direct children joined together, for convenience.
+		[codeblocks]
+		[gdscript]
+		var xml = XML.new()
+		if xml.parse("&lt;window width=\"1280\"&gt;&lt;title&gt;Game&lt;/title&gt;&lt;/window&gt;") == OK:
+			var root = xml.get_data()
+			print(root["attributes"]["width"]) # Prints 1280
+			print(root["children"][0]["text"]) # Prints Game
+		else:
+			print("Line %d: %s" % [xml.get_error_line(), xml.get_error_message()])
+
+		var element = { "name": "note", "attributes": { "to": "Ann" }, "text": "Hi" }
+		print(XML.stringify(element)) # Prints the declaration and &lt;note to="Ann"&gt;Hi&lt;/note&gt;
+		[/gdscript]
+		[csharp]
+		var xml = new Xml();
+		if (xml.Parse("&lt;window width=\"1280\"&gt;&lt;title&gt;Game&lt;/title&gt;&lt;/window&gt;") == Error.Ok)
+		{
+			var root = xml.GetData();
+			GD.Print(root["attributes"].AsGodotDictionary()["width"]); // Prints 1280
+			GD.Print(root["children"].AsGodotArray()[0].AsGodotDictionary()["text"]); // Prints Game
+		}
+		else
+		{
+			GD.Print($"Line {xml.GetErrorLine()}: {xml.GetErrorMessage()}");
+		}
+
+		var element = new Godot.Collections.Dictionary
+		{
+			{ "name", "note" },
+			{ "attributes", new Godot.Collections.Dictionary { { "to", "Ann" } } },
+			{ "text", "Hi" },
+		};
+		GD.Print(Xml.Stringify(element));
+		[/csharp]
+		[/codeblocks]
+		[b]Round trip:[/b] reading drops whitespace-only text between elements (indentation), but keeps CDATA sections as text. Writing puts whitespace-only text into CDATA and writes an element that contains text on one line, so no indentation becomes part of the text. Therefore [code]XML.parse_string(XML.stringify(data)) == data[/code] for all data returned by [method parse_string]. Adjacent text nodes are joined into one [String]. Comments, processing instructions and the XML declaration are not kept.
+		[b]Note:[/b] The static methods can be called from any thread. An [XML] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a [Resource] from XML [param text] written by [method serialize]. The class comes from the attribute [code]type[/code] of the root element, or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_XML, type_hint, options)[/code].
+			</description>
+		</method>
+		<method name="get_data" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the root element read by the last successful call to [method parse], or an empty [Dictionary].
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the 1-based line of the error of the last call to [method parse], or [code]0[/code] if it succeeded.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses the XML document [param text]. Returns [constant OK] and stores the root element for [method get_data], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_line] and [method get_error_message]. Errors are an empty text, a document without or with more than one root element, an element that is not closed and an end tag that does not match.
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses the XML document [param text] and returns its root element. Returns an empty [Dictionary] and prints the error if the text can't be read. Use [method parse] for the error details.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as XML text, with its stored properties, sub-resources and the type marker (attribute [code]type[/code] of the root element [code]&lt;resource&gt;[/code]). [code]null[/code] [param options] uses the project settings [code]filesystem/resources/text_formats/*[/code]. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_XML, options)[/code].
+				[b]Note:[/b] [method stringify] writes element dictionaries; use [method serialize] for resources.
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Dictionary" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Writes the element [Dictionary] [param data] (see the class description) as an XML document. Without [code]"children"[/code], the [String] in [code]"text"[/code] is the content. [param options] sets the indentation ([member SerializerOptions.indent]), the declaration ([member SerializerOptions.xml_declaration]) and the attribute order ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Attribute values and text that are not [String]s are converted with [method @GlobalScope.str]. Returns an empty [String] and prints an error if an element has no valid [code]"name"[/code], an attribute name is invalid or a child is neither a [Dictionary] nor text.
+			</description>
+		</method>
+	</methods>
+</class>

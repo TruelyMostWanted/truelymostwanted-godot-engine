@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="CSV" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads and writes CSV text as arrays, and list resources as CSV.
+	</brief_description>
+	<description>
+		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
+		Cells that contain the delimiter, a double quote, a line break or leading or trailing spaces are written in double quotes, and a double quote inside is doubled ([code]""[/code]). The delimiter comes from [member SerializerOptions.csv_delimiter] (one character, for example [code];[/code] or a tab).
+		With [member SerializerOptions.csv_headers] (the default), the first row names the columns and [method parse] returns an [Array] of [Dictionary], one per row, keyed by column name. Without it, every row is a [PackedStringArray]. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
+		[codeblocks]
+		[gdscript]
+		var csv = CSV.new()
+		if csv.parse("name,level\nAnn,3\n\"Bob, the 2nd\",7\n") == OK:
+			for row in csv.get_data():
+				print(row["name"], " ", int(row["level"]))
+		else:
+			print("Line %d: %s" % [csv.get_error_line(), csv.get_error_message()])
+
+		print(CSV.stringify([{ "name": "Ann", "level": 3 }]))
+		# name,level
+		# Ann,3
+		[/gdscript]
+		[csharp]
+		var csv = new Csv();
+		if (csv.Parse("name,level\nAnn,3\n\"Bob, the 2nd\",7\n") == Error.Ok)
+		{
+			foreach (var row in csv.GetData())
+			{
+				var record = row.AsGodotDictionary();
+				GD.Print(record["name"], " ", record["level"].AsString().ToInt());
+			}
+		}
+		else
+		{
+			GD.Print($"Line {csv.GetErrorLine()}: {csv.GetErrorMessage()}");
+		}
+
+		var rows = new Godot.Collections.Array { new Godot.Collections.Dictionary { { "name", "Ann" }, { "level", 3 } } };
+		GD.Print(Csv.Stringify(rows));
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The static methods can be called from any thread. A [CSV] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a list [Resource] of the class [param type_hint] from CSV [param text]: every row becomes one element of its typed array of resources. CSV has no type marker, so [param type_hint] is needed. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_CSV, type_hint, options)[/code].
+			</description>
+		</method>
+		<method name="get_data" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Returns the rows read by the last successful call to [method parse], or an empty [Array].
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the 1-based line of the error of the last call to [method parse], or [code]0[/code] if it succeeded. For a row with more cells than the header has columns, this is the row number, which differs from the line if a quoted cell above contains a line break.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Parses the CSV [param text] with the delimiter and header mode of [param options] ([code]null[/code] uses the project settings). Returns [constant OK] and stores the rows for [method get_data], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_line] and [method get_error_message]. Errors are a quoted cell that is not closed and, with headers, a row with more cells than the header has columns. Missing cells at the end of a row are empty strings. Empty lines are skipped.
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Array" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Parses the CSV [param text] and returns its rows, like [method parse]. Returns an empty [Array] and prints the error if the text can't be read.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns a list [param resource] as CSV text: the resource needs exactly one typed array of resources with simple properties, and every element becomes one row. Use [method ResourceTextSerializer.can_serialize] to check a resource first. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_CSV, options)[/code].
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Array" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Writes the rows in [param data] as CSV text. Rows are either all [Dictionary]s or all arrays ([Array] or [PackedStringArray]). For dictionaries, the columns are the keys in order of first appearance (sorted with [member SerializerOptions.sort_keys]), a header row is written unless [member SerializerOptions.csv_headers] is off, and a missing key is an empty cell. Values are converted with [method @GlobalScope.str], [code]null[/code] is an empty cell. Returns an empty [String] and prints an error if a row has another type.
+			</description>
+		</method>
+	</methods>
+</class>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="INI" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads and writes INI text as dictionaries, and any [Resource] as INI.
+	</brief_description>
+	<description>
+		[INI] converts INI text to a [Dictionary] and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
+		The data is a [Dictionary] of sections: each section name maps to a [Dictionary] of keys and values. Keys before the first [code][section][/code] header belong to the section [code]""[/code] and are written first, without a header. Lines starting with [code];[/code] or [code]#[/code] are comments. A section that appears twice is merged.
+		Values are written in Godot's [Variant] syntax, like [ConfigFile]: strings are quoted, numbers, [code]true[/code]/[code]false[/code] and [code]null[/code] are plain, other types use their constructor ([code]Vector2(1, 2)[/code]). With [member SerializerOptions.ini_plain_values], values are plain text that other tools can read. Reading understands both forms; text that is neither a number, a boolean, [code]null[/code] nor Godot syntax is a [String].
+		[codeblocks]
+		[gdscript]
+		var ini = INI.new()
+		if ini.parse("version=2\n[video]\nsize=Vector2i(1280, 720)\nvsync=true\n") == OK:
+			var data = ini.get_data()
+			print(data[""]["version"]) # Prints 2
+			print(data["video"]["size"]) # Prints (1280, 720)
+		else:
+			print("Line %d: %s" % [ini.get_error_line(), ini.get_error_message()])
+
+		print(INI.stringify({ "audio": { "volume": 0.5, "device": "Speakers" } }))
+		# [audio]
+		# volume=0.5
+		# device="Speakers"
+		[/gdscript]
+		[csharp]
+		var ini = new Ini();
+		if (ini.Parse("version=2\n[video]\nsize=Vector2i(1280, 720)\nvsync=true\n") == Error.Ok)
+		{
+			var data = ini.GetData();
+			GD.Print(data[""].AsGodotDictionary()["version"]); // Prints 2
+			GD.Print(data["video"].AsGodotDictionary()["size"]); // Prints (1280, 720)
+		}
+		else
+		{
+			GD.Print($"Line {ini.GetErrorLine()}: {ini.GetErrorMessage()}");
+		}
+
+		var audio = new Godot.Collections.Dictionary { { "volume", 0.5 }, { "device", "Speakers" } };
+		GD.Print(Ini.Stringify(new Godot.Collections.Dictionary { { "audio", audio } }));
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The static methods can be called from any thread. An [INI] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a [Resource] from INI [param text] written by [method serialize]. The class comes from the key [code]$type[/code] of the section [code][root][/code], or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_INI, type_hint, options)[/code].
+			</description>
+		</method>
+		<method name="get_data" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the sections read by the last successful call to [method parse], or an empty [Dictionary].
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the 1-based line of the error of the last call to [method parse], or [code]0[/code] if it succeeded.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses the INI [param text]. Returns [constant OK] and stores the sections for [method get_data], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_line] and [method get_error_message]. Errors are a section header without [code]][/code] and a line that is neither a comment, a header nor [code]key=value[/code].
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses the INI [param text] and returns its sections. Returns an empty [Dictionary] and prints the error if the text can't be read. Use [method parse] for the error details.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as INI text: one section per resource ([code][root][/code], [code][root/main][/code], [code][root/entries/0][/code]) with one key per stored property, and the type marker [code]$type[/code]. [code]null[/code] [param options] uses the project settings [code]filesystem/resources/text_formats/*[/code]. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_INI, options)[/code].
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Dictionary" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Writes the sections in [param data] as INI text. Every value of [param data] must be a [Dictionary] of keys; the section [code]""[/code] is written first, without a header. [param options] sets the value syntax ([member SerializerOptions.ini_plain_values]) and the order of sections and keys ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Returns an empty [String] and prints an error if a section is not a [Dictionary], a section name contains [code]][/code] or a line break, or a key is empty.
+			</description>
+		</method>
+	</methods>
+</class>
