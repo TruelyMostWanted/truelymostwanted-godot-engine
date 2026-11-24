@@ -192,7 +192,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="save_mode" type="int" setter="set_save_mode" getter="get_save_mode" enum="InputMapSettingsServer.SaveMode" default="0">
+		<member name="save_mode" type="int" setter="set_save_mode" getter="get_save_mode" enum="InputMapSettingsServer.SaveMode">
 			Which actions this server manages and stores. The default is the project setting [member ProjectSettings.settings/input_map/save_mode], read when the server is created.
 		</member>
 	</members>
