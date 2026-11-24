@@ -99,6 +99,9 @@
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_effect_settings.h"
 #include "servers/settings/video_effect_settings_server.h"
+#include "servers/settings/video_preset.h"
+#include "servers/settings/video_preset_settings.h"
+#include "servers/settings/video_preset_settings_server.h"
 #include "servers/settings/video_quality_settings.h"
 #include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_shadow_settings.h"
@@ -197,6 +200,7 @@ static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
 static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
+static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
@@ -288,6 +292,13 @@ void register_server_types() {
 	video_effect_settings_server = memnew(VideoEffectSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoEffectSettingsServer", VideoEffectSettingsServer::get_singleton(), "VideoEffectSettingsServer"));
 	settings_server_manager->register_server(video_effect_settings_server);
+	// After the four video domains it applies presets to (#25).
+	GDREGISTER_CLASS(VideoPreset);
+	GDREGISTER_CLASS(VideoPresetSettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoPresetSettingsServer);
+	video_preset_settings_server = memnew(VideoPresetSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoPresetSettingsServer", VideoPresetSettingsServer::get_singleton(), "VideoPresetSettingsServer"));
+	settings_server_manager->register_server(video_preset_settings_server);
 	GDREGISTER_CLASS(AccessibilitySettings);
 	GDREGISTER_CLASS(AccessibilityColorScheme);
 	GDREGISTER_ABSTRACT_CLASS(AccessibilitySettingsServer);
@@ -554,6 +565,8 @@ void unregister_server_types() {
 	memdelete(video_texture_streaming_settings_server);
 	video_texture_streaming_settings_server = nullptr;
 #endif
+	memdelete(video_preset_settings_server);
+	video_preset_settings_server = nullptr;
 	memdelete(video_effect_settings_server);
 	video_effect_settings_server = nullptr;
 	memdelete(accessibility_settings_server);
