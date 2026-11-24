@@ -44,6 +44,7 @@ TEST_FORCE_LINK(test_camera_settings_server)
 #include "servers/settings/camera_settings.h"
 #include "servers/settings/camera_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestCameraSettingsServer {
@@ -289,6 +290,36 @@ TEST_CASE("[SceneTree][CameraSettingsServer] Cameras in the group get the values
 	root->remove_child(next_player);
 	memdelete(cutscene);
 	memdelete(next_player);
+	memdelete(server);
+}
+
+TEST_CASE("[CameraSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "field_of_view_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("field_of_view", 90.0);
+	SIGNAL_CHECK_FALSE("field_of_view_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 90.0 } };
+	SIGNAL_CHECK("field_of_view_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("field_of_view_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("field_of_view");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("field_of_view_changed");
+	CHECK(server->apply() == OK);
+	const Array default_args = { { default_value } };
+	SIGNAL_CHECK("field_of_view_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "field_of_view_changed");
 	memdelete(server);
 }
 
