@@ -67,6 +67,7 @@
 #include "core/io/resource_database.h"
 #include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_binary.h"
+#include "core/io/resource_format_pck.h"
 #include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
@@ -124,6 +125,8 @@ static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
 static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
 static Ref<ResourceFormatLoaderResourceXML> resource_loader_resource_xml;
 static Ref<ResourceFormatSaverResourceXML> resource_saver_resource_xml;
+static Ref<ResourceFormatLoaderPck> resource_loader_pck;
+static Ref<ResourceFormatSaverPck> resource_saver_pck;
 static ResourceTextSerializer *_resource_text_serializer = nullptr;
 
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
@@ -306,6 +309,12 @@ void register_core_types() {
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_csv);
 	resource_saver_resource_xml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
+
+	// `.pck` files as `PckPackage` resources: loading opens a pack without mounting it, saving builds one.
+	resource_loader_pck.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_pck);
+	resource_saver_pck.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_pck);
 
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
@@ -579,6 +588,10 @@ void unregister_core_types() {
 	resource_loader_resource_xml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_resource_xml);
 	resource_saver_resource_xml.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_pck);
+	resource_loader_pck.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_pck);
+	resource_saver_pck.unref();
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_json);

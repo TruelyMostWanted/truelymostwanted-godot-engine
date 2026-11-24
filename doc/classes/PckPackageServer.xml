@@ -46,9 +46,9 @@
 			<param index="1" name="target_path" type="String" />
 			<param index="2" name="key" type="String" default="&quot;&quot;" />
 			<description>
-				Writes [param package] as a new pack to [param target_path], using [PCKPacker]. The pack uses the current format, [member PckPackage.alignment] and [member PckPackage.encrypted_directory]. Encrypted entries stay encrypted and are encrypted again with [param key]; an empty [param key] uses the key the package was opened with.
-				Building onto the pack the package was read from is allowed: the new pack is written to a temporary file first, then replaces the old one, and the package is read again from the new file.
-				Returns [constant ERR_BUSY] if [param target_path] is mounted (unmount it first), and [constant ERR_UNAVAILABLE] if the package has delta patches, which can't be rebuilt.
+				Writes [param package] as a new pack to [param target_path], using [PCKPacker]. The pack uses the current format, [member PckPackage.alignment] and [member PckPackage.encrypted_directory]. Encrypted entries stay encrypted and are encrypted again with [param key]; an empty [param key] uses the key of the package (see [method PckPackage.set_key]), or the key compiled into the engine. [code]ResourceSaver.save(package, "user://x.pck")[/code] calls this method with an empty [param key].
+				Building onto the pack the package was read from, or onto its [member PckPackage.base_pack], is allowed: the new pack is written to a temporary file first, then replaces the old one. A package that was read from that pack is read again from the new file.
+				Returns [constant ERR_BUSY] if [param target_path] is mounted (unmount it first), [constant ERR_FILE_NOT_FOUND] if source files added with [method PckPackage.add_file] are missing (all of them are listed in the error, and nothing is written), and [constant ERR_UNAVAILABLE] if the package has delta patches, which can't be rebuilt.
 			</description>
 		</method>
 		<method name="get_mounted" qualifiers="const">
