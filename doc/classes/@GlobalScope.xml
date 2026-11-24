@@ -1565,6 +1565,9 @@
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
 		</member>
+		<member name="CameraSettingsServer" type="CameraSettingsServer" setter="" getter="">
+			The [CameraSettingsServer] singleton.
+		</member>
 		<member name="ClassDB" type="ClassDB" setter="" getter="">
 			The [ClassDB] singleton.
 		</member>
@@ -1723,8 +1726,14 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
+		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
+			The [VideoEffectSettingsServer] singleton.
+		</member>
 		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
 			The [VideoQualitySettingsServer] singleton.
+		</member>
+		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
+			The [VideoShadowSettingsServer] singleton.
 		</member>
 		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
 			The [VideoTextureSettingsServer] singleton.
