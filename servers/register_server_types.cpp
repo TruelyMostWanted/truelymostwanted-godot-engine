@@ -245,6 +245,8 @@ void register_server_types() {
 	GDREGISTER_CLASS(AudioDeviceSettings);
 	GDREGISTER_CLASS(AudioBusSettings);
 	GDREGISTER_CLASS(AudioBusListSettings);
+	GDREGISTER_CLASS(AudioBusSettingsRow);
+	GDREGISTER_CLASS(AudioBusSettingsRows);
 	GDREGISTER_ABSTRACT_CLASS(AudioDeviceSettingsServer);
 	GDREGISTER_ABSTRACT_CLASS(AudioBusSettingsServer);
 	audio_device_settings_server = memnew(AudioDeviceSettingsServer);
