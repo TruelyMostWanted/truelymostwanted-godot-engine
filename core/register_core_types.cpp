@@ -61,6 +61,7 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
@@ -78,6 +79,7 @@
 #include "core/io/serializer_options.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
+#include "core/io/streaming_assets_server.h"
 #include "core/io/tcp_server.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
@@ -134,6 +136,7 @@ static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
 static FilesManifestServer *_files_manifest_server = nullptr;
 static PckPackageServer *_pck_package_server = nullptr;
+static StreamingAssetsServer *_streaming_assets_server = nullptr;
 static ResourceDatabase *_resource_database = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
@@ -390,8 +393,10 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(PckExtractResult);
 	GDREGISTER_CLASS(PckPackage);
 	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
 	GDREGISTER_CLASS(PreloadList);
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
@@ -421,6 +426,8 @@ void register_core_types() {
 	_resource_saver = memnew(CoreBind::ResourceSaver);
 	_files_manifest_server = memnew(FilesManifestServer);
 	_pck_package_server = memnew(PckPackageServer);
+	// Registers the locked `streaming://` prefix; `setup()` points it at the files later.
+	_streaming_assets_server = memnew(StreamingAssetsServer);
 	_resource_database = memnew(ResourceDatabase);
 	_os = memnew(CoreBind::OS);
 	_engine = memnew(CoreBind::Engine);
@@ -450,6 +457,7 @@ void register_core_settings() {
 
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 	ResourceTextSerializer::register_settings();
+	StreamingAssetsServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -479,6 +487,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PckPackageServer", PckPackageServer::get_singleton(), "PckPackageServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("StreamingAssetsServer", StreamingAssetsServer::get_singleton(), "StreamingAssetsServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceDatabase", ResourceDatabase::get_singleton(), "ResourceDatabase"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
@@ -491,6 +500,8 @@ void register_core_extensions() {
 
 	// The project settings are loaded here: register the default path prefixes before extensions can replace them.
 	PathPrefixServer::get_singleton()->register_default_prefixes();
+	// The main pack is loaded too: resolve `streaming://` and mount the streaming pack before anything loads resources.
+	StreamingAssetsServer::get_singleton()->setup();
 
 	// Hardcoded for now.
 	GDExtension::initialize_gdextensions();
@@ -528,6 +539,7 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_streaming_assets_server);
 	memdelete(_pck_package_server);
 	memdelete(_files_manifest_server);
 	memdelete(_path_prefix_server);
