@@ -1550,6 +1550,8 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AccessibilitySettingsServer" type="AccessibilitySettingsServer" setter="" getter="">
+		</member>
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
 		</member>
@@ -1612,6 +1614,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputMapSettingsServer" type="InputMapSettingsServer" setter="" getter="">
+			The [InputMapSettingsServer] singleton.
+		</member>
 		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
 			The [InputSettingsServer] singleton.
 		</member>
@@ -1622,9 +1627,6 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
-		</member>
-		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
-			The [KeyBindingSettingsServer] singleton.
 		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
@@ -1726,8 +1728,14 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
+		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
+			The [VideoEffectSettingsServer] singleton.
+		</member>
 		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
 			The [VideoQualitySettingsServer] singleton.
+		</member>
+		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
+			The [VideoShadowSettingsServer] singleton.
 		</member>
 		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
 			The [VideoTextureSettingsServer] singleton.
