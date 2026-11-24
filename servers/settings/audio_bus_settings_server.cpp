@@ -125,7 +125,7 @@ void AudioBusSettingsServer::_apply_settings(const Ref<Resource> &p_settings, co
 	}
 }
 
-void AudioBusSettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
+void AudioBusSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	const AudioServer *audio_server = AudioServer::get_singleton();
 	if (audio_server == nullptr) {
 		return;

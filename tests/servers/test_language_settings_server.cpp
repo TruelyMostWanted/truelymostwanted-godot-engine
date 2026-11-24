@@ -214,7 +214,7 @@ TEST_CASE("[LanguageSettingsServer] Root window values wait until a SceneTree ex
 	server->set_layout_direction(Window::LAYOUT_DIRECTION_RTL);
 	CHECK(server->get_layout_direction() == Window::LAYOUT_DIRECTION_RTL);
 	// Kept for the root window and read back from there.
-	server->retrieve();
+	server->read_from_engine();
 	CHECK(server->get_layout_direction() == Window::LAYOUT_DIRECTION_RTL);
 
 	// Values out of range are rejected.
