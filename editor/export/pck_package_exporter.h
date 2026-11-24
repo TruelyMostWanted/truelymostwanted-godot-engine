@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/pck_build_plan.h"
 #include "core/io/pck_package.h"
 #include "core/object/object.h"
 #include "core/templates/hash_set.h"
@@ -63,22 +64,8 @@ protected:
 	static void _bind_methods();
 
 public:
-	// How the entries of a description are built.
-	struct Plan {
-		// `res://` sources that go through the export pipeline (the target equals the source path).
-		PackedStringArray export_sources;
-		// Pack paths copied as they are: data, files outside `res://`, and files of the base pack.
-		PackedStringArray raw_files;
-		// Pack paths written as removal entries.
-		PackedStringArray removals;
-		// Pack paths that are not written because the export writes them for their source (`.import`, `.remap`, `.uid`).
-		PackedStringArray skipped;
-		// Entries that can't be built; nothing is written if there is one.
-		PackedStringArray errors;
-	};
-
-	static Plan make_plan(const Ref<PCKPackage> &p_description);
-	static Dictionary plan_description(const Ref<PCKPackage> &p_description);
+	// How the entries of a description are built, without building anything.
+	static Ref<PCKBuildPlan> plan_description(const Ref<PCKPackage> &p_description);
 
 	// The encryption filters of an export preset, applied like the export does (`*` and `?`, case-insensitive,
 	// with or without `res://`). An exclude filter wins over an include filter.

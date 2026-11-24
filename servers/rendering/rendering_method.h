@@ -241,6 +241,11 @@ public:
 	virtual void environment_set_volumetric_fog_volume_size(int p_size, int p_depth) = 0;
 	virtual void environment_set_volumetric_fog_filter_active(bool p_enable) = 0;
 
+	// Global overrides
+	virtual void environment_set_global_effect_disabled(RSE::EnvironmentEffect p_effect, bool p_disabled) = 0;
+	virtual void environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation) = 0;
+	virtual void environment_set_ignore_global_overrides(RID p_env, bool p_ignore) = 0;
+
 	// Glow
 
 	virtual void environment_set_glow(RID p_env, bool p_enable, Vector<float> p_levels, float p_intensity, float p_strength, float p_mix, float p_bloom_threshold, RSE::EnvironmentGlowBlendMode p_blend_mode, float p_hdr_bleed_threshold, float p_hdr_bleed_scale, float p_hdr_luminance_cap, float p_glow_map_strength, RID p_glow_map) = 0;

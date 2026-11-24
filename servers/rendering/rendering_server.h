@@ -706,6 +706,10 @@ public:
 	virtual void environment_set_volumetric_fog_volume_size(int p_size, int p_depth) = 0;
 	virtual void environment_set_volumetric_fog_filter_active(bool p_enable) = 0;
 
+	virtual void environment_set_global_effect_disabled(RSE::EnvironmentEffect p_effect, bool p_disabled) = 0;
+	virtual void environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation) = 0;
+	virtual void environment_set_ignore_global_overrides(RID p_env, bool p_ignore) = 0;
+
 	virtual Ref<Image> environment_bake_panorama(RID p_env, bool p_bake_irradiance, const Size2i &p_size) = 0;
 
 	virtual void screen_space_roughness_limiter_set_active(bool p_enable, float p_amount, float p_limit) = 0;
@@ -1158,6 +1162,7 @@ VARIANT_ENUM_CAST_EXT(RSE::EnvironmentGlowBlendMode, RenderingServer::Environmen
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentFogMode, RenderingServer::EnvironmentFogMode);
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentToneMapper, RenderingServer::EnvironmentToneMapper);
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentSSRRoughnessQuality, RenderingServer::EnvironmentSSRRoughnessQuality);
+VARIANT_ENUM_CAST_EXT(RSE::EnvironmentEffect, RenderingServer::EnvironmentEffect);
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentSSAOQuality, RenderingServer::EnvironmentSSAOQuality);
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentSSILQuality, RenderingServer::EnvironmentSSILQuality);
 VARIANT_ENUM_CAST_EXT(RSE::EnvironmentSDFGIFramesToConverge, RenderingServer::EnvironmentSDFGIFramesToConverge);

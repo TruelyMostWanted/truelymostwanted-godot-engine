@@ -537,6 +537,11 @@
 /modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
+/modules/yaml/                                @TruelyMostWanted
+/modules/yaml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
+/modules/yaml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
+/modules/yaml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/yaml/tests/                          @TruelyMostWanted @godotengine/tests
 /servers/settings/                            @TruelyMostWanted
 /servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
 /modules/mono/tests/                          @TruelyMostWanted @godotengine/dotnet @godotengine/tests
