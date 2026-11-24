@@ -3704,7 +3704,7 @@
 			[/codeblock]
 		</member>
 		<member name="settings/apply/confirmation_timeout" type="float" setter="" getter="" default="15.0">
-			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_pending] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
+			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_changes] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
 		</member>
 		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
@@ -3719,13 +3719,13 @@
 			Scripts of the settings servers of your game: paths to [code].gd[/code] or [code].cs[/code] files (or the names of global classes) whose class extends [SettingsServer]. [SettingsServerManager] creates one instance of each in [constant SettingsServer.APPLY_PHASE_SCENE], registers it and frees it when the game exits. Not used in the editor and the project manager.
 		</member>
 		<member name="settings/storage/autosave" type="bool" setter="" getter="" default="true">
-			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_pending]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
+			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_changes]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
 		</member>
 		<member name="settings/storage/folder" type="String" setter="" getter="" default="&quot;user://settings&quot;">
 			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
 		</member>
-		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
-			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_serialize]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+		<member name="settings/storage/format" type="int" setter="" getter="" default="1">
+			The text format of the settings files, a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_INI] (plain INI that players can edit, the default), [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_CSV], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_serialize]); a format that is not available (TOML with the module disabled, YAML) can't be used either. These domains use INI instead and print a warning once. See [method SettingsServerManager.get_storage_format].
 		</member>
 		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.

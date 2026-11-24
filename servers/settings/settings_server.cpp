@@ -152,7 +152,8 @@ Ref<Resource> SettingsServer::copy_settings(const Ref<Resource> &p_settings) {
 
 void SettingsServer::register_settings() {
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_STORAGE_FOLDER, PROPERTY_HINT_DIR), "user://settings");
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_STORAGE_FORMAT, PROPERTY_HINT_ENUM, "ini,json,csv"), "ini");
+	// Values of ResourceTextSerializer::Format.
+	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_STORAGE_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
 	GLOBAL_DEF(SETTING_ONLY_CHANGED, true);
 	GLOBAL_DEF(SETTING_AUTOSAVE, true);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CONFIRMATION_TIMEOUT, PROPERTY_HINT_RANGE, "1,120,0.5,or_greater,suffix:s"), 15.0);
@@ -171,12 +172,19 @@ String SettingsServer::get_storage_folder() {
 	return folder.is_empty() ? String("user://settings") : folder;
 }
 
-String SettingsServer::get_storage_format() {
-	const String format = String(_get_project_setting(SETTING_STORAGE_FORMAT, "ini")).to_lower();
-	if (format != "ini" && format != "json" && format != "csv") {
-		return "ini";
+ResourceTextSerializer::Format SettingsServer::get_storage_format() {
+	const Variant value = _get_project_setting(SETTING_STORAGE_FORMAT, ResourceTextSerializer::FORMAT_INI);
+	int format = ResourceTextSerializer::FORMAT_INI;
+	if (value.get_type() == Variant::STRING || value.get_type() == Variant::STRING_NAME) {
+		// A format name written by hand into project.godot ("json", "ini", ...).
+		format = ResourceTextSerializer::get_format_for_extension(value);
+	} else if (value.get_type() == Variant::INT) {
+		format = value;
 	}
-	return format;
+	if (format < 0 || format >= ResourceTextSerializer::FORMAT_MAX) {
+		return ResourceTextSerializer::FORMAT_INI;
+	}
+	return ResourceTextSerializer::Format(format);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -195,9 +203,10 @@ int SettingsServer::get_format_version() const {
 }
 
 SettingsServer::ApplyPhase SettingsServer::get_apply_phase() const {
-	int ret = APPLY_PHASE_SERVERS;
+	ApplyPhase ret = APPLY_PHASE_SERVERS;
 	GDVIRTUAL_CALL(_get_apply_phase, ret);
-	return ApplyPhase(CLAMP(ret, 0, int(APPLY_PHASE_MAX) - 1));
+	// APPLY_PHASE_NONE and out-of-range values start the server in the first or last phase.
+	return ApplyPhase(CLAMP(int(ret), int(APPLY_PHASE_PRE_DISPLAY), int(APPLY_PHASE_MAX) - 1));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -213,8 +222,8 @@ void SettingsServer::_apply_settings(const Ref<Resource> &p_settings, const Pack
 	GDVIRTUAL_CALL(_apply, p_settings, p_names);
 }
 
-void SettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
-	GDVIRTUAL_CALL(_retrieve, p_settings);
+void SettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+	GDVIRTUAL_CALL(_read_from_engine, p_settings);
 }
 
 Variant SettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
@@ -233,14 +242,21 @@ Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionar
 	return p_data;
 }
 
-String SettingsServer::_get_default_extension() {
-	const String format = get_storage_format();
-	if (format == "csv") {
+ResourceTextSerializer::Format SettingsServer::_get_file_format() {
+	const ResourceTextSerializer::Format format = get_storage_format();
+	if (format == ResourceTextSerializer::FORMAT_CSV) {
 		if (!format_warned) {
 			format_warned = true;
 			WARN_PRINT(vformat("Settings domain \"%s\" is not a list domain and can't be stored as CSV; INI is used.", get_domain()));
 		}
-		return "ini";
+		return ResourceTextSerializer::FORMAT_INI;
+	}
+	if (!ResourceTextSerializer::has_format_implementation(format)) {
+		if (!format_warned) {
+			format_warned = true;
+			WARN_PRINT(vformat("Settings domain \"%s\": the text format %s is not available (module disabled); INI is used.", get_domain(), ResourceTextSerializer::get_format_display_name(format)));
+		}
+		return ResourceTextSerializer::FORMAT_INI;
 	}
 	return format;
 }
@@ -271,7 +287,7 @@ void SettingsServer::_initialize() {
 		defaults.instantiate();
 	}
 	// The engine state at this point (project settings, bus layout, ...) becomes the default.
-	_retrieve_into(defaults);
+	_read_from_engine_into(defaults);
 
 	// Optional defaults of the project: a resource in `res://` named in `settings/defaults/<domain>`.
 	const StringName domain = get_domain();
@@ -579,7 +595,7 @@ void SettingsServer::_push_values(const PackedStringArray &p_names) {
 	}
 }
 
-void SettingsServer::_retrieve_into(const Ref<Resource> &p_settings) {
+void SettingsServer::_read_from_engine_into(const Ref<Resource> &p_settings) {
 	for (const KeyValue<StringName, Binding> &kv : bindings) {
 		const Binding &binding = kv.value;
 		if (binding.flags.has_flag(SETTING_FLAG_NO_ENGINE_TARGET) || !_object_has_value(p_settings, kv.key)) {
@@ -613,7 +629,7 @@ void SettingsServer::_retrieve_into(const Ref<Resource> &p_settings) {
 			p_settings->set(kv.key, value);
 		}
 	}
-	_retrieve_settings(p_settings);
+	_read_settings_from_engine(p_settings);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -640,16 +656,16 @@ PackedStringArray SettingsServer::_get_changed_names(const Ref<Resource> &p_a, c
 }
 
 bool SettingsServer::is_dirty() const {
-	return !get_dirty_values().is_empty();
+	return !get_dirty_setting_names().is_empty();
 }
 
-PackedStringArray SettingsServer::get_dirty_values() const {
+PackedStringArray SettingsServer::get_dirty_setting_names() const {
 	_ensure_initialized();
 	return _get_changed_names(settings, applied);
 }
 
-PackedStringArray SettingsServer::get_restart_values() const {
-	return restart_values;
+PackedStringArray SettingsServer::get_restart_required_names() const {
+	return restart_required_names;
 }
 
 void SettingsServer::revert() {
@@ -713,7 +729,7 @@ bool SettingsServer::has_session_override(const StringName &p_name) const {
 /////////////////////////////////////////////////////////////////////////////
 // Engine.
 
-void SettingsServer::_record_restart_values(const PackedStringArray &p_names) {
+void SettingsServer::_record_restart_required_names(const PackedStringArray &p_names) {
 	if (in_startup) {
 		return;
 	}
@@ -721,8 +737,8 @@ void SettingsServer::_record_restart_values(const PackedStringArray &p_names) {
 	for (const String &name : p_names) {
 		if (get_setting_flags(name).has_flag(SETTING_FLAG_RESTART_REQUIRED)) {
 			restart.push_back(name);
-			if (!restart_values.has(name)) {
-				restart_values.push_back(name);
+			if (!restart_required_names.has(name)) {
+				restart_required_names.push_back(name);
 			}
 		}
 	}
@@ -742,7 +758,7 @@ Error SettingsServer::apply() {
 	}
 	_push_values(names);
 	applied = copy_settings(settings);
-	_record_restart_values(names);
+	_record_restart_required_names(names);
 	emit_signal(SNAME("applied"), names);
 	if (!in_startup && !confirmation_active) {
 		unsaved = true;
@@ -771,14 +787,14 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	confirmation_deadline_msec = OS::get_singleton()->get_ticks_msec() + uint64_t(MAX(timeout, 0.0) * 1000.0);
 	_push_values(names);
 	applied = copy_settings(settings);
-	_record_restart_values(names);
+	_record_restart_required_names(names);
 	emit_signal(SNAME("applied"), names);
 	_set_confirmation_processing(true);
 	emit_signal(SNAME("confirmation_requested"), timeout);
 	return OK;
 }
 
-void SettingsServer::confirm_pending() {
+void SettingsServer::confirm_changes() {
 	if (!confirmation_active) {
 		return;
 	}
@@ -790,7 +806,7 @@ void SettingsServer::confirm_pending() {
 	emit_signal(SNAME("confirmation_finished"), true);
 }
 
-void SettingsServer::cancel_pending() {
+void SettingsServer::cancel_confirmation() {
 	if (!confirmation_active) {
 		return;
 	}
@@ -825,7 +841,7 @@ double SettingsServer::get_confirmation_time_left() const {
 
 void SettingsServer::_set_confirmation_processing(bool p_enabled) {
 	MainLoop *main_loop = OS::get_singleton()->get_main_loop();
-	// The SceneTree emits `process_frame`; without it the game calls confirm_pending() or cancel_pending() itself.
+	// The SceneTree emits `process_frame`; without it the game calls confirm_changes() or cancel_confirmation() itself.
 	if (main_loop == nullptr || !main_loop->has_signal(SNAME("process_frame"))) {
 		return;
 	}
@@ -840,15 +856,15 @@ void SettingsServer::_set_confirmation_processing(bool p_enabled) {
 
 void SettingsServer::_on_process_frame() {
 	if (confirmation_active && OS::get_singleton()->get_ticks_msec() >= confirmation_deadline_msec) {
-		cancel_pending();
+		cancel_confirmation();
 	}
 }
 
-void SettingsServer::retrieve() {
+void SettingsServer::read_from_engine() {
 	_ensure_initialized();
-	_retrieve_into(settings);
+	_read_from_engine_into(settings);
 	applied = copy_settings(settings);
-	emit_signal(SNAME("retrieved"));
+	emit_signal(SNAME("read_from_engine_finished"));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -864,7 +880,7 @@ String SettingsServer::get_file_path() const {
 	}
 	const StringName domain = get_domain();
 	ERR_FAIL_COND_V_MSG(domain == StringName(), String(), "A settings server needs a domain name: implement _get_domain().");
-	return get_storage_folder().path_join(String(domain) + "." + const_cast<SettingsServer *>(this)->_get_default_extension());
+	return get_storage_folder().path_join(String(domain) + "." + ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format()));
 }
 
 bool SettingsServer::has_unsaved_changes() const {
@@ -891,11 +907,12 @@ Error SettingsServer::load() {
 	Ref<Resource> loaded;
 	PackedStringArray present;
 	const String type_name = ResourceTextSerializer::get_type_name(defaults.ptr());
-	const String extension = path.get_extension().to_lower();
+	// The extension decides; an unknown extension (set_file_path()) is read as INI.
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(path.get_extension());
 
 	if (err != OK) {
 		error = vformat("can't read the file (%s)", error_names[err]);
-	} else if (extension == "csv") {
+	} else if (format == ResourceTextSerializer::FORMAT_CSV) {
 		err = ResourceTextSerializer::parse_csv(text, type_name, ResourceTextSerializer::get_default_options(), loaded, error);
 		if (err == OK) {
 			// CSV holds only the list; the other values keep their defaults.
@@ -909,7 +926,7 @@ Error SettingsServer::load() {
 		}
 	} else {
 		Dictionary tree;
-		if (extension == "json") {
+		if (format == ResourceTextSerializer::FORMAT_JSON) {
 			Ref<JSON> json;
 			json.instantiate();
 			err = json->parse(text);
@@ -921,8 +938,17 @@ Error SettingsServer::load() {
 			} else {
 				tree = json->get_data();
 			}
-		} else {
+		} else if (format == ResourceTextSerializer::FORMAT_INI || format == ResourceTextSerializer::FORMAT_MAX) {
 			err = ResourceTextSerializer::parse_ini_tree(text, tree, error);
+		} else {
+			// XML, TOML, YAML: the format reads the resource, the tree is taken from it. These files hold all values
+			// (see save()), so every value of the tree is present in the file.
+			const ResourceTextSerializer::Options read_options = ResourceTextSerializer::get_default_options();
+			Ref<Resource> parsed;
+			err = ResourceTextSerializer::parse_format(format, text, type_name, read_options, parsed, error);
+			if (err == OK) {
+				err = ResourceTextSerializer::encode_resource(parsed, read_options, true, tree, error);
+			}
 		}
 		if (err == OK) {
 			const String version_key = String("metadata/") + META_SETTINGS_VERSION;
@@ -982,24 +1008,28 @@ Error SettingsServer::save() {
 	const Ref<Resource> data = confirmation_active ? confirmation_backup : applied;
 
 	ResourceTextSerializer::Options options = ResourceTextSerializer::get_default_options();
-	const String extension = path.get_extension().to_lower();
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(path.get_extension());
 	String text;
 	String error;
 	Error err = OK;
-	if (extension == "csv") {
+	if (format == ResourceTextSerializer::FORMAT_CSV) {
 		err = ResourceTextSerializer::write_csv(data, options, text, error);
 	} else {
 		Ref<Resource> copy = data->duplicate(false);
 		copy->set_meta(META_SETTINGS_VERSION, get_format_version());
-		if (bool(_get_project_setting(SETTING_ONLY_CHANGED, true))) {
+		const bool tree_format = format == ResourceTextSerializer::FORMAT_JSON || format == ResourceTextSerializer::FORMAT_INI || format == ResourceTextSerializer::FORMAT_MAX;
+		// Only JSON and INI are read back as a tree with the missing values taken from the defaults.
+		if (tree_format && bool(_get_project_setting(SETTING_ONLY_CHANGED, true))) {
 			options.defaults = defaults;
 		}
-		if (extension == "json") {
+		if (format == ResourceTextSerializer::FORMAT_JSON) {
 			err = ResourceTextSerializer::write_json(copy, options, text, error);
-		} else {
+		} else if (tree_format) {
 			// Plain INI: players and other tools can edit it.
 			options.ini_plain_values = true;
 			err = ResourceTextSerializer::write_ini(copy, options, text, error);
+		} else {
+			err = ResourceTextSerializer::write_format(format, copy, options, text, error);
 		}
 	}
 	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Settings domain \"%s\": can't write \"%s\": %s", domain, path, error));
@@ -1085,8 +1115,8 @@ void SettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_apply_mode", "mode"), &SettingsServer::set_apply_mode);
 	ClassDB::bind_method(D_METHOD("get_apply_mode"), &SettingsServer::get_apply_mode);
 	ClassDB::bind_method(D_METHOD("is_dirty"), &SettingsServer::is_dirty);
-	ClassDB::bind_method(D_METHOD("get_dirty_values"), &SettingsServer::get_dirty_values);
-	ClassDB::bind_method(D_METHOD("get_restart_values"), &SettingsServer::get_restart_values);
+	ClassDB::bind_method(D_METHOD("get_dirty_setting_names"), &SettingsServer::get_dirty_setting_names);
+	ClassDB::bind_method(D_METHOD("get_restart_required_names"), &SettingsServer::get_restart_required_names);
 	ClassDB::bind_method(D_METHOD("revert"), &SettingsServer::revert);
 	ClassDB::bind_method(D_METHOD("reset_value", "name"), &SettingsServer::reset_value);
 	ClassDB::bind_method(D_METHOD("reset_to_defaults"), &SettingsServer::reset_to_defaults);
@@ -1097,11 +1127,11 @@ void SettingsServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("apply"), &SettingsServer::apply);
 	ClassDB::bind_method(D_METHOD("apply_with_confirmation", "timeout_sec"), &SettingsServer::apply_with_confirmation, DEFVAL(-1.0));
-	ClassDB::bind_method(D_METHOD("confirm_pending"), &SettingsServer::confirm_pending);
-	ClassDB::bind_method(D_METHOD("cancel_pending"), &SettingsServer::cancel_pending);
+	ClassDB::bind_method(D_METHOD("confirm_changes"), &SettingsServer::confirm_changes);
+	ClassDB::bind_method(D_METHOD("cancel_confirmation"), &SettingsServer::cancel_confirmation);
 	ClassDB::bind_method(D_METHOD("is_confirmation_pending"), &SettingsServer::is_confirmation_pending);
 	ClassDB::bind_method(D_METHOD("get_confirmation_time_left"), &SettingsServer::get_confirmation_time_left);
-	ClassDB::bind_method(D_METHOD("retrieve"), &SettingsServer::retrieve);
+	ClassDB::bind_method(D_METHOD("read_from_engine"), &SettingsServer::read_from_engine);
 
 	ClassDB::bind_method(D_METHOD("load"), &SettingsServer::load);
 	ClassDB::bind_method(D_METHOD("save"), &SettingsServer::save);
@@ -1110,15 +1140,12 @@ void SettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_unsaved_changes"), &SettingsServer::has_unsaved_changes);
 	ClassDB::bind_method(D_METHOD("is_started"), &SettingsServer::is_started);
 
-	ClassDB::bind_static_method("SettingsServer", D_METHOD("get_storage_folder"), &SettingsServer::get_storage_folder);
-	ClassDB::bind_static_method("SettingsServer", D_METHOD("get_storage_format"), &SettingsServer::get_storage_format);
-
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "apply_mode", PROPERTY_HINT_ENUM, "Immediate,Manual"), "set_apply_mode", "get_apply_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "file_path", PROPERTY_HINT_NONE, ""), "set_file_path", "get_file_path");
 
 	ADD_SIGNAL(MethodInfo("value_changed", PropertyInfo(Variant::STRING_NAME, "name"), PropertyInfo(Variant::NIL, "value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NIL_IS_VARIANT)));
 	ADD_SIGNAL(MethodInfo("applied", PropertyInfo(Variant::PACKED_STRING_ARRAY, "names")));
-	ADD_SIGNAL(MethodInfo("retrieved"));
+	ADD_SIGNAL(MethodInfo("read_from_engine_finished"));
 	ADD_SIGNAL(MethodInfo("loaded"));
 	ADD_SIGNAL(MethodInfo("saved"));
 	ADD_SIGNAL(MethodInfo("reset"));
@@ -1129,6 +1156,7 @@ void SettingsServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(APPLY_MODE_IMMEDIATE);
 	BIND_ENUM_CONSTANT(APPLY_MODE_MANUAL);
 
+	BIND_ENUM_CONSTANT(APPLY_PHASE_NONE);
 	BIND_ENUM_CONSTANT(APPLY_PHASE_PRE_DISPLAY);
 	BIND_ENUM_CONSTANT(APPLY_PHASE_SERVERS);
 	BIND_ENUM_CONSTANT(APPLY_PHASE_SCENE);
@@ -1144,7 +1172,7 @@ void SettingsServer::_bind_methods() {
 	GDVIRTUAL_BIND(_get_apply_phase);
 	GDVIRTUAL_BIND(_create_settings);
 	GDVIRTUAL_BIND(_apply, "settings", "names");
-	GDVIRTUAL_BIND(_retrieve, "settings");
+	GDVIRTUAL_BIND(_read_from_engine, "settings");
 	GDVIRTUAL_BIND(_validate_value, "name", "value");
 	GDVIRTUAL_BIND(_migrate, "from_version", "data");
 	GDVIRTUAL_BIND(_is_value_supported, "name");
