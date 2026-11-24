@@ -43,6 +43,8 @@ TEST_FORCE_LINK(test_resource_text_serializer)
 #include "core/variant/typed_array.h"
 #include "tests/test_utils.h"
 
+#include "modules/modules_enabled.gen.h" // For yaml.
+
 namespace TestResourceTextSerializer {
 
 class TextFormatEntry : public Resource {
@@ -718,13 +720,17 @@ TEST_CASE("[ResourceTextSerializer] Unavailable formats and can_serialize()") {
 	const Ref<TextFormatSettings> settings = make_settings();
 	CHECK(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_JSON));
 	CHECK_FALSE(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_CSV));
+#ifndef MODULE_YAML_ENABLED
 	CHECK_FALSE(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_YAML));
+#endif
 	CHECK_FALSE(serializer->can_serialize(Ref<Resource>(), ResourceTextSerializer::FORMAT_JSON));
 
 	String text;
 	String error;
+#ifndef MODULE_YAML_ENABLED
 	CHECK(ResourceTextSerializer::write_format(ResourceTextSerializer::FORMAT_YAML, settings, ResourceTextSerializer::get_default_options(), text, error) == ERR_UNAVAILABLE);
 	CHECK(error.contains("YAML"));
+#endif
 	CHECK(ResourceTextSerializer::write_format(ResourceTextSerializer::FORMAT_MAX, settings, ResourceTextSerializer::get_default_options(), text, error) == ERR_UNAVAILABLE);
 	CHECK(ResourceTextSerializer::TEXT_LAYOUT_VERSION == 1);
 }

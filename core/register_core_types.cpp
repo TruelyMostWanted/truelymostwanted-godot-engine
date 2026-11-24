@@ -46,6 +46,7 @@
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
 #include "core/io/config_file.h"
+#include "core/io/csv_format.h"
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
@@ -54,6 +55,7 @@
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
+#include "core/io/ini_format.h"
 #include "core/io/json.h"
 #include "core/io/json_resource_format.h"
 #include "core/io/marshalls.h"
@@ -62,6 +64,7 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_build_plan.h"
 #include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
@@ -85,6 +88,7 @@
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
+#include "core/io/xml_format.h"
 #include "core/io/xml_parser.h"
 #include "core/io/xml_writer.h"
 #include "core/math/a_star.h"
@@ -338,6 +342,9 @@ void register_core_types() {
 	GDREGISTER_CLASS(XMLParser);
 	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
+	GDREGISTER_CLASS(XML);
+	GDREGISTER_CLASS(INI);
+	GDREGISTER_CLASS(CSV);
 	GDREGISTER_CLASS(RegExMatch);
 	GDREGISTER_CLASS(RegEx);
 
@@ -398,6 +405,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PCKExtractResult);
 	GDREGISTER_CLASS(PCKPackage);
 	GDREGISTER_CLASS(PCKPackageEntry);
+	GDREGISTER_CLASS(PCKBuildPlan);
 	GDREGISTER_ABSTRACT_CLASS(PCKPackageServer);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
 	GDREGISTER_CLASS(PreloadList);

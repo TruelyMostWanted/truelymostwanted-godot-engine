@@ -55,7 +55,7 @@
 		[/csharp]
 		[/codeblocks]
 		[b]Note:[/b] In C#, the static class [code skip-lint]InputSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]InputSettingsServer.Singleton[/code].
-		[b]Note:[/b] Key bindings are not part of this domain.
+		[b]Note:[/b] The events of the [InputMap] actions are not part of this domain, see [InputMapSettingsServer].
 	</description>
 	<tutorials>
 	</tutorials>

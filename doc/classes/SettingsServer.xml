@@ -12,8 +12,9 @@
 		[b]Apply mode.[/b] In [constant APPLY_MODE_IMMEDIATE] (the default), every [method set_value] calls [method apply] at once. In [constant APPLY_MODE_MANUAL] the changes stay pending until you call [method apply], for an options menu with an "Apply" button; [method revert] drops them. [method apply] pushes the changed values to the engine and emits [signal applied].
 		[b]Bindings.[/b] A setting is pushed to the engine in one of three ways: a property of an object ([method bind_setting_property]), a property of an engine singleton ([method bind_setting_singleton_property]) or two callables ([method bind_setting_callbacks]). Settings without a binding are passed to [method _apply]. The same bindings are used to read the engine state in [method read_from_engine] and for the defaults. Use [enum SettingFlags] to mark values that need a restart or a confirmation.
 		[b]Confirmation.[/b] [method apply_with_confirmation] applies the changes and starts a timer. If the player does not call [method confirm_changes] in time, the old values are restored, for example when a new video mode shows a black screen. The timeout is checked every frame of the [SceneTree] ([signal SceneTree.process_frame]); without a [SceneTree] call [method confirm_changes] or [method cancel_confirmation] yourself. In [constant APPLY_MODE_IMMEDIATE], values with [constant SETTING_FLAG_CONFIRM] go through the confirmation automatically. The default timeout is [member ProjectSettings.settings/apply/confirmation_timeout].
-		[b]Storage.[/b] Each domain has one file, [code]user://settings/&lt;domain&gt;.ini[/code] (plain INI that players can edit), [code].json[/code], [code].xml[/code] or [code].toml[/code], chosen with [member ProjectSettings.settings/storage/format] (a [enum ResourceTextSerializer.Format] value, see [method SettingsServerManager.get_storage_format]). A [ListSettingsServer] can also use [code].csv[/code]. A format that is not available (TOML with the module disabled, YAML) falls back to INI with a warning. With [member ProjectSettings.settings/storage/only_changed_values] only the values that differ from the defaults are written (INI and JSON; XML and TOML files always hold all values), so values added in a game update reach players who never changed them. The file contains the entry [code]metadata/settings_version[/code] with [method get_format_version]; if it is older than the current version, [method _migrate] converts the data when the file is loaded.
-		[method load] reads the file into the pending copy (call [method apply] afterwards to use it; [SettingsServerManager] does this at startup). If there is no file, it returns [constant ERR_FILE_NOT_FOUND] and the defaults stay, without a message: this is the normal first start. If the file is broken, it prints a warning and the defaults are used; the file is not overwritten until the next [method save]. [method save] writes the applied state (the confirmed state while a confirmation is pending).
+		[b]Storage.[/b] Each domain has one file. Its path is, in this order: [member file_path] set at runtime, the project setting [code]settings/paths/&lt;domain&gt;_settings_path[/code] (for example [code]settings/paths/audio_settings_path = "user://settings/audio.json"[/code]; see [member file_path]), or [code]user://settings/&lt;domain&gt;.ini[/code] (plain INI that players can edit), [code].json[/code], [code].xml[/code], [code].toml[/code] or [code].yaml[/code], chosen with [member ProjectSettings.settings/storage/format] (a [enum ResourceTextSerializer.Format] value, see [method SettingsServerManager.get_storage_format]). A [ListSettingsServer] can also use [code].csv[/code]. A format that is not available (TOML or YAML with its module disabled) falls back to INI with a warning. With [member ProjectSettings.settings/storage/only_changed_values] only the values that differ from the defaults are written (INI and JSON; XML, TOML and YAML files always hold all values), so values added in a game update reach players who never changed them. The file contains the entry [code]metadata/settings_version[/code] with [method get_format_version]; if it is older than the current version, [method _migrate] converts the data when the file is loaded.
+		[method load] reads the file into the pending copy (call [method apply] afterwards to use it; [SettingsServerManager] does this at startup). If there is no file, it returns [constant ERR_FILE_NOT_FOUND] and the defaults stay, without a message: this is the normal first start. If the file is broken, it prints a warning, emits [signal load_failed] and the defaults are used; the file is not overwritten until the next [method save]. [method save] writes the applied state (the confirmed state while a confirmation is pending) and emits [signal save_failed] if the file can't be written.
+		[b]Signals.[/b] A game can follow a server by its signals alone: [signal settings_changed] after every operation that changes pending values (or [signal value_changed] per value), [signal applied] when values reach the engine, [signal restart_required], [signal confirmation_requested] and [signal confirmation_finished] for the confirmation dialog, [signal loaded], [signal saved], [signal load_failed] and [signal save_failed] for the file, and [signal reset].
 		With [member ProjectSettings.settings/storage/autosave], a save is queued after every [method apply] and runs at the end of the frame, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. On exit, [SettingsServerManager] runs queued saves.
 		[b]Session overrides.[/b] [method set_session_override] pushes a value to the engine without changing the stored value, for example from a command line argument. It is never saved. A later [method set_value] for the same setting removes the override.
 		[b]Writing a domain for your game.[/b] Extend [SettingsServer], implement [method _get_domain] and [method _create_settings], and list the script in the project setting [member ProjectSettings.settings/startup/custom_servers]. [SettingsServerManager] creates and starts it.
@@ -105,6 +106,7 @@
 			<return type="int" enum="SettingsServer.ApplyPhase" />
 			<description>
 				Returns the [enum ApplyPhase] in which [SettingsServerManager] starts this server while the game starts. The default is [constant APPLY_PHASE_SERVERS]. [constant APPLY_PHASE_NONE] and values outside the range of [enum ApplyPhase] are clamped to the first or the last phase.
+				[b]Note:[/b] A script domain listed in [member ProjectSettings.settings/startup/custom_servers] is created in [constant APPLY_PHASE_SCENE], the latest phase, and is started at once, whatever this method returns: scripts can't run before the [DisplayServer] exists. Only a domain written in C++ (an engine module or a GDExtension registered at the servers level) can start in [constant APPLY_PHASE_PRE_DISPLAY] or [constant APPLY_PHASE_SERVERS]. A domain registered after its phase (for example by an autoload) is started when it is registered.
 			</description>
 		</method>
 		<method name="_get_domain" qualifiers="virtual const">
@@ -154,6 +156,7 @@
 			<description>
 				Pushes all values that differ between the pending and the applied copy to the engine, makes the pending copy the applied one, emits [signal applied] and queues an autosave. Returns [constant OK] when there is nothing to apply.
 				If one of the changed values has [constant SETTING_FLAG_CONFIRM] (and the server is not starting), [method apply_with_confirmation] is called instead and its result is returned. Values with [constant SETTING_FLAG_RESTART_REQUIRED] are listed in [method get_restart_required_names] and reported with [signal restart_required].
+				If a confirmation is pending ([method is_confirmation_pending]), it is kept first ([method confirm_changes]: [signal confirmation_finished] with [code]true[/code]): the player changed more settings while the confirmation dialog was open, so the pending values work. A later [method cancel_confirmation] only reverts the values of a new confirmation.
 			</description>
 		</method>
 		<method name="apply_with_confirmation">
@@ -161,7 +164,7 @@
 			<param index="0" name="timeout_sec" type="float" default="-1.0" />
 			<description>
 				Applies the pending changes like [method apply], keeps a backup of the previous applied state and waits for [method confirm_changes]. If it is not called within [param timeout_sec] seconds, [method cancel_confirmation] restores the backup. A negative [param timeout_sec] uses [member ProjectSettings.settings/apply/confirmation_timeout]. Emits [signal confirmation_requested].
-				The changes are not saved until they are confirmed. Returns [constant OK] when there is nothing to apply and [constant ERR_BUSY] if a confirmation is already pending.
+				The changes are not saved until they are confirmed. Returns [constant OK] when there is nothing to apply. If a confirmation is already pending, it is kept first ([method confirm_changes]), then the new confirmation starts with its own backup and timeout.
 			</description>
 		</method>
 		<method name="bind_setting_callbacks">
@@ -272,7 +275,7 @@
 		<method name="get_restart_required_names" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the names of the settings with [constant SETTING_FLAG_RESTART_REQUIRED] that were applied since the game started. Their new values take effect after a restart.
+				Returns the names of the settings with [constant SETTING_FLAG_RESTART_REQUIRED] whose applied value differs from the value the engine started with. Their new values take effect after a restart. A name is removed when its value is applied back to the value of the start (also by [method cancel_confirmation] or [method reset_to_defaults]), and the list is cleared when [SettingsServerManager] starts the server. Before the server is started, the defaults are the values of the start.
 			</description>
 		</method>
 		<method name="get_setting_flags" qualifiers="const">
@@ -356,20 +359,20 @@
 		<method name="load">
 			<return type="int" enum="Error" />
 			<description>
-				Reads the settings file into the pending copy: the defaults, with the values from the file on top. Values that are missing in the file keep their default. Values from the file are validated ([method _validate_value]) and old files are converted with [method _migrate]. Emits [signal loaded]. Nothing is pushed to the engine; call [method apply] to use the values.
-				Returns [constant ERR_FILE_NOT_FOUND] if there is no file yet; the defaults are used and no warning is printed. Returns an error code, prints a warning and uses the defaults if the file can't be read or is not valid; the file is not overwritten until the next [method save].
+				Reads the settings file into the pending copy: the defaults, with the values from the file on top. Values that are missing in the file keep their default. Values from the file are validated ([method _validate_value]) and old files are converted with [method _migrate]. Emits [signal settings_changed] with the values that changed and then [signal loaded]. Nothing is pushed to the engine; call [method apply] to use the values.
+				Returns [constant ERR_FILE_NOT_FOUND] if there is no file yet; the defaults are used and no warning is printed. Returns an error code, prints a warning, emits [signal load_failed] and uses the defaults if the file can't be read or is not valid; the file is not overwritten until the next [method save].
 			</description>
 		</method>
 		<method name="read_from_engine">
 			<return type="void" />
 			<description>
-				Reads the current engine state of the bound values (and [method _read_from_engine]) into the pending copy and makes it the applied copy. Use it after the engine changed a value by other means, for example the window was resized by the player. Emits [signal read_from_engine_finished]. Values without a getter keep their pending value.
+				Reads the current engine state of the bound values (and [method _read_from_engine]) into the pending copy and makes it the applied copy. Use it after the engine changed a value by other means, for example the window was resized by the player. Emits [signal settings_changed] with the values that changed, then [signal read_from_engine_finished]. Values without a getter keep their pending value.
 			</description>
 		</method>
 		<method name="reset_to_defaults">
 			<return type="void" />
 			<description>
-				Sets all pending values to the defaults, clears the session overrides of the changed values and emits [signal value_changed] for each changed value and [signal reset]. In [constant APPLY_MODE_IMMEDIATE] the defaults are applied at once.
+				Sets all pending values to the defaults, clears the session overrides of the changed values and emits [signal value_changed] for each changed value, [signal settings_changed] once and [signal reset]. In [constant APPLY_MODE_IMMEDIATE] the defaults are applied at once.
 			</description>
 		</method>
 		<method name="reset_value">
@@ -382,13 +385,13 @@
 		<method name="revert">
 			<return type="void" />
 			<description>
-				Drops all pending changes: the pending copy is set to the applied copy. Emits [signal value_changed] for each changed value.
+				Drops all pending changes: the pending copy is set to the applied copy. Emits [signal value_changed] for each changed value and [signal settings_changed] once.
 			</description>
 		</method>
 		<method name="save">
 			<return type="int" enum="Error" />
 			<description>
-				Writes the applied state to the settings file and creates the folder if needed. While a confirmation is pending, the state from before the confirmation is written. With [member ProjectSettings.settings/storage/only_changed_values], only values that differ from the defaults are written (INI and JSON). Emits [signal saved]. Returns an error code and prints an error if the file can't be written.
+				Writes the applied state to the settings file and creates the folder if needed. While a confirmation is pending, the state from before the confirmation is written. With [member ProjectSettings.settings/storage/only_changed_values], only values that differ from the defaults are written (INI and JSON). Values are compared by their stored properties, like [method is_dirty]: the list of a [ListSettingsServer] is not written while its entries have the values of the default entries, even though they are other resources. Emits [signal saved]. Returns an error code, prints an error and emits [signal save_failed] if the file can't be written (also when the text can't be built, the folder can't be created or the path is read-only, such as [code]res://[/code] in an exported game).
 				[b]Note:[/b] Pending values that are not applied are not saved. A save that was queued by autosave is cleared.
 			</description>
 		</method>
@@ -413,7 +416,7 @@
 			<param index="0" name="name" type="StringName" />
 			<param index="1" name="value" type="Variant" />
 			<description>
-				Changes the pending value of the setting [param name]. The value is validated first (range hints are clamped, invalid enum values are rejected with an error, then [method _validate_value] is called). A session override of the setting is removed. If the value changed, [signal value_changed] is emitted and, in [constant APPLY_MODE_IMMEDIATE], [method apply] is called. Reports an error if the domain has no such setting.
+				Changes the pending value of the setting [param name]. The value is validated first (range hints are clamped, invalid enum values are rejected with an error, then [method _validate_value] is called). A session override of the setting is removed. If the value changed, [signal value_changed] and [signal settings_changed] are emitted and, in [constant APPLY_MODE_IMMEDIATE], [method apply] is called. Reports an error if the domain has no such setting.
 			</description>
 		</method>
 		<method name="unbind_setting">
@@ -429,7 +432,12 @@
 			When changed values are applied: at once or when [method apply] is called.
 		</member>
 		<member name="file_path" type="String" setter="set_file_path" getter="get_file_path">
-			The path of the settings file. If empty, the file is [code]&lt;storage folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] (see [method SettingsServerManager.get_storage_folder] and [method SettingsServerManager.get_storage_format]); the getter then returns this path. The format is taken from the extension of the path ([method ResourceTextSerializer.get_format_from_extension]): [code].ini[/code], [code].json[/code], [code].csv[/code], [code].xml[/code] or [code].toml[/code]. Anything else is read and written as INI.
+			The path of the settings file. The getter returns the path in use, which is the first of:
+			- the path set with the setter at runtime;
+			- the project setting [code]settings/paths/&lt;domain&gt;_settings_path[/code], for example [code]settings/paths/input_map_settings_path = "user://settings/input_map.json"[/code]. [SettingsServerManager] defines it when the domain registers, so the engine domains show it in [b]Project Settings &gt; Settings &gt; Paths[/b] (advanced settings). Script domains from [member ProjectSettings.settings/startup/custom_servers] define it when the game runs; add it by hand in the editor with this name;
+			- [code]&lt;storage folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] (see [method SettingsServerManager.get_storage_folder] and [method SettingsServerManager.get_storage_format]), for example [code]user://settings/audio.ini[/code]. This is the default: the project setting is empty.
+			The format is taken from the extension of the path ([method ResourceTextSerializer.get_format_from_extension]): [code].json[/code], [code].ini[/code], [code].csv[/code] (only [ListSettingsServer]), [code].xml[/code], [code].toml[/code], [code].yaml[/code] or [code].yml[/code]. An unknown extension, or a format whose module is not in the build, prints an error once that names the domain and the path; the file is then read and written in the format of [member ProjectSettings.settings/storage/format].
+			[b]Note:[/b] Use a [code]user://[/code] path. [code]res://[/code] is read-only in exported games, and on the Web only [code]user://[/code] is writable (kept in IndexedDB); absolute paths work on desktop platforms only.
 		</member>
 	</members>
 	<signals>
@@ -451,9 +459,16 @@
 				Emitted when [method apply_with_confirmation] starts waiting. Show a dialog with a countdown ([method get_confirmation_time_left]) and call [method confirm_changes] or [method cancel_confirmation].
 			</description>
 		</signal>
+		<signal name="load_failed">
+			<param index="0" name="error" type="int" enum="Error" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Emitted by [method load] when the file at [param path] exists but can't be read or is not valid, or there is no path; [param error] is the error that [method load] returns. The defaults are used; [signal loaded] follows. Not emitted when there is no file yet (the normal first start).
+			</description>
+		</signal>
 		<signal name="loaded">
 			<description>
-				Emitted when [method load] has finished, also if there was no file or the file was not valid.
+				Emitted when [method load] has finished, also if there was no file or the file was not valid (then after [signal load_failed]).
 			</description>
 		</signal>
 		<signal name="read_from_engine_finished">
@@ -469,7 +484,14 @@
 		<signal name="restart_required">
 			<param index="0" name="names" type="PackedStringArray" />
 			<description>
-				Emitted when values with [constant SETTING_FLAG_RESTART_REQUIRED] were applied. They take effect after a restart. Not emitted while the server starts.
+				Emitted when the list of [method get_restart_required_names] changes: a value with [constant SETTING_FLAG_RESTART_REQUIRED] was applied and differs from the value the engine started with, or was applied back to it. [param names] is the whole list after the change; an empty list means that no restart is needed any more. Not emitted while the server starts.
+			</description>
+		</signal>
+		<signal name="save_failed">
+			<param index="0" name="error" type="int" enum="Error" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Emitted by [method save] (also a save queued by autosave) when the file at [param path] can't be written; [param error] is the error that [method save] returns. The file keeps its old content and [method has_unsaved_changes] stays [code]true[/code]. Show a message, or try another path with [member file_path].
 			</description>
 		</signal>
 		<signal name="saved">
@@ -477,11 +499,17 @@
 				Emitted when [method save] has written the file.
 			</description>
 		</signal>
+		<signal name="settings_changed">
+			<param index="0" name="names" type="PackedStringArray" />
+			<description>
+				Emitted once after an operation that changed pending values, with the names of all changed values: [method set_value] (and [method reset_value]), [method revert], [method reset_to_defaults], [method load], [method read_from_engine], and a confirmation that was canceled or timed out. Not emitted when nothing changed. Connect a whole options menu to this signal instead of [signal value_changed], which is emitted per value and not by [method load] and [method read_from_engine]. In [constant APPLY_MODE_IMMEDIATE] it comes before [signal applied].
+			</description>
+		</signal>
 		<signal name="value_changed">
 			<param index="0" name="name" type="StringName" />
 			<param index="1" name="value" type="Variant" />
 			<description>
-				Emitted when the pending value of a setting changed, with the new value. In [constant APPLY_MODE_MANUAL] this is before the value is applied.
+				Emitted when the pending value of a setting changed, with the new value: by [method set_value], [method reset_value], [method revert], [method reset_to_defaults] and a canceled confirmation. In [constant APPLY_MODE_MANUAL] this is before the value is applied. [method load] and [method read_from_engine] emit only [signal settings_changed].
 			</description>
 		</signal>
 	</signals>

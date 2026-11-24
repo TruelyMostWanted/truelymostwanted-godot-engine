@@ -43,9 +43,12 @@ class AudioBusSettingsServer : public ListSettingsServer {
 
 	bool create_missing_buses = false;
 	HashSet<String> warned_buses; // Buses missing in the layout that were reported once.
+	bool pushing_buses = false; // Set while _apply_settings() changes AudioServer (add_bus() emits bus_layout_changed).
 
 	static Ref<AudioBusSettings> _make_entry_from_engine(int p_bus);
 	void _merge_layout_buses();
+	void _connect_audio_server();
+	void _on_bus_layout_changed();
 	void _set_bus_value(const StringName &p_bus, const StringName &p_name, const Variant &p_value);
 	Variant _get_bus_value(const StringName &p_bus, const StringName &p_name) const;
 
