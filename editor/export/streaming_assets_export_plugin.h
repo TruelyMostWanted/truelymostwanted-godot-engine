@@ -33,9 +33,10 @@
 #include "editor/export/editor_export_plugin.h"
 
 // Ships the streaming assets folder (`filesystem/streaming_assets/*`) with an export.
-// The folder never goes through the import pipeline of the export: it is skipped
-// and either copied unchanged next to the export (`raw` on desktop) or embedded
-// as raw files into the main pack (the fallback on all other platforms).
+// The folder never goes into the main pack through the export pipeline: it is skipped
+// and either copied unchanged next to the export (`raw` on desktop), built into the
+// streaming pack next to the main pack (`pack` on desktop, see StreamingAssetsPackBuilder)
+// or embedded as raw files into the main pack (the fallback on all other platforms).
 // The project settings are registered by StreamingAssetsServer (core); this
 // plugin only reads them and uses the same defaults when they are missing.
 class StreamingAssetsExportPlugin : public EditorExportPlugin {
@@ -57,16 +58,19 @@ public:
 		PLACEMENT_EMBED,
 		PLACEMENT_NONE,
 		PLACEMENT_BUNDLE,
+		PLACEMENT_PACK,
 	};
 
 	static constexpr const char *SETTING_ENABLED = "filesystem/streaming_assets/enabled";
 	static constexpr const char *SETTING_SOURCE_FOLDER = "filesystem/streaming_assets/source_folder";
 	static constexpr const char *SETTING_MODE = "filesystem/streaming_assets/mode";
 	static constexpr const char *SETTING_TARGET_FOLDER = "filesystem/streaming_assets/target_folder";
+	static constexpr const char *SETTING_PACK_FILE = "filesystem/streaming_assets/pack_file";
 	static constexpr const char *SETTING_FALLBACK = "filesystem/streaming_assets/fallback";
 
 	static constexpr const char *DEFAULT_SOURCE_FOLDER = "res://streaming_assets";
 	static constexpr const char *DEFAULT_TARGET_FOLDER = "{exe_name}_Data/StreamingAssets";
+	static constexpr const char *DEFAULT_PACK_FILE = "{exe_name}.streaming.pck";
 
 private:
 	bool active = false;
@@ -74,6 +78,8 @@ private:
 	String source_folder; // `res://` path, simplified, without a trailing slash.
 	String target_folder; // Expanded, relative to the export folder or to the bundle resources.
 	String export_path; // Absolute path of the exported executable or pack.
+	String pack_path; // Absolute path of the streaming pack (PLACEMENT_PACK).
+	bool debug = false;
 	PackedStringArray files; // Relative to `source_folder`.
 
 	static void _collect_files(const String &p_root, const String &p_relative, int p_depth, PackedStringArray &r_files);
@@ -83,6 +89,7 @@ private:
 	void _add_message(EditorExportPlatform::ExportMessageType p_type, const String &p_message) const;
 	void _reset();
 	void _copy_external();
+	void _build_pack();
 
 protected:
 	static void _bind_methods();
@@ -100,7 +107,7 @@ public:
 	static bool is_path_in_folder(const String &p_path, const String &p_folder);
 	static bool is_file_excluded(const String &p_name);
 	static PackedStringArray collect_files(const String &p_folder);
-	static Placement resolve_placement(const PackedStringArray &p_features, const String &p_export_path, Fallback p_fallback);
+	static Placement resolve_placement(const PackedStringArray &p_features, const String &p_export_path, Fallback p_fallback, Mode p_mode = MODE_RAW);
 	// The `{exe_name}` the exported game sees at runtime (`StreamingAssetsServer::get_exe_name()`).
 	static String get_export_exe_name(const PackedStringArray &p_features, const String &p_export_path, const String &p_app_name);
 };

@@ -34,6 +34,7 @@
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
+#include "servers/settings/list_settings_server.h"
 
 static constexpr const char *SETTING_APPLY_ON_STARTUP = "settings/startup/apply_on_startup";
 static constexpr const char *SETTING_CUSTOM_SERVERS = "settings/startup/custom_servers";
@@ -97,6 +98,8 @@ Error SettingsServerManager::register_server(SettingsServer *p_server) {
 		}
 	}
 	ERR_FAIL_COND_V_MSG(duplicate, ERR_ALREADY_EXISTS, vformat("A settings server for the domain \"%s\" is already registered.", domain));
+	// `settings/paths/<domain>_settings_path`: engine domains register in the editor too, so their path shows up in the project settings.
+	SettingsServer::register_path_setting(domain, Object::cast_to<ListSettingsServer>(p_server) != nullptr);
 	// Registered after its startup phase (for example by a module or a GDExtension at scene level).
 	if (enabled && phase != SettingsServer::APPLY_PHASE_NONE && int(p_server->get_apply_phase()) <= int(phase)) {
 		p_server->startup();
@@ -270,6 +273,10 @@ void SettingsServerManager::_create_custom_servers() {
 			WARN_PRINT(vformat("Settings: can't create an instance of \"%s\".", entry));
 			continue;
 		}
+		if (int(server->get_apply_phase()) < int(SettingsServer::APPLY_PHASE_SCENE)) {
+			// Scripts can't run before the DisplayServer and the script languages exist.
+			print_verbose(vformat("Settings: the script domain \"%s\" asks for an earlier apply phase; script domains from \"%s\" start in APPLY_PHASE_SCENE.", server->get_domain(), SETTING_CUSTOM_SERVERS));
+		}
 		{
 			MutexLock lock(mutex);
 			owned.push_back(object->get_instance_id());
@@ -291,13 +298,14 @@ void SettingsServerManager::startup(SettingsServer::ApplyPhase p_phase) {
 		MutexLock lock(mutex);
 		startup_enabled = enabled;
 	}
-	if (p_phase == SettingsServer::APPLY_PHASE_SCENE) {
-		// Script domains: their classes are loaded now.
-		_create_custom_servers();
-	}
 	{
 		MutexLock lock(mutex);
 		startup_phase = SettingsServer::ApplyPhase(MAX(int(startup_phase), int(p_phase)));
+	}
+	if (p_phase == SettingsServer::APPLY_PHASE_SCENE) {
+		// Script domains: their classes are loaded now. The phase is already APPLY_PHASE_SCENE, so register_server()
+		// starts each one at once, whatever phase its _get_apply_phase() returns (the latest phase is the only one left).
+		_create_custom_servers();
 	}
 	if (!enabled) {
 		return;

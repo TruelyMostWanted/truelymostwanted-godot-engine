@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoShadowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [VideoShadowSettingsServer]: shadow atlases and soft shadow quality.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"video_shadow"[/code]. [VideoShadowSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_shadow.ini[/code]. Change the values through the methods of [VideoShadowSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [VideoShadowSettingsServer] rounds atlas sizes up to a power of two, clamps them to [code]256[/code] to [code]16384[/code] and replaces invalid enum values with the default, with a warning, when they are set or loaded.
+		It can also be used as the project defaults of the domain: save a [VideoShadowSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/video_shadow[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_positional_shadow_atlas_quadrant_subdiv" qualifiers="const">
+			<return type="int" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" />
+			<param index="0" name="quadrant" type="int" />
+			<description>
+				Returns the subdivision of the quadrant [param quadrant] ([code]0[/code] to [code]3[/code]) of the positional shadow atlas. See [member positional_shadow_atlas_quad_0].
+			</description>
+		</method>
+		<method name="set_positional_shadow_atlas_quadrant_subdiv">
+			<return type="void" />
+			<param index="0" name="quadrant" type="int" />
+			<param index="1" name="subdiv" type="int" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" />
+			<description>
+				Sets the subdivision of the quadrant [param quadrant] ([code]0[/code] to [code]3[/code]) of the positional shadow atlas. See [member positional_shadow_atlas_quad_0].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="directional_shadow_16_bits" type="bool" setter="set_directional_shadow_16_bits" getter="is_directional_shadow_16_bits_enabled" default="true">
+			If [code]true[/code], the shadow map of [DirectionalLight3D]s uses 16-bit depth, pushed to [method RenderingServer.directional_shadow_atlas_set_size]. [code]false[/code] uses 32-bit depth (24-bit in the Compatibility renderer): fewer shadow acne artifacts at large distances, twice the memory and bandwidth. Global, not per viewport. Works in every renderer.
+			[b]Note:[/b] Forward+ and Mobile precompile the shadow pipelines only for the bit depths in the project settings; switching to another one compiles them on first use (one longer hitch).
+		</member>
+		<member name="directional_shadow_atlas_size" type="int" setter="set_directional_shadow_atlas_size" getter="get_directional_shadow_atlas_size" default="4096">
+			The size in pixels of the shadow map of [DirectionalLight3D]s, pushed to [method RenderingServer.directional_shadow_atlas_set_size]. Larger values give sharper directional shadows and use more VRAM ([code]4096[/code] at 16 bits: 32 MiB). Global, not per viewport. Rounded up to a power of two; valid range: [code]256[/code] to [code]16384[/code]. Changing it reallocates the shadow map on the next frame (a short hitch). Works in every renderer.
+		</member>
+		<member name="directional_soft_shadow_filter_quality" type="int" setter="set_directional_soft_shadow_filter_quality" getter="get_directional_soft_shadow_filter_quality" enum="RenderingServer.ShadowQuality" default="2">
+			The soft shadow filter quality of [DirectionalLight3D]s, pushed to [method RenderingServer.directional_soft_shadow_filter_set_quality]. Higher qualities give smoother shadow edges and cost more GPU time. Global. Works in every renderer; the Compatibility renderer has three levels only: [constant RenderingServer.SHADOW_QUALITY_HARD] and [constant RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW] are hard, [constant RenderingServer.SHADOW_QUALITY_SOFT_LOW] and [constant RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM] use 5 samples, [constant RenderingServer.SHADOW_QUALITY_SOFT_HIGH] and [constant RenderingServer.SHADOW_QUALITY_SOFT_ULTRA] use 13 samples.
+		</member>
+		<member name="positional_shadow_atlas_16_bits" type="bool" setter="set_positional_shadow_atlas_16_bits" getter="is_positional_shadow_atlas_16_bits_enabled" default="true">
+			If [code]true[/code], the shadow atlas of [OmniLight3D]s and [SpotLight3D]s uses 16-bit depth, pushed to [member Viewport.positional_shadow_atlas_16_bits]. Works in every renderer. See [member directional_shadow_16_bits].
+		</member>
+		<member name="positional_shadow_atlas_quad_0" type="int" setter="set_positional_shadow_atlas_quadrant_subdiv" getter="get_positional_shadow_atlas_quadrant_subdiv" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" default="2">
+			The subdivision of the first quadrant of the positional shadow atlas, pushed to [member Viewport.positional_shadow_atlas_quad_0]. More subdivisions allow more shadowed lights at once, each with a smaller shadow. Works in every renderer.
+		</member>
+		<member name="positional_shadow_atlas_quad_1" type="int" setter="set_positional_shadow_atlas_quadrant_subdiv" getter="get_positional_shadow_atlas_quadrant_subdiv" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" default="2">
+			The subdivision of the second quadrant of the positional shadow atlas, pushed to [member Viewport.positional_shadow_atlas_quad_1]. Works in every renderer.
+		</member>
+		<member name="positional_shadow_atlas_quad_2" type="int" setter="set_positional_shadow_atlas_quadrant_subdiv" getter="get_positional_shadow_atlas_quadrant_subdiv" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" default="3">
+			The subdivision of the third quadrant of the positional shadow atlas, pushed to [member Viewport.positional_shadow_atlas_quad_2]. Works in every renderer.
+		</member>
+		<member name="positional_shadow_atlas_quad_3" type="int" setter="set_positional_shadow_atlas_quadrant_subdiv" getter="get_positional_shadow_atlas_quadrant_subdiv" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" default="4">
+			The subdivision of the fourth quadrant of the positional shadow atlas, pushed to [member Viewport.positional_shadow_atlas_quad_3]. Works in every renderer.
+		</member>
+		<member name="positional_shadow_atlas_size" type="int" setter="set_positional_shadow_atlas_size" getter="get_positional_shadow_atlas_size" default="4096">
+			The size in pixels of the shadow atlas of [OmniLight3D]s and [SpotLight3D]s, pushed to [member Viewport.positional_shadow_atlas_size]. Larger values give sharper shadows and use more VRAM. [code]0[/code] disables positional shadows entirely (a cheap "off" option for low-end devices). Rounded up to a power of two; valid range: [code]0[/code], or [code]256[/code] to [code]16384[/code]. Changing it reallocates the atlas on the next frame (a short hitch). Works in every renderer.
+		</member>
+		<member name="positional_soft_shadow_filter_quality" type="int" setter="set_positional_soft_shadow_filter_quality" getter="get_positional_soft_shadow_filter_quality" enum="RenderingServer.ShadowQuality" default="2">
+			The soft shadow filter quality of [OmniLight3D]s and [SpotLight3D]s, pushed to [method RenderingServer.positional_soft_shadow_filter_set_quality]. Global. Works in every renderer; the Compatibility renderer has three levels only (see [member directional_soft_shadow_filter_quality]).
+		</member>
+	</members>
+</class>
