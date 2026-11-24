@@ -368,6 +368,11 @@ Variant SettingsServer::_validate_setting(const StringName &p_name, const Varian
 	return p_value;
 }
 
+String SettingsServer::_get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const {
+	const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, p_format);
+	return ResourceTextSerializer::get_type_name(storage_defaults.ptr());
+}
+
 Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionary &p_data) {
 	Dictionary ret;
 	if (GDVIRTUAL_CALL(_migrate, p_from_version, p_data, ret)) {
@@ -1152,10 +1157,9 @@ Error SettingsServer::load() {
 	String error;
 	Ref<Resource> loaded;
 	PackedStringArray present;
-	const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
-	const String type_name = ResourceTextSerializer::get_type_name(storage_defaults.ptr());
 	// The extension decides; an unknown extension is read in the format of the domain.
 	const ResourceTextSerializer::Format format = _get_format_for_path(path);
+	const String type_name = _get_storage_type_for_text(text, format);
 
 	if (err != OK) {
 		error = vformat("can't read the file (%s)", error_names[err]);
@@ -1277,7 +1281,7 @@ Error SettingsServer::save() {
 	String error;
 	Error err = OK;
 	// The storage form has the value names of the settings resource (see _settings_to_storage()).
-	const Ref<Resource> storage = _settings_to_storage(data);
+	const Ref<Resource> storage = _settings_to_storage_for_format(data, format);
 	if (storage.is_null()) {
 		err = ERR_INVALID_DATA;
 		error = "the settings can't be converted to their storage form";
@@ -1292,7 +1296,7 @@ Error SettingsServer::save() {
 			// The serializer compares a value with its default by `==`, which compares the resources of a list by
 			// identity. A value equal to its default by its stored properties (values_equal()) is put into the
 			// compared defaults as the very same value, so it is skipped like an unchanged single value.
-			const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
+			const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, format);
 			Ref<Resource> compared_defaults = storage_defaults.is_valid() ? storage_defaults->duplicate(false) : Ref<Resource>();
 			LocalVector<PropertyInfo> infos;
 			get_value_infos(data.ptr(), infos);

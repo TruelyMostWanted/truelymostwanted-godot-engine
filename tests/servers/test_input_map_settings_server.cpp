@@ -41,6 +41,7 @@ TEST_FORCE_LINK(test_input_map_settings_server)
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_text_serializer.h"
+#include "servers/settings/input_map_settings_records.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/test_utils.h"
@@ -238,7 +239,7 @@ TEST_CASE("[InputMapSettingsServer] Text form of the events of an action") {
 	touch.instantiate();
 	events.push_back(touch); // No text form: skipped.
 	const String text = InputMapSettingsServer::events_to_text(events);
-	CHECK(text == "Key:Ctrl+S; PhysicalKey:W; MouseButton:Left; JoypadButton:A@1; JoypadMotion:LeftX-");
+	CHECK(text == "KeyboardLabel:Ctrl+S; Keyboard:W; Mouse:Left; Gamepad:A@1; GamepadAxis:LeftX-");
 
 	const TypedArray<InputEvent> read = InputMapSettingsServer::text_to_events(text);
 	REQUIRE(read.size() == 5);
@@ -248,35 +249,266 @@ TEST_CASE("[InputMapSettingsServer] Text form of the events of an action") {
 	CHECK(InputMapSettingsServer::events_to_text(read) == text);
 
 	// Invalid items are skipped.
-	CHECK(InputMapSettingsServer::text_to_events("Key:Ctrl+S; NotAType:X; ;").size() == 1);
+	CHECK(InputMapSettingsServer::text_to_events("Keyboard:Ctrl+S; NotAType:X; Keyboard:NoSuchKey; ;").size() == 1);
 	CHECK(InputMapSettingsServer::text_to_events("").is_empty());
 }
 
-TEST_CASE("[SceneTree][InputMapSettingsServer] The file holds one text row per action; version 1 files still load") {
+TEST_CASE("[InputMapSettingsServer] Records: physical or label, device id, axis direction, modifiers") {
+	// Physical key: the position, a label key: the layout.
+	Ref<InputMapSettingsEvent> physical = InputMapSettingsEvent::from_event(make_key(Key::W, true));
+	REQUIRE(physical.is_valid());
+	CHECK(physical->get_device() == InputMapSettingsEvent::DEVICE_KEYBOARD);
+	CHECK(physical->get_input() == "W");
+	CHECK(physical->get_key_mode() == InputMapSettingsEvent::KEY_MODE_PHYSICAL);
+	CHECK(physical->to_text() == "Keyboard:W");
+	const Ref<InputEventKey> physical_event = physical->to_event();
+	REQUIRE(physical_event.is_valid());
+	CHECK(physical_event->get_physical_keycode() == Key::W);
+	CHECK(physical_event->get_keycode() == Key::NONE);
+
+	Ref<InputMapSettingsEvent> label = InputMapSettingsEvent::from_event(make_key(Key::E, false));
+	REQUIRE(label.is_valid());
+	CHECK(label->get_key_mode() == InputMapSettingsEvent::KEY_MODE_LABEL);
+	CHECK(label->to_text() == "KeyboardLabel:E");
+	const Ref<InputEventKey> label_event = label->to_event();
+	REQUIRE(label_event.is_valid());
+	CHECK(label_event->get_keycode() == Key::E);
+	CHECK(label_event->get_physical_keycode() == Key::NONE);
+
+	// Modifiers: keyboard and mouse.
+	Ref<InputMapSettingsEvent> ctrl_shift = InputMapSettingsEvent::from_text("Keyboard:Ctrl+Shift+S");
+	REQUIRE(ctrl_shift.is_valid());
+	CHECK(ctrl_shift->get_modifiers() == "Ctrl+Shift");
+	CHECK(ctrl_shift->get_input() == "S");
+	const Ref<InputEventKey> ctrl_shift_event = ctrl_shift->to_event();
+	REQUIRE(ctrl_shift_event.is_valid());
+	CHECK(ctrl_shift_event->is_ctrl_pressed());
+	CHECK(ctrl_shift_event->is_shift_pressed());
+	CHECK_FALSE(ctrl_shift_event->is_alt_pressed());
+	const Ref<InputMapSettingsEvent> mouse = InputMapSettingsEvent::from_text("Mouse:Ctrl+WheelUp");
+	REQUIRE(mouse.is_valid());
+	CHECK(mouse->get_device() == InputMapSettingsEvent::DEVICE_MOUSE);
+	CHECK(mouse->get_modifiers() == "Ctrl");
+	CHECK(mouse->get_input() == "WheelUp");
+
+	// Gamepad: Any or one pad; an axis has a direction.
+	const Ref<InputMapSettingsEvent> any_button = InputMapSettingsEvent::from_text("Gamepad:A@Any");
+	REQUIRE(any_button.is_valid());
+	CHECK(any_button->get_device_id() == "Any");
+	CHECK(any_button->get_device_number() == -1);
+	CHECK(any_button->to_event()->get_device() == -1);
+	CHECK(any_button->to_text() == "Gamepad:A@Any");
+	const Ref<InputMapSettingsEvent> pad_button = InputMapSettingsEvent::from_text("Gamepad:B@2");
+	REQUIRE(pad_button.is_valid());
+	CHECK(pad_button->get_device_id() == "2");
+	CHECK(pad_button->to_event()->get_device() == 2);
+	CHECK(pad_button->to_text() == "Gamepad:B@2");
+	const Ref<InputMapSettingsEvent> axis = InputMapSettingsEvent::from_text("GamepadAxis:LeftX-");
+	REQUIRE(axis.is_valid());
+	CHECK(axis->get_device() == InputMapSettingsEvent::DEVICE_GAMEPAD);
+	CHECK(axis->get_input() == "LeftX");
+	CHECK(axis->get_direction() == "-");
+	const Ref<InputEventJoypadMotion> axis_event = axis->to_event();
+	REQUIRE(axis_event.is_valid());
+	CHECK(axis_event->get_axis() == JoyAxis::LEFT_X);
+	CHECK(axis_event->get_axis_value() < 0.0f);
+	CHECK(axis->to_text() == "GamepadAxis:LeftX-");
+	const Ref<InputMapSettingsEvent> axis_plus = InputMapSettingsEvent::from_event(InputEventJoypadMotion::create_reference(JoyAxis::TRIGGER_RIGHT, 1.0f, 1));
+	REQUIRE(axis_plus.is_valid());
+	CHECK(axis_plus->get_direction() == "+");
+	CHECK(axis_plus->get_device_id() == "1");
+	CHECK(axis_plus->to_text() == "GamepadAxis:TriggerRight+@1");
+
+	// The names of version 2 are still read.
+	const Ref<InputMapSettingsEvent> old_key = InputMapSettingsEvent::from_text("Key:Ctrl+S");
+	REQUIRE(old_key.is_valid());
+	CHECK(old_key->get_key_mode() == InputMapSettingsEvent::KEY_MODE_LABEL);
+	CHECK(old_key->to_text() == "KeyboardLabel:Ctrl+S");
+	CHECK(InputMapSettingsEvent::from_text("PhysicalKey:W")->to_text() == "Keyboard:W");
+	CHECK(InputMapSettingsEvent::from_text("MouseButton:Left")->to_text() == "Mouse:Left");
+	CHECK(InputMapSettingsEvent::from_text("JoypadButton:A@3")->to_text() == "Gamepad:A@3");
+	CHECK(InputMapSettingsEvent::from_text("JoypadMotion:LeftY-")->to_text() == "GamepadAxis:LeftY-");
+
+	// Not valid.
+	for (const String &text : { String(""), String("Keyboard"), String("Keyboard:"), String("Keyboard:NoSuchKey"), String("Mouse:Sideways"), String("Gamepad:Z"), String("GamepadAxis:LeftX"), String("GamepadAxis:Nowhere+"), String("Touch:1") }) {
+		CHECK_MESSAGE(InputMapSettingsEvent::from_text(text).is_null(), text);
+	}
+	// Events without a record.
+	Ref<InputEventScreenTouch> touch;
+	touch.instantiate();
+	CHECK(InputMapSettingsEvent::from_event(touch).is_null());
+}
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] Every format writes the fields of an event; round trip in all six formats") {
 	TestSetup setup;
-	{
-		// JSON: the storage type and its rows, not InputActions with InputEvent sub-resources.
-		const String path = temp_file("input_map_rows.json");
+	for (const String &extension : { String("json"), String("ini"), String("csv"), String("xml"), String("toml"), String("yaml") }) {
+		if (!ResourceTextSerializer::has_format_implementation(ResourceTextSerializer::get_format_for_extension(extension))) {
+			continue; // The module of the format is disabled in this build.
+		}
+		const String path = temp_file("input_map_fields." + extension);
+		load_project_actions();
+		{
+			InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+			server->set_file_path(path);
+			// jump: physical W, left stick left, label E with Ctrl+Shift, button B; fire: Ctrl+right mouse button, no keyboard.
+			CHECK(server->rebind(JUMP, make_key(Key::W, true)) == OK);
+			CHECK(server->add_event(JUMP, InputAction::text_to_event("Key:Ctrl+Shift+E")) == OK);
+			CHECK(server->rebind(JUMP, InputEventJoypadMotion::create_reference(JoyAxis::LEFT_X, -1.0f)) == OK);
+			CHECK(server->add_event(JUMP, InputEventJoypadButton::create_reference(JoyButton::B)) == OK);
+			CHECK(server->rebind(FIRE, InputAction::text_to_event("MouseButton:Ctrl+Right")) == OK);
+			server->set_action_deadzone(JUMP, 0.45f);
+			CHECK(server->save() == OK);
+			memdelete(server);
+		}
+
+		const String text = FileAccess::get_file_as_string(path);
+		CHECK_FALSE_MESSAGE(text.contains("InputEvent"), extension);
+		CHECK_FALSE_MESSAGE(text.contains("bindings"), extension);
+		CHECK_MESSAGE(text.contains("Keyboard"), extension);
+		CHECK_MESSAGE(text.contains("Gamepad"), extension);
+		CHECK_MESSAGE(text.contains("Ctrl+Shift"), extension);
+		CHECK_MESSAGE(text.contains("LeftX"), extension);
+		CHECK_MESSAGE(text.contains("Label"), extension);
+		CHECK_MESSAGE(text.contains("Ctrl"), extension);
+		if (extension == "json") {
+			CHECK(text.contains("InputMapSettingsActions"));
+			CHECK(text.contains("\"input_events\""));
+			CHECK(text.contains("\"key_mode\""));
+			CHECK(text.contains("\"device_id\""));
+		} else if (extension == "ini") {
+			CHECK(text.contains("input_events"));
+			CHECK(text.contains("device_id"));
+		} else if (extension == "csv") {
+			// One row per event: Action, Index, Device, Input, Direction, Modifiers, KeyMode, DeviceId, Deadzone.
+			const Vector<String> lines = text.strip_edges().split("\n");
+			REQUIRE(lines.size() >= 2);
+			CHECK(lines[0].strip_edges() == "action,index,device,input,direction,modifiers,key_mode,device_id,deadzone");
+			int jump_rows = 0;
+			int fire_rows = 0;
+			for (const String &line : lines) {
+				if (line.begins_with(String(JUMP) + ",")) {
+					jump_rows++;
+					CHECK_MESSAGE(line.ends_with(",0.45"), line);
+				}
+				if (line.begins_with(String(FIRE) + ",")) {
+					fire_rows++;
+				}
+			}
+			CHECK(jump_rows == 4);
+			CHECK(fire_rows == 1);
+			CHECK(text.contains(String(JUMP) + ",0,Keyboard,W,,,Physical,Any,0.45"));
+			CHECK(text.contains(String(JUMP) + ",1,Gamepad,LeftX,-,,Physical,Any,0.45"));
+			CHECK(text.contains(String(JUMP) + ",2,Keyboard,E,,Ctrl+Shift,Label,Any,0.45"));
+			CHECK(text.contains(String(JUMP) + ",3,Gamepad,B,,,Physical,Any,0.45"));
+			CHECK(text.contains(String(FIRE) + ",0,Mouse,Right,,Ctrl,Physical,Any,"));
+		}
+
+		// "Restart": the file gives back exactly these events.
+		load_project_actions();
 		InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 		server->set_file_path(path);
-		CHECK(server->rebind(JUMP, InputAction::text_to_event("Key:Ctrl+J")) == OK);
-		CHECK(server->save() == OK);
+		server->startup();
+		CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "Keyboard:W; GamepadAxis:LeftX-; KeyboardLabel:Ctrl+Shift+E; Gamepad:B@Any", extension);
+		CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(FIRE)) == "Mouse:Ctrl+Right", extension);
+		CHECK_MESSAGE(server->get_action_deadzone(JUMP) == doctest::Approx(0.45), extension);
+		CHECK_MESSAGE(is_action(make_pressed_key(Key::W), JUMP), extension);
+		CHECK_FALSE_MESSAGE(is_action(make_pressed_key(Key::SPACE), JUMP), extension);
+		Ref<InputEventKey> ctrl_shift_e = make_pressed_key(Key::E);
+		ctrl_shift_e->set_ctrl_pressed(true);
+		ctrl_shift_e->set_shift_pressed(true);
+		CHECK_MESSAGE(is_action(ctrl_shift_e, JUMP), extension);
+		CHECK_MESSAGE(is_action(InputEventJoypadButton::create_reference(JoyButton::B, 2), JUMP), extension);
+		CHECK_MESSAGE(is_action(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_X, -1.0f, 0), JUMP), extension);
+		CHECK_FALSE_MESSAGE(is_action(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_X, 1.0f, 0), JUMP), extension);
+		CHECK_FALSE(server->is_dirty());
 		memdelete(server);
-		const String text = FileAccess::get_file_as_string(path);
-		CHECK(text.contains("InputMapSettingsRows"));
-		CHECK(text.contains("\"bindings\""));
-		CHECK(text.contains("Key:Ctrl+J; JoypadButton:A"));
-		CHECK_FALSE(text.contains("\"events\""));
 	}
-	for (const String &extension : { String("json"), String("csv") }) {
-		// A file of the first layout (InputActions with InputAction.bindings, version 1).
-		const String path = temp_file("input_map_v1." + extension);
-		String text;
-		if (extension == "json") {
-			text = vformat("{\"$type\": \"InputActions\", \"$format_version\": 1, \"metadata/settings_version\": 1, \"actions\": [{\"action\": \"%s\", \"deadzone\": 0.4, \"bindings\": \"Key:K; JoypadButton:B@2\"}, {\"action\": \"%s\", \"deadzone\": 0.2, \"bindings\": \"MouseButton:Right\"}]}", JUMP, FIRE);
-		} else {
-			text = vformat("action,deadzone,bindings\n%s,0.4,Key:K; JoypadButton:B@2\n%s,0.2,MouseButton:Right\n", JUMP, FIRE);
+}
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] A hand-written CSV file: pad numbers, axes, an action without events") {
+	TestSetup setup;
+	const String path = temp_file("input_map_hand.csv");
+	const String text = vformat("action,index,device,input,direction,modifiers,key_mode,device_id,deadzone\n%s,0,Gamepad,B,,,Physical,2,0.3\n%s,1,Gamepad,RightX,+,,Physical,Any,0.3\n%s,2,Keyboard,Q,,Alt,Label,Any,0.3\n%s,-1,Keyboard,,,,Physical,Any,0.5\n", JUMP, JUMP, JUMP, FIRE);
+	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+	REQUIRE(file.is_valid());
+	file->store_string(text);
+	file.unref();
+
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+	server->set_file_path(path);
+	CHECK(server->load() == OK);
+	server->apply();
+	CHECK(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "Gamepad:B@2; GamepadAxis:RightX+; KeyboardLabel:Alt+Q");
+	CHECK(server->get_action_deadzone(FIRE) == doctest::Approx(0.5));
+	CHECK(server->get_events(FIRE).is_empty());
+	CHECK(is_action(InputEventJoypadButton::create_reference(JoyButton::B, 2), JUMP));
+	CHECK_FALSE(is_action(InputEventJoypadButton::create_reference(JoyButton::B, 1), JUMP));
+	CHECK(is_action(InputEventJoypadMotion::create_reference(JoyAxis::RIGHT_X, 1.0f, 0), JUMP));
+	CHECK_FALSE(is_action(make_mouse_button(MouseButton::LEFT), FIRE));
+	memdelete(server);
+}
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] SAVE_MODE_ALL writes the layer of the actions") {
+	TestSetup setup;
+	BuiltinSetup builtin(InputMapSettingsServer::SAVE_MODE_ALL);
+	const String path = temp_file("input_map_layer.json");
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+	server->set_file_path(path);
+	CHECK(server->save() == OK);
+	memdelete(server);
+	const String text = FileAccess::get_file_as_string(path);
+	CHECK(text.contains("ui_accept"));
+	CHECK(text.contains("Custom"));
+	if (InputMap::get_singleton()->is_builtin_input_action("ui_accept")) {
+		CHECK(text.contains("BuiltIn"));
+	}
+}
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] Version 2 and version 1 files still load") {
+	TestSetup setup;
+	for (const String &extension : { String("json"), String("ini"), String("csv"), String("xml"), String("toml"), String("yaml") }) {
+		if (!ResourceTextSerializer::has_format_implementation(ResourceTextSerializer::get_format_for_extension(extension))) {
+			continue;
 		}
+		// A version 2 file: InputMapSettingsRows with one `bindings` text per action, written by the same engine one version earlier.
+		Ref<InputMapSettingsRow> jump_row;
+		jump_row.instantiate();
+		jump_row->set_action(JUMP);
+		jump_row->set_deadzone(0.4f);
+		jump_row->set_bindings("Key:K; PhysicalKey:Ctrl+J; JoypadButton:B@2; JoypadMotion:LeftY-");
+		Ref<InputMapSettingsRow> fire_row;
+		fire_row.instantiate();
+		fire_row->set_action(FIRE);
+		fire_row->set_bindings("MouseButton:Right");
+		TypedArray<InputMapSettingsRow> rows;
+		rows.push_back(jump_row);
+		rows.push_back(fire_row);
+		Ref<InputMapSettingsRows> old_file;
+		old_file.instantiate();
+		old_file->set_actions(rows);
+
+		ResourceTextSerializer::Options options = ResourceTextSerializer::get_default_options();
+		String text;
+		String error;
+		Error err = OK;
+		const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(extension);
+		if (format == ResourceTextSerializer::FORMAT_CSV) {
+			err = ResourceTextSerializer::write_csv(old_file, options, text, error);
+		} else {
+			old_file->set_meta("settings_version", 2);
+			if (format == ResourceTextSerializer::FORMAT_JSON) {
+				err = ResourceTextSerializer::write_json(old_file, options, text, error);
+			} else if (format == ResourceTextSerializer::FORMAT_INI) {
+				options.ini_plain_values = true;
+				err = ResourceTextSerializer::write_ini(old_file, options, text, error);
+			} else {
+				err = ResourceTextSerializer::write_format(format, old_file, options, text, error);
+			}
+		}
+		REQUIRE_MESSAGE(err == OK, extension);
+		CHECK_MESSAGE(text.contains("bindings"), extension);
+
+		const String path = temp_file("input_map_v2." + extension);
 		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
 		REQUIRE(file.is_valid());
 		file->store_string(text);
@@ -288,11 +520,46 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] The file holds one text row per a
 		CHECK_MESSAGE(server->load() == OK, extension);
 		server->apply();
 		CHECK_MESSAGE(server->get_action_deadzone(JUMP) == doctest::Approx(0.4), extension);
-		CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "Key:K; JoypadButton:B@2", extension);
+		CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "KeyboardLabel:K; Keyboard:Ctrl+J; Gamepad:B@2; GamepadAxis:LeftY-", extension);
 		CHECK_MESSAGE(is_action(make_pressed_key(Key::K), JUMP), extension);
 		CHECK_FALSE_MESSAGE(is_action(make_pressed_key(Key::SPACE), JUMP), extension);
 		CHECK_MESSAGE(is_action(make_mouse_button(MouseButton::RIGHT), FIRE), extension);
+		CHECK_FALSE_MESSAGE(is_action(make_mouse_button(MouseButton::LEFT), FIRE), extension);
+
+		// The next save writes version 3.
+		CHECK_MESSAGE(server->save() == OK, extension);
 		memdelete(server);
+		const String saved = FileAccess::get_file_as_string(path);
+		CHECK_FALSE_MESSAGE(saved.contains("bindings"), extension);
+		CHECK_MESSAGE(saved.contains("Keyboard"), extension);
+	}
+	{
+		// A file of the first layout (InputActions with InputAction.bindings, version 1).
+		for (const String &extension : { String("json"), String("csv") }) {
+			const String path = temp_file("input_map_v1." + extension);
+			String text;
+			if (extension == "json") {
+				text = vformat("{\"$type\": \"InputActions\", \"$format_version\": 1, \"metadata/settings_version\": 1, \"actions\": [{\"action\": \"%s\", \"deadzone\": 0.4, \"bindings\": \"Key:K; JoypadButton:B@2\"}, {\"action\": \"%s\", \"deadzone\": 0.2, \"bindings\": \"MouseButton:Right\"}]}", JUMP, FIRE);
+			} else {
+				text = vformat("action,deadzone,bindings\n%s,0.4,Key:K; JoypadButton:B@2\n%s,0.2,MouseButton:Right\n", JUMP, FIRE);
+			}
+			Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+			REQUIRE(file.is_valid());
+			file->store_string(text);
+			file.unref();
+
+			load_project_actions();
+			InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+			server->set_file_path(path);
+			CHECK_MESSAGE(server->load() == OK, extension);
+			server->apply();
+			CHECK_MESSAGE(server->get_action_deadzone(JUMP) == doctest::Approx(0.4), extension);
+			CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "KeyboardLabel:K; Gamepad:B@2", extension);
+			CHECK_MESSAGE(is_action(make_pressed_key(Key::K), JUMP), extension);
+			CHECK_FALSE_MESSAGE(is_action(make_pressed_key(Key::SPACE), JUMP), extension);
+			CHECK_MESSAGE(is_action(make_mouse_button(MouseButton::RIGHT), FIRE), extension);
+			memdelete(server);
+		}
 	}
 }
 
@@ -322,7 +589,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Defaults come from InputMap; cust
 	CHECK(copy->get_action() == StringName(JUMP));
 	CHECK(copy->get_deadzone() == doctest::Approx(0.3));
 	CHECK(copy->get_event_count() == 2);
-	CHECK(InputMapSettingsServer::events_to_text(copy->get_events()) == "Key:Space; JoypadButton:A");
+	CHECK(InputMapSettingsServer::events_to_text(copy->get_events()) == "KeyboardLabel:Space; Gamepad:A@Any");
 	copy->clear_events();
 	CHECK(server->get_events(JUMP).size() == 2);
 	memdelete(server);
@@ -522,27 +789,25 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the ne
 			memdelete(server);
 		}
 		const String text = FileAccess::get_file_as_string(path);
-		CHECK_MESSAGE(text.contains("PhysicalKey:W"), extension);
-		CHECK_MESSAGE(text.contains("JoypadMotion:LeftY-"), extension);
-		CHECK_MESSAGE(text.contains("MouseButton:Ctrl+Right"), extension);
-		// The events are one text value per action, never sub-resources.
+		CHECK_MESSAGE(text.contains("Keyboard"), extension);
+		CHECK_MESSAGE(text.contains("LeftY"), extension);
+		CHECK_MESSAGE(text.contains("Ctrl"), extension);
+		// The events are fields, never sub-resources.
 		CHECK_FALSE_MESSAGE(text.contains("InputEvent"), extension);
 		if (extension == "csv") {
-			// One row per action with the bindings of the action in one cell.
+			// One row per event: jump has the key W and the axis (the pad button was replaced), fire one mouse button.
 			int jump_rows = 0;
 			int fire_rows = 0;
 			for (const String &line : text.split("\n")) {
-				if (line.contains(JUMP)) {
+				if (line.begins_with(String(JUMP) + ",")) {
 					jump_rows++;
-					CHECK_MESSAGE(line.contains("Key:"), line);
-					CHECK_MESSAGE(line.contains("JoypadMotion:LeftY-"), line);
 				}
-				if (line.contains(FIRE)) {
+				if (line.begins_with(String(FIRE) + ",")) {
 					fire_rows++;
-					CHECK_MESSAGE(line.contains("MouseButton:Ctrl+Right"), line);
+					CHECK_MESSAGE(line.contains(",Mouse,Right,,Ctrl,"), line);
 				}
 			}
-			CHECK(jump_rows == 1);
+			CHECK(jump_rows == 2);
 			CHECK(fire_rows == 1);
 		}
 

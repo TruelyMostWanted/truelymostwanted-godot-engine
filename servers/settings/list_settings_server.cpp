@@ -61,7 +61,7 @@ ResourceTextSerializer::Format ListSettingsServer::_get_file_format() {
 	}
 	String error;
 	const Ref<Resource> default_settings = get_default_settings();
-	const Ref<Resource> storage = default_settings.is_valid() ? _settings_to_storage(default_settings) : Ref<Resource>();
+	const Ref<Resource> storage = default_settings.is_valid() ? _settings_to_storage_for_format(default_settings, ResourceTextSerializer::FORMAT_CSV) : Ref<Resource>();
 	if (storage.is_valid() && ResourceTextSerializer::check_csv(storage, error) == OK) {
 		return ResourceTextSerializer::FORMAT_CSV;
 	}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapSettingsEventRows" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The content of the CSV settings file of [InputMapSettingsServer].
+	</brief_description>
+	<description>
+		The CSV form of [InputActions]: one [InputMapSettingsEventRow] per event, the rows of an action one after the other. See [InputMapSettingsActions] for the other formats. [InputMapSettingsServer] converts between [InputActions] and this resource when it saves and loads; games do not need this class.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="actions" type="InputMapSettingsEventRow[]" setter="set_actions" getter="get_actions" default="[]">
+			The rows, one per event. The list is called [code skip-lint]actions[/code] like the list of the settings.
+		</member>
+	</members>
+</class>
