@@ -54,6 +54,7 @@
 #include "editor/export/pck_package_exporter.h"
 #include "editor/export/register_exporters.h"
 #include "editor/export/streaming_assets_export_plugin.h"
+#include "editor/export/streaming_assets_pack_builder.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -186,6 +187,7 @@ void register_editor_types() {
 	GDREGISTER_CLASS(EditorExportPlatformExtension);
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsPackBuilder);
 	GDREGISTER_ABSTRACT_CLASS(PCKPackageExporter);
 	GDREGISTER_CLASS(PCKBuildPlan);
 
