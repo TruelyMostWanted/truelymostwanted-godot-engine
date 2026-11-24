@@ -1606,6 +1606,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
+			The [InputSettingsServer] singleton.
+		</member>
 		<member name="JavaClassWrapper" type="JavaClassWrapper" setter="" getter="">
 			The [JavaClassWrapper] singleton.
 			[b]Note:[/b] Only implemented on Android.
