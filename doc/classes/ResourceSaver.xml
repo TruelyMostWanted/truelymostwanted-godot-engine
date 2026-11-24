@@ -103,8 +103,32 @@
 			<description>
 				Saves a resource to disk to the given path, using a [ResourceFormatSaver] that recognizes the resource object. If [param path] is empty, [ResourceSaver] will try to use [member Resource.resource_path].
 				The [param flags] bitmask can be specified to customize the save behavior.
-				Returns [constant OK] on success.
+				Returns [constant OK] on success. Use [method save_result] to get the saver's message as well.
 				[b]Note:[/b] When the project is running, any generated UID associated with the resource will not be saved as the required code is only executed in editor mode.
+			</description>
+		</method>
+		<method name="save_result">
+			<return type="ResourceSaveResult" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="path" type="String" default="&quot;&quot;" />
+			<param index="2" name="flags" type="int" enum="ResourceSaver.SaverFlags" is_bitfield="true" default="0" />
+			<description>
+				Saves a resource like [method save] and reports why it failed: the returned [ResourceSaveResult] holds the [enum Error] code and the message the saver printed (or, if nothing was printed, the name of the error code and the path). [member ResourceSaveResult.path] is [param path], or [member Resource.resource_path] if [param path] is empty. A [code]null[/code] [param resource] gives [constant ERR_INVALID_PARAMETER]. The errors are still printed as with [method save].
+				[codeblocks]
+				[gdscript]
+				var result := ResourceSaver.save_result(settings, "user://settings.tres")
+				if not result.ok:
+					push_error(result.error_message)
+				[/gdscript]
+				[csharp]
+				ResourceSaveResult result = ResourceSaver.SaveResult(settings, "user://settings.tres");
+				if (!result.Ok)
+				{
+				    GD.PushError(result.ErrorMessage);
+				}
+				// Or: ResourceSaver.TrySave(settings, "user://settings.tres", out Error error).
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="set_uid">

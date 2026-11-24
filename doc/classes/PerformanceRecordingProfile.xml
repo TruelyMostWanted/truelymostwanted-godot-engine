@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceRecordingProfile" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Describes what [PerformanceRecorder] records, how often, and where the CSV file goes.
+	</brief_description>
+	<description>
+		A [PerformanceRecordingProfile] selects the columns of a recording (builtins, [Performance] monitors, custom monitors, native metric sources and pushed metrics), the sampling intervals, the size of the ring buffer and the CSV output. Save it as a [code].tres[/code] file to use it from the project settings ([member ProjectSettings.debug/performance_recording/profile]) or the command line ([code]--record-performance-profile[/code]).
+		A new profile starts with a default selection: the builtins [constant PerformanceRecorder.BUILTIN_FRAME], [constant PerformanceRecorder.BUILTIN_TIME_USEC], [constant PerformanceRecorder.BUILTIN_FRAME_TIME], [constant PerformanceRecorder.BUILTIN_PROCESS_TIME], [constant PerformanceRecorder.BUILTIN_PHYSICS_TIME], [constant PerformanceRecorder.BUILTIN_PHYSICS_STEPS], [constant PerformanceRecorder.BUILTIN_PROCESS_MEMORY] and [constant PerformanceRecorder.BUILTIN_RECORDER_TIME], and the monitors [constant Performance.TIME_FPS], [constant Performance.MEMORY_STATIC], [constant Performance.OBJECT_COUNT], [constant Performance.OBJECT_NODE_COUNT], [constant Performance.RENDER_TOTAL_OBJECTS_IN_FRAME], [constant Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME], [constant Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME] and [constant Performance.RENDER_VIDEO_MEM_USED].
+		[codeblocks]
+		[gdscript]
+		var profile = PerformanceRecordingProfile.new()
+		profile.builtins = [PerformanceRecorder.BUILTIN_FRAME_TIME, PerformanceRecorder.BUILTIN_GPU_TIME]
+		profile.monitors = [Performance.TIME_FPS, Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME]
+		profile.metrics = ["enemies_alive"]
+		profile.output_path = "user://perf/{platform}_{date}_{time}.csv"
+		PerformanceRecorder.start(profile)
+		[/gdscript]
+		[csharp]
+		var profile = new PerformanceRecordingProfile();
+		profile.Builtins = [(int)PerformanceRecorder.Builtin.FrameTime, (int)PerformanceRecorder.Builtin.GpuTime];
+		profile.Monitors = [(int)Performance.Monitor.TimeFps, (int)Performance.Monitor.RenderTotalDrawCallsInFrame];
+		profile.Metrics = ["enemies_alive"];
+		profile.OutputPath = "user://perf/{platform}_{date}_{time}.csv";
+		PerformanceRecorder.Start(profile);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="buffer_frames" type="int" setter="set_buffer_frames" getter="get_buffer_frames" default="3600">
+			Number of rows kept in memory (the ring buffer). All memory is allocated in [method PerformanceRecorder.start]: [code]columns × buffer_frames × 8[/code] bytes. If [member flush_interval_frames] is greater than [code]0[/code], the buffer holds at least [code]2 × flush_interval_frames[/code] rows, so that a flush split over several frames never loses rows. On Web and mobile, a smaller value saves memory.
+		</member>
+		<member name="builtins" type="PackedInt32Array" setter="set_builtins" getter="get_builtins" default="PackedInt32Array(0, 1, 2, 3, 4, 5, 6, 9)">
+			Engine values recorded per row, as [enum PerformanceRecorder.Builtin] values. They come first in the CSV, in this order.
+		</member>
+		<member name="delimiter" type="String" setter="set_delimiter" getter="get_delimiter" default="&quot;,&quot;">
+			Separator between the values of a CSV row. Decimal numbers always use [code].[/code] as decimal separator, so use [code]";"[/code] or [code]"\t"[/code] for spreadsheet programs that expect a decimal comma.
+		</member>
+		<member name="flush_budget_usec" type="int" setter="set_flush_budget_usec" getter="get_flush_budget_usec" default="2000">
+			Maximum time in microseconds that writing rows to the CSV file may take per frame. If more rows are waiting, the rest is written in the next frames. [code]0[/code] writes all waiting rows at once. [method PerformanceRecorder.flush] and [method PerformanceRecorder.stop] ignore the budget.
+		</member>
+		<member name="flush_interval_frames" type="int" setter="set_flush_interval_frames" getter="get_flush_interval_frames" default="300">
+			Number of recorded rows after which they are appended to the CSV file. Rows that are not yet written are lost if the application is killed or crashes, so keep this short on mobile and Web.
+			If [code]0[/code], nothing is written until [method PerformanceRecorder.flush] or [method PerformanceRecorder.stop], and only the last [member buffer_frames] rows are kept. Use this to record "the last N seconds" before a hitch, or for in-game graphs with [method PerformanceRecorder.get_column].
+		</member>
+		<member name="include_custom_monitors" type="bool" setter="set_include_custom_monitors" getter="is_include_custom_monitors" default="false">
+			If [code]true[/code], every custom monitor of [Performance] that exists when recording starts gets a column (see [method Performance.add_custom_monitor]). Custom monitors call a [Callable] per row, which costs more than the other columns. Values that are not numbers are written as empty cells.
+		</member>
+		<member name="metric_sources" type="PackedStringArray" setter="set_metric_sources" getter="get_metric_sources" default="PackedStringArray()">
+			Names of native metric sources to record, for example [code]"dotnet"[/code] when the .NET module provides one. Each value of a source gets a column [code]source/value[/code]. Sources that are not registered are skipped with a warning.
+		</member>
+		<member name="metrics" type="PackedStringArray" setter="set_metrics" getter="get_metrics" default="PackedStringArray()">
+			Names of the pushed metrics to record (see [method PerformanceRecorder.register_metric]). If empty, all metrics registered when recording starts are recorded. Names that are not registered yet are registered as [constant PerformanceRecorder.METRIC_GAUGE], so a profile used at startup can name metrics that the game registers later.
+		</member>
+		<member name="monitors" type="PackedInt32Array" setter="set_monitors" getter="get_monitors" default="PackedInt32Array(0, 4, 7, 9, 11, 12, 13, 14)">
+			[Performance] monitors recorded per row, as [enum Performance.Monitor] values. The column name is the monitor's name, for example [code]time/fps[/code].
+			[b]Note:[/b] [constant Performance.TIME_PROCESS] and [constant Performance.TIME_PHYSICS_PROCESS] are the maximum of the last second. Use [constant PerformanceRecorder.BUILTIN_PROCESS_TIME] and [constant PerformanceRecorder.BUILTIN_PHYSICS_TIME] for per-frame values.
+		</member>
+		<member name="output_path" type="String" setter="set_output_path" getter="get_output_path" default="&quot;user://performance/{date}_{time}.csv&quot;">
+			Path of the CSV file. The placeholders [code]{date}[/code] ([code]YYYY-MM-DD[/code]), [code]{time}[/code] ([code]HH-MM-SS[/code]) and [code]{platform}[/code] (lower-case [method OS.get_name]) are replaced when recording starts. Missing directories are created. An existing file is overwritten. If empty, nothing is written and the rows stay in memory.
+			A path under [code]user://[/code] is recommended. On Web it is the only writable location (stored in IndexedDB).
+		</member>
+		<member name="process_memory_interval_frames" type="int" setter="set_process_memory_interval_frames" getter="get_process_memory_interval_frames" default="30">
+			Number of frames between two reads of the process memory ([constant PerformanceRecorder.BUILTIN_PROCESS_MEMORY]). Reading it is a system call on most platforms; rows in between repeat the last value.
+		</member>
+		<member name="sample_interval_frames" type="int" setter="set_sample_interval_frames" getter="get_sample_interval_frames" default="1">
+			Records one row every this many frames. [code]1[/code] records every frame. Values of [constant PerformanceRecorder.METRIC_COUNTER] metrics added in the frames in between are summed into the next row.
+		</member>
+	</members>
+</class>
