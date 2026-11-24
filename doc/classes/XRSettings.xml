@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XRSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [XRSettingsServer]: OpenXR foveation, render scale, refresh rate, performance levels and hand tracking.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"xr"[/code]. [XRSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/xr.ini[/code]. Change the values through the methods of [XRSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		Every value except [member hand_tracking_enabled] goes to the [OpenXRInterface]. Values the OpenXR runtime does not support are stored but not pushed (see [method XRSettingsServer.get_unsupported_setting_names]); values pushed before the interface is initialized wait for it (see [method XRSettingsServer.get_deferred_setting_names]).
+		The setters store values as they are; [XRSettingsServer] clamps values out of range with a warning when they are set or loaded.
+		[b]Note:[/b] This class only exists when the engine is built with the [code]openxr[/code] module (Windows, Linux, macOS, Android); it is missing in the Web export, on iOS and with [code]disable_xr=yes[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="cpu_level" type="int" setter="set_cpu_level" getter="get_cpu_level" enum="XRSettings.PerformanceLevel" default="0">
+			The CPU performance level the runtime is asked for, pushed with [method OpenXRInterface.set_cpu_level]. [constant PERFORMANCE_LEVEL_RUNTIME_DEFAULT] (default) leaves the runtime alone. Needs the OpenXR extension [code]XR_EXT_performance_settings[/code]; runtimes without it ignore the value. Takes effect at once.
+		</member>
+		<member name="display_refresh_rate" type="float" setter="set_display_refresh_rate" getter="get_display_refresh_rate" default="0.0">
+			The display refresh rate of the headset in Hz, pushed to [member OpenXRInterface.display_refresh_rate]. [code]0[/code] (default) keeps the rate of the runtime. Another value is matched to the nearest rate of [method XRSettingsServer.get_available_display_refresh_rates]; the stored value stays the player's choice. Needs [code]XR_FB_display_refresh_rate[/code] (Meta Quest, Pico). Valid range: [code]0[/code] to [code]500[/code]. Takes effect at once during a session.
+		</member>
+		<member name="foveation_dynamic" type="bool" setter="set_foveation_dynamic" getter="is_foveation_dynamic" default="false">
+			If [code]true[/code], the runtime lowers the foveation level when the GPU has time to spare, pushed to [member OpenXRInterface.foveation_dynamic]. Needs [code]XR_FB_foveation[/code]. Takes effect at once during a session.
+		</member>
+		<member name="foveation_level" type="int" setter="set_foveation_level" getter="get_foveation_level" enum="XRSettings.FoveationLevel" default="0">
+			How much the image is reduced at the edges of the view (fixed foveated rendering), pushed to [member OpenXRInterface.foveation_level]. Higher levels are faster but blurrier at the edges. Needs [code]XR_FB_foveation[/code] (Meta Quest, Pico; not SteamVR or Windows Mixed Reality). Takes effect at once during a session.
+		</member>
+		<member name="foveation_with_subsampled_images" type="bool" setter="set_foveation_with_subsampled_images" getter="is_foveation_with_subsampled_images" default="true">
+			If [code]true[/code], foveation uses subsampled images (Vulkan), pushed to [member OpenXRInterface.foveation_with_subsampled_images]. Needs [code]XR_FB_foveation[/code]. Takes effect with the next XR session (the swapchains are created then).
+		</member>
+		<member name="gpu_level" type="int" setter="set_gpu_level" getter="get_gpu_level" enum="XRSettings.PerformanceLevel" default="0">
+			The GPU performance level the runtime is asked for, pushed with [method OpenXRInterface.set_gpu_level]. See [member cpu_level]. Takes effect at once.
+		</member>
+		<member name="hand_tracking_enabled" type="bool" setter="set_hand_tracking_enabled" getter="is_hand_tracking_enabled" default="true">
+			Game-side value: if [code]false[/code], the player does not want to use hand tracking; the game hides tracked hands and ignores hand trackers. Never pushed to the engine ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): the OpenXR hand tracking extension is switched by the project setting [code]xr/openxr/extensions/hand_tracking[/code], which is read before any settings domain is applied.
+		</member>
+		<member name="left_hand_motion_range" type="int" setter="set_left_hand_motion_range" getter="get_left_hand_motion_range" enum="XRSettings.HandMotionRange" default="0">
+			The motion range of the tracked left hand, pushed with [method OpenXRInterface.set_motion_range]. Needs hand tracking ([method OpenXRInterface.is_hand_tracking_supported]). Takes effect at once.
+		</member>
+		<member name="render_target_size_multiplier" type="float" setter="set_render_target_size_multiplier" getter="get_render_target_size_multiplier" default="1.0">
+			The render scale of the headset: multiplies the render target size the runtime recommends, pushed to [member OpenXRInterface.render_target_size_multiplier]. Lower values are faster but blurrier. Works with every runtime and is pushed as soon as the interface exists, also before it is initialized. Valid range: [code]0.1[/code] to [code]3[/code].
+		</member>
+		<member name="right_hand_motion_range" type="int" setter="set_right_hand_motion_range" getter="get_right_hand_motion_range" enum="XRSettings.HandMotionRange" default="0">
+			The motion range of the tracked right hand. See [member left_hand_motion_range].
+		</member>
+		<member name="vrs_min_radius" type="float" setter="set_vrs_min_radius" getter="get_vrs_min_radius" default="20.0">
+			The radius in percent of the view in which variable rate shading keeps the full rate, pushed to [member OpenXRInterface.vrs_min_radius]. Used by the Forward+ and Mobile renderers when [member Viewport.vrs_mode] is [constant Viewport.VRS_XR]. Valid range: [code]1[/code] to [code]100[/code]. Takes effect at once.
+		</member>
+		<member name="vrs_strength" type="float" setter="set_vrs_strength" getter="get_vrs_strength" default="1.0">
+			How fast the shading rate falls off outside [member vrs_min_radius], pushed to [member OpenXRInterface.vrs_strength]. Valid range: [code]0.1[/code] to [code]10[/code]. Takes effect at once.
+		</member>
+	</members>
+	<constants>
+		<constant name="FOVEATION_LEVEL_OFF" value="0" enum="FoveationLevel">
+			No foveation.
+		</constant>
+		<constant name="FOVEATION_LEVEL_LOW" value="1" enum="FoveationLevel">
+			Low foveation: the edges are slightly reduced.
+		</constant>
+		<constant name="FOVEATION_LEVEL_MEDIUM" value="2" enum="FoveationLevel">
+			Medium foveation.
+		</constant>
+		<constant name="FOVEATION_LEVEL_HIGH" value="3" enum="FoveationLevel">
+			High foveation: the fastest, the edges are clearly blurrier.
+		</constant>
+		<constant name="PERFORMANCE_LEVEL_RUNTIME_DEFAULT" value="0" enum="PerformanceLevel">
+			The runtime chooses; nothing is pushed.
+		</constant>
+		<constant name="PERFORMANCE_LEVEL_POWER_SAVINGS" value="1" enum="PerformanceLevel">
+			Saves power; [constant OpenXRInterface.PERF_SETTINGS_LEVEL_POWER_SAVINGS].
+		</constant>
+		<constant name="PERFORMANCE_LEVEL_SUSTAINED_LOW" value="2" enum="PerformanceLevel">
+			Low sustained performance; [constant OpenXRInterface.PERF_SETTINGS_LEVEL_SUSTAINED_LOW].
+		</constant>
+		<constant name="PERFORMANCE_LEVEL_SUSTAINED_HIGH" value="3" enum="PerformanceLevel">
+			High sustained performance; [constant OpenXRInterface.PERF_SETTINGS_LEVEL_SUSTAINED_HIGH].
+		</constant>
+		<constant name="PERFORMANCE_LEVEL_BOOST" value="4" enum="PerformanceLevel">
+			The highest performance for a short time; [constant OpenXRInterface.PERF_SETTINGS_LEVEL_BOOST].
+		</constant>
+		<constant name="HAND_MOTION_RANGE_UNOBSTRUCTED" value="0" enum="HandMotionRange">
+			The hand moves freely; [constant OpenXRInterface.HAND_MOTION_RANGE_UNOBSTRUCTED].
+		</constant>
+		<constant name="HAND_MOTION_RANGE_CONFORM_TO_CONTROLLER" value="1" enum="HandMotionRange">
+			The hand is shaped around a held controller; [constant OpenXRInterface.HAND_MOTION_RANGE_CONFORM_TO_CONTROLLER].
+		</constant>
+	</constants>
+</class>

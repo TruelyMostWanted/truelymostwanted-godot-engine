@@ -1334,7 +1334,11 @@ bool EditorInspectorPluginSpriteSheet::can_handle(Object *p_object) {
 	return Object::cast_to<SpriteSheet>(p_object) != nullptr;
 }
 
-void EditorInspectorPluginSpriteSheet::parse_begin(Object *p_object) {
+void EditorInspectorPluginSpriteSheet::parse_category(Object *p_object, const String &p_category) {
+	// Below the class header of SpriteSheet, like the class's own properties.
+	if (p_category != "SpriteSheet") {
+		return;
+	}
 	Ref<SpriteSheet> atlas(Object::cast_to<SpriteSheet>(p_object));
 	ERR_FAIL_COND(atlas.is_null());
 	add_custom_control(memnew(SpriteSheetInspector(atlas)));

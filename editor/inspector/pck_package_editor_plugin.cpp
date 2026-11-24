@@ -746,7 +746,11 @@ bool EditorInspectorPluginPCKPackage::can_handle(Object *p_object) {
 	return Object::cast_to<PCKPackage>(p_object) != nullptr;
 }
 
-void EditorInspectorPluginPCKPackage::parse_begin(Object *p_object) {
+void EditorInspectorPluginPCKPackage::parse_category(Object *p_object, const String &p_category) {
+	// Below the class header of PCKPackage, like the class's own properties.
+	if (p_category != "PCKPackage") {
+		return;
+	}
 	Ref<PCKPackage> package(Object::cast_to<PCKPackage>(p_object));
 	ERR_FAIL_COND(package.is_null());
 	add_custom_control(memnew(PCKPackageEditor(package)));

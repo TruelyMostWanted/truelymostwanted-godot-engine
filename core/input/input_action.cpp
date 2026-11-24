@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_action.cpp                                                  */
+/*  input_action.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,33 +28,21 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "input_map_action.h"
+#include "input_action.h"
 
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
-#include "servers/display/display_server.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // Text form.
 
 static const char *_mouse_button_names[] = { "Left", "Right", "Middle", "WheelUp", "WheelDown", "WheelLeft", "WheelRight", "Extra1", "Extra2" };
-static const char *_mouse_button_labels[] = { "Left Mouse Button", "Right Mouse Button", "Middle Mouse Button", "Mouse Wheel Up", "Mouse Wheel Down", "Mouse Wheel Left", "Mouse Wheel Right", "Mouse Thumb Button 1", "Mouse Thumb Button 2" };
 static constexpr int MOUSE_BUTTON_NAME_COUNT = 9; // MouseButton::LEFT (1) to MouseButton::MB_XBUTTON2 (9).
 
 static const char *_joy_button_names[] = { "A", "B", "X", "Y", "Back", "Guide", "Start", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Misc1", "Paddle1", "Paddle2", "Paddle3", "Paddle4", "Touchpad", "Misc2", "Misc3", "Misc4", "Misc5", "Misc6" };
-static const char *_joy_button_labels[] = { "A", "B", "X", "Y", "Back", "Guide", "Start", "Left Stick", "Right Stick", "Left Shoulder", "Right Shoulder", "D-pad Up", "D-pad Down", "D-pad Left", "D-pad Right", "Misc 1", "Paddle 1", "Paddle 2", "Paddle 3", "Paddle 4", "Touchpad", "Misc 2", "Misc 3", "Misc 4", "Misc 5", "Misc 6" };
 static constexpr int JOY_BUTTON_NAME_COUNT = int(JoyButton::SDL_MAX);
 
 static const char *_joy_axis_names[] = { "LeftX", "LeftY", "RightX", "RightY", "TriggerLeft", "TriggerRight" };
-// Negative and positive direction per axis (Y is positive downwards).
-static const char *_joy_axis_labels[][2] = {
-	{ "Left Stick Left", "Left Stick Right" },
-	{ "Left Stick Up", "Left Stick Down" },
-	{ "Right Stick Left", "Right Stick Right" },
-	{ "Right Stick Up", "Right Stick Down" },
-	{ "Left Trigger", "Left Trigger" },
-	{ "Right Trigger", "Right Trigger" },
-};
 static constexpr int JOY_AXIS_NAME_COUNT = int(JoyAxis::SDL_MAX);
 
 static bool _is_modifier_key(Key p_key) {
@@ -158,7 +146,7 @@ static int _text_to_index(const String &p_text, const char *const *p_names, int 
 	return -1;
 }
 
-String InputMapAction::event_to_text(const Ref<InputEvent> &p_event) {
+String InputAction::event_to_text(const Ref<InputEvent> &p_event) {
 	const Ref<InputEventKey> key_event = p_event;
 	if (key_event.is_valid()) {
 		// A pressed key has all three codes; the physical one keeps the binding on the same key on every layout.
@@ -205,7 +193,7 @@ String InputMapAction::event_to_text(const Ref<InputEvent> &p_event) {
 	return String();
 }
 
-Ref<InputEvent> InputMapAction::text_to_event(const String &p_text) {
+Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 	const int colon = p_text.find_char(':');
 	if (colon <= 0) {
 		return Ref<InputEvent>();
@@ -284,7 +272,7 @@ Ref<InputEvent> InputMapAction::text_to_event(const String &p_text) {
 	return Ref<InputEvent>();
 }
 
-InputMapAction::InputDevice InputMapAction::get_event_device(const Ref<InputEvent> &p_event) {
+InputAction::InputDevice InputAction::get_event_device(const Ref<InputEvent> &p_event) {
 	if (Ref<InputEventKey>(p_event).is_valid()) {
 		return INPUT_DEVICE_KEYBOARD;
 	}
@@ -297,178 +285,148 @@ InputMapAction::InputDevice InputMapAction::get_event_device(const Ref<InputEven
 	return INPUT_DEVICE_MAX;
 }
 
-// Display servers that implement keyboard_get_label_from_physical(); the others print an error.
-static bool _has_keyboard_layout() {
-	const DisplayServer *display_server = DisplayServer::get_singleton();
-	if (display_server == nullptr) {
-		return false;
-	}
-	const String server_name = display_server->get_name();
-	return server_name == "Windows" || server_name == "X11" || server_name == "Wayland" || server_name == "macOS" || server_name == "embedded";
-}
-
-String InputMapAction::event_to_label(const Ref<InputEvent> &p_event) {
-	const Ref<InputEventKey> key_event = p_event;
-	if (key_event.is_valid()) {
-		Key code = key_event->get_keycode();
-		if (code == Key::NONE && key_event->get_physical_keycode() != Key::NONE) {
-			code = key_event->get_physical_keycode();
-			if (_has_keyboard_layout()) {
-				const Key label = DisplayServer::get_singleton()->keyboard_get_label_from_physical(code);
-				if (label != Key::NONE) {
-					code = label;
-				}
-			}
-		}
-		if (code == Key::NONE) {
-			code = key_event->get_key_label();
-		}
-		if (code == Key::NONE) {
-			return String();
-		}
-		if (_is_modifier_key(code)) {
-			return keycode_get_string(code);
-		}
-		return keycode_get_string(code | KeyModifierMask(key_event->get_modifiers_mask()));
-	}
-	const Ref<InputEventMouseButton> mouse_event = p_event;
-	if (mouse_event.is_valid()) {
-		const int index = int(mouse_event->get_button_index());
-		const String button = (index >= 1 && index <= MOUSE_BUTTON_NAME_COUNT) ? String(_mouse_button_labels[index - 1]) : vformat("Mouse Button %d", index);
-		const Key modifiers = Key::NONE | KeyModifierMask(mouse_event->get_modifiers_mask());
-		const String prefix = modifiers == Key::NONE ? String() : keycode_get_string(modifiers) + "+";
-		return prefix + button;
-	}
-	const Ref<InputEventJoypadButton> button_event = p_event;
-	if (button_event.is_valid()) {
-		const int index = int(button_event->get_button_index());
-		return index >= 0 && index < JOY_BUTTON_NAME_COUNT ? vformat("Joypad %s", _joy_button_labels[index]) : vformat("Joypad Button %d", index);
-	}
-	const Ref<InputEventJoypadMotion> motion_event = p_event;
-	if (motion_event.is_valid()) {
-		const int index = int(motion_event->get_axis());
-		const bool positive = motion_event->get_axis_value() >= 0.0f;
-		if (index >= 0 && index < JOY_AXIS_NAME_COUNT) {
-			return String(_joy_axis_labels[index][positive ? 1 : 0]);
-		}
-		return vformat("Joypad Axis %d%s", index, positive ? "+" : "-");
-	}
-	return p_event.is_valid() ? p_event->as_text() : String();
-}
-
 /////////////////////////////////////////////////////////////////////////////
-// InputMapAction.
+// InputAction.
 
-void InputMapAction::set_action(const String &p_action) {
+InputAction::InputAction(const StringName &p_action, float p_deadzone) :
+		action(p_action),
+		deadzone(p_deadzone) {
+}
+
+void InputAction::set_action(const StringName &p_action) {
+	if (action == p_action) {
+		return;
+	}
 	action = p_action;
 	emit_changed();
 }
 
-String InputMapAction::get_action() const {
+StringName InputAction::get_action() const {
 	return action;
 }
 
-void InputMapAction::set_device(InputDevice p_device) {
-	ERR_FAIL_INDEX(int(p_device), int(INPUT_DEVICE_MAX));
-	device = p_device;
+void InputAction::set_deadzone(float p_deadzone) {
+	if (deadzone == p_deadzone) {
+		return;
+	}
+	deadzone = p_deadzone;
 	emit_changed();
 }
 
-InputMapAction::InputDevice InputMapAction::get_device() const {
-	return device;
-}
-
-void InputMapAction::set_slot(int p_slot) {
-	slot = MAX(p_slot, 0);
-	emit_changed();
-}
-
-int InputMapAction::get_slot() const {
-	return slot;
-}
-
-void InputMapAction::set_event(const String &p_event) {
-	event = p_event;
-	emit_changed();
-}
-
-String InputMapAction::get_event() const {
-	return event;
-}
-
-void InputMapAction::set_device_id(int p_device_id) {
-	device_id = MAX(p_device_id, -1);
-	emit_changed();
-}
-
-int InputMapAction::get_device_id() const {
-	return device_id;
-}
-
-void InputMapAction::set_deadzone(float p_deadzone) {
-	deadzone = CLAMP(p_deadzone, 0.0f, 1.0f);
-	emit_changed();
-}
-
-float InputMapAction::get_deadzone() const {
+float InputAction::get_deadzone() const {
 	return deadzone;
 }
 
-Ref<InputEvent> InputMapAction::get_input_event() const {
-	if (event.is_empty()) {
-		return Ref<InputEvent>();
+void InputAction::set_events(const TypedArray<InputEvent> &p_events) {
+	events.clear();
+	for (int i = 0; i < p_events.size(); i++) {
+		const Ref<InputEvent> event = p_events[i];
+		if (event.is_valid()) {
+			events.push_back(event);
+		}
 	}
-	Ref<InputEvent> input_event = text_to_event(event);
-	if (input_event.is_valid()) {
-		input_event->set_device(device_id);
-	}
-	return input_event;
+	emit_changed();
 }
 
-void InputMapAction::set_input_event(const Ref<InputEvent> &p_event) {
-	if (p_event.is_null()) {
-		set_event(String());
+TypedArray<InputEvent> InputAction::get_events() const {
+	TypedArray<InputEvent> result;
+	for (const Ref<InputEvent> &event : events) {
+		result.push_back(event);
+	}
+	return result;
+}
+
+void InputAction::add_event(const Ref<InputEvent> &p_event) {
+	ERR_FAIL_COND_MSG(p_event.is_null(), "InputAction: the event is null.");
+	if (has_event(p_event)) {
 		return;
 	}
-	const InputDevice event_device = get_event_device(p_event);
-	ERR_FAIL_COND_MSG(event_device == INPUT_DEVICE_MAX, vformat("InputMapAction: a %s can't be bound; use a key, mouse button, joypad button or joypad axis.", p_event->get_class()));
-	device = event_device;
-	device_id = MAX(p_event->get_device(), -1);
-	set_event(event_to_text(p_event));
+	events.push_back(p_event);
+	emit_changed();
 }
 
-bool InputMapAction::is_empty() const {
-	return event.is_empty();
+bool InputAction::has_event(const Ref<InputEvent> &p_event) const {
+	if (p_event.is_null()) {
+		return false;
+	}
+	for (const Ref<InputEvent> &event : events) {
+		if (event == p_event || event->is_match(p_event, true)) {
+			return true;
+		}
+	}
+	return false;
 }
 
-void InputMapAction::_bind_methods() {
-	ClassDB::bind_static_method("InputMapAction", D_METHOD("event_to_text", "event"), &InputMapAction::event_to_text);
-	ClassDB::bind_static_method("InputMapAction", D_METHOD("text_to_event", "text"), &InputMapAction::text_to_event);
-	ClassDB::bind_static_method("InputMapAction", D_METHOD("get_event_device", "event"), &InputMapAction::get_event_device);
-	ClassDB::bind_static_method("InputMapAction", D_METHOD("event_to_label", "event"), &InputMapAction::event_to_label);
+bool InputAction::remove_event(const Ref<InputEvent> &p_event) {
+	if (p_event.is_null()) {
+		return false;
+	}
+	for (int i = 0; i < events.size(); i++) {
+		if (events[i] == p_event || events[i]->is_match(p_event, true)) {
+			events.remove_at(i);
+			emit_changed();
+			return true;
+		}
+	}
+	return false;
+}
 
-	ClassDB::bind_method(D_METHOD("set_action", "action"), &InputMapAction::set_action);
-	ClassDB::bind_method(D_METHOD("get_action"), &InputMapAction::get_action);
-	ClassDB::bind_method(D_METHOD("set_device", "device"), &InputMapAction::set_device);
-	ClassDB::bind_method(D_METHOD("get_device"), &InputMapAction::get_device);
-	ClassDB::bind_method(D_METHOD("set_slot", "slot"), &InputMapAction::set_slot);
-	ClassDB::bind_method(D_METHOD("get_slot"), &InputMapAction::get_slot);
-	ClassDB::bind_method(D_METHOD("set_event", "event"), &InputMapAction::set_event);
-	ClassDB::bind_method(D_METHOD("get_event"), &InputMapAction::get_event);
-	ClassDB::bind_method(D_METHOD("set_device_id", "device_id"), &InputMapAction::set_device_id);
-	ClassDB::bind_method(D_METHOD("get_device_id"), &InputMapAction::get_device_id);
-	ClassDB::bind_method(D_METHOD("set_deadzone", "deadzone"), &InputMapAction::set_deadzone);
-	ClassDB::bind_method(D_METHOD("get_deadzone"), &InputMapAction::get_deadzone);
-	ClassDB::bind_method(D_METHOD("get_input_event"), &InputMapAction::get_input_event);
-	ClassDB::bind_method(D_METHOD("set_input_event", "event"), &InputMapAction::set_input_event);
-	ClassDB::bind_method(D_METHOD("is_empty"), &InputMapAction::is_empty);
+void InputAction::push_event(const Ref<InputEvent> &p_event) {
+	ERR_FAIL_COND_MSG(p_event.is_null(), "InputAction: the event is null.");
+	events.push_back(p_event);
+	emit_changed();
+}
 
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "action"), "set_action", "get_action");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "device", PROPERTY_HINT_ENUM, "Keyboard,Mouse,Gamepad"), "set_device", "get_device");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "slot", PROPERTY_HINT_RANGE, "0,16,1,or_greater"), "set_slot", "get_slot");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "event", PROPERTY_HINT_PLACEHOLDER_TEXT, "Key:Ctrl+S"), "set_event", "get_event");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "device_id", PROPERTY_HINT_RANGE, "-1,16,1,or_greater"), "set_device_id", "get_device_id");
+void InputAction::remove_event_at(int p_index) {
+	ERR_FAIL_INDEX(p_index, events.size());
+	events.remove_at(p_index);
+	emit_changed();
+}
+
+void InputAction::clear_events() {
+	if (events.is_empty()) {
+		return;
+	}
+	events.clear();
+	emit_changed();
+}
+
+int InputAction::get_event_count() const {
+	return events.size();
+}
+
+TypedArray<InputEvent> InputAction::get_device_events(InputDevice p_device) const {
+	TypedArray<InputEvent> result;
+	for (const Ref<InputEvent> &event : events) {
+		if (get_event_device(event) == p_device) {
+			result.push_back(event);
+		}
+	}
+	return result;
+}
+
+void InputAction::_bind_methods() {
+	ClassDB::bind_static_method("InputAction", D_METHOD("event_to_text", "event"), &InputAction::event_to_text);
+	ClassDB::bind_static_method("InputAction", D_METHOD("text_to_event", "text"), &InputAction::text_to_event);
+	ClassDB::bind_static_method("InputAction", D_METHOD("get_event_device", "event"), &InputAction::get_event_device);
+
+	ClassDB::bind_method(D_METHOD("set_action", "action"), &InputAction::set_action);
+	ClassDB::bind_method(D_METHOD("get_action"), &InputAction::get_action);
+	ClassDB::bind_method(D_METHOD("set_deadzone", "deadzone"), &InputAction::set_deadzone);
+	ClassDB::bind_method(D_METHOD("get_deadzone"), &InputAction::get_deadzone);
+	ClassDB::bind_method(D_METHOD("set_events", "events"), &InputAction::set_events);
+	ClassDB::bind_method(D_METHOD("get_events"), &InputAction::get_events);
+
+	ClassDB::bind_method(D_METHOD("add_event", "event"), &InputAction::add_event);
+	ClassDB::bind_method(D_METHOD("has_event", "event"), &InputAction::has_event);
+	ClassDB::bind_method(D_METHOD("remove_event", "event"), &InputAction::remove_event);
+	ClassDB::bind_method(D_METHOD("clear_events"), &InputAction::clear_events);
+	ClassDB::bind_method(D_METHOD("get_event_count"), &InputAction::get_event_count);
+	ClassDB::bind_method(D_METHOD("get_device_events", "device"), &InputAction::get_device_events);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "action"), "set_action", "get_action");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "deadzone", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_deadzone", "get_deadzone");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "events", PROPERTY_HINT_ARRAY_TYPE, "InputEvent"), "set_events", "get_events");
 
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_KEYBOARD);
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_MOUSE);

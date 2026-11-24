@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapSettingsRows" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The content of the settings file of [InputMapSettingsServer].
+	</brief_description>
+	<description>
+		The file form of [InputActions] in the settings file of [InputMapSettingsServer]: one [InputMapSettingsRow] per action. [InputMapSettingsServer] converts between [InputActions] and this resource when it saves and loads; games do not need this class.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="actions" type="InputMapSettingsRow[]" setter="set_actions" getter="get_actions" default="[]">
+			The actions, one row each.
+		</member>
+	</members>
+</class>
