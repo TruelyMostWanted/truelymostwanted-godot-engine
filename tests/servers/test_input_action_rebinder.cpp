@@ -418,6 +418,18 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	CHECK(recorder->log[1].begins_with("changed:"));
 	CHECK(recorder->log[2] == vformat("completed:%s:0:Keyboard:Space", FIRE));
 
+	// Swap with a label binding (`KeyboardLabel:Space`) of the other action: the pressed key conflicts with it, and
+	// the swap replaces it, although the stored form of the pressed key is the physical one.
+	server->reset_action(FIRE);
+	server->reset_action(JUMP);
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
+	CHECK(rebinder->begin(FIRE, 0) == OK);
+	CHECK(rebinder->update(make_key(Key::SPACE)));
+	CHECK(rebinder->is_conflict_pending());
+	CHECK(rebinder->resolve_conflict_swap() == OK);
+	CHECK(events_text(server, FIRE) == "Keyboard:Space");
+	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X");
+
 	rebinder.unref();
 	memdelete(server);
 	memdelete(recorder);

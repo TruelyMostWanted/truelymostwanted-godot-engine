@@ -83,6 +83,7 @@ private:
 	Ref<InputEvent> pending_modifier_event;
 	bool conflict_pending = false; // CONFLICT_ASK: waiting for resolve_conflict_swap(), resolve_conflict_allow() or cancel().
 	Ref<InputEvent> conflict_event; // The normalized event of the last conflict.
+	Ref<InputEvent> conflict_pressed; // The event as pressed: it matches bindings by any of its codes.
 	LocalVector<Conflict> conflicts;
 
 	InputMapSettingsServer *_get_server() const;

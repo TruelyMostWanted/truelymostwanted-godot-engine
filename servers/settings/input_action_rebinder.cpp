@@ -209,6 +209,7 @@ void InputActionRebinder::_reset_session() {
 	pending_modifier_event.unref();
 	conflict_pending = false;
 	conflict_event.unref();
+	conflict_pressed.unref();
 	conflicts.clear();
 }
 
@@ -296,6 +297,7 @@ void InputActionRebinder::_accept(const Ref<InputEvent> &p_pressed) {
 	event->set_device(-1);
 	_find_conflicts(server, event, p_pressed);
 	conflict_event = event;
+	conflict_pressed = p_pressed;
 	if (conflicts.is_empty()) {
 		_commit(event, false);
 		return;
@@ -410,8 +412,9 @@ Error InputActionRebinder::resolve_conflict_swap() {
 	ERR_FAIL_COND_V_MSG(!conflict_pending, ERR_UNCONFIGURED, "InputActionRebinder: no conflict is waiting for a decision.");
 	InputMapSettingsServer *server = _get_server();
 	ERR_FAIL_NULL_V(server, ERR_UNCONFIGURED);
-	// The bindings may have changed while the player decided.
-	_find_conflicts(server, conflict_event, conflict_event);
+	// The bindings may have changed while the player decided. Found like in update(): with the pressed event, whose
+	// codes match a label binding (`KeyboardLabel:G`) as well as the physical one that is stored.
+	_find_conflicts(server, conflict_event, conflict_pressed.is_valid() ? conflict_pressed : conflict_event);
 	return _commit(conflict_event, true);
 }
 
