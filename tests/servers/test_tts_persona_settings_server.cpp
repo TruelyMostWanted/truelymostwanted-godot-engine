@@ -47,7 +47,7 @@ namespace TestTTSPersonaSettingsServer {
 // Unit tests run without text to speech: TTSServer keeps its personas, but reports no voices.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		TTSServer *tts_server = TTSServer::get_singleton();
 		tts_server->clear_personas();
 		tts_server->clear_persona_overrides();
@@ -56,8 +56,8 @@ struct TestSetup {
 		TTSServer *tts_server = TTSServer::get_singleton();
 		tts_server->clear_personas();
 		tts_server->clear_persona_overrides();
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_INI);
 	}
 };
 
@@ -92,7 +92,7 @@ TEST_CASE("[TTSPersonaSettingsServer] The domain is an engine singleton register
 	CHECK(server->get_entry_key() == StringName("persona_name"));
 
 	CHECK(server->get_file_path() == "user://settings/tts_personas.ini");
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_CSV);
 	CHECK(server->get_file_path() == "user://settings/tts_personas.csv");
 }
 

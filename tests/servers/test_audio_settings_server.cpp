@@ -52,7 +52,7 @@ namespace TestAudioSettingsServer {
 // (one bus, "Master") for each test case and frees it afterwards.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		AudioServer *audio_server = AudioServer::get_singleton();
 		CHECK(audio_server != nullptr);
 		if (audio_server == nullptr) {
@@ -64,8 +64,8 @@ struct TestSetup {
 		audio_server->set_bus_volume_db(1, -6.0);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_INI);
 	}
 };
 
@@ -104,7 +104,7 @@ TEST_CASE("[Audio][AudioDeviceSettingsServer] Both domains are engine singletons
 
 	CHECK(audio->get_file_path() == "user://settings/audio.ini");
 	CHECK(buses->get_file_path() == "user://settings/audio_buses.ini");
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_CSV);
 	CHECK(buses->get_file_path() == "user://settings/audio_buses.csv");
 	ERR_PRINT_OFF;
 	// The devices are one record: no CSV.
