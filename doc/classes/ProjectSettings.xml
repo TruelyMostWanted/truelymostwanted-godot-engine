@@ -705,6 +705,10 @@
 		<member name="debug/gdscript/warnings/unused_variable" type="int" setter="" getter="" default="1">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when a local variable is unused.
 		</member>
+		<member name="debug/performance_recording/budget" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to a [PerformanceBudget] resource. If set and recording started at startup, the budget is checked against [method PerformanceRecorder.get_summary] when the engine quits; the result is printed, and the exit code becomes [code]1[/code] if the budget fails and no other exit code was set. A budget that cannot be loaded also sets the exit code to [code]1[/code].
+			This can be specified on the command line with [code]--performance-budget &lt;file&gt;[/code], which also starts recording (in memory if no output path is set).
+		</member>
 		<member name="debug/performance_recording/enabled" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [PerformanceRecorder] starts recording when the project starts, with the profile from [member debug/performance_recording/profile]. It does not start in the editor or the project manager. Use feature tags to enable it only for some exports, for example [code]debug/performance_recording/enabled.web[/code].
 			This can be specified on the command line with [code]--record-performance &lt;file&gt;[/code], which also sets the output path.
