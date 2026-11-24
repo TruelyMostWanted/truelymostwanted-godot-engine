@@ -56,6 +56,14 @@ private:
 	Error _copy_dir(Ref<DirAccess> &p_target_da, const String &p_to, int p_chmod_flags, bool p_copy_links);
 	PackedStringArray _get_contents(bool p_directories);
 
+	enum PathListMode {
+		PATH_LIST_FILES,
+		PATH_LIST_DIRECTORIES,
+		PATH_LIST_EXTENSIONS,
+	};
+	PackedStringArray _get_paths(const String &p_base_path, PathListMode p_mode, bool p_recursive, const PackedStringArray &p_extensions);
+	static PackedStringArray _get_paths_at(const String &p_path, PathListMode p_mode, bool p_recursive, const PackedStringArray &p_extensions);
+
 	static inline thread_local Error last_dir_open_error = OK;
 	bool include_navigational = false;
 	bool include_hidden = false;
@@ -161,6 +169,13 @@ public:
 	static PackedStringArray get_files_at(const String &p_path);
 	PackedStringArray get_directories();
 	static PackedStringArray get_directories_at(const String &p_path);
+
+	PackedStringArray get_file_paths(bool p_recursive = false, const PackedStringArray &p_extensions = PackedStringArray());
+	static PackedStringArray get_file_paths_at(const String &p_path, bool p_recursive = false, const PackedStringArray &p_extensions = PackedStringArray());
+	PackedStringArray get_directory_paths(bool p_recursive = false);
+	static PackedStringArray get_directory_paths_at(const String &p_path, bool p_recursive = false);
+	PackedStringArray get_file_extensions(bool p_recursive = false);
+	static PackedStringArray get_file_extensions_at(const String &p_path, bool p_recursive = false);
 	String _get_next();
 
 	void set_include_navigational(bool p_enable);

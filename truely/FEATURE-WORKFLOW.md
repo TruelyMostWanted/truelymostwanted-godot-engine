@@ -46,29 +46,25 @@ git switch -c 03-feature-path-prefix-server
 - **Beliebig oft** in den Feature-Branch committen.
 - Der pre-commit-Hook (clang-format, codespell, doc-status, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen.
 
-### 2.3 Pushen
+### 2.3 Lokal prüfen und pushen
 
-- **Nur bei einem WIP-Stand oder wenn das Feature fertig ist.** Nicht nach jedem Commit.
-- Jeder Push startet die volle CI mit allen Plattformen. Reine Änderungen an Vorlagen oder Doku dürfen `[skip ci]` in der Commit-Message tragen.
+- Vor dem Merge muss lokal alles grün sein: Windows/Mono-Build ohne Fehler und Warnungen, Unit-Tests, Checks in GDScript und C# im Testprojekt.
+- Pushen auf den Feature-Branch ist jederzeit erlaubt (Sicherung). **Ein Push auf einen Feature-Branch startet keine CI** (`.github/workflows/runner.yml`).
 
-```powershell
-git push -u origin 03-feature-path-prefix-server
-```
+### 2.4 CI in Stapeln
 
-### 2.4 CI abwarten
-
-```powershell
-gh run watch                      # den laufenden Lauf verfolgen
-gh run list --branch 03-feature-path-prefix-server -L 3
-```
-
-Erst weitermachen, wenn der Lauf **grün** ist.
-
-**Richtung:** Features gehen nach `truely-godot-engine`, nie umgekehrt. `truely-godot-engine` wird **nicht** in einen fertigen Feature-Branch gemergt, um die CI grün zu bekommen. Hat die Basis einen CI-Fix bekommen, den der Branch noch nicht hat: PR öffnen. Die CI des PR (`pull_request`) läuft auf dem Merge-Ergebnis aus Feature und aktueller Basis und ist dann das Tor für den Squash-Merge. Ist er rot, den Fehler im Feature-Branch beheben, committen, pushen und wieder abwarten.
+- Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
+- Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
+- Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
+- **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
+- Damit das selten nötig ist, prüft der Orchestrator **vor** dem Merge eines Features auf dessen Branch auch das, was die CI prüft und lokal geht: `--doctool --headless` ohne Diff, pre-commit-Hooks, Unit-Tests.
+- Ein eigenes Bug-Issue mit eigenem Branch nur für Fehler, die zu keinem Feature gehören (z. B. CI, Werkzeuge). `truely-godot-engine` wird nie zurückgesetzt.
 
 ### 2.5 Mergen
 
-Bei grüner CI: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature.
+Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft danach auf `truely-godot-engine` (2.4).
+
+**Richtung:** Feature-Branches enthalten nur ihre eigenen Änderungen, wie ein PR. Sie gehen nach `truely-godot-engine`, nie umgekehrt: `truely-godot-engine` wird nicht in einen Feature-Branch gemergt.
 
 ```powershell
 gh pr create --base truely-godot-engine --head 03-feature-path-prefix-server --fill
@@ -232,7 +228,7 @@ Jedes Feature- und Refactoring-Issue endet mit diesen fünf Punkten:
 - [ ] Test build on the current platform done (no errors or warnings)
 - [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
 
-Danach: Push → CI grün → Squash-Merge → Feature-Branch bleibt bestehen.
+Danach: lokal grün → Squash-Merge → CI auf `truely-godot-engine` (im Stapel) → Feature-Branch bleibt bestehen.
 
 ---
 

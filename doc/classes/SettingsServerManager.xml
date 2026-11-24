@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SettingsServerManager" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Registry of all [SettingsServer]s and entry point for starting them with the game.
+	</brief_description>
+	<description>
+		[SettingsServerManager] keeps one [SettingsServer] per domain, finds them by name and has "all" methods ([method load_all], [method save_all], [method apply_all], [method revert_all], [method reset_all_to_defaults]) for menus such as "Reset all settings". It also starts the servers while the game starts: for each server it captures the defaults, loads the settings file and applies the values, so that the settings of the player are active before the first scene.
+		[b]Startup phases.[/b] A server is started in the phase returned by [method SettingsServer.get_apply_phase]:
+		- [constant SettingsServer.APPLY_PHASE_PRE_DISPLAY]: right after the servers and modules are registered, before [DisplayServer] is created. Values that the window needs at creation belong here.
+		- [constant SettingsServer.APPLY_PHASE_SERVERS]: after the script languages are initialized and the default bus layout is loaded. This is the default.
+		- [constant SettingsServer.APPLY_PHASE_SCENE]: in the start of the game after the root window is set up, before the main scene is loaded and before the autoloads are ready. The script domains from [member ProjectSettings.settings/startup/custom_servers] are created in this phase.
+		After each phase, [signal startup_applied] is emitted. A server that is registered after its phase has already passed (for example by a GDExtension) is started at once.
+		Startup only happens in games, not in the editor and the project manager, and only if [member ProjectSettings.settings/startup/apply_on_startup] is [code]true[/code]. When the game exits, queued autosaves are written and the servers created from [member ProjectSettings.settings/startup/custom_servers] are freed.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			print(SettingsServerManager.get_domains()) # For example ["audio", "game"].
+
+			var game = SettingsServerManager.get_server(&amp;"game")
+			if game:
+				game.value_changed.connect(func(name, value): print("%s = %s" % [name, value]))
+
+		func _on_reset_all_pressed():
+			SettingsServerManager.reset_all_to_defaults()
+
+		func _on_apply_pressed():
+			SettingsServerManager.apply_all()
+			if SettingsServerManager.is_any_dirty():
+				print("Some values could not be applied.")
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GD.Print(string.Join(", ", SettingsServerManager.GetDomains()));
+
+		    var game = SettingsServerManager.GetServer("game");
+		    if (game != null)
+		    {
+		        game.ValueChanged += (name, value) =&gt; GD.Print($"{name} = {value}");
+		    }
+		}
+
+		private void OnResetAllPressed()
+		{
+		    SettingsServerManager.ResetAllToDefaults();
+		}
+
+		private void OnApplyPressed()
+		{
+		    SettingsServerManager.ApplyAll();
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The API is for the main thread. The registry itself can be read from other threads.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="apply_all">
+			<return type="int" enum="Error" />
+			<description>
+				Calls [method SettingsServer.apply] on every server. Returns the last error of a server, or [constant OK].
+			</description>
+		</method>
+		<method name="get_domains" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the domain names of all registered servers, in the order of registration.
+			</description>
+		</method>
+		<method name="get_server" qualifiers="const">
+			<return type="SettingsServer" />
+			<param index="0" name="domain" type="StringName" />
+			<description>
+				Returns the server of [param domain], or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="get_servers" qualifiers="const">
+			<return type="SettingsServer[]" />
+			<description>
+				Returns all registered servers, in the order of registration.
+			</description>
+		</method>
+		<method name="get_startup_phase" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the last [enum SettingsServer.ApplyPhase] that startup has reached, or [code]-1[/code] if startup has not begun (for example in the editor).
+			</description>
+		</method>
+		<method name="get_storage_folder" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the folder of the settings files, like [method SettingsServer.get_storage_folder].
+			</description>
+		</method>
+		<method name="has_server" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="domain" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a server is registered for [param domain].
+			</description>
+		</method>
+		<method name="is_any_dirty" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if any server has pending values that are not applied (see [method SettingsServer.is_dirty]).
+			</description>
+		</method>
+		<method name="load_all">
+			<return type="int" enum="Error" />
+			<description>
+				Calls [method SettingsServer.load] on every server. A missing file ([constant ERR_FILE_NOT_FOUND]) is not an error here. Returns the last other error, or [constant OK]. The values are not applied; call [method apply_all].
+			</description>
+		</method>
+		<method name="register_server">
+			<return type="int" enum="Error" />
+			<param index="0" name="server" type="SettingsServer" />
+			<description>
+				Registers [param server] under its domain. Returns [constant ERR_INVALID_PARAMETER] if [param server] is [code]null[/code] or has no domain, and [constant ERR_ALREADY_EXISTS] if the domain is taken by another server. Registering the same server twice does nothing. If the phase of the server has already passed, the server is started at once. Emits [signal server_registered].
+				[b]Note:[/b] The manager does not take ownership. Keep the server alive and free it yourself; a freed server is removed automatically.
+			</description>
+		</method>
+		<method name="reset_all_to_defaults">
+			<return type="void" />
+			<description>
+				Calls [method SettingsServer.reset_to_defaults] on every server.
+			</description>
+		</method>
+		<method name="revert_all">
+			<return type="void" />
+			<description>
+				Calls [method SettingsServer.revert] on every server.
+			</description>
+		</method>
+		<method name="save_all">
+			<return type="int" enum="Error" />
+			<description>
+				Calls [method SettingsServer.save] on every server. Returns the last error, or [constant OK].
+			</description>
+		</method>
+		<method name="unregister_server">
+			<return type="void" />
+			<param index="0" name="domain" type="StringName" />
+			<description>
+				Removes the server of [param domain] from the registry and emits [signal server_unregistered]. The server is not freed. Reports an error if no server is registered for [param domain].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="server_registered">
+			<param index="0" name="domain" type="StringName" />
+			<description>
+				Emitted when a server was registered.
+			</description>
+		</signal>
+		<signal name="server_unregistered">
+			<param index="0" name="domain" type="StringName" />
+			<description>
+				Emitted when a server was removed from the registry, by [method unregister_server] or because it was freed.
+			</description>
+		</signal>
+		<signal name="startup_applied">
+			<param index="0" name="phase" type="int" />
+			<description>
+				Emitted after the servers of a startup phase were started. [param phase] is a value of [enum SettingsServer.ApplyPhase]. Not emitted if [member ProjectSettings.settings/startup/apply_on_startup] is [code]false[/code].
+			</description>
+		</signal>
+	</signals>
+</class>

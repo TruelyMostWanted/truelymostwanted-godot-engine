@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PathPrefix" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The logic of one path prefix for [PathPrefixServer].
+	</brief_description>
+	<description>
+		Extend this class to define how a path prefix such as [code]mods://[/code] is turned into a real path on the current platform, and back. Register an instance with [method PathPrefixServer.register_prefix].
+		The methods can be called from any thread, for example from [ResourceLoader] threads. They must be thread-safe and must not touch the scene tree.
+		[codeblocks]
+		[gdscript]
+		class_name ModsPrefix
+		extends PathPrefix
+
+		func _globalize(path: String) -&gt; String:
+			return OS.get_executable_path().get_base_dir().path_join("mods").path_join(path.trim_prefix("mods://"))
+		[/gdscript]
+		[csharp]
+		using Godot;
+
+		public partial class ModsPrefix : PathPrefix
+		{
+		    public override string _Globalize(string path)
+		    {
+		        return OS.GetExecutablePath().GetBaseDir().PathJoin("mods").PathJoin(path.TrimPrefix("mods://"));
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="_globalize" qualifiers="virtual const">
+			<return type="String" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns the real path for [param path]. [param path] is the canonical prefixed path, for example [code]mods://a/b.txt[/code]. Required.
+			</description>
+		</method>
+		<method name="_is_available" qualifiers="virtual const">
+			<return type="bool" />
+			<description>
+				Returns [code]false[/code] if the prefix does not work on this platform or in this build. Optional, [code]true[/code] by default.
+			</description>
+		</method>
+		<method name="_is_read_only" qualifiers="virtual const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if paths with this prefix cannot be written to. Optional, [code]false[/code] by default.
+			</description>
+		</method>
+		<method name="_localize" qualifiers="virtual const">
+			<return type="String" />
+			<param index="0" name="global_path" type="String" />
+			<description>
+				Returns the canonical prefixed path for the real path [param global_path], or an empty string if it does not belong to this prefix. Optional; without it [method PathPrefixServer.localize] does not map paths to this prefix.
+			</description>
+		</method>
+	</methods>
+</class>

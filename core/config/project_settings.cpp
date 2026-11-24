@@ -37,6 +37,8 @@
 #include "core/io/file_access.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/marshalls.h"
+#include "core/io/path_prefix_server.h"
+#include "core/io/pck_package_server.h"
 #include "core/io/resource_uid.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
@@ -285,6 +287,9 @@ String ProjectSettings::globalize_path(const String &p_path) const {
 			return p_path.replace("user:/", data_dir);
 		}
 		return p_path.replace("user://", "");
+	} else if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+		// Prefixes other than the engine ones (`exec://`, `appdata://`, registered ones).
+		return PathPrefixServer::get_singleton()->globalize(p_path);
 	}
 
 	return p_path;
@@ -583,6 +588,10 @@ void ProjectSettings::_emit_changed() {
 }
 
 bool ProjectSettings::load_resource_pack(const String &p_pack, bool p_replace_files, int p_offset) {
+	// PckPackageServer records the pack and emits `pack_mounted`; it calls `_load_resource_pack()`.
+	if (PckPackageServer::get_singleton()) {
+		return PckPackageServer::get_singleton()->mount(p_pack, p_replace_files, p_offset) == OK;
+	}
 	return ProjectSettings::_load_resource_pack(p_pack, p_replace_files, p_offset, false);
 }
 
@@ -608,6 +617,10 @@ bool ProjectSettings::_load_resource_pack(const String &p_pack, bool p_replace_f
 	bool ok = PackedData::get_singleton()->add_pack(p_pack, p_replace_files, p_offset) == OK;
 	if (!ok) {
 		return false;
+	}
+	if (p_main_pack) {
+		// Main packs can't be unmounted with PckPackageServer.
+		PackedData::get_singleton()->mark_main_pack(p_pack);
 	}
 
 	if (project_loaded) {

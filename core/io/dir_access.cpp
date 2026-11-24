@@ -32,9 +32,11 @@
 
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
+#include "core/io/path_prefix_server.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 
 String DirAccess::_get_root_path() const {
@@ -143,6 +145,9 @@ Error DirAccess::make_dir_recursive(const String &p_dir) {
 	}
 
 	full_dir = full_dir.replace_char('\\', '/');
+	if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(full_dir)) {
+		full_dir = PathPrefixServer::get_singleton()->globalize(full_dir);
+	}
 
 	String base;
 
@@ -209,6 +214,10 @@ String DirAccess::fix_path(const String &p_path) const {
 
 		} break;
 		case ACCESS_FILESYSTEM: {
+			if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+				// Prefixes other than the engine ones (`exec://`, `appdata://`, registered ones).
+				return PathPrefixServer::get_singleton()->globalize(p_path);
+			}
 			return p_path;
 		} break;
 		case ACCESS_MAX:
@@ -219,6 +228,11 @@ String DirAccess::fix_path(const String &p_path) const {
 }
 
 DirAccess::CreateFunc DirAccess::create_func[ACCESS_MAX] = { nullptr, nullptr, nullptr };
+
+// A registered prefix that resolves into `res://` or `user://` uses the engine access, including the PCK.
+static String _resolve_prefixed_path(const String &p_path) {
+	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
+}
 
 Ref<DirAccess> DirAccess::create_for_path(const String &p_path) {
 	Ref<DirAccess> da;
@@ -234,9 +248,10 @@ Ref<DirAccess> DirAccess::create_for_path(const String &p_path) {
 }
 
 Ref<DirAccess> DirAccess::open(const String &p_path, Error *r_error) {
-	Ref<DirAccess> da = create_for_path(p_path);
+	const String path = _resolve_prefixed_path(p_path);
+	Ref<DirAccess> da = create_for_path(path);
 	ERR_FAIL_COND_V_MSG(da.is_null(), nullptr, vformat("Cannot create DirAccess for path '%s'.", p_path));
-	Error err = da->change_dir(p_path);
+	Error err = da->change_dir(path);
 	if (r_error) {
 		*r_error = err;
 	}
@@ -273,18 +288,21 @@ String DirAccess::_get_drive_label(int p_idx) {
 }
 
 Error DirAccess::make_dir_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->make_dir(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->make_dir(dir);
 }
 
 Error DirAccess::make_dir_recursive_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->make_dir_recursive(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->make_dir_recursive(dir);
 }
 
 bool DirAccess::dir_exists_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->dir_exists(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->dir_exists(dir);
 }
 
 Error DirAccess::copy_absolute(const String &p_from, const String &p_to, int p_chmod_flags) {
@@ -303,8 +321,9 @@ Error DirAccess::rename_absolute(const String &p_from, const String &p_to) {
 }
 
 Error DirAccess::remove_absolute(const String &p_path) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_path);
-	return d->remove(p_path);
+	const String path = _resolve_prefixed_path(p_path);
+	Ref<DirAccess> d = DirAccess::create_for_path(path);
+	return d->remove(path);
 }
 
 Ref<DirAccess> DirAccess::create(AccessType p_access) {
@@ -601,6 +620,114 @@ PackedStringArray DirAccess::_get_contents(bool p_directories) {
 	return ret;
 }
 
+PackedStringArray DirAccess::get_file_paths(bool p_recursive, const PackedStringArray &p_extensions) {
+	return _get_paths(get_current_dir(), PATH_LIST_FILES, p_recursive, p_extensions);
+}
+
+PackedStringArray DirAccess::get_file_paths_at(const String &p_path, bool p_recursive, const PackedStringArray &p_extensions) {
+	return _get_paths_at(p_path, PATH_LIST_FILES, p_recursive, p_extensions);
+}
+
+PackedStringArray DirAccess::get_directory_paths(bool p_recursive) {
+	return _get_paths(get_current_dir(), PATH_LIST_DIRECTORIES, p_recursive, PackedStringArray());
+}
+
+PackedStringArray DirAccess::get_directory_paths_at(const String &p_path, bool p_recursive) {
+	return _get_paths_at(p_path, PATH_LIST_DIRECTORIES, p_recursive, PackedStringArray());
+}
+
+PackedStringArray DirAccess::get_file_extensions(bool p_recursive) {
+	return _get_paths(get_current_dir(), PATH_LIST_EXTENSIONS, p_recursive, PackedStringArray());
+}
+
+PackedStringArray DirAccess::get_file_extensions_at(const String &p_path, bool p_recursive) {
+	return _get_paths_at(p_path, PATH_LIST_EXTENSIONS, p_recursive, PackedStringArray());
+}
+
+PackedStringArray DirAccess::_get_paths_at(const String &p_path, PathListMode p_mode, bool p_recursive, const PackedStringArray &p_extensions) {
+	Ref<DirAccess> da = DirAccess::open(p_path);
+	ERR_FAIL_COND_V_MSG(da.is_null(), PackedStringArray(), vformat("Couldn't open directory at path \"%s\".", p_path));
+	// Use the path as given, so the returned paths keep its prefix (`res://`, `user://`, ...).
+	return da->_get_paths(p_path, p_mode, p_recursive, p_extensions);
+}
+
+PackedStringArray DirAccess::_get_paths(const String &p_base_path, PathListMode p_mode, bool p_recursive, const PackedStringArray &p_extensions) {
+	HashSet<String> extension_filter;
+	for (const String &extension : p_extensions) {
+		String normalized = extension.to_lower();
+		if (normalized.begins_with(".")) {
+			normalized = normalized.substr(1);
+		}
+		if (!normalized.is_empty()) {
+			extension_filter.insert(normalized);
+		}
+	}
+
+	PackedStringArray ret;
+	HashSet<String> found_extensions;
+	// Folders still to list, as paths built from `p_base_path`. Iterative instead of recursive,
+	// so deep trees cannot exhaust the stack.
+	LocalVector<String> pending;
+
+	// Lists the current folder of `p_da`, which is reachable as `p_path`.
+	auto list_folder = [&](DirAccess *p_da, const String &p_path) -> bool {
+		if (p_da->list_dir_begin() != OK) {
+			return false;
+		}
+		const String current_dir = p_da->get_current_dir();
+		for (String name = p_da->_get_next(); !name.is_empty(); name = p_da->_get_next()) {
+			if (name == "." || name == "..") {
+				continue; // Never returned, even with `include_navigational`.
+			}
+			if (p_da->current_is_dir()) {
+				const String path = p_path.path_join(name);
+				if (p_mode == PATH_LIST_DIRECTORIES) {
+					ret.push_back(path);
+				}
+				// Symbolic links to folders are listed, but not followed (no endless loops).
+				if (p_recursive && !p_da->is_link(current_dir.path_join(name))) {
+					pending.push_back(path);
+				}
+			} else if (p_mode == PATH_LIST_FILES) {
+				if (extension_filter.is_empty() || extension_filter.has(name.get_extension().to_lower())) {
+					ret.push_back(p_path.path_join(name));
+				}
+			} else if (p_mode == PATH_LIST_EXTENSIONS) {
+				const String extension = name.get_extension().to_lower();
+				if (!extension.is_empty()) {
+					found_extensions.insert(extension);
+				}
+			}
+		}
+		p_da->list_dir_end();
+		return true;
+	};
+
+	ERR_FAIL_COND_V_MSG(!list_folder(this, p_base_path), PackedStringArray(), vformat("Couldn't list directory at path \"%s\".", p_base_path));
+
+	for (uint32_t i = 0; i < pending.size(); i++) {
+		const String path = pending[i];
+		bool listed = false;
+		Ref<DirAccess> sub_da = DirAccess::create_for_path(path);
+		if (sub_da.is_valid() && sub_da->change_dir(path) == OK) {
+			sub_da->set_include_hidden(include_hidden);
+			listed = list_folder(sub_da.ptr(), path);
+		}
+		if (!listed) {
+			WARN_PRINT(vformat("Skipped unreadable directory \"%s\".", path));
+		}
+	}
+
+	if (p_mode == PATH_LIST_EXTENSIONS) {
+		for (const String &extension : found_extensions) {
+			ret.push_back(extension);
+		}
+	}
+
+	ret.sort();
+	return ret;
+}
+
 String DirAccess::_get_next() {
 	String next = get_next();
 	while (!next.is_empty() && ((!include_navigational && (next == "." || next == "..")) || (!include_hidden && current_is_hidden()))) {
@@ -646,6 +773,12 @@ void DirAccess::_bind_methods() {
 	ClassDB::bind_static_method("DirAccess", D_METHOD("get_files_at", "path"), &DirAccess::get_files_at);
 	ClassDB::bind_method(D_METHOD("get_directories"), &DirAccess::get_directories);
 	ClassDB::bind_static_method("DirAccess", D_METHOD("get_directories_at", "path"), &DirAccess::get_directories_at);
+	ClassDB::bind_method(D_METHOD("get_file_paths", "recursive", "extensions"), &DirAccess::get_file_paths, DEFVAL(false), DEFVAL(PackedStringArray()));
+	ClassDB::bind_static_method("DirAccess", D_METHOD("get_file_paths_at", "path", "recursive", "extensions"), &DirAccess::get_file_paths_at, DEFVAL(false), DEFVAL(PackedStringArray()));
+	ClassDB::bind_method(D_METHOD("get_directory_paths", "recursive"), &DirAccess::get_directory_paths, DEFVAL(false));
+	ClassDB::bind_static_method("DirAccess", D_METHOD("get_directory_paths_at", "path", "recursive"), &DirAccess::get_directory_paths_at, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("get_file_extensions", "recursive"), &DirAccess::get_file_extensions, DEFVAL(false));
+	ClassDB::bind_static_method("DirAccess", D_METHOD("get_file_extensions_at", "path", "recursive"), &DirAccess::get_file_extensions_at, DEFVAL(false));
 	ClassDB::bind_static_method("DirAccess", D_METHOD("get_drive_count"), &DirAccess::_get_drive_count);
 	ClassDB::bind_static_method("DirAccess", D_METHOD("get_drive_name", "idx"), &DirAccess::_get_drive_name);
 	ClassDB::bind_static_method("DirAccess", D_METHOD("get_drive_label", "idx"), &DirAccess::_get_drive_label);

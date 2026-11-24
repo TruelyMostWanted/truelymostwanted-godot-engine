@@ -36,9 +36,14 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 
-Ref<ResourceFormatSaver> ResourceSaver::saver[MAX_SAVERS];
+ResourceSaverFormatSnapshot ResourceSaver::savers;
+Mutex ResourceSaver::savers_mutex;
 
-int ResourceSaver::saver_count = 0;
+ResourceSaverFormatSnapshot ResourceSaver::_get_savers() {
+	MutexLock lock(savers_mutex);
+	return savers;
+}
+
 bool ResourceSaver::timestamp_on_save = false;
 ResourceSavedCallback ResourceSaver::save_callback = nullptr;
 ResourceSaverGetResourceIDForPath ResourceSaver::save_get_id_for_path = nullptr;
@@ -109,12 +114,12 @@ Error ResourceSaver::save(RequiredParam<Resource> p_resource, const String &p_pa
 
 	Error err = ERR_FILE_UNRECOGNIZED;
 
-	for (int i = 0; i < saver_count; i++) {
-		if (!saver[i]->recognize(resource)) {
+	for (const Ref<ResourceFormatSaver> &format_saver : _get_savers()) {
+		if (!format_saver->recognize(resource)) {
 			continue;
 		}
 
-		if (!saver[i]->recognize_path(resource, path)) {
+		if (!format_saver->recognize_path(resource, path)) {
 			continue;
 		}
 
@@ -126,7 +131,7 @@ Error ResourceSaver::save(RequiredParam<Resource> p_resource, const String &p_pa
 			resource->set_path(local_path);
 		}
 
-		err = saver[i]->save(resource, path, p_flags);
+		err = format_saver->save(resource, path, p_flags);
 
 		if (err == OK) {
 #ifdef TOOLS_ENABLED
@@ -161,8 +166,8 @@ Error ResourceSaver::set_uid(const String &p_path, ResourceUID::ID p_uid) {
 
 	Error err = ERR_FILE_UNRECOGNIZED;
 
-	for (int i = 0; i < saver_count; i++) {
-		err = saver[i]->set_uid(path, p_uid);
+	for (const Ref<ResourceFormatSaver> &format_saver : _get_savers()) {
+		err = format_saver->set_uid(path, p_uid);
 		if (err == OK) {
 			break;
 		}
@@ -177,51 +182,35 @@ void ResourceSaver::set_save_callback(ResourceSavedCallback p_callback) {
 
 void ResourceSaver::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) {
 	ERR_FAIL_COND_MSG(p_resource.is_null(), "It's not a reference to a valid Resource object.");
-	for (int i = 0; i < saver_count; i++) {
-		saver[i]->get_recognized_extensions(p_resource, p_extensions);
+	for (const Ref<ResourceFormatSaver> &format_saver : _get_savers()) {
+		format_saver->get_recognized_extensions(p_resource, p_extensions);
 	}
 }
 
 void ResourceSaver::add_resource_format_saver(Ref<ResourceFormatSaver> p_format_saver, bool p_at_front) {
 	ERR_FAIL_COND_MSG(p_format_saver.is_null(), "It's not a reference to a valid ResourceFormatSaver object.");
-	ERR_FAIL_COND(saver_count >= MAX_SAVERS);
 
+	MutexLock lock(savers_mutex);
 	if (p_at_front) {
-		for (int i = saver_count; i > 0; i--) {
-			saver[i] = saver[i - 1];
-		}
-		saver[0] = p_format_saver;
-		saver_count++;
+		savers.formats.insert(0, p_format_saver);
 	} else {
-		saver[saver_count++] = p_format_saver;
+		savers.formats.push_back(p_format_saver);
 	}
 }
 
 void ResourceSaver::remove_resource_format_saver(Ref<ResourceFormatSaver> p_format_saver) {
 	ERR_FAIL_COND_MSG(p_format_saver.is_null(), "It's not a reference to a valid ResourceFormatSaver object.");
 
-	// Find saver
-	int i = 0;
-	for (; i < saver_count; ++i) {
-		if (saver[i] == p_format_saver) {
-			break;
-		}
-	}
-
-	ERR_FAIL_COND(i >= saver_count); // Not found
-
-	// Shift next savers up
-	for (; i < saver_count - 1; ++i) {
-		saver[i] = saver[i + 1];
-	}
-	saver[saver_count - 1].unref();
-	--saver_count;
+	MutexLock lock(savers_mutex);
+	int64_t index = savers.formats.find(p_format_saver);
+	ERR_FAIL_COND(index < 0); // Not found
+	savers.formats.remove_at(index);
 }
 
 Ref<ResourceFormatSaver> ResourceSaver::_find_custom_resource_format_saver(const String &p_path) {
-	for (int i = 0; i < saver_count; ++i) {
-		if (saver[i]->get_script_instance() && saver[i]->get_script_instance()->get_script()->get_path() == p_path) {
-			return saver[i];
+	for (const Ref<ResourceFormatSaver> &format_saver : _get_savers()) {
+		if (format_saver->get_script_instance() && format_saver->get_script_instance()->get_script()->get_path() == p_path) {
+			return format_saver;
 		}
 	}
 	return Ref<ResourceFormatSaver>();
@@ -271,9 +260,9 @@ void ResourceSaver::add_custom_savers() {
 
 void ResourceSaver::remove_custom_savers() {
 	Vector<Ref<ResourceFormatSaver>> custom_savers;
-	for (int i = 0; i < saver_count; ++i) {
-		if (saver[i]->get_script_instance()) {
-			custom_savers.push_back(saver[i]);
+	for (const Ref<ResourceFormatSaver> &format_saver : _get_savers()) {
+		if (format_saver->get_script_instance()) {
+			custom_savers.push_back(format_saver);
 		}
 	}
 
