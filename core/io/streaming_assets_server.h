@@ -32,6 +32,7 @@
 
 #include "core/object/object.h"
 #include "core/os/rw_lock.h"
+#include "core/variant/binder_common.h"
 
 // Owns the streaming assets settings (`filesystem/streaming_assets/*`) and the `streaming://` prefix.
 // `setup()` runs once at startup, after the project settings and the main pack are loaded. It finds
