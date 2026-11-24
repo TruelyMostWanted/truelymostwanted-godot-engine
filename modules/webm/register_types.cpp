@@ -31,10 +31,12 @@
 #include "register_types.h"
 
 #include "video_stream_webm.h"
+#include "video_stream_webm_resource_format.h"
 
 #include "core/object/class_db.h"
 
-static Ref<ResourceFormatLoaderWebm> resource_loader_webm;
+// Extends ResourceFormatLoaderWebm with the import rule, all base type hints and a header check.
+static Ref<ResourceFormatLoaderVideoStreamWebm> resource_loader_webm;
 
 void initialize_webm_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
