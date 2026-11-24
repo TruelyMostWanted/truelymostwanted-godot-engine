@@ -35,7 +35,6 @@
 #include "core/object/object.h"
 #include "core/templates/hash_set.h"
 #include "editor/export/editor_export_preset.h"
-#include "editor/export/pck_build_plan.h"
 
 // Builds a `PCKPackage` description through the export pipeline of an export preset. Entries with a `res://`
 // source are packed in exported form for the preset's platform (`.import` files, imported artifacts, `.remap`
