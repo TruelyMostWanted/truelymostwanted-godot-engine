@@ -232,17 +232,18 @@ jobs:
           path: bin/godot.*
 
   macos:
-    name: 🍎 macOS ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    # One job per variant (standard, Mono) builds the editor and both templates: macOS runners are
+    # scarce, and six parallel jobs were often cancelled for capacity.
+    name: 🍎 macOS${{ matrix.mono && ' (Mono)' || '' }}
     needs: setup
     if: needs.setup.outputs.release == 'true'
     runs-on: macos-26
-    timeout-minutes: 240
+    timeout-minutes: 300
     env:
       GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
     strategy:
       fail-fast: false
       matrix:
-        target: [editor, template_debug, template_release]
         mono: [false, true]
     steps:
       - name: Checkout
@@ -260,29 +261,28 @@ jobs:
           python ./misc/scripts/install_accesskit.py
           sh misc/scripts/install_vulkan_sdk_macos.sh
 
-      - name: Compilation (x86_64 and arm64)
-        run: |
-          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
-          FLAGS="platform=macos target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} vulkan=yes angle=yes accesskit=yes"
-          # Metal is not supported in x86_64 builds.
-          scons $FLAGS arch=x86_64 metal=no
-          scons $FLAGS arch=arm64
-
-      - name: Prepare artifact (lipo, ad-hoc signature)
+      - name: Compilation (editor and templates, x86_64 and arm64, lipo, ad-hoc signature)
         run: |
           suffix="${{ matrix.mono && '.mono' || '' }}"
-          out="./bin/godot.macos.${{ matrix.target }}.universal$suffix"
-          lipo -create "./bin/godot.macos.${{ matrix.target }}.x86_64$suffix" "./bin/godot.macos.${{ matrix.target }}.arm64$suffix" -output "$out"
-          rm "./bin/godot.macos.${{ matrix.target }}.x86_64$suffix" "./bin/godot.macos.${{ matrix.target }}.arm64$suffix"
+          mkdir -p out
+          for target in editor template_debug template_release; do
+            FLAGS="platform=macos target=$target $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} vulkan=yes angle=yes accesskit=yes"
+            # Metal is not supported in x86_64 builds.
+            scons $FLAGS arch=x86_64 metal=no
+            scons $FLAGS arch=arm64
+            u="out/godot.macos.$target.universal$suffix"
+            lipo -create "./bin/godot.macos.$target.x86_64$suffix" "./bin/godot.macos.$target.arm64$suffix" -output "$u"
+            rm "./bin/godot.macos.$target.x86_64$suffix" "./bin/godot.macos.$target.arm64$suffix"
+            strip "$u"
+            codesign --force --sign - "$u"
+          done
           rm -rf ./bin/build_deps ./bin/obj
-          strip "$out"
-          codesign --force --sign - "$out"
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: ./.github/actions/upload-artifact
         with:
-          name: release-macos-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
-          path: bin/godot.*
+          name: release-macos${{ matrix.mono && '-mono' || '' }}
+          path: out/godot.*
 
   web:
     name: 🌐 Web ${{ matrix.target }}${{ matrix.threads == 'no' && ' (no threads)' || '' }}
