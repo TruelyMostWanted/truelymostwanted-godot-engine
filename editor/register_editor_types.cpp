@@ -79,6 +79,7 @@
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
+#include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
 #include "editor/inspector/tool_button_editor_plugin.h"
 #include "editor/plugins/pck_extract_editor_plugin.h"
@@ -248,6 +249,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<MaterialEditorPlugin>();
 	EditorPlugins::add_by_type<PackedSceneEditorPlugin>();
 	EditorPlugins::add_by_type<PCKExtractEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageEditorPlugin>();
 	EditorPlugins::add_by_type<ResourcePreloaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderFileEditorPlugin>();
