@@ -153,13 +153,13 @@ String InputAction::event_to_text(const Ref<InputEvent> &p_event) {
 		String type;
 		Key code = Key::NONE;
 		if (key_event->get_physical_keycode() != Key::NONE) {
-			type = "PhysicalKey";
+			type = "Keyboard";
 			code = key_event->get_physical_keycode();
 		} else if (key_event->get_keycode() != Key::NONE) {
-			type = "Key";
+			type = "KeyboardLabel";
 			code = key_event->get_keycode();
 		} else if (key_event->get_key_label() != Key::NONE) {
-			type = "KeyLabel";
+			type = "KeyboardPrinted";
 			code = key_event->get_key_label();
 		} else {
 			return String();
@@ -174,21 +174,21 @@ String InputAction::event_to_text(const Ref<InputEvent> &p_event) {
 		}
 		const int index = int(mouse_event->get_button_index());
 		const String button = (index >= 1 && index <= MOUSE_BUTTON_NAME_COUNT) ? String(_mouse_button_names[index - 1]) : itos(index);
-		return "MouseButton:" + _modifiers_to_text(mouse_event.ptr()) + button;
+		return "Mouse:" + _modifiers_to_text(mouse_event.ptr()) + button;
 	}
 	const Ref<InputEventJoypadButton> button_event = p_event;
 	if (button_event.is_valid()) {
 		if (button_event->get_button_index() == JoyButton::INVALID) {
 			return String();
 		}
-		return "JoypadButton:" + _index_to_text(int(button_event->get_button_index()), _joy_button_names, JOY_BUTTON_NAME_COUNT);
+		return "Gamepad:" + _index_to_text(int(button_event->get_button_index()), _joy_button_names, JOY_BUTTON_NAME_COUNT);
 	}
 	const Ref<InputEventJoypadMotion> motion_event = p_event;
 	if (motion_event.is_valid()) {
 		if (motion_event->get_axis() == JoyAxis::INVALID) {
 			return String();
 		}
-		return "JoypadMotion:" + _index_to_text(int(motion_event->get_axis()), _joy_axis_names, JOY_AXIS_NAME_COUNT) + (motion_event->get_axis_value() < 0.0f ? "-" : "+");
+		return "GamepadAxis:" + _index_to_text(int(motion_event->get_axis()), _joy_axis_names, JOY_AXIS_NAME_COUNT) + (motion_event->get_axis_value() < 0.0f ? "-" : "+");
 	}
 	return String();
 }
@@ -198,7 +198,21 @@ Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 	if (colon <= 0) {
 		return Ref<InputEvent>();
 	}
-	const String type = p_text.substr(0, colon).strip_edges();
+	String type = p_text.substr(0, colon).strip_edges();
+	// Names since #193 (Keyboard = physical key, KeyboardLabel = key code of the layout); the older names still load.
+	if (type == "Keyboard") {
+		type = "PhysicalKey";
+	} else if (type == "KeyboardLabel") {
+		type = "Key";
+	} else if (type == "KeyboardPrinted") {
+		type = "KeyLabel";
+	} else if (type == "Mouse") {
+		type = "MouseButton";
+	} else if (type == "Gamepad") {
+		type = "JoypadButton";
+	} else if (type == "GamepadAxis") {
+		type = "JoypadMotion";
+	}
 	const String value = p_text.substr(colon + 1).strip_edges();
 	if (value.is_empty()) {
 		return Ref<InputEvent>();

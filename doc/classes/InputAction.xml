@@ -6,18 +6,18 @@
 	<description>
 		An [InputAction] describes one action of the [InputMap] ([code]"jump"[/code], [code]"ui_accept"[/code], ...) with its [member action] name, its [member deadzone] and its [member events]. The layers of the [InputMap] are [InputActions] of [InputAction]s: [method InputMap.get_input_action] returns the action of the [InputMap] itself (changing it changes the [InputMap]), and [method InputMap.set_input_action] puts one into the [InputMap]. A set of actions is an [InputActions]. [InputMapSettingsServer] stores the player's bindings as [InputActions].
 		[member events] is a list of [InputEvent]s. It is stored like any other resource property: a [code].tres[/code] file holds the events as sub-resources, the same layout the editor writes, so an [InputAction] or an [InputActions] can be edited in the Inspector and saved again. [InputMapSettingsServer] stores the player's bindings in readable text instead (see [method InputMapSettingsServer.events_to_text]).
-		[method event_to_text] and [method text_to_event] convert one event to and from its text form [code]Type:Value[/code]. Only keys, mouse buttons, joypad buttons and joypad axes have one:
-		- [code]Key:Ctrl+S[/code], [code]PhysicalKey:W[/code] and [code]KeyLabel:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.keycode], [member InputEventKey.physical_keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
-		- [code]MouseButton:Left[/code], [code]MouseButton:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
-		- [code]JoypadButton:A[/code]: an [InputEventJoypadButton] with the names of [enum JoyButton] in PascalCase ([code]LeftShoulder[/code], [code]DPadUp[/code], ...) or the button index.
-		- [code]JoypadMotion:LeftX+[/code]: an [InputEventJoypadMotion] with the axis ([code]LeftX[/code], [code]LeftY[/code], [code]RightX[/code], [code]RightY[/code], [code]TriggerLeft[/code], [code]TriggerRight[/code] or the axis index) and the direction ([code]+[/code] or [code]-[/code]).
+		[method event_to_text] and [method text_to_event] convert one event to and from its text form [code]Type:Value[/code]. The older names ([code]PhysicalKey[/code], [code]Key[/code], [code]KeyLabel[/code], [code]MouseButton[/code], [code]JoypadButton[/code], [code]JoypadMotion[/code]) are still read. Only keys, mouse buttons, joypad buttons and joypad axes have one:
+		- [code]Keyboard:W[/code], [code]KeyboardLabel:Ctrl+S[/code] and [code]KeyboardPrinted:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.physical_keycode] (the key at the same place on every layout, the usual choice for games), [member InputEventKey.keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
+		- [code]Mouse:Left[/code], [code]Mouse:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
+		- [code]Gamepad:A[/code]: an [InputEventJoypadButton] with the names of [enum JoyButton] in PascalCase ([code]LeftShoulder[/code], [code]DPadUp[/code], ...) or the button index.
+		- [code]GamepadAxis:LeftX+[/code]: an [InputEventJoypadMotion] with the axis ([code]LeftX[/code], [code]LeftY[/code], [code]RightX[/code], [code]RightY[/code], [code]TriggerLeft[/code], [code]TriggerRight[/code] or the axis index) and the direction ([code]+[/code] or [code]-[/code]).
 		[codeblocks]
 		[gdscript]
 		var action = InputAction.new()
 		action.action = &amp;"jump"
 		action.deadzone = 0.3
 		action.add_event(InputAction.text_to_event("Key:Space"))
-		action.add_event(InputAction.text_to_event("JoypadButton:A"))
+		action.add_event(InputAction.text_to_event("Gamepad:A"))
 		InputMap.set_input_action(action)
 		ResourceSaver.save(action, "user://jump.tres") # The events are sub-resources of the file.
 		[/gdscript]
@@ -26,7 +26,7 @@
 		action.Action = "jump";
 		action.Deadzone = 0.3f;
 		action.AddEvent(InputAction.TextToEvent("Key:Space"));
-		action.AddEvent(InputAction.TextToEvent("JoypadButton:A"));
+		action.AddEvent(InputAction.TextToEvent("Gamepad:A"));
 		InputMap.Singleton.SetInputAction(action);
 		ResourceSaver.Save(action, "user://jump.tres"); // The events are sub-resources of the file.
 		[/csharp]
