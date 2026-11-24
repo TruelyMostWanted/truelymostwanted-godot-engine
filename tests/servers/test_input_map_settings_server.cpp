@@ -179,35 +179,35 @@ TEST_CASE("[InputMapSettingsServer] The domain is an engine singleton registered
 
 TEST_CASE("[InputMapSettingsServer] Text form of key, mouse button, joypad button and joypad axis") {
 	// Round trip of every kind.
-	for (const String &text : { String("Key:Ctrl+S"), String("PhysicalKey:W"), String("KeyLabel:Alt+Shift+A"), String("Key:CmdOrCtrl+Z"),
-				 String("Key:F5"), String("Key:Kp Add"), String("MouseButton:Left"), String("MouseButton:Ctrl+WheelUp"), String("MouseButton:Extra2"),
-				 String("JoypadButton:A"), String("JoypadButton:LeftShoulder"), String("JoypadButton:30"),
-				 String("JoypadMotion:LeftX+"), String("JoypadMotion:LeftY-"), String("JoypadMotion:TriggerRight+"), String("JoypadMotion:7-") }) {
+	for (const String &text : { String("KeyboardLabel:Ctrl+S"), String("Keyboard:W"), String("KeyboardPrinted:Alt+Shift+A"), String("KeyboardLabel:CmdOrCtrl+Z"),
+				 String("KeyboardLabel:F5"), String("KeyboardLabel:Kp Add"), String("Mouse:Left"), String("Mouse:Ctrl+WheelUp"), String("Mouse:Extra2"),
+				 String("Gamepad:A"), String("Gamepad:LeftShoulder"), String("Gamepad:30"),
+				 String("GamepadAxis:LeftX+"), String("GamepadAxis:LeftY-"), String("GamepadAxis:TriggerRight+"), String("GamepadAxis:7-") }) {
 		const Ref<InputEvent> event = InputAction::text_to_event(text);
 		REQUIRE_MESSAGE(event.is_valid(), text);
 		CHECK_MESSAGE(InputAction::event_to_text(event) == text, text);
 		CHECK(event->get_device() == -1);
 	}
 
-	const Ref<InputEventKey> ctrl_s = InputAction::text_to_event("Key:Ctrl+S");
+	const Ref<InputEventKey> ctrl_s = InputAction::text_to_event("KeyboardLabel:Ctrl+S");
 	CHECK(ctrl_s->get_keycode() == Key::S);
 	CHECK(ctrl_s->get_physical_keycode() == Key::NONE);
 	CHECK(ctrl_s->is_ctrl_pressed());
-	const Ref<InputEventKey> undo = InputAction::text_to_event("Key:CmdOrCtrl+Z");
+	const Ref<InputEventKey> undo = InputAction::text_to_event("KeyboardLabel:CmdOrCtrl+Z");
 	CHECK(undo->is_command_or_control_autoremap());
-	const Ref<InputEventJoypadMotion> left_y = InputAction::text_to_event("JoypadMotion:LeftY-");
+	const Ref<InputEventJoypadMotion> left_y = InputAction::text_to_event("GamepadAxis:LeftY-");
 	CHECK(left_y->get_axis() == JoyAxis::LEFT_Y);
 	CHECK(left_y->get_axis_value() == doctest::Approx(-1.0));
 
 	// A pressed key is stored by its physical code; a modifier key alone has no modifier flags.
-	CHECK(InputAction::event_to_text(make_pressed_key(Key::W)) == "PhysicalKey:W");
+	CHECK(InputAction::event_to_text(make_pressed_key(Key::W)) == "Keyboard:W");
 	Ref<InputEventKey> shift = make_pressed_key(Key::SHIFT);
 	shift->set_shift_pressed(true);
-	CHECK(InputAction::event_to_text(shift) == "PhysicalKey:Shift");
+	CHECK(InputAction::event_to_text(shift) == "Keyboard:Shift");
 
 	// Invalid texts and event types that can't be bound.
-	for (const String &text : { String(""), String("Key"), String("Key:"), String("Key:NoSuchKey"), String("Key:Hyper+S"), String("Mouse:Left"),
-				 String("MouseButton:Sideways"), String("JoypadButton:Z"), String("JoypadMotion:LeftX"), String("JoypadMotion:Nowhere+") }) {
+	for (const String &text : { String(""), String("Key"), String("KeyboardLabel:"), String("KeyboardLabel:NoSuchKey"), String("KeyboardLabel:Hyper+S"), String("Mouse:Left"),
+				 String("Mouse:Sideways"), String("Gamepad:Z"), String("GamepadAxis:LeftX"), String("GamepadAxis:Nowhere+") }) {
 		CHECK_MESSAGE(InputAction::text_to_event(text).is_null(), text);
 	}
 	Ref<InputEventScreenTouch> touch;
@@ -221,20 +221,20 @@ TEST_CASE("[InputMapSettingsServer] Text form of key, mouse button, joypad butto
 	// Labels for the UI.
 	const InputMapSettingsServer *label_server = InputMapSettingsServer::get_singleton();
 	REQUIRE(label_server != nullptr);
-	CHECK(label_server->get_event_label(InputAction::text_to_event("Key:Ctrl+S")) == "Ctrl+S");
-	CHECK(label_server->get_event_label(InputAction::text_to_event("MouseButton:Right")) == "Right Mouse Button");
-	CHECK(label_server->get_event_label(InputAction::text_to_event("JoypadButton:A")) == "Joypad A");
-	CHECK(label_server->get_event_label(InputAction::text_to_event("JoypadMotion:LeftX+")) == "Left Stick Right");
-	CHECK(label_server->get_event_label(InputAction::text_to_event("PhysicalKey:W")) == "W");
+	CHECK(label_server->get_event_label(InputAction::text_to_event("KeyboardLabel:Ctrl+S")) == "Ctrl+S");
+	CHECK(label_server->get_event_label(InputAction::text_to_event("Mouse:Right")) == "Right Mouse Button");
+	CHECK(label_server->get_event_label(InputAction::text_to_event("Gamepad:A")) == "Joypad A");
+	CHECK(label_server->get_event_label(InputAction::text_to_event("GamepadAxis:LeftX+")) == "Left Stick Right");
+	CHECK(label_server->get_event_label(InputAction::text_to_event("Keyboard:W")) == "W");
 }
 
 TEST_CASE("[InputMapSettingsServer] Text form of the events of an action") {
 	TypedArray<InputEvent> events;
-	events.push_back(InputAction::text_to_event("Key:Ctrl+S"));
-	events.push_back(InputAction::text_to_event("PhysicalKey:W"));
-	events.push_back(InputAction::text_to_event("MouseButton:Left"));
+	events.push_back(InputAction::text_to_event("KeyboardLabel:Ctrl+S"));
+	events.push_back(InputAction::text_to_event("Keyboard:W"));
+	events.push_back(InputAction::text_to_event("Mouse:Left"));
 	events.push_back(InputEventJoypadButton::create_reference(JoyButton::A, 1));
-	events.push_back(InputAction::text_to_event("JoypadMotion:LeftX-"));
+	events.push_back(InputAction::text_to_event("GamepadAxis:LeftX-"));
 	Ref<InputEventScreenTouch> touch;
 	touch.instantiate();
 	events.push_back(touch); // No text form: skipped.
@@ -320,14 +320,14 @@ TEST_CASE("[InputMapSettingsServer] Records: physical or label, device id, axis 
 	CHECK(axis_plus->to_text() == "GamepadAxis:TriggerRight+@1");
 
 	// The names of version 2 are still read.
-	const Ref<InputMapSettingsEvent> old_key = InputMapSettingsEvent::from_text("Key:Ctrl+S");
+	const Ref<InputMapSettingsEvent> old_key = InputMapSettingsEvent::from_text("KeyboardLabel:Ctrl+S");
 	REQUIRE(old_key.is_valid());
 	CHECK(old_key->get_key_mode() == InputMapSettingsEvent::KEY_MODE_LABEL);
 	CHECK(old_key->to_text() == "KeyboardLabel:Ctrl+S");
-	CHECK(InputMapSettingsEvent::from_text("PhysicalKey:W")->to_text() == "Keyboard:W");
-	CHECK(InputMapSettingsEvent::from_text("MouseButton:Left")->to_text() == "Mouse:Left");
-	CHECK(InputMapSettingsEvent::from_text("JoypadButton:A@3")->to_text() == "Gamepad:A@3");
-	CHECK(InputMapSettingsEvent::from_text("JoypadMotion:LeftY-")->to_text() == "GamepadAxis:LeftY-");
+	CHECK(InputMapSettingsEvent::from_text("Keyboard:W")->to_text() == "Keyboard:W");
+	CHECK(InputMapSettingsEvent::from_text("Mouse:Left")->to_text() == "Mouse:Left");
+	CHECK(InputMapSettingsEvent::from_text("Gamepad:A@3")->to_text() == "Gamepad:A@3");
+	CHECK(InputMapSettingsEvent::from_text("GamepadAxis:LeftY-")->to_text() == "GamepadAxis:LeftY-");
 
 	// Not valid.
 	for (const String &text : { String(""), String("Keyboard"), String("Keyboard:"), String("Keyboard:NoSuchKey"), String("Mouse:Sideways"), String("Gamepad:Z"), String("GamepadAxis:LeftX"), String("GamepadAxis:Nowhere+"), String("Touch:1") }) {
@@ -352,10 +352,10 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Every format writes the fields of
 			server->set_file_path(path);
 			// jump: physical W, left stick left, label E with Ctrl+Shift, button B; fire: Ctrl+right mouse button, no keyboard.
 			CHECK(server->rebind(JUMP, make_key(Key::W, true)) == OK);
-			CHECK(server->add_event(JUMP, InputAction::text_to_event("Key:Ctrl+Shift+E")) == OK);
+			CHECK(server->add_event(JUMP, InputAction::text_to_event("KeyboardLabel:Ctrl+Shift+E")) == OK);
 			CHECK(server->rebind(JUMP, InputEventJoypadMotion::create_reference(JoyAxis::LEFT_X, -1.0f)) == OK);
 			CHECK(server->add_event(JUMP, InputEventJoypadButton::create_reference(JoyButton::B)) == OK);
-			CHECK(server->rebind(FIRE, InputAction::text_to_event("MouseButton:Ctrl+Right")) == OK);
+			CHECK(server->rebind(FIRE, InputAction::text_to_event("Mouse:Ctrl+Right")) == OK);
 			server->set_action_deadzone(JUMP, 0.45f);
 			CHECK(server->save() == OK);
 			memdelete(server);
@@ -578,7 +578,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Defaults come from InputMap; cust
 	CHECK(server->get_slot_count(JUMP, InputAction::INPUT_DEVICE_KEYBOARD) == 1);
 	CHECK(server->get_slot_count(JUMP, InputAction::INPUT_DEVICE_GAMEPAD) == 1);
 	CHECK(server->get_slot_count(JUMP, InputAction::INPUT_DEVICE_MOUSE) == 0);
-	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD)) == "Key:Space");
+	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD)) == "KeyboardLabel:Space");
 	CHECK(server->get_events(JUMP).size() == 2);
 	CHECK(server->get_action_deadzone(JUMP) == doctest::Approx(0.3));
 	CHECK(server->get_action_deadzone(FIRE) == doctest::Approx(0.2));
@@ -645,7 +645,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Rebinding reaches InputMap at onc
 	// A slot behind the last one appends.
 	CHECK(server->rebind(JUMP, make_pressed_key(Key::DOWN), 5) == OK);
 	CHECK(server->get_slot_count(JUMP, InputAction::INPUT_DEVICE_KEYBOARD) == 3);
-	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 2)) == "PhysicalKey:Down");
+	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 2)) == "Keyboard:Down");
 	CHECK(is_action(make_pressed_key(Key::DOWN), JUMP));
 
 	server->set_action_deadzone(JUMP, 0.6f);
@@ -676,8 +676,8 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] clear_event removes the event, la
 	// Slot 0 is cleared: slot 1 becomes slot 0, slot 2 becomes slot 1.
 	server->clear_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 0);
 	CHECK(server->get_slot_count(JUMP, InputAction::INPUT_DEVICE_KEYBOARD) == 2);
-	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 0)) == "PhysicalKey:Up");
-	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 1)) == "PhysicalKey:Down");
+	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 0)) == "Keyboard:Up");
+	CHECK(InputAction::event_to_text(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 1)) == "Keyboard:Down");
 	CHECK(server->get_event(JUMP, InputAction::INPUT_DEVICE_KEYBOARD, 2).is_null());
 	CHECK_FALSE(is_action(make_pressed_key(Key::W), JUMP));
 	CHECK(is_action(make_pressed_key(Key::UP), JUMP));
@@ -782,7 +782,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the ne
 			server->set_file_path(path);
 			CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK);
 			CHECK(server->rebind(JUMP, InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -1.0f)) == OK);
-			CHECK(server->rebind(FIRE, InputAction::text_to_event("MouseButton:Ctrl+Right")) == OK);
+			CHECK(server->rebind(FIRE, InputAction::text_to_event("Mouse:Ctrl+Right")) == OK);
 			server->clear_event(FIRE, InputAction::INPUT_DEVICE_MOUSE, 1); // No second slot: nothing happens.
 			server->set_action_deadzone(JUMP, 0.45f);
 			CHECK(server->save() == OK);
@@ -872,7 +872,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] A saved action that no longer exi
 		Ref<InputAction> gone;
 		gone.instantiate();
 		gone->set_action("kb_test_removed");
-		gone->add_event(InputAction::text_to_event("Key:G"));
+		gone->add_event(InputAction::text_to_event("KeyboardLabel:G"));
 		ERR_PRINT_OFF; // Applying warns once that the project has no such action.
 		server->add_entry(gone);
 		ERR_PRINT_ON;
