@@ -55,6 +55,7 @@ namespace Godot.Bridge
         public delegate* unmanaged<void*, void> DebuggingUtils_GetCurrentStackInfo;
         public delegate* unmanaged<void> DisposablesTracker_OnGodotShuttingDown;
         public delegate* unmanaged<godot_bool, void> GD_OnCoreApiAssemblyLoaded;
+        public delegate* unmanaged<double*, int, int> RuntimeMetrics_Sample;
         // @formatter:on
 
         public static ManagedCallbacks Create()
@@ -105,6 +106,7 @@ namespace Godot.Bridge
                 DebuggingUtils_GetCurrentStackInfo = &DebuggingUtils.GetCurrentStackInfo,
                 DisposablesTracker_OnGodotShuttingDown = &DisposablesTracker.OnGodotShuttingDown,
                 GD_OnCoreApiAssemblyLoaded = &GD.OnCoreApiAssemblyLoaded,
+                RuntimeMetrics_Sample = &RuntimeMetrics.Sample,
                 // @formatter:on
             };
         }

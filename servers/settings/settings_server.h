@@ -109,6 +109,7 @@ private:
 	Ref<Resource> settings; // Pending: what set_value() changes.
 	Ref<Resource> applied; // What the engine has now.
 	Ref<Resource> defaults;
+	Ref<Resource> restart_baseline; // The applied state at startup: what the engine read when it started.
 
 	ApplyMode apply_mode = APPLY_MODE_IMMEDIATE;
 	String file_path;
@@ -134,7 +135,7 @@ private:
 	Variant _validate(const StringName &p_name, const Variant &p_value) const;
 	bool _has_flag(const PackedStringArray &p_names, SettingFlags p_flag) const;
 	PackedStringArray _get_changed_names(const Ref<Resource> &p_a, const Ref<Resource> &p_b) const;
-	void _record_restart_required_names(const PackedStringArray &p_names);
+	void _update_restart_required_names(const PackedStringArray &p_names);
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
@@ -166,6 +167,11 @@ protected:
 	void notify_value_changed(const StringName &p_name);
 	// Pending settings without starting the lazy initialization again.
 	Ref<Resource> get_pending_settings() const;
+	// Checks a value against the range or enum hint of the property `p_name` of `p_object`. Returns the clamped
+	// value, or the current value of the property if the value is not one of the enum values.
+	Variant validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const;
+	// Called by load() after the values of the file are set on `p_settings` and validated (ListSettingsServer validates its entries).
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) {}
 
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
