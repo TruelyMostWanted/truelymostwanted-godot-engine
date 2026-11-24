@@ -316,7 +316,11 @@ TEST_CASE("[CameraSettingsServer] Typed signals fire once per applied change") {
 	server->reset_to_defaults();
 	SIGNAL_CHECK_FALSE("field_of_view_changed");
 	CHECK(server->apply() == OK);
-	const Array default_args = { { default_value } };
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
 	SIGNAL_CHECK("field_of_view_changed", default_args);
 
 	SIGNAL_UNWATCH(server, "field_of_view_changed");
