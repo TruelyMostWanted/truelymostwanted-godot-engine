@@ -110,7 +110,7 @@ TEST_CASE("[EngineSettingsServer] The domain is an engine singleton registered w
 	CHECK(ProjectSettings::get_singleton()->has_setting("settings/engine/allow_simulation_values"));
 
 	const PackedStringArray names = server->get_setting_names();
-	for (const String &value_name : { "max_fps", "time_scale", "physics_ticks_per_second", "max_physics_steps_per_frame", "physics_jitter_fix", "physics_interpolation", "audio_playback_speed_scale", "low_processor_mode", "low_processor_mode_sleep_usec" }) {
+	for (const char *value_name : { "max_fps", "time_scale", "physics_ticks_per_second", "max_physics_steps_per_frame", "physics_jitter_fix", "physics_interpolation", "audio_playback_speed_scale", "low_processor_mode", "low_processor_mode_sleep_usec" }) {
 		CHECK_MESSAGE(names.has(value_name), value_name);
 		CHECK(server->is_setting_bound(value_name));
 	}

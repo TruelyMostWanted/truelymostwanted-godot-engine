@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapSettingsAction" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One action as stored in the file of [InputMapSettingsServer].
+	</brief_description>
+	<description>
+		The file form of an [InputAction] in the settings file of [InputMapSettingsServer]: the name, the deadzone, the layer and one [InputMapSettingsEvent] per event. [InputMapSettingsServer] converts between [InputActions] and these records when it saves and loads; games do not need this class.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="action" type="StringName" setter="set_action" getter="get_action" default="&amp;&quot;&quot;">
+			The name of the action.
+		</member>
+		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
+			The deadzone of the action.
+		</member>
+		<member name="input_events" type="InputMapSettingsEvent[]" setter="set_input_events" getter="get_input_events" default="[]">
+			The events of the action, in the order of the action.
+		</member>
+		<member name="layer" type="int" setter="set_layer" getter="get_layer" enum="InputMapSettingsAction.Layer" default="1">
+			The layer of the action in [InputMap]: [constant LAYER_BUILT_IN] for the [code]ui_*[/code] actions, [constant LAYER_CUSTOM] for the actions of the project. It is written for information; the project decides the layer when the file is loaded.
+		</member>
+	</members>
+	<constants>
+		<constant name="LAYER_BUILT_IN" value="0" enum="Layer">
+			A built-in action of the engine.
+		</constant>
+		<constant name="LAYER_CUSTOM" value="1" enum="Layer">
+			An action of the project.
+		</constant>
+	</constants>
+</class>

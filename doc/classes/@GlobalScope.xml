@@ -1611,6 +1611,9 @@
 		<member name="Input" type="Input" setter="" getter="">
 			The [Input] singleton.
 		</member>
+		<member name="InputIconServer" type="InputIconServer" setter="" getter="">
+			The [InputIconServer] singleton.
+		</member>
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>

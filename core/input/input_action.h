@@ -37,7 +37,7 @@
 
 // One input action of InputMap as a resource (#172): its name, deadzone and events.
 // The events are stored as sub-resources (`.tres`, `.res`), like the events of the project settings.
-// event_to_text() and text_to_event() give the text form of an event (`Key:Ctrl+S`); only keys, mouse
+// event_to_text() and text_to_event() give the text form of an event (`Keyboard:Ctrl+S`); only keys, mouse
 // buttons, joypad buttons and joypad axes have one. InputMapSettingsServer stores its actions with it.
 class InputAction : public Resource {
 	GDCLASS(InputAction, Resource);
@@ -61,10 +61,11 @@ protected:
 	static void _bind_methods();
 
 public:
-	// Text form of an event (`Key:Ctrl+S`, `PhysicalKey:W`, `MouseButton:Left`, `JoypadButton:A`,
-	// `JoypadMotion:LeftX+`); empty for event types without a text form (touch, MIDI, ...).
+	// Text form `[Device<N>:]<Type>:[<Modifiers>+]<Input>` of an event (`Keyboard:Ctrl+S`, `KeyboardLabel:W`, `Mouse:Left`,
+	// `Gamepad:A`, `GamepadAxis:LeftStickLeft`, `Device3:Gamepad:A`); empty for event types without a text form (touch, MIDI, ...).
 	static String event_to_text(const Ref<InputEvent> &p_event);
-	// Event of a text form; null if the text is not valid. The device of the event is -1 (all devices).
+	// Event of a text form (also `Any:`, the `@N` suffix and the older names); null if the text is not valid. The device
+	// of the event is the `Device<N>:` prefix of a gamepad event, otherwise -1 (all devices).
 	static Ref<InputEvent> text_to_event(const String &p_text);
 	// Device of a bindable event; INPUT_DEVICE_MAX for event types that are not bindable.
 	static InputDevice get_event_device(const Ref<InputEvent> &p_event);
