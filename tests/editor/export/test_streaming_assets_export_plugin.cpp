@@ -131,27 +131,27 @@ TEST_CASE("[StreamingAssetsExportPlugin] collect_files") {
 }
 
 TEST_CASE("[StreamingAssetsExportPlugin] resolve_placement") {
-	const PackedStringArray windows = { "pc", "windows", "x86_64" };
-	const PackedStringArray linux = { "pc", "linux", "linuxbsd", "x86_64" };
-	const PackedStringArray macos = { "pc", "macos", "arm64" };
-	const PackedStringArray android = { "mobile", "android", "arm64" };
-	const PackedStringArray web = { "web" };
-	const PackedStringArray ios = { "mobile", "ios", "arm64" };
+	const PackedStringArray tags_windows = { "pc", "windows", "x86_64" };
+	const PackedStringArray tags_linux = { "pc", "linux", "linuxbsd", "x86_64" };
+	const PackedStringArray tags_macos = { "pc", "macos", "arm64" };
+	const PackedStringArray tags_android = { "mobile", "android", "arm64" };
+	const PackedStringArray tags_web = { "web" };
+	const PackedStringArray tags_ios = { "mobile", "ios", "arm64" };
 
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.pck", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_EXTERNAL);
-	CHECK(Plugin::resolve_placement(linux, "/build/Game.x86_64", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.pck", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.x86_64", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
 
 	// ZIP exports cannot hold an external folder.
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(linux, "/build/Game.ZIP", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.ZIP", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
 
 	// Bundles (#90), Android and Web use the fallback.
-	CHECK(Plugin::resolve_placement(macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
 }
 
 } // namespace TestStreamingAssetsExportPlugin
