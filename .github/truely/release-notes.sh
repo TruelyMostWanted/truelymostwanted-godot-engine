@@ -12,7 +12,8 @@
 #
 # Changes: the first-parent commits since the previous truely-godot* tag (without one: the last
 # 50), merge commits and "[skip ci]" commits left out. The issue number "(#N)" at the end of each
-# subject is looked up with gh and sorted by its "type: ..." label.
+# subject is looked up with gh and grouped by category (Godot's topic groups) and type (Feature,
+# Enhancement, Bugfix) with the rules of .github/truely/changelog-categories.tsv.
 set -euo pipefail
 
 SHA="$(git rev-parse "$1^{commit}")"
@@ -59,25 +60,52 @@ while IFS= read -r subject; do
 	fi
 done < <(git log --first-parent --no-merges --reverse --format='%s' "${RANGE[@]}")
 
-features=()
-fixes=()
-tasks=()
+# Category of an issue: its row in changelog-categories.tsv (issue number), else the first label row
+# it carries, else Core. "-" leaves the issue out. See that file for the rules.
+MAP="$(git show "$SHA:.github/truely/changelog-categories.tsv" 2>/dev/null || true)"
+declare -A cat_of_issue=() cat_of_label=()
+label_order=()
+while IFS=$'	' read -r key cat; do
+	case "$key" in '' | '#'*) continue ;; esac
+	if [[ "$key" =~ ^[0-9]+$ ]]; then
+		cat_of_issue[$key]="$cat"
+	else
+		cat_of_label[$key]="$cat"
+		label_order+=("$key")
+	fi
+done <<<"$MAP"
+
+# Godot's order of topic groups (interactive changelog), then Feature, Enhancement, Bugfix inside each.
+CATEGORIES=(2D 3D Animation Audio Buildsystem "C#" Core Editor Export GDExtension GDScript GUI Import Input Navigation Network Physics Platforms Rendering Shaders Tests Thirdparty XR)
+TYPES=(Feature Enhancement Bugfix)
+declare -A lines=()
 for n in "${order[@]}"; do
 	# One call for issues and pull requests; squash merges may append the PR number after the issue.
 	if ! info="$(gh api "repos/$REPO/issues/$n" --jq '[(if .pull_request then "pr" else "issue" end), .title, .html_url, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null)"; then
-		tasks+=("- [#$n]($URL/issues/$n)")
+		# Not an issue of this repository (a number from merged upstream history).
 		continue
 	fi
-	IFS=$'\t' read -r kind title link labels <<<"$info"
+	IFS=$'	' read -r kind title link labels <<<"$info"
 	[ "$kind" = "issue" ] || continue
 	# Drop the template prefix "[Feature] ", "[Bug] ", ...
 	title="$(sed -E 's/^\[[^]]*\] *//' <<<"$title")"
-	line="- $title ([#$n]($link))"
+	cat="${cat_of_issue[$n]:-}"
+	if [ -z "$cat" ]; then
+		for l in "${label_order[@]+"${label_order[@]}"}"; do
+			case ",$labels," in *",$l,"*) cat="${cat_of_label[$l]}"; break ;; esac
+		done
+	fi
+	[ -n "$cat" ] || cat="Core"
+	[ "$cat" != "-" ] || continue
 	case ",$labels," in
-		*",type: feature,"*) features+=("$line") ;;
-		*",type: bug,"*) fixes+=("$line") ;;
-		*) tasks+=("$line") ;;
+		*",type: feature,"*) type="Feature" ;;
+		*",type: bug,"*) type="Bugfix" ;;
+		*",type: refactoring,"*) type="Enhancement" ;;
+		*",type: task,"* | *",type: concept,"*) [ -n "${cat_of_issue[$n]:-}" ] || continue; type="Enhancement" ;;
+		*) continue ;;
 	esac
+	lines["$cat|$type"]+="- $type: $title ([#$n]($link))"$'
+'
 done
 
 section() {
@@ -116,9 +144,15 @@ if [ -n "$PREV" ]; then
 else
 	printf 'First release: changes of the last 50 commits.\n\n'
 fi
-section "Features" "${features[@]+"${features[@]}"}"
-section "Fixes" "${fixes[@]+"${fixes[@]}"}"
-section "Refactoring and tasks" "${tasks[@]+"${tasks[@]}"}"
+for c in "${CATEGORIES[@]}"; do
+	body=""
+	for t in "${TYPES[@]}"; do body+="${lines["$c|$t"]:-}"; done
+	[ -n "$body" ] || continue
+	printf '### %s
+
+%s
+' "$c" "$body"
+done
 if [ "${#others[@]}" -gt 0 ]; then
 	others_lines=()
 	for s in "${others[@]}"; do others_lines+=("- $s"); done
