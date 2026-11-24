@@ -242,7 +242,7 @@ class EditorInspectorPluginSpriteSheet : public EditorInspectorPlugin {
 
 public:
 	virtual bool can_handle(Object *p_object) override;
-	virtual void parse_begin(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
 };
 
 class SpriteSheetEditorPlugin : public EditorPlugin {
