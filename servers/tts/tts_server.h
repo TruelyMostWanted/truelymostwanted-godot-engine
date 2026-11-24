@@ -37,18 +37,18 @@
 #include "core/variant/typed_array.h"
 #include "servers/tts/tts_persona.h"
 
-// Text to speech in one place. Speaks text with a TtsPersona, keeps a list of named personas
+// Text to speech in one place. Speaks text with a TTSPersona, keeps a list of named personas
 // and sends one signal per utterance event. The speech itself is done by DisplayServer::tts_*(),
-// which stays available as before; TtsServer only wraps it.
-class TtsServer : public Object {
-	GDCLASS(TtsServer, Object);
+// which stays available as before; TTSServer only wraps it.
+class TTSServer : public Object {
+	GDCLASS(TTSServer, Object);
 
-	static TtsServer *singleton;
+	static TTSServer *singleton;
 
 	mutable Mutex mutex;
-	HashMap<String, Ref<TtsPersona>> personas;
-	String default_persona_name;
-	mutable Ref<TtsPersona> builtin_persona;
+	HashMap<StringName, Ref<TTSPersona>> personas;
+	StringName default_persona_name;
+	mutable Ref<TTSPersona> builtin_persona;
 	HashSet<int64_t> pending;
 	int64_t next_utterance_id = 1;
 
@@ -56,7 +56,7 @@ class TtsServer : public Object {
 	static bool _language_matches(const String &p_voice_language, const String &p_language);
 	static String _find_voice_for_language(const TypedArray<Dictionary> &p_voices, const String &p_language);
 	String _get_unavailable_reason() const;
-	Ref<TtsPersona> _get_default_persona_locked() const;
+	Ref<TTSPersona> _get_default_persona_locked() const;
 
 	void _emit_utterance_event(int p_event, int64_t p_id, int p_char_pos);
 
@@ -64,13 +64,13 @@ protected:
 	static void _bind_methods();
 
 public:
-	static TtsServer *get_singleton();
+	static TTSServer *get_singleton();
 
 	// Availability.
 	bool is_available() const;
 
 	// Speech.
-	int64_t speak(const String &p_text, const Ref<TtsPersona> &p_persona = Ref<TtsPersona>());
+	int64_t speak(const String &p_text, const Ref<TTSPersona> &p_persona = Ref<TTSPersona>());
 	void stop();
 	void pause();
 	void resume();
@@ -79,25 +79,25 @@ public:
 	PackedInt64Array get_pending_utterances() const;
 
 	// Personas.
-	void add_persona(const Ref<TtsPersona> &p_persona);
-	void remove_persona(const String &p_name);
-	bool has_persona(const String &p_name) const;
-	Ref<TtsPersona> get_persona(const String &p_name) const;
-	TypedArray<TtsPersona> get_personas() const;
+	void add_persona(const Ref<TTSPersona> &p_persona);
+	void remove_persona(const StringName &p_name);
+	bool has_persona(const StringName &p_name) const;
+	Ref<TTSPersona> get_persona(const StringName &p_name) const;
+	TypedArray<TTSPersona> get_personas() const;
 	PackedStringArray get_persona_names() const;
 	void clear_personas();
 
-	void set_default_persona(const String &p_name);
-	Ref<TtsPersona> get_default_persona() const;
-	String get_default_persona_name() const;
+	void set_default_persona(const StringName &p_name);
+	Ref<TTSPersona> get_default_persona() const;
+	StringName get_default_persona_name() const;
 
 	// Voices.
 	TypedArray<Dictionary> get_voices(const String &p_language = String()) const;
-	String resolve_voice(const Ref<TtsPersona> &p_persona = Ref<TtsPersona>()) const;
+	String resolve_voice_id(const Ref<TTSPersona> &p_persona = Ref<TTSPersona>()) const;
 
 	// Called by DisplayServer::tts_post_utterance_event(), from any thread.
 	void post_utterance_event(int p_event, int64_t p_id, int p_char_pos);
 
-	TtsServer();
-	~TtsServer();
+	TTSServer();
+	~TTSServer();
 };

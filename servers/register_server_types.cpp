@@ -165,7 +165,7 @@ static bool has_server_feature_callback(const String &p_feature) {
 }
 
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
-static TtsServer *tts_server = nullptr;
+static TTSServer *tts_server = nullptr;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioSettingsServer *audio_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
@@ -188,10 +188,10 @@ void register_server_types() {
 
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TextServerManager", TextServerManager::get_singleton(), "TextServerManager"));
 
-	GDREGISTER_CLASS(TtsPersona);
-	GDREGISTER_ABSTRACT_CLASS(TtsServer);
-	tts_server = memnew(TtsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("TtsServer", TtsServer::get_singleton(), "TtsServer"));
+	GDREGISTER_CLASS(TTSPersona);
+	GDREGISTER_ABSTRACT_CLASS(TTSServer);
+	tts_server = memnew(TTSServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSServer", TTSServer::get_singleton(), "TTSServer"));
 
 	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
 	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
