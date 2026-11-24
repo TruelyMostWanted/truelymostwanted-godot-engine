@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputIconSet" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Custom icons per key, mouse button, gamepad button and gamepad axis direction.
+	</brief_description>
+	<description>
+		An [InputIconSet] assigns a [Texture2D] to each [enum Key], [enum MouseButton], [enum JoyButton] and gamepad axis direction, plus one fallback icon per event type. Use it for in-game button prompts, and register it in [InputIconServer] (or in the project settings [code]input_devices/icons/*[/code]) so the editor's Input Map shows the icons too.
+		In the Inspector, every value has its own property, grouped as [b]Keyboard[/b], [b]Mouse[/b], [b]Gamepad Buttons[/b] and [b]Gamepad Axes[/b]. The icons are saved in [member key_icons], [member mouse_button_icons], [member joy_button_icons] and [member joy_axis_icons], keyed by the text names of [method InputAction.event_to_text] ([code]"Space"[/code], [code]"Left"[/code], [code]"LeftStickPress"[/code], [code]"LeftStickLeft"[/code]).
+		[codeblocks]
+		[gdscript]
+		var icons = InputIconSet.new()
+		icons.set_key_icon(KEY_SPACE, preload("res://prompts/space.png"))
+		icons.set_joy_button_icon(JOY_BUTTON_A, preload("res://prompts/a.png"))
+		icons.set_joy_axis_icon(JOY_AXIS_LEFT_X, -1.0, preload("res://prompts/left_stick_left.png"))
+		var icon = icons.get_icon_for_text("Gamepad:A")
+		[/gdscript]
+		[csharp]
+		var icons = new InputIconSet();
+		icons.SetKeyIcon(Key.Space, GD.Load&lt;Texture2D&gt;("res://prompts/space.png"));
+		icons.SetJoyButtonIcon(JoyButton.A, GD.Load&lt;Texture2D&gt;("res://prompts/a.png"));
+		icons.SetJoyAxisIcon(JoyAxis.LeftX, -1.0f, GD.Load&lt;Texture2D&gt;("res://prompts/left_stick_left.png"));
+		Texture2D icon = icons.GetIconForText("Gamepad:A");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes all icons, including the fallback icons.
+			</description>
+		</method>
+		<method name="get_fallback_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the fallback icon of the event's type ([member fallback_key_icon], [member fallback_mouse_button_icon], [member fallback_joy_button_icon] or [member fallback_joy_axis_icon]), or [code]null[/code] for other event types.
+			</description>
+		</method>
+		<method name="get_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="event" type="InputEvent" />
+			<param index="1" name="use_fallback" type="bool" default="true" />
+			<description>
+				Returns the icon of the event's key, mouse button, gamepad button or axis direction. If there is none and [param use_fallback] is [code]true[/code], returns the fallback icon of the event's type. Returns [code]null[/code] if there is no icon.
+				Modifiers and the device of the event are ignored. For keys, the physical keycode is used, else the keycode, else the key label.
+			</description>
+		</method>
+		<method name="get_icon_for_text" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="use_fallback" type="bool" default="true" />
+			<description>
+				Like [method get_icon] for the event of a text form of [method InputAction.text_to_event], for example [code]"Keyboard:Space"[/code], [code]"Gamepad:A"[/code] or [code]"GamepadAxis:LeftStickLeft"[/code]. Returns [code]null[/code] if the text is not valid.
+			</description>
+		</method>
+		<method name="get_joy_axis_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="axis" type="int" enum="JoyAxis" />
+			<param index="1" name="direction" type="float" />
+			<description>
+				Returns the icon of a gamepad axis direction, or [code]null[/code]. Only the sign of [param direction] counts: below [code]0.0[/code] is the negative direction (left or up on a stick).
+			</description>
+		</method>
+		<method name="get_joy_button_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="button" type="int" enum="JoyButton" />
+			<description>
+				Returns the icon of a gamepad button, or [code]null[/code].
+			</description>
+		</method>
+		<method name="get_key_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="key" type="int" enum="Key" />
+			<description>
+				Returns the icon of a key, or [code]null[/code]. Modifier masks in [param key] are ignored.
+			</description>
+		</method>
+		<method name="get_mouse_button_icon" qualifiers="const">
+			<return type="Texture2D" />
+			<param index="0" name="button" type="int" enum="MouseButton" />
+			<description>
+				Returns the icon of a mouse button, or [code]null[/code].
+			</description>
+		</method>
+		<method name="has_icon" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns [code]true[/code] if the set has an icon for the event's key, button or axis direction (fallback icons do not count).
+			</description>
+		</method>
+		<method name="set_joy_axis_icon">
+			<return type="void" />
+			<param index="0" name="axis" type="int" enum="JoyAxis" />
+			<param index="1" name="direction" type="float" />
+			<param index="2" name="icon" type="Texture2D" />
+			<description>
+				Sets the icon of a gamepad axis direction; [code]null[/code] removes it. Only the sign of [param direction] counts. Triggers only use the positive direction.
+			</description>
+		</method>
+		<method name="set_joy_button_icon">
+			<return type="void" />
+			<param index="0" name="button" type="int" enum="JoyButton" />
+			<param index="1" name="icon" type="Texture2D" />
+			<description>
+				Sets the icon of a gamepad button; [code]null[/code] removes it.
+			</description>
+		</method>
+		<method name="set_key_icon">
+			<return type="void" />
+			<param index="0" name="key" type="int" enum="Key" />
+			<param index="1" name="icon" type="Texture2D" />
+			<description>
+				Sets the icon of a key; [code]null[/code] removes it. Modifier masks in [param key] are ignored.
+			</description>
+		</method>
+		<method name="set_mouse_button_icon">
+			<return type="void" />
+			<param index="0" name="button" type="int" enum="MouseButton" />
+			<param index="1" name="icon" type="Texture2D" />
+			<description>
+				Sets the icon of a mouse button; [code]null[/code] removes it.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="fallback_joy_axis_icon" type="Texture2D" setter="set_fallback_joy_axis_icon" getter="get_fallback_joy_axis_icon">
+			Icon for gamepad axis directions without an own icon.
+		</member>
+		<member name="fallback_joy_button_icon" type="Texture2D" setter="set_fallback_joy_button_icon" getter="get_fallback_joy_button_icon">
+			Icon for gamepad buttons without an own icon.
+		</member>
+		<member name="fallback_key_icon" type="Texture2D" setter="set_fallback_key_icon" getter="get_fallback_key_icon">
+			Icon for keys without an own icon.
+		</member>
+		<member name="fallback_mouse_button_icon" type="Texture2D" setter="set_fallback_mouse_button_icon" getter="get_fallback_mouse_button_icon">
+			Icon for mouse buttons without an own icon.
+		</member>
+		<member name="joy_axis_icons" type="Dictionary" setter="set_joy_axis_icons" getter="get_joy_axis_icons" default="{}">
+			The icons of the gamepad axis directions, keyed by the direction names of [method InputAction.event_to_text] ([code]"LeftStickLeft"[/code], [code]"LeftStickRight"[/code], [code]"LeftStickUp"[/code], [code]"LeftStickDown"[/code], the same for [code]RightStick[/code], [code]"LeftTrigger"[/code], [code]"RightTrigger"[/code]). Setting it replaces all axis icons; unknown names are reported and skipped.
+		</member>
+		<member name="joy_button_icons" type="Dictionary" setter="set_joy_button_icons" getter="get_joy_button_icons" default="{}">
+			The icons of the gamepad buttons, keyed by the button names of [method InputAction.event_to_text] ([code]"A"[/code], [code]"LeftStickPress"[/code], [code]"DPadUp"[/code], ...). [enum JoyButton] values are accepted as keys when it is set.
+		</member>
+		<member name="key_icons" type="Dictionary" setter="set_key_icons" getter="get_key_icons" default="{}">
+			The icons of the keys, keyed by the key names of [method InputAction.event_to_text] ([code]"Space"[/code], [code]"A"[/code], [code]"Escape"[/code], ...). [enum Key] values are accepted as keys when it is set.
+		</member>
+		<member name="mouse_button_icons" type="Dictionary" setter="set_mouse_button_icons" getter="get_mouse_button_icons" default="{}">
+			The icons of the mouse buttons, keyed by the button names of [method InputAction.event_to_text] ([code]"Left"[/code], [code]"Right"[/code], [code]"WheelUp"[/code], ...). [enum MouseButton] values are accepted as keys when it is set.
+		</member>
+	</members>
+</class>
