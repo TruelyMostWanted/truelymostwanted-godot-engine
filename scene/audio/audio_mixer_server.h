@@ -37,6 +37,9 @@
 #include "scene/resources/audio/audio_mixer_layout.h"
 #include "scene/resources/audio/audio_stream.h"
 
+class AudioCommand;
+class AudioCommandList;
+class AudioCommandRegistry;
 class AudioServer;
 
 // Global audio channels (music, ambience, voice, ...) that live outside the scene tree.
@@ -120,6 +123,7 @@ private:
 	AudioServer *callback_server = nullptr;
 	uint64_t last_tick_usec = 0;
 	bool default_layout_checked = false;
+	AudioCommandRegistry *command_registry = nullptr; // Data-driven commands, see scene/audio/audio_command.h.
 
 	static void _update_callback(void *p_self);
 	void _ensure_callback();
@@ -206,6 +210,16 @@ public:
 	float get_channel_pitch_scale(const StringName &p_channel) const;
 	void switch_clip(const StringName &p_channel, const StringName &p_clip);
 	Ref<AudioStreamPlayback> get_channel_playback(const StringName &p_channel) const;
+
+	// Commands (AudioCommand, AudioCommandList), implemented by AudioCommandRegistry.
+	Error execute(const Ref<AudioCommand> &p_command);
+	Error execute_list(const Ref<AudioCommandList> &p_list);
+	Error register_commands(const Ref<AudioCommandList> &p_list);
+	void unregister_commands(const Ref<AudioCommandList> &p_list);
+	bool has_command(const StringName &p_name) const;
+	Error execute_named(const StringName &p_name);
+	Error execute_group(const StringName &p_group);
+	PackedStringArray get_command_names() const;
 
 	// C++ only: advances fades, end-of-stream detection and queues by p_delta seconds.
 	// Called every frame from AudioServer::update(); unit tests call it directly.

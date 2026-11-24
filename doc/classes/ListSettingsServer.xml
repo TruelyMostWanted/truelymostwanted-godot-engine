@@ -6,7 +6,7 @@
 	<description>
 		A [ListSettingsServer] is a [SettingsServer] whose settings resource holds a list of entry resources in one typed [Array] property, for example the buses of an audio layout or the personas of a game. The entries are found by their index or by the value of a key property (see [method _get_entry_key]).
 		Every change of the list or of an entry emits [signal SettingsServer.value_changed] for the list property and, in [constant SettingsServer.APPLY_MODE_IMMEDIATE], applies the settings. The list property is the name that [method SettingsServer.get_dirty_values] and [signal SettingsServer.applied] report.
-		A list domain can be stored as CSV ([member ProjectSettings.settings/storage/format] [code]"csv"[/code]) if its settings resource has exactly one typed array of resources with simple properties (see [method ResourceTextSerializer.can_save_as_csv]). The file then has one row per entry. If the domain does not fit, INI is used and a warning is printed once.
+		A list domain can be stored as CSV ([member ProjectSettings.settings/storage/format] [code]"csv"[/code]) if its settings resource has exactly one typed array of resources with simple properties (see [method ResourceTextSerializer.can_serialize] with [constant ResourceTextSerializer.FORMAT_CSV]). The file then has one row per entry. If the domain does not fit, INI is used and a warning is printed once.
 		[codeblocks]
 		[gdscript]
 		# voices_settings.gd, listed in settings/startup/custom_servers.

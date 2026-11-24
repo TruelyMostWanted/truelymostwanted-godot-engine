@@ -33,6 +33,7 @@
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/streaming_assets_server.h"
 #include "core/object/class_db.h"
 
 // Guards against deep or cyclic folder structures (links are skipped, but junctions may not be detected).
@@ -41,7 +42,8 @@ static constexpr int STREAMING_ASSETS_MAX_FOLDER_DEPTH = 64;
 // Static helpers.
 
 String StreamingAssetsExportPlugin::expand_template(const String &p_template, const String &p_exe_name) {
-	return p_template.replace("{exe_name}", p_exe_name);
+	// The runtime expands the same templates (`{exe_name}`, `{app_name}`, `{version}`) to find the folder.
+	return StreamingAssetsServer::expand_template(p_template, p_exe_name);
 }
 
 bool StreamingAssetsExportPlugin::is_valid_target_folder(const String &p_folder) {

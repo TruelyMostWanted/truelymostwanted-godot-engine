@@ -1696,6 +1696,9 @@
 		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
 			The [SettingsServerManager] singleton.
 		</member>
+		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
+			The [StreamingAssetsServer] singleton.
+		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
