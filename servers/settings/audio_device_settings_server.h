@@ -32,7 +32,7 @@
 
 #include "servers/settings/settings_server.h"
 
-// Settings domain `audio`: the output and the input device of AudioServer (AudioDeviceSettings).
+// Settings domain `audio_device`: the output and the input device of AudioServer (AudioDeviceSettings).
 // The bus values are a separate list domain (AudioBusSettingsServer), so that list can be stored as CSV.
 class AudioDeviceSettingsServer : public SettingsServer {
 	GDCLASS(AudioDeviceSettingsServer, SettingsServer);
@@ -47,6 +47,9 @@ class AudioDeviceSettingsServer : public SettingsServer {
 
 protected:
 	static void _bind_methods();
+
+	// Emits the typed `<value>_changed` signal of an applied value.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;

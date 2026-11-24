@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioBusSettingsRow" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One bus in the settings file of [AudioBusSettingsServer].
+	</brief_description>
+	<description>
+		The storage form of an [AudioBusSettings]: one row of the file [code]user://settings/audio_bus.&lt;format&gt;[/code] (one line of a CSV file). [AudioBusSettingsServer] writes only the values that the project stores ([member ProjectSettings.settings/audio_bus/store_volume], [member ProjectSettings.settings/audio_bus/store_mute], [member ProjectSettings.settings/audio_bus/store_solo]); when it reads a file, it accepts every value, ignores the values that are not stored and takes stored values that the row does not have from the bus layout.
+		Games do not need this class: use [AudioBusSettingsServer] and [AudioBusSettings].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="bus_name" type="String" setter="set_bus_name" getter="get_bus_name" default="&quot;&quot;">
+			The name of the bus in the bus layout.
+		</member>
+		<member name="mute" type="bool" setter="set_mute" getter="is_mute" default="false">
+			The stored mute state. Written only if the project stores it.
+		</member>
+		<member name="solo" type="bool" setter="set_solo" getter="is_solo" default="false">
+			The stored solo state. Written only if the project stores it.
+		</member>
+		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
+			The stored volume in decibels, clamped to -80 dB … 24 dB. Written only if the project stores it.
+		</member>
+	</members>
+</class>

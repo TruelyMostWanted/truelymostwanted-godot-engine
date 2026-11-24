@@ -396,6 +396,20 @@ void RendererSceneRender::environment_set_glow(RID p_env, bool p_enable, Vector<
 	environment_storage.environment_set_glow(p_env, p_enable, p_levels, p_intensity, p_strength, p_mix, p_bloom_threshold, p_blend_mode, p_hdr_bleed_threshold, p_hdr_bleed_scale, p_hdr_luminance_cap, p_glow_map_strength, p_glow_map);
 }
 
+// Global overrides
+
+void RendererSceneRender::environment_set_global_effect_disabled(RSE::EnvironmentEffect p_effect, bool p_disabled) {
+	environment_storage.environment_set_global_effect_disabled(p_effect, p_disabled);
+}
+
+void RendererSceneRender::environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation) {
+	environment_storage.environment_set_global_adjustment(p_brightness, p_contrast, p_saturation);
+}
+
+void RendererSceneRender::environment_set_ignore_global_overrides(RID p_env, bool p_ignore) {
+	environment_storage.environment_set_ignore_global_overrides(p_env, p_ignore);
+}
+
 bool RendererSceneRender::environment_get_glow_enabled(RID p_env) const {
 	return environment_storage.environment_get_glow_enabled(p_env);
 }

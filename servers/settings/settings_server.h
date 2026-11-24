@@ -109,6 +109,7 @@ private:
 	Ref<Resource> settings; // Pending: what set_value() changes.
 	Ref<Resource> applied; // What the engine has now.
 	Ref<Resource> defaults;
+	Ref<Resource> restart_baseline; // The applied state at startup: what the engine read when it started.
 
 	ApplyMode apply_mode = APPLY_MODE_IMMEDIATE;
 	String file_path;
@@ -120,6 +121,8 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	String format_warned_path; // The last path whose extension gave no usable format (warned once).
+	mutable String file_name_warned; // The last invalid `settings/<domain>/file_name` (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -129,15 +132,23 @@ private:
 	void _initialize();
 	Ref<Resource> _effective_settings() const;
 	bool _object_has_value(const Ref<Resource> &p_settings, const StringName &p_name) const;
-	void _push_values(const PackedStringArray &p_names);
+	// Pushes the values to the engine. Returns the effective values that were pushed (pending values with the session overrides).
+	Ref<Resource> _push_values(const PackedStringArray &p_names);
+	// Calls _notify_value_applied() once per name with its value in `p_effective`.
+	void _notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective);
 	void _read_from_engine_into(const Ref<Resource> &p_settings);
 	Variant _validate(const StringName &p_name, const Variant &p_value) const;
 	bool _has_flag(const PackedStringArray &p_names, SettingFlags p_flag) const;
 	PackedStringArray _get_changed_names(const Ref<Resource> &p_a, const Ref<Resource> &p_b) const;
-	void _record_restart_required_names(const PackedStringArray &p_names);
+	void _update_restart_required_names(const PackedStringArray &p_names);
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
+	// `settings/<domain>/file_name` (a relative path without extension); the domain name if empty or invalid.
+	String _get_file_name() const;
+	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
+	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
+	void _emit_settings_changed(const PackedStringArray &p_names);
 
 protected:
 	static void _bind_methods();
@@ -148,9 +159,16 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings);
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const;
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data);
-	// Text format of the file when no file path is set: the project setting `settings/storage/format`, or INI if
-	// the domain can't use it (CSV is only for ListSettingsServer, a format whose module is missing).
+	// Text format of the file when no file path is set: _get_configured_format(), or INI if the domain can't use it
+	// (CSV is only for ListSettingsServer, a format whose module is missing).
 	virtual ResourceTextSerializer::Format _get_file_format();
+	// `settings/<domain>/format` with `settings/<domain>/override_format`, otherwise `settings/general/default_format`.
+	ResourceTextSerializer::Format _get_configured_format() const;
+	// Storage form (#172): the resource that is written to the settings file and read back from it. By default the
+	// settings resource itself. A domain whose settings hold values without a readable text form (sub-resources such
+	// as input events) returns a resource with the same value names and plain values, and converts it back.
+	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const { return p_settings; }
+	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const { return p_storage; }
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)
@@ -161,11 +179,23 @@ protected:
 	GDVIRTUAL2RC(Variant, _validate_value, StringName, Variant)
 	GDVIRTUAL2R(Dictionary, _migrate, int, Dictionary)
 	GDVIRTUAL1RC(bool, _is_value_supported, StringName)
+	GDVIRTUAL2(_value_applied, StringName, Variant)
+
+	// Called once per value after it reached the engine and the applied state is updated: on apply() (also at startup
+	// after the file is loaded, and after reset_to_defaults() in APPLY_MODE_IMMEDIATE), apply_with_confirmation(),
+	// cancel_confirmation() (the restored values) and when a session override is set or cleared. Not called for pending
+	// changes in APPLY_MODE_MANUAL. Domains emit their typed signals here. The default calls the script virtual _value_applied().
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value);
 
 	// For ListSettingsServer: the pending value was changed in place; emits `value_changed` and applies it in APPLY_MODE_IMMEDIATE.
 	void notify_value_changed(const StringName &p_name);
 	// Pending settings without starting the lazy initialization again.
 	Ref<Resource> get_pending_settings() const;
+	// Checks a value against the range or enum hint of the property `p_name` of `p_object`. Returns the clamped
+	// value, or the current value of the property if the value is not one of the enum values.
+	Variant validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const;
+	// Called by load() after the values of the file are set on `p_settings` and validated (ListSettingsServer validates its entries).
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) {}
 
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
@@ -175,9 +205,15 @@ public:
 	static Ref<Resource> copy_settings(const Ref<Resource> &p_settings);
 
 	static void register_settings();
-	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
+	// The project settings `settings/general/folder` and `settings/general/default_format`. Bound on SettingsServerManager.
 	static String get_storage_folder();
 	static ResourceTextSerializer::Format get_storage_format();
+	// `settings/<domain>/<key>`: a project setting of one domain (`file_name`, `override_format`, `format`).
+	static String get_domain_setting_name(const StringName &p_domain, const String &p_key);
+	// Defines `settings/<domain>/file_name`, `override_format` and `format` (called by SettingsServerManager::register_server()).
+	static void register_domain_settings(const StringName &p_domain, bool p_csv);
+	// A relative file name for `settings/<domain>/file_name`: not empty, not absolute, no `..`, `.` or empty folder name.
+	static bool is_valid_file_name(const String &p_file_name);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;

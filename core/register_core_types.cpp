@@ -43,6 +43,8 @@
 #include "core/extension/gdextension_resource_format.h"
 #include "core/extension/godot_instance.h"
 #include "core/input/input.h"
+#include "core/input/input_action.h"
+#include "core/input/input_actions.h"
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
 #include "core/io/config_file.h"
@@ -64,6 +66,7 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_build_plan.h"
 #include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
@@ -245,6 +248,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(InputEventMagnifyGesture);
 	GDREGISTER_CLASS(InputEventPanGesture);
 	GDREGISTER_CLASS(InputEventMIDI);
+	GDREGISTER_CLASS(InputAction);
+	GDREGISTER_CLASS(InputActions);
 
 	// Network
 	GDREGISTER_ABSTRACT_CLASS(StreamPeer);
@@ -404,6 +409,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PCKExtractResult);
 	GDREGISTER_CLASS(PCKPackage);
 	GDREGISTER_CLASS(PCKPackageEntry);
+	GDREGISTER_CLASS(PCKBuildPlan);
 	GDREGISTER_ABSTRACT_CLASS(PCKPackageServer);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
 	GDREGISTER_CLASS(PreloadList);

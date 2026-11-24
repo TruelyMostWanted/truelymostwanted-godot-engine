@@ -41,6 +41,7 @@ TEST_FORCE_LINK(test_video_window_settings_server)
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_window_settings.h"
 #include "servers/settings/video_window_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestVideoWindowSettingsServer {
@@ -48,10 +49,10 @@ namespace TestVideoWindowSettingsServer {
 // Autosave off; the test display server has no screen, so the window values are kept by the domain.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 
@@ -296,6 +297,40 @@ TEST_CASE("[SceneTree][VideoWindowSettingsServer] Content scale reaches the root
 	memdelete(server);
 	root->set_content_scale_mode(original_mode);
 	root->set_content_scale_factor(original_factor);
+}
+
+TEST_CASE("[VideoWindowSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "vsync_mode_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("vsync_mode", int(DisplayServerEnums::VSYNC_DISABLED));
+	SIGNAL_CHECK_FALSE("vsync_mode_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { int(DisplayServerEnums::VSYNC_DISABLED) } };
+	SIGNAL_CHECK("vsync_mode_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("vsync_mode_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("vsync_mode");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("vsync_mode_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("vsync_mode_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "vsync_mode_changed");
+	memdelete(server);
 }
 
 } // namespace TestVideoWindowSettingsServer

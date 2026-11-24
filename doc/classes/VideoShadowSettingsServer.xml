@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoShadowSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the shadow atlases (size, bit depth, quadrant subdivisions) and the soft shadow filter quality.
+	</brief_description>
+	<description>
+		[VideoShadowSettingsServer] is the settings domain [code]"video_shadow"[/code]: it stores the directional shadow map ([method RenderingServer.directional_shadow_atlas_set_size]), the positional shadow atlas of omni and spot lights ([member Viewport.positional_shadow_atlas_size], [member Viewport.positional_shadow_atlas_16_bits], [member Viewport.positional_shadow_atlas_quad_0] to [member Viewport.positional_shadow_atlas_quad_3]) and the soft shadow filter quality ([method RenderingServer.directional_soft_shadow_filter_set_quality], [method RenderingServer.positional_soft_shadow_filter_set_quality]) for the player. Every value takes effect at once. The settings resource is a [VideoShadowSettings]; the file is [code]user://settings/video_shadow.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]).
+		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the root viewport exists and before the main scene is loaded. Values set earlier wait until then. The defaults are the project settings ([member ProjectSettings.rendering/lights_and_shadows/directional_shadow/size], [member ProjectSettings.rendering/lights_and_shadows/directional_shadow/16_bits], [member ProjectSettings.rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality], [member ProjectSettings.rendering/lights_and_shadows/positional_shadow/atlas_size], [member ProjectSettings.rendering/lights_and_shadows/positional_shadow/atlas_16_bits], [member ProjectSettings.rendering/lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv] to [member ProjectSettings.rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv], [member ProjectSettings.rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality]), with their feature overrides such as [code].mobile[/code].
+		[b]Further viewports:[/b] the positional atlas values also go to the viewports added with [method add_viewport] and to every [Viewport] in the group [method get_viewport_group], for example a [SubViewport] that renders the 3D world. The directional shadow map and both filter qualities are global.
+		[b]Atlas sizes:[/b] rounded up to a power of two, like the renderers do, so the stored value is the size the atlas gets. Values out of range are clamped to [code]256[/code] to [code]16384[/code] with a warning; [code]positional_shadow_atlas_size[/code] also accepts [code]0[/code], which disables positional shadows. An enum value out of range is replaced by the default. Changing a size or a bit depth reallocates the atlas on the next frame that draws shadows (a short hitch); setting the same value again costs nothing.
+		[b]Renderers:[/b] Forward+, Mobile and Compatibility (default in the Web export) use every value, so [method get_unsupported_setting_names] is empty. The Compatibility renderer has three filter levels only (see [member VideoShadowSettings.directional_soft_shadow_filter_quality]).
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			$ShadowSize.value = VideoShadowSettingsServer.get_directional_shadow_atlas_size()
+			$ShadowQuality.selected = VideoShadowSettingsServer.get_directional_soft_shadow_filter_quality()
+
+		func _on_shadow_size_value_changed(value):
+			VideoShadowSettingsServer.set_directional_shadow_atlas_size(int(value))
+			VideoShadowSettingsServer.set_positional_shadow_atlas_size(int(value))
+
+		func _on_shadow_quality_item_selected(index):
+			VideoShadowSettingsServer.set_directional_soft_shadow_filter_quality(index as RenderingServer.ShadowQuality)
+			VideoShadowSettingsServer.set_positional_soft_shadow_filter_quality(index as RenderingServer.ShadowQuality)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GetNode&lt;SpinBox&gt;("ShadowSize").Value = VideoShadowSettingsServer.GetDirectionalShadowAtlasSize();
+		    GetNode&lt;OptionButton&gt;("ShadowQuality").Selected = (int)VideoShadowSettingsServer.GetDirectionalSoftShadowFilterQuality();
+		}
+
+		private void OnShadowQualityItemSelected(long index)
+		{
+		    VideoShadowSettingsServer.SetDirectionalSoftShadowFilterQuality((RenderingServer.ShadowQuality)index);
+		    VideoShadowSettingsServer.SetPositionalSoftShadowFilterQuality((RenderingServer.ShadowQuality)index);
+		    // Methods of the base class are called through Singleton.
+		    VideoShadowSettingsServer.Singleton.Save();
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]VideoShadowSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]VideoShadowSettingsServer.Singleton[/code].
+		[b]Note:[/b] A game that sets these properties on the root viewport itself overwrites the player's values until they are applied again. Shadow settings per light (distance, splits) belong to the scene and are not part of this domain. The domain is never applied to the editor itself.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_viewport">
+			<return type="void" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Adds a further viewport (for example a [SubViewport] that renders the 3D world) that gets the positional atlas values at once and every later change, like the root viewport. The directional shadow map and the filter qualities are global, not per viewport. A freed viewport is dropped on its own. See also [method get_viewport_group].
+			</description>
+		</method>
+		<method name="get_directional_shadow_atlas_size" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending size of the directional shadow map. See [member VideoShadowSettings.directional_shadow_atlas_size].
+			</description>
+		</method>
+		<method name="get_directional_soft_shadow_filter_quality" qualifiers="const">
+			<return type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Returns the pending soft shadow filter quality of directional lights. See [member VideoShadowSettings.directional_soft_shadow_filter_quality].
+			</description>
+		</method>
+		<method name="get_positional_shadow_atlas_quadrant_subdiv" qualifiers="const">
+			<return type="int" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" />
+			<param index="0" name="quadrant" type="int" />
+			<description>
+				Returns the pending subdivision of the quadrant [param quadrant] ([code]0[/code] to [code]3[/code]) of the positional shadow atlas. See [member VideoShadowSettings.positional_shadow_atlas_quad_0].
+			</description>
+		</method>
+		<method name="get_positional_shadow_atlas_size" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending size of the positional shadow atlas. See [member VideoShadowSettings.positional_shadow_atlas_size].
+			</description>
+		</method>
+		<method name="get_positional_soft_shadow_filter_quality" qualifiers="const">
+			<return type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Returns the pending soft shadow filter quality of omni and spot lights. See [member VideoShadowSettings.positional_soft_shadow_filter_quality].
+			</description>
+		</method>
+		<method name="get_unsupported_setting_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the values the current renderer ignores, for example to gray out their options in a settings menu. Empty with every current renderer; kept for the same API as the other video domains. See [method SettingsServer.is_value_supported].
+			</description>
+		</method>
+		<method name="get_viewport_group" qualifiers="static">
+			<return type="StringName" />
+			<description>
+				Returns the group [code]&amp;"video_shadow_settings"[/code]. Every [Viewport] in this group gets the positional atlas values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
+			</description>
+		</method>
+		<method name="has_viewport" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Returns [code]true[/code] if [param viewport] was added with [method add_viewport].
+			</description>
+		</method>
+		<method name="is_directional_shadow_16_bits_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the pending directional shadow map uses 16-bit depth. See [member VideoShadowSettings.directional_shadow_16_bits].
+			</description>
+		</method>
+		<method name="is_positional_shadow_atlas_16_bits_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the pending positional shadow atlas uses 16-bit depth. See [member VideoShadowSettings.positional_shadow_atlas_16_bits].
+			</description>
+		</method>
+		<method name="is_renderer_supported" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the current renderer uses the value [param name]. Forward+, Mobile and Compatibility use every value of this domain. Unlike [method SettingsServer.is_value_supported], it does not check that the domain has the value.
+			</description>
+		</method>
+		<method name="remove_viewport">
+			<return type="void" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Removes a viewport added with [method add_viewport]. It keeps its current values.
+			</description>
+		</method>
+		<method name="set_directional_shadow_16_bits">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets the bit depth of the directional shadow map (setting [code]"directional_shadow_16_bits"[/code]). See [member VideoShadowSettings.directional_shadow_16_bits].
+			</description>
+		</method>
+		<method name="set_directional_shadow_atlas_size">
+			<return type="void" />
+			<param index="0" name="size" type="int" />
+			<description>
+				Sets the size of the directional shadow map (setting [code]"directional_shadow_atlas_size"[/code]). See [member VideoShadowSettings.directional_shadow_atlas_size].
+			</description>
+		</method>
+		<method name="set_directional_soft_shadow_filter_quality">
+			<return type="void" />
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Sets the soft shadow filter quality of directional lights (setting [code]"directional_soft_shadow_filter_quality"[/code]). See [member VideoShadowSettings.directional_soft_shadow_filter_quality].
+			</description>
+		</method>
+		<method name="set_positional_shadow_atlas_16_bits">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets the bit depth of the positional shadow atlas (setting [code]"positional_shadow_atlas_16_bits"[/code]). See [member VideoShadowSettings.positional_shadow_atlas_16_bits].
+			</description>
+		</method>
+		<method name="set_positional_shadow_atlas_quadrant_subdiv">
+			<return type="void" />
+			<param index="0" name="quadrant" type="int" />
+			<param index="1" name="subdiv" type="int" enum="Viewport.PositionalShadowAtlasQuadrantSubdiv" />
+			<description>
+				Sets the subdivision of the quadrant [param quadrant] ([code]0[/code] to [code]3[/code]) of the positional shadow atlas (settings [code]"positional_shadow_atlas_quad_0"[/code] to [code]"positional_shadow_atlas_quad_3"[/code]). See [member VideoShadowSettings.positional_shadow_atlas_quad_0].
+			</description>
+		</method>
+		<method name="set_positional_shadow_atlas_size">
+			<return type="void" />
+			<param index="0" name="size" type="int" />
+			<description>
+				Sets the size of the positional shadow atlas (setting [code]"positional_shadow_atlas_size"[/code]). [code]0[/code] disables positional shadows. See [member VideoShadowSettings.positional_shadow_atlas_size].
+			</description>
+		</method>
+		<method name="set_positional_soft_shadow_filter_quality">
+			<return type="void" />
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Sets the soft shadow filter quality of omni and spot lights (setting [code]"positional_soft_shadow_filter_quality"[/code]). See [member VideoShadowSettings.positional_soft_shadow_filter_quality].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="directional_shadow_atlas_size_changed">
+			<param index="0" name="size" type="int" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.directional_shadow_atlas_size] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="directional_soft_shadow_filter_quality_changed">
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.directional_soft_shadow_filter_quality] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="positional_shadow_atlas_size_changed">
+			<param index="0" name="size" type="int" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.positional_shadow_atlas_size] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] with omni or spot light shadows.
+			</description>
+		</signal>
+		<signal name="positional_soft_shadow_filter_quality_changed">
+			<param index="0" name="quality" type="int" enum="RenderingServer.ShadowQuality" />
+			<description>
+				Emitted once when a changed [member VideoShadowSettings.positional_soft_shadow_filter_quality] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
+</class>
