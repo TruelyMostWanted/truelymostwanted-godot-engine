@@ -57,7 +57,7 @@ struct TestSetup {
 	Ref<Translation> japanese;
 
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		original_locale = translation_server->get_locale();
 		original_pseudolocalization = translation_server->is_pseudolocalization_enabled();
 		french.instantiate();
@@ -73,7 +73,7 @@ struct TestSetup {
 		translation_server->set_locale(original_locale);
 		translation_server->set_pseudolocalization_enabled(original_pseudolocalization);
 		ProjectSettings::get_singleton()->set_setting("internationalization/locale/test", "");
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 

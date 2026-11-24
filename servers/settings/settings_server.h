@@ -122,6 +122,7 @@ private:
 	bool unsaved = false;
 	bool format_warned = false;
 	String format_warned_path; // The last path whose extension gave no usable format (warned once).
+	mutable String file_name_warned; // The last invalid `settings/<domain>/file_name` (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -143,8 +144,8 @@ private:
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
-	// The project setting `settings/paths/<domain>_settings_path`; empty if not set.
-	String _get_project_file_path() const;
+	// `settings/<domain>/file_name` (a relative path without extension); the domain name if empty or invalid.
+	String _get_file_name() const;
 	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
 	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
 	void _emit_settings_changed(const PackedStringArray &p_names);
@@ -158,9 +159,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings);
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const;
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data);
-	// Text format of the file when no file path is set: the project setting `settings/storage/format`, or INI if
-	// the domain can't use it (CSV is only for ListSettingsServer, a format whose module is missing).
+	// Text format of the file when no file path is set: _get_configured_format(), or INI if the domain can't use it
+	// (CSV is only for ListSettingsServer, a format whose module is missing).
 	virtual ResourceTextSerializer::Format _get_file_format();
+	// `settings/<domain>/format` with `settings/<domain>/override_format`, otherwise `settings/general/default_format`.
+	ResourceTextSerializer::Format _get_configured_format() const;
 	// Storage form (#172): the resource that is written to the settings file and read back from it. By default the
 	// settings resource itself. A domain whose settings hold values without a readable text form (sub-resources such
 	// as input events) returns a resource with the same value names and plain values, and converts it back.
@@ -202,13 +205,15 @@ public:
 	static Ref<Resource> copy_settings(const Ref<Resource> &p_settings);
 
 	static void register_settings();
-	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
+	// The project settings `settings/general/folder` and `settings/general/default_format`. Bound on SettingsServerManager.
 	static String get_storage_folder();
 	static ResourceTextSerializer::Format get_storage_format();
-	// `settings/paths/<domain>_settings_path`: the file path of a domain set in the project settings.
-	static String get_path_setting_name(const StringName &p_domain);
-	// Defines the project setting of the domain's path (called by SettingsServerManager::register_server()).
-	static void register_path_setting(const StringName &p_domain, bool p_csv);
+	// `settings/<domain>/<key>`: a project setting of one domain (`file_name`, `override_format`, `format`).
+	static String get_domain_setting_name(const StringName &p_domain, const String &p_key);
+	// Defines `settings/<domain>/file_name`, `override_format` and `format` (called by SettingsServerManager::register_server()).
+	static void register_domain_settings(const StringName &p_domain, bool p_csv);
+	// A relative file name for `settings/<domain>/file_name`: not empty, not absolute, no `..`, `.` or empty folder name.
+	static bool is_valid_file_name(const String &p_file_name);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;

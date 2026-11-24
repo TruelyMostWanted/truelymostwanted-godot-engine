@@ -110,11 +110,11 @@ static void load_project_actions() {
 
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		load_project_actions();
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 		for (const char *action : { JUMP, FIRE }) {
 			ProjectSettings::get_singleton()->set_setting(String("input/") + action, Variant());
 		}

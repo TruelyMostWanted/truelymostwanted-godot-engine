@@ -50,10 +50,10 @@ namespace TestVideoShadowSettingsServer {
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 

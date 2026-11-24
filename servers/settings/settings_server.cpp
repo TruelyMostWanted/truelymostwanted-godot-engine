@@ -43,14 +43,17 @@
 #include "core/os/os.h"
 #include "servers/settings/settings_server_manager.h"
 
-static constexpr const char *SETTING_STORAGE_FOLDER = "settings/storage/folder";
-static constexpr const char *SETTING_STORAGE_FORMAT = "settings/storage/format";
-static constexpr const char *SETTING_ONLY_CHANGED = "settings/storage/only_changed_values";
-static constexpr const char *SETTING_AUTOSAVE = "settings/storage/autosave";
-static constexpr const char *SETTING_CONFIRMATION_TIMEOUT = "settings/apply/confirmation_timeout";
+static constexpr const char *SETTING_GENERAL_FOLDER = "settings/general/folder";
+static constexpr const char *SETTING_GENERAL_DEFAULT_FORMAT = "settings/general/default_format";
+static constexpr const char *SETTING_ONLY_CHANGED = "settings/general/only_changed_values";
+static constexpr const char *SETTING_AUTOSAVE = "settings/general/autosave";
+static constexpr const char *SETTING_CONFIRMATION_TIMEOUT = "settings/general/confirmation_timeout";
 static constexpr const char *SETTING_DEFAULTS_PREFIX = "settings/defaults/";
-static constexpr const char *SETTING_PATHS_PREFIX = "settings/paths/";
-static constexpr const char *SETTING_PATH_SUFFIX = "_settings_path";
+// Per domain: `settings/<domain>/<key>`.
+static constexpr const char *SETTING_DOMAIN_PREFIX = "settings/";
+static constexpr const char *SETTING_KEY_FILE_NAME = "file_name";
+static constexpr const char *SETTING_KEY_OVERRIDE_FORMAT = "override_format";
+static constexpr const char *SETTING_KEY_FORMAT = "format";
 
 // Metadata key in the settings file (INI and JSON) with the format version of the domain.
 static constexpr const char *META_SETTINGS_VERSION = "settings_version";
@@ -153,9 +156,9 @@ Ref<Resource> SettingsServer::copy_settings(const Ref<Resource> &p_settings) {
 // Project settings.
 
 void SettingsServer::register_settings() {
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_STORAGE_FOLDER, PROPERTY_HINT_DIR), "user://settings");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_GENERAL_FOLDER, PROPERTY_HINT_DIR), "user://settings");
 	// Values of ResourceTextSerializer::Format.
-	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_STORAGE_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_GENERAL_DEFAULT_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
 	GLOBAL_DEF(SETTING_ONLY_CHANGED, true);
 	GLOBAL_DEF(SETTING_AUTOSAVE, true);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CONFIRMATION_TIMEOUT, PROPERTY_HINT_RANGE, "1,120,0.5,or_greater,suffix:s"), 15.0);
@@ -170,37 +173,66 @@ static Variant _get_project_setting(const String &p_name, const Variant &p_defau
 }
 
 String SettingsServer::get_storage_folder() {
-	const String folder = _get_project_setting(SETTING_STORAGE_FOLDER, "user://settings");
+	const String folder = _get_project_setting(SETTING_GENERAL_FOLDER, "user://settings");
 	return folder.is_empty() ? String("user://settings") : folder;
 }
 
-String SettingsServer::get_path_setting_name(const StringName &p_domain) {
-	return String(SETTING_PATHS_PREFIX) + String(p_domain) + SETTING_PATH_SUFFIX;
+String SettingsServer::get_domain_setting_name(const StringName &p_domain, const String &p_key) {
+	return String(SETTING_DOMAIN_PREFIX) + String(p_domain) + "/" + p_key;
 }
 
-void SettingsServer::register_path_setting(const StringName &p_domain, bool p_csv) {
+void SettingsServer::register_domain_settings(const StringName &p_domain, bool p_csv) {
 	ERR_FAIL_COND(p_domain == StringName());
 	if (ProjectSettings::get_singleton() == nullptr) {
 		return;
 	}
-	// The extension of the path picks the text format. CSV only for list domains.
-	const String extensions = p_csv ? "*.json,*.ini,*.csv,*.xml,*.toml,*.yaml,*.yml" : "*.json,*.ini,*.xml,*.toml,*.yaml,*.yml";
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, get_path_setting_name(p_domain), PROPERTY_HINT_SAVE_FILE, extensions), String());
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, get_domain_setting_name(p_domain, SETTING_KEY_FILE_NAME)), String(p_domain));
+	GLOBAL_DEF(get_domain_setting_name(p_domain, SETTING_KEY_OVERRIDE_FORMAT), false);
+	// Values of ResourceTextSerializer::Format. CSV only for list domains.
+	const String formats = p_csv ? "JSON:0,INI:1,CSV:2,XML:3,TOML:4,YAML:5" : "JSON:0,INI:1,XML:3,TOML:4,YAML:5";
+	GLOBAL_DEF(PropertyInfo(Variant::INT, get_domain_setting_name(p_domain, SETTING_KEY_FORMAT), PROPERTY_HINT_ENUM, formats), ResourceTextSerializer::FORMAT_INI);
 }
 
-ResourceTextSerializer::Format SettingsServer::get_storage_format() {
-	const Variant value = _get_project_setting(SETTING_STORAGE_FORMAT, ResourceTextSerializer::FORMAT_INI);
+// A format value of the project settings: a Format value, or a format name written by hand into project.godot ("json", "ini", ...).
+static ResourceTextSerializer::Format _parse_format_setting(const Variant &p_value) {
 	int format = ResourceTextSerializer::FORMAT_INI;
-	if (value.get_type() == Variant::STRING || value.get_type() == Variant::STRING_NAME) {
-		// A format name written by hand into project.godot ("json", "ini", ...).
-		format = ResourceTextSerializer::get_format_for_extension(value);
-	} else if (value.get_type() == Variant::INT) {
-		format = value;
+	if (p_value.get_type() == Variant::STRING || p_value.get_type() == Variant::STRING_NAME) {
+		format = ResourceTextSerializer::get_format_for_extension(p_value);
+	} else if (p_value.get_type() == Variant::INT) {
+		format = p_value;
 	}
 	if (format < 0 || format >= ResourceTextSerializer::FORMAT_MAX) {
 		return ResourceTextSerializer::FORMAT_INI;
 	}
 	return ResourceTextSerializer::Format(format);
+}
+
+ResourceTextSerializer::Format SettingsServer::get_storage_format() {
+	return _parse_format_setting(_get_project_setting(SETTING_GENERAL_DEFAULT_FORMAT, ResourceTextSerializer::FORMAT_INI));
+}
+
+ResourceTextSerializer::Format SettingsServer::_get_configured_format() const {
+	const StringName domain = get_domain();
+	if (domain != StringName() && bool(_get_project_setting(get_domain_setting_name(domain, SETTING_KEY_OVERRIDE_FORMAT), false))) {
+		return _parse_format_setting(_get_project_setting(get_domain_setting_name(domain, SETTING_KEY_FORMAT), ResourceTextSerializer::FORMAT_INI));
+	}
+	return get_storage_format();
+}
+
+bool SettingsServer::is_valid_file_name(const String &p_file_name) {
+	const String file_name = p_file_name.strip_edges();
+	// is_absolute_path() also covers `res://`, `user://` and drive letters (`:/`, `:\`).
+	if (file_name.is_empty() || file_name.is_absolute_path()) {
+		return false;
+	}
+	// An empty part is a trailing or a double separator.
+	const Vector<String> parts = file_name.replace_char('\\', '/').split("/");
+	for (const String &part : parts) {
+		if (part.is_empty() || part == "." || part == "..") {
+			return false;
+		}
+	}
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -263,7 +295,7 @@ Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionar
 }
 
 ResourceTextSerializer::Format SettingsServer::_get_file_format() {
-	const ResourceTextSerializer::Format format = get_storage_format();
+	const ResourceTextSerializer::Format format = _get_configured_format();
 	if (format == ResourceTextSerializer::FORMAT_CSV) {
 		if (!format_warned) {
 			format_warned = true;
@@ -290,9 +322,9 @@ ResourceTextSerializer::Format SettingsServer::_get_format_for_path(const String
 	if (format_warned_path != p_path) {
 		format_warned_path = p_path;
 		if (format == ResourceTextSerializer::FORMAT_MAX) {
-			ERR_PRINT(vformat("Settings domain \"%s\": the extension of \"%s\" belongs to no text format (use .json, .ini, .csv, .xml, .toml, .yaml or .yml); the file is read and written as %s, the format of \"%s\".", get_domain(), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+			ERR_PRINT(vformat("Settings domain \"%s\": the extension of \"%s\" belongs to no text format (use .json, .ini, .csv, .xml, .toml, .yaml or .yml); the file is read and written as %s, the format of the domain (\"%s\" or \"%s\").", get_domain(), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_GENERAL_DEFAULT_FORMAT, get_domain_setting_name(get_domain(), SETTING_KEY_FORMAT)));
 		} else {
-			ERR_PRINT(vformat("Settings domain \"%s\": the text format %s of \"%s\" is not available (module disabled); the file is read and written as %s, the format of \"%s\".", get_domain(), ResourceTextSerializer::get_format_display_name(format), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+			ERR_PRINT(vformat("Settings domain \"%s\": the text format %s of \"%s\" is not available (module disabled); the file is read and written as %s, the format of the domain (\"%s\" or \"%s\").", get_domain(), ResourceTextSerializer::get_format_display_name(format), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_GENERAL_DEFAULT_FORMAT, get_domain_setting_name(get_domain(), SETTING_KEY_FORMAT)));
 		}
 	}
 	return fallback;
@@ -962,22 +994,27 @@ String SettingsServer::get_file_path() const {
 	if (!file_path.is_empty()) {
 		return file_path;
 	}
-	const String project_path = _get_project_file_path();
-	if (!project_path.is_empty()) {
-		return project_path;
-	}
 	const StringName domain = get_domain();
 	ERR_FAIL_COND_V_MSG(domain == StringName(), String(), "A settings server needs a domain name: implement _get_domain().");
-	return get_storage_folder().path_join(String(domain) + "." + ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format()));
+	const String extension = ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format());
+	return get_storage_folder().path_join(_get_file_name() + "." + extension);
 }
 
-String SettingsServer::_get_project_file_path() const {
+String SettingsServer::_get_file_name() const {
 	const StringName domain = get_domain();
-	if (domain == StringName()) {
-		return String();
+	const String key = get_domain_setting_name(domain, SETTING_KEY_FILE_NAME);
+	const String file_name = String(_get_project_setting(key, String(domain))).strip_edges();
+	if (file_name.is_empty()) {
+		return String(domain);
 	}
-	const String path = _get_project_setting(get_path_setting_name(domain), String());
-	return path.strip_edges();
+	if (!is_valid_file_name(file_name)) {
+		if (file_name_warned != file_name) {
+			file_name_warned = file_name;
+			ERR_PRINT(vformat("Settings domain \"%s\": \"%s\" in \"%s\" is not a relative file name (no absolute path, no \"..\", no empty folder name); \"%s\" is used.", domain, file_name, key, domain));
+		}
+		return String(domain);
+	}
+	return file_name.replace_char('\\', '/');
 }
 
 bool SettingsServer::has_unsaved_changes() const {
@@ -1012,7 +1049,7 @@ Error SettingsServer::load() {
 	PackedStringArray present;
 	const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
 	const String type_name = ResourceTextSerializer::get_type_name(storage_defaults.ptr());
-	// The extension decides; an unknown extension is read in the format of `settings/storage/format`.
+	// The extension decides; an unknown extension is read in the format of the domain.
 	const ResourceTextSerializer::Format format = _get_format_for_path(path);
 
 	if (err != OK) {

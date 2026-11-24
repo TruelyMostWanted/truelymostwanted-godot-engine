@@ -56,7 +56,7 @@ StringName ListSettingsServer::get_entry_key() const {
 }
 
 ResourceTextSerializer::Format ListSettingsServer::_get_file_format() {
-	if (get_storage_format() != ResourceTextSerializer::FORMAT_CSV) {
+	if (_get_configured_format() != ResourceTextSerializer::FORMAT_CSV) {
 		return SettingsServer::_get_file_format();
 	}
 	String error;
