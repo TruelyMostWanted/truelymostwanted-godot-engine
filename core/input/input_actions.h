@@ -35,7 +35,8 @@
 #include "core/templates/local_vector.h"
 
 // A collection of InputAction resources with O(1) lookup by action name (#172).
-// It is a layer of InputMap (InputMap.get_input_actions()) and the settings of InputMapSettingsServer.
+// InputMap references two of them as its layers (InputMap.get_input_actions()); it is also the settings
+// resource of InputMapSettingsServer. It emits `changed` when the list or one of its actions changes.
 // The list is the typed array `actions` for the Inspector; action names are unique (adding an action
 // with a name that is already used replaces the old one).
 class InputActions : public Resource {
@@ -46,9 +47,10 @@ class InputActions : public Resource {
 	mutable bool lookup_dirty = false;
 
 	int _find(const StringName &p_action) const;
+	Callable _get_changed_callable(const Ref<InputAction> &p_action);
 	void _attach(const Ref<InputAction> &p_action);
 	void _detach(const Ref<InputAction> &p_action);
-	void _action_changed();
+	void _action_changed(uint64_t p_action_id);
 
 protected:
 	static void _bind_methods();

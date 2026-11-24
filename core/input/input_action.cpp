@@ -421,6 +421,18 @@ bool InputAction::remove_event(const Ref<InputEvent> &p_event) {
 	return false;
 }
 
+void InputAction::push_event(const Ref<InputEvent> &p_event) {
+	ERR_FAIL_COND_MSG(p_event.is_null(), "InputAction: the event is null.");
+	events.push_back(p_event);
+	emit_changed();
+}
+
+void InputAction::remove_event_at(int p_index) {
+	ERR_FAIL_INDEX(p_index, events.size());
+	events.remove_at(p_index);
+	emit_changed();
+}
+
 void InputAction::clear_events() {
 	if (events.is_empty()) {
 		return;

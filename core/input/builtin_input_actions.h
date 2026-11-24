@@ -34,7 +34,7 @@
 #include "core/os/keyboard.h"
 
 // Godot's built-in input actions (`ui_*`), the data of InputMap::get_builtins() (#172).
-// The table is generated at build time from `core/input/builtin_input_actions.json`
+// The table is generated at build time from `core/input/builtin_input_actions.tres`, an InputActions resource
 // (see `make_builtin_input_actions()` in `core/input/input_builders.py`), so no file is read at runtime.
 // An action name with a feature suffix (`ui_text_backspace_word.macos`) replaces the plain action
 // when OS::has_feature() is true for the feature.

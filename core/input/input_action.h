@@ -90,6 +90,10 @@ public:
 
 	TypedArray<InputEvent> get_device_events(InputDevice p_device) const;
 
+	// For InputMap, which checks duplicates itself (with the device of the event): no check here.
+	void push_event(const Ref<InputEvent> &p_event);
+	void remove_event_at(int p_index);
+
 	InputAction() {}
 	InputAction(const StringName &p_action, float p_deadzone = DEFAULT_DEADZONE);
 };

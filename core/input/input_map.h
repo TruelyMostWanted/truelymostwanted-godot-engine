@@ -72,12 +72,25 @@ public:
 private:
 	static inline InputMap *singleton = nullptr;
 
-	mutable HashMap<StringName, Action> input_map;
-	HashMap<String, List<Ref<InputEvent>>> default_builtin_cache;
-	HashMap<String, List<Ref<InputEvent>>> default_builtin_with_overrides_cache;
+	// The two layers (#172), the source of truth: InputMap references them, get_input_actions() returns them.
+	Ref<InputActions> builtin_actions;
+	Ref<InputActions> custom_actions;
 
 	// Names of Godot's built-in actions, with and without feature suffix (`ui_text_backspace_word.macos`).
+	// add_action() puts an action with one of these names into the built-in layer.
 	HashSet<StringName> builtin_action_names;
+
+	// The action map (#172): both layers merged (built-in first, then custom; a custom action replaces a
+	// built-in one of the same name), with the same InputEvent objects. Derived from the layers and rebuilt
+	// on the next access after a change of a layer or of one of its actions (their `changed` signal).
+	mutable Mutex input_map_mutex;
+	mutable SafeFlag input_map_dirty;
+	mutable HashMap<StringName, Action> input_map;
+	mutable LocalVector<Ref<InputEvent>> watched_events; // The events of input_map, connected to the index.
+	mutable int next_action_id = 1;
+
+	HashMap<String, List<Ref<InputEvent>>> default_builtin_cache;
+	HashMap<String, List<Ref<InputEvent>>> default_builtin_with_overrides_cache;
 
 	// Reverse index (#172): event key (type and keycode, button or axis) to the actions that have an event
 	// with that key, as ordinals into `event_index_actions` (the actions in the order of `input_map`).
@@ -88,11 +101,19 @@ private:
 	mutable LocalVector<StringName> event_index_actions;
 	mutable LocalVector<uint32_t> event_index_unindexed; // Actions with event types the index doesn't know.
 
+	void _ensure_input_map() const;
+	void _rebuild_input_map(LocalVector<Ref<InputEvent>> &r_normalize) const;
+	void _mark_input_map_dirty();
 	void _rebuild_event_index() const;
 	void _mark_event_index_dirty();
-	void _watch_event(const Ref<InputEvent> &p_event);
-	void _unwatch_event(const Ref<InputEvent> &p_event);
 	void _add_project_action(const String &p_name, const Dictionary &p_action);
+
+	InputActions *_get_layer(InputActionLayer p_layer) const;
+	Ref<InputAction> _get_layer_action(const StringName &p_action) const;
+	static int _find_layer_event(const Ref<InputAction> &p_action, const Ref<InputEvent> &p_event);
+	static bool _needs_device_normalization(const Ref<InputEvent> &p_event);
+	static int _get_normalized_device(const Ref<InputEvent> &p_event);
+	static void _normalize_event_device(const Ref<InputEvent> &p_event);
 
 	List<Ref<InputEvent>>::Element *_find_event(Action &p_action, const Ref<InputEvent> &p_event, bool p_exact_match = false, bool *r_pressed = nullptr, float *r_strength = nullptr, float *r_raw_strength = nullptr, int *r_event_index = nullptr) const;
 
@@ -137,6 +158,8 @@ public:
 	// Layers (#172).
 	bool is_builtin_input_action(const StringName &p_action) const;
 	bool is_custom_input_action(const StringName &p_action) const;
+	// True for the names of Godot's built-in actions, also with a feature suffix, whether in the map or not.
+	bool is_builtin_action_name(const StringName &p_action) const;
 	InputActionLayer get_input_action_layer(const StringName &p_action) const;
 	Ref<InputAction> get_input_action(const StringName &p_action) const;
 	Ref<InputActions> get_input_actions(InputActionLayer p_layer) const;

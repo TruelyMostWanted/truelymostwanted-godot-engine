@@ -282,7 +282,7 @@ TEST_CASE("[SceneTree][InputMap] Built-in actions come from the generated data")
 	int event_count = 0;
 	for (const KeyValue<String, List<Ref<InputEvent>>> &E : builtins) {
 		event_count += E.value.size();
-		CHECK(input_map->is_builtin_input_action(E.key));
+		CHECK(input_map->is_builtin_action_name(E.key));
 	}
 	CHECK(event_count == 128);
 	CHECK(builtins.begin()->key == "ui_accept");
@@ -326,7 +326,9 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	input_map->action_add_event("layers_keycode", InputEventKey::create_reference(Key::W));
 
 	CHECK(input_map->is_builtin_input_action("ui_accept"));
-	CHECK(input_map->is_builtin_input_action("ui_text_backspace_word.macos"));
+	// A lookup in the built-in layer: a platform variant is a built-in name, but not an action of the map.
+	CHECK(input_map->is_builtin_action_name("ui_text_backspace_word.macos"));
+	CHECK_FALSE(input_map->is_builtin_input_action("ui_text_backspace_word.macos"));
 	CHECK_FALSE(input_map->is_custom_input_action("ui_accept"));
 	CHECK(input_map->is_custom_input_action("layers_keycode"));
 	CHECK_FALSE(input_map->is_builtin_input_action("layers_keycode"));
@@ -342,18 +344,55 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	CHECK_FALSE(custom_layer->has_action("ui_accept"));
 	CHECK(builtin_layer->get_action_count() + custom_layer->get_action_count() == input_map->get_actions().size());
 
-	// get_input_action() is a copy; set_input_action() writes it back.
-	Ref<InputAction> copy = input_map->get_input_action("layers_keycode");
-	REQUIRE(copy.is_valid());
-	CHECK(copy->get_deadzone() == doctest::Approx(0.4f));
-	CHECK(copy->get_bindings() == "Key:W");
-	copy->clear_events();
-	copy->add_event(InputEventKey::create_reference(Key::E));
-	CHECK(input_map->action_get_events("layers_keycode")->size() == 1);
+	// InputMap references the layers: get_input_actions() returns the same objects every time.
+	CHECK(input_map->get_input_actions(InputMap::INPUT_ACTION_LAYER_BUILTIN) == builtin_layer);
+	CHECK(input_map->get_input_actions(InputMap::INPUT_ACTION_LAYER_CUSTOM) == custom_layer);
+
+	// get_input_action() is the action of the layer: changing it changes the action map.
+	Ref<InputAction> action = input_map->get_input_action("layers_keycode");
+	REQUIRE(action.is_valid());
+	CHECK(action == custom_layer->get_action("layers_keycode"));
+	CHECK(action->get_deadzone() == doctest::Approx(0.4f));
+	CHECK(action->get_bindings() == "Key:W");
 	CHECK(input_map->event_is_action(make_key(Key::W, Key::W, Key::W), "layers_keycode"));
-	input_map->set_input_action(copy);
+	action->clear_events();
+	action->add_event(InputEventKey::create_reference(Key::E));
+	action->set_deadzone(0.45f);
+	CHECK(input_map->action_get_events("layers_keycode")->size() == 1);
+	CHECK(input_map->get_action_map()["layers_keycode"].deadzone == doctest::Approx(0.45f));
 	CHECK_FALSE(input_map->event_is_action(make_key(Key::W, Key::W, Key::W), "layers_keycode"));
 	CHECK(input_map->event_is_action(make_key(Key::E, Key::E, Key::E), "layers_keycode"));
+
+	// set_input_action() puts the resource itself into the layer, in the place of the old one.
+	Ref<InputAction> replacement = Ref<InputAction>(memnew(InputAction("layers_keycode", 0.6f)));
+	replacement->add_event(InputEventKey::create_reference(Key::R));
+	input_map->set_input_action(replacement);
+	CHECK(input_map->get_input_action("layers_keycode") == replacement);
+	CHECK(custom_layer->get_action("layers_keycode") == replacement);
+	CHECK(input_map->action_get_deadzone("layers_keycode") == doctest::Approx(0.6f));
+	CHECK_FALSE(input_map->event_is_action(make_key(Key::E, Key::E, Key::E), "layers_keycode"));
+	CHECK(input_map->event_is_action(make_key(Key::R, Key::R, Key::R), "layers_keycode"));
+
+	// The InputMap API writes into the layer of the action.
+	input_map->action_add_event("layers_keycode", InputEventKey::create_reference(Key::T));
+	CHECK(replacement->get_event_count() == 2);
+	input_map->action_erase_event("layers_keycode", InputEventKey::create_reference(Key::R));
+	CHECK(replacement->get_bindings() == "Key:T");
+	input_map->action_set_deadzone("layers_keycode", 0.7f);
+	CHECK(replacement->get_deadzone() == doctest::Approx(0.7f));
+	CHECK(builtin_layer->has_action("ui_accept"));
+
+	// Direct edits of a layer: the action map follows on the next access.
+	Ref<InputAction> direct = Ref<InputAction>(memnew(InputAction("layers_label")));
+	direct->add_event(InputEventKey::create_reference(Key::Y));
+	custom_layer->add_action(direct);
+	CHECK(input_map->has_action("layers_label"));
+	CHECK(input_map->is_custom_input_action("layers_label"));
+	CHECK(input_map->get_action_map().has("layers_label"));
+	CHECK(input_map->event_is_action(make_key(Key::Y, Key::Y, Key::Y), "layers_label"));
+	custom_layer->remove_action("layers_label");
+	CHECK_FALSE(input_map->has_action("layers_label"));
+	CHECK_FALSE(input_map->get_action_map().has("layers_label"));
 
 	// set_input_actions() adds missing actions.
 	Ref<InputActions> added;

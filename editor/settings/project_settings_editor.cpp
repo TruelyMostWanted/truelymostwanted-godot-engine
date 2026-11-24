@@ -637,7 +637,7 @@ void ProjectSettingsEditor::_update_action_map_editor() {
 		action_info.name = display_name;
 
 		// Godot's built-in actions, also with a feature suffix (`ui_*.macos`); a hash lookup (#172).
-		const bool is_builtin_input = InputMap::get_singleton()->is_builtin_input_action(display_name);
+		const bool is_builtin_input = InputMap::get_singleton()->is_builtin_action_name(display_name);
 		if (is_builtin_input) {
 			action_info.editable = false;
 			action_info.icon = builtin_icon;

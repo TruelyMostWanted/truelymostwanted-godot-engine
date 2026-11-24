@@ -82,6 +82,7 @@ String InputMap::suggest_actions(const StringName &p_action) const {
 	float closest_similarity = 0.0;
 
 	// Find the most action with the most similar name.
+	_ensure_input_map();
 	for (const KeyValue<StringName, Action> &kv : input_map) {
 		const float similarity = String(kv.key).similarity(p_action);
 
@@ -130,26 +131,21 @@ void InputMap::get_argument_options(const StringName &p_function, int p_idx, Lis
 #endif
 
 void InputMap::add_action(const StringName &p_action, float p_deadzone) {
-	ERR_FAIL_COND_MSG(input_map.has(p_action), vformat("InputMap already has action \"%s\".", String(p_action)));
-	input_map[p_action] = Action();
-	static int last_id = 1;
-	input_map[p_action].id = last_id;
-	input_map[p_action].deadzone = p_deadzone;
-	last_id++;
-	_mark_event_index_dirty();
+	ERR_FAIL_COND_MSG(has_action(p_action), vformat("InputMap already has action \"%s\".", String(p_action)));
+	// Godot's built-in names go to the built-in layer, all others to the custom layer.
+	const Ref<InputAction> action = memnew(InputAction(p_action, p_deadzone));
+	_get_layer(builtin_action_names.has(p_action) ? INPUT_ACTION_LAYER_BUILTIN : INPUT_ACTION_LAYER_CUSTOM)->add_action(action);
 }
 
 void InputMap::erase_action(const StringName &p_action) {
-	ERR_FAIL_COND_MSG(!input_map.has(p_action), suggest_actions(p_action));
+	ERR_FAIL_COND_MSG(!has_action(p_action), suggest_actions(p_action));
 
-	for (const Ref<InputEvent> &event : input_map[p_action].inputs) {
-		_unwatch_event(event);
-	}
-	input_map.erase(p_action);
-	_mark_event_index_dirty();
+	builtin_actions->remove_action(p_action);
+	custom_actions->remove_action(p_action);
 }
 
 TypedArray<StringName> InputMap::get_actions() {
+	_ensure_input_map();
 	TypedArray<StringName> ret;
 
 	ret.resize(input_map.size());
@@ -184,15 +180,16 @@ List<Ref<InputEvent>>::Element *InputMap::_find_event(Action &p_action, const Re
 }
 
 bool InputMap::has_action(const StringName &p_action) const {
-	return input_map.has(p_action);
+	return builtin_actions->has_action(p_action) || custom_actions->has_action(p_action);
 }
 
 String InputMap::get_action_description(const StringName &p_action) const {
-	ERR_FAIL_COND_V_MSG(!input_map.has(p_action), String(), suggest_actions(p_action));
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_V_MSG(action.is_null(), String(), suggest_actions(p_action));
 
 	String ret;
-	const List<Ref<InputEvent>> &inputs = input_map[p_action].inputs;
-	for (Ref<InputEventKey> iek : inputs) {
+	for (const Ref<InputEvent> &event : action->get_event_list()) {
+		const Ref<InputEventKey> iek = event;
 		if (iek.is_valid()) {
 			if (!ret.is_empty()) {
 				ret += RTR(" or ");
@@ -207,60 +204,46 @@ String InputMap::get_action_description(const StringName &p_action) const {
 }
 
 float InputMap::action_get_deadzone(const StringName &p_action) {
-	ERR_FAIL_COND_V_MSG(!input_map.has(p_action), 0.0f, suggest_actions(p_action));
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_V_MSG(action.is_null(), 0.0f, suggest_actions(p_action));
 
-	return input_map[p_action].deadzone;
+	return action->get_deadzone();
 }
 
 void InputMap::action_set_deadzone(const StringName &p_action, float p_deadzone) {
-	ERR_FAIL_COND_MSG(!input_map.has(p_action), suggest_actions(p_action));
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_MSG(action.is_null(), suggest_actions(p_action));
 
-	input_map[p_action].deadzone = p_deadzone;
+	action->set_deadzone(p_deadzone);
 }
 
 void InputMap::action_add_event(const StringName &p_action, RequiredParam<InputEvent> p_event) {
 	EXTRACT_PARAM_OR_FAIL_MSG(event, p_event, "It's not a reference to a valid InputEvent object.");
-	ERR_FAIL_COND_MSG(!input_map.has(p_action), suggest_actions(p_action));
-	if (_find_event(input_map[p_action], event, true)) {
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_MSG(action.is_null(), suggest_actions(p_action));
+
+	_normalize_event_device(event);
+	if (_find_layer_event(action, event) >= 0) {
 		return; // Already added.
 	}
-
-	// Normalize legacy device IDs: before the device ID change,
-	// keyboard and mouse events defaulted to device=0.
-	if (event->get_device() == 0) {
-		switch (event->get_type()) {
-			case InputEventType::KEY:
-				event->set_device(InputEvent::DEVICE_ID_KEYBOARD);
-				break;
-			case InputEventType::MOUSE_BUTTON:
-			case InputEventType::MOUSE_MOTION:
-				event->set_device(InputEvent::DEVICE_ID_MOUSE);
-				break;
-			default:
-				break;
-		}
-	}
-
-	input_map[p_action].inputs.push_back(event);
-	_watch_event(event);
-	_mark_event_index_dirty();
+	action->push_event(event);
 }
 
 bool InputMap::action_has_event(const StringName &p_action, RequiredParam<InputEvent> p_event) {
 	EXTRACT_PARAM_OR_FAIL_V(event, p_event, false);
-	ERR_FAIL_COND_V_MSG(!input_map.has(p_action), false, suggest_actions(p_action));
-	return (_find_event(input_map[p_action], event, true) != nullptr);
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_V_MSG(action.is_null(), false, suggest_actions(p_action));
+	return _find_layer_event(action, event) >= 0;
 }
 
 void InputMap::action_erase_event(const StringName &p_action, RequiredParam<InputEvent> p_event) {
 	EXTRACT_PARAM_OR_FAIL(event, p_event);
-	ERR_FAIL_COND_MSG(!input_map.has(p_action), suggest_actions(p_action));
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_MSG(action.is_null(), suggest_actions(p_action));
 
-	List<Ref<InputEvent>>::Element *E = _find_event(input_map[p_action], event, true);
-	if (E) {
-		_unwatch_event(E->get());
-		input_map[p_action].inputs.erase(E);
-		_mark_event_index_dirty();
+	const int index = _find_layer_event(action, event);
+	if (index >= 0) {
+		action->remove_event_at(index);
 
 		if (Input::get_singleton()->is_action_pressed(p_action)) {
 			Input::get_singleton()->action_release(p_action);
@@ -269,32 +252,23 @@ void InputMap::action_erase_event(const StringName &p_action, RequiredParam<Inpu
 }
 
 void InputMap::action_erase_events(const StringName &p_action) {
-	ERR_FAIL_COND_MSG(!input_map.has(p_action), suggest_actions(p_action));
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_MSG(action.is_null(), suggest_actions(p_action));
 
 	if (Input::get_singleton()->is_action_pressed(p_action)) {
 		Input::get_singleton()->action_release(p_action);
 	}
 
-	for (const Ref<InputEvent> &event : input_map[p_action].inputs) {
-		_unwatch_event(event);
-	}
-	input_map[p_action].inputs.clear();
-	_mark_event_index_dirty();
+	action->clear_events();
 }
 
 TypedArray<InputEvent> InputMap::_action_get_events(const StringName &p_action) {
-	TypedArray<InputEvent> ret;
-	const List<Ref<InputEvent>> *al = action_get_events(p_action);
-	if (al) {
-		for (const List<Ref<InputEvent>>::Element *E = al->front(); E; E = E->next()) {
-			ret.push_back(E->get());
-		}
-	}
-
-	return ret;
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	return action.is_valid() ? action->get_events() : TypedArray<InputEvent>();
 }
 
 const List<Ref<InputEvent>> *InputMap::action_get_events(const StringName &p_action) {
+	_ensure_input_map();
 	HashMap<StringName, Action>::Iterator E = input_map.find(p_action);
 	if (!E) {
 		return nullptr;
@@ -315,6 +289,7 @@ int InputMap::event_get_index(const Ref<InputEvent> &p_event, const StringName &
 }
 
 bool InputMap::event_get_action_status(const Ref<InputEvent> &p_event, const StringName &p_action, bool p_exact_match, bool *r_pressed, float *r_strength, float *r_raw_strength, int *r_event_index) const {
+	_ensure_input_map();
 	HashMap<StringName, Action>::Iterator E = input_map.find(p_action);
 	ERR_FAIL_COND_V_MSG(!E, false, suggest_actions(p_action));
 
@@ -346,6 +321,7 @@ bool InputMap::event_get_action_status(const Ref<InputEvent> &p_event, const Str
 }
 
 const HashMap<StringName, InputMap::Action> &InputMap::get_action_map() const {
+	_ensure_input_map();
 	return input_map;
 }
 
@@ -368,33 +344,20 @@ void InputMap::_add_project_action(const String &p_name, const Dictionary &p_act
 }
 
 void InputMap::load_from_project_settings() {
-	for (const KeyValue<StringName, Action> &E : input_map) {
-		for (const Ref<InputEvent> &event : E.value.inputs) {
-			_unwatch_event(event);
-		}
-	}
-	input_map.clear();
-	_mark_event_index_dirty();
+	// The layer resources stay the same objects; only their actions are replaced.
+	builtin_actions->clear();
+	custom_actions->clear();
 
 	List<PropertyInfo> pinfo;
 	ProjectSettings::get_singleton()->get_property_list(&pinfo);
 
-	// The built-in layer first, then the custom layer, each in project order.
-	Vector<String> custom_settings;
 	for (const PropertyInfo &pi : pinfo) {
 		if (!pi.name.begins_with("input/")) {
 			continue;
 		}
 
 		String name = pi.name.substr(pi.name.find_char('/') + 1);
-		if (!is_builtin_input_action(name)) {
-			custom_settings.push_back(pi.name);
-			continue;
-		}
 		_add_project_action(name, GLOBAL_GET(pi.name));
-	}
-	for (const String &setting : custom_settings) {
-		_add_project_action(setting.substr(setting.find_char('/') + 1), GLOBAL_GET(setting));
 	}
 
 	emit_signal("project_settings_loaded");
@@ -499,7 +462,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 		return default_builtin_cache;
 	}
 
-	// The actions come from `core/input/builtin_input_actions.json` (#172), compiled into a table at build time.
+	// The actions come from `core/input/builtin_input_actions.tres` (#172), compiled into a table at build time.
 	for (int i = 0; i < BuiltinInputActions::action_count; i++) {
 		const BuiltinInputActions::Action &action = BuiltinInputActions::actions[i];
 		List<Ref<InputEvent>> inputs;
@@ -590,41 +553,89 @@ void InputMap::load_default() {
 /////////////////////////////////////////////////////////////////////////////
 // Layers (#172).
 
+InputActions *InputMap::_get_layer(InputActionLayer p_layer) const {
+	return p_layer == INPUT_ACTION_LAYER_BUILTIN ? builtin_actions.ptr() : custom_actions.ptr();
+}
+
+Ref<InputAction> InputMap::_get_layer_action(const StringName &p_action) const {
+	// A custom action replaces a built-in action of the same name, as in the action map.
+	const Ref<InputAction> action = custom_actions->get_action(p_action);
+	return action.is_valid() ? action : builtin_actions->get_action(p_action);
+}
+
+int InputMap::_find_layer_event(const Ref<InputAction> &p_action, const Ref<InputEvent> &p_event) {
+	// The exact match of _find_event(), on the events of the layer. A keyboard or mouse event with the
+	// legacy device 0 counts as the event with the normalized device.
+	const int event_device = _get_normalized_device(p_event);
+	const Vector<Ref<InputEvent>> &events = p_action->get_event_list();
+	for (int i = 0; i < events.size(); i++) {
+		const int device = events[i]->get_device();
+		if ((device == ALL_DEVICES || device == event_device) && events[i]->action_match(p_event, true, p_action->get_deadzone(), nullptr, nullptr, nullptr)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+bool InputMap::_needs_device_normalization(const Ref<InputEvent> &p_event) {
+	// Before the device ID change, keyboard and mouse events defaulted to device 0.
+	if (p_event.is_null() || p_event->get_device() != 0) {
+		return false;
+	}
+	switch (p_event->get_type()) {
+		case InputEventType::KEY:
+		case InputEventType::MOUSE_BUTTON:
+		case InputEventType::MOUSE_MOTION:
+			return true;
+		default:
+			return false;
+	}
+}
+
+int InputMap::_get_normalized_device(const Ref<InputEvent> &p_event) {
+	if (!_needs_device_normalization(p_event)) {
+		return p_event->get_device();
+	}
+	return p_event->get_type() == InputEventType::KEY ? InputEvent::DEVICE_ID_KEYBOARD : InputEvent::DEVICE_ID_MOUSE;
+}
+
+void InputMap::_normalize_event_device(const Ref<InputEvent> &p_event) {
+	if (_needs_device_normalization(p_event)) {
+		p_event->set_device(_get_normalized_device(p_event));
+	}
+}
+
 bool InputMap::is_builtin_input_action(const StringName &p_action) const {
-	return builtin_action_names.has(p_action);
+	return builtin_actions->has_action(p_action);
 }
 
 bool InputMap::is_custom_input_action(const StringName &p_action) const {
-	return input_map.has(p_action) && !builtin_action_names.has(p_action);
+	return custom_actions->has_action(p_action);
+}
+
+bool InputMap::is_builtin_action_name(const StringName &p_action) const {
+	return builtin_action_names.has(p_action);
 }
 
 InputMap::InputActionLayer InputMap::get_input_action_layer(const StringName &p_action) const {
-	return builtin_action_names.has(p_action) ? INPUT_ACTION_LAYER_BUILTIN : INPUT_ACTION_LAYER_CUSTOM;
+	if (custom_actions->has_action(p_action)) {
+		return INPUT_ACTION_LAYER_CUSTOM;
+	}
+	if (builtin_actions->has_action(p_action) || builtin_action_names.has(p_action)) {
+		return INPUT_ACTION_LAYER_BUILTIN;
+	}
+	return INPUT_ACTION_LAYER_CUSTOM;
 }
 
 Ref<InputAction> InputMap::get_input_action(const StringName &p_action) const {
-	const Action *action = input_map.getptr(p_action);
-	ERR_FAIL_NULL_V_MSG(action, Ref<InputAction>(), suggest_actions(p_action));
-
-	// A copy: changing it does not change the map until it is passed to set_input_action().
-	Ref<InputAction> result;
-	result.instantiate(p_action, action->deadzone);
-	for (const Ref<InputEvent> &event : action->inputs) {
-		const Ref<InputEvent> copy = event->duplicate();
-		result->add_event(copy);
-	}
-	return result;
+	const Ref<InputAction> action = _get_layer_action(p_action);
+	ERR_FAIL_COND_V_MSG(action.is_null(), Ref<InputAction>(), suggest_actions(p_action));
+	return action;
 }
 
 Ref<InputActions> InputMap::get_input_actions(InputActionLayer p_layer) const {
-	Ref<InputActions> result;
-	result.instantiate();
-	for (const KeyValue<StringName, Action> &E : input_map) {
-		if (get_input_action_layer(E.key) == p_layer) {
-			result->add_action(get_input_action(E.key));
-		}
-	}
-	return result;
+	ERR_FAIL_INDEX_V(int(p_layer), 2, Ref<InputActions>());
+	return Ref<InputActions>(_get_layer(p_layer));
 }
 
 void InputMap::set_input_action(const Ref<InputAction> &p_action) {
@@ -632,24 +643,99 @@ void InputMap::set_input_action(const Ref<InputAction> &p_action) {
 	const StringName action = p_action->get_action();
 	ERR_FAIL_COND_MSG(action == StringName(), "InputMap: the action has no name.");
 
-	if (!input_map.has(action)) {
-		add_action(action, p_action->get_deadzone());
-	} else {
-		action_set_deadzone(action, p_action->get_deadzone());
-		action_erase_events(action);
+	const Ref<InputAction> old_action = _get_layer_action(action);
+	if (old_action == p_action) {
+		return;
+	}
+	if (old_action.is_valid() && Input::get_singleton() != nullptr && Input::get_singleton()->is_action_pressed(action)) {
+		Input::get_singleton()->action_release(action);
 	}
 	for (const Ref<InputEvent> &event : p_action->get_event_list()) {
-		if (event.is_valid()) {
-			action_add_event(action, event);
-		}
+		_normalize_event_device(event);
 	}
+	// The layer keeps the resource itself; an action of that name is replaced in its place.
+	_get_layer(get_input_action_layer(action))->add_action(p_action);
 }
 
 void InputMap::set_input_actions(const Ref<InputActions> &p_actions) {
 	ERR_FAIL_COND_MSG(p_actions.is_null(), "InputMap: the actions are null.");
-	for (const Ref<InputAction> &action : p_actions->get_action_list()) {
+	const LocalVector<Ref<InputAction>> list(p_actions->get_action_list());
+	for (const Ref<InputAction> &action : list) {
 		set_input_action(action);
 	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Action map, derived from the layers (#172).
+
+void InputMap::_mark_input_map_dirty() {
+	input_map_dirty.set();
+}
+
+void InputMap::_ensure_input_map() const {
+	if (!input_map_dirty.is_set()) {
+		return;
+	}
+	LocalVector<Ref<InputEvent>> normalize;
+	{
+		MutexLock lock(input_map_mutex);
+		if (input_map_dirty.is_set()) {
+			_rebuild_input_map(normalize);
+		}
+	}
+	// After releasing the lock: set_device() emits `changed`, which runs other code.
+	for (const Ref<InputEvent> &event : normalize) {
+		_normalize_event_device(event);
+	}
+}
+
+void InputMap::_rebuild_input_map(LocalVector<Ref<InputEvent>> &r_normalize) const {
+	// Called with input_map_mutex held.
+	input_map_dirty.clear();
+
+	// An event changed in place (for example `event.keycode = KEY_B`) may change its key in the reverse index.
+	const Callable on_event_changed = callable_mp(const_cast<InputMap *>(this), &InputMap::_mark_event_index_dirty);
+	for (const Ref<InputEvent> &event : watched_events) {
+		if (event->is_connected(CoreStringName(changed), on_event_changed)) {
+			event->disconnect(CoreStringName(changed), on_event_changed);
+		}
+	}
+	watched_events.clear();
+
+	// The built-in layer first, then the custom layer, each in its order. Actions keep their ID.
+	HashMap<StringName, Action> new_map;
+	const InputActions *layers[2] = { builtin_actions.ptr(), custom_actions.ptr() };
+	for (const InputActions *layer : layers) {
+		for (const Ref<InputAction> &layer_action : layer->get_action_list()) {
+			const StringName action_name = layer_action->get_action();
+			if (action_name == StringName()) {
+				continue;
+			}
+			Action *action = new_map.getptr(action_name);
+			if (action == nullptr) {
+				const Action *old_action = input_map.getptr(action_name);
+				Action created;
+				created.id = old_action != nullptr ? old_action->id : next_action_id++;
+				created.deadzone = DEFAULT_DEADZONE;
+				action = &new_map.insert(action_name, created)->value;
+			}
+			action->deadzone = layer_action->get_deadzone();
+			action->inputs.clear();
+			for (const Ref<InputEvent> &event : layer_action->get_event_list()) {
+				if (event.is_null()) {
+					continue;
+				}
+				action->inputs.push_back(event);
+				watched_events.push_back(event);
+				event->connect(CoreStringName(changed), on_event_changed, CONNECT_REFERENCE_COUNTED);
+				if (_needs_device_normalization(event)) {
+					r_normalize.push_back(event);
+				}
+			}
+		}
+	}
+	input_map = std::move(new_map);
+	event_index_dirty.set();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -718,18 +804,6 @@ void InputMap::_mark_event_index_dirty() {
 	event_index_dirty.set();
 }
 
-void InputMap::_watch_event(const Ref<InputEvent> &p_event) {
-	// An event changed in place (for example `event.keycode = KEY_B`) may change its index key.
-	p_event->connect(CoreStringName(changed), callable_mp(this, &InputMap::_mark_event_index_dirty), CONNECT_REFERENCE_COUNTED);
-}
-
-void InputMap::_unwatch_event(const Ref<InputEvent> &p_event) {
-	const Callable callable = callable_mp(this, &InputMap::_mark_event_index_dirty);
-	if (p_event.is_valid() && p_event->is_connected(CoreStringName(changed), callable)) {
-		p_event->disconnect(CoreStringName(changed), callable);
-	}
-}
-
 void InputMap::_rebuild_event_index() const {
 	// Called with event_index_mutex held.
 	event_index_dirty.clear();
@@ -769,6 +843,7 @@ void InputMap::get_event_candidate_actions(const Ref<InputEvent> &p_event, Local
 	if (p_event.is_null()) {
 		return;
 	}
+	_ensure_input_map();
 
 	// event_get_action_status() matches an InputEventAction by its action name only.
 	if (const InputEventAction *event_action = Object::cast_to<InputEventAction>(p_event.ptr())) {
@@ -843,14 +918,27 @@ InputMap::InputMap() {
 	ERR_FAIL_COND_MSG(singleton, "Singleton in InputMap already exists.");
 	singleton = this;
 
+	builtin_actions.instantiate();
+	custom_actions.instantiate();
+	// Any change of a layer or of one of its actions: the action map is rebuilt on the next access.
+	builtin_actions->connect(CoreStringName(changed), callable_mp(this, &InputMap::_mark_input_map_dirty));
+	custom_actions->connect(CoreStringName(changed), callable_mp(this, &InputMap::_mark_input_map_dirty));
+
 	for (int i = 0; i < BuiltinInputActions::action_count; i++) {
 		const String action_name = BuiltinInputActions::actions[i].name;
 		builtin_action_names.insert(action_name);
 		builtin_action_names.insert(action_name.get_slicec('.', 0));
 	}
+	input_map_dirty.set();
 	event_index_dirty.set();
 }
 
 InputMap::~InputMap() {
+	const Callable on_event_changed = callable_mp(this, &InputMap::_mark_event_index_dirty);
+	for (const Ref<InputEvent> &event : watched_events) {
+		if (event->is_connected(CoreStringName(changed), on_event_changed)) {
+			event->disconnect(CoreStringName(changed), on_event_changed);
+		}
+	}
 	singleton = nullptr;
 }
