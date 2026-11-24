@@ -151,6 +151,15 @@
 				Called by [method set_value], [method set_session_override] and [method load] for every value, after the built-in checks (range hints are clamped, enum hints are rejected with an error and the old value is kept). Return the value to use, for example a corrected value. The default returns [param value] unchanged.
 			</description>
 		</method>
+		<method name="_value_applied" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Called once per value after it reached the engine and the applied copy is updated, before [signal applied] is emitted. [param value] is the value the engine uses now (a session override wins over the stored value). It is called by [method apply] (also at startup after the file is loaded, and after [method reset_to_defaults] in [constant APPLY_MODE_IMMEDIATE]), by [method apply_with_confirmation], by [method cancel_confirmation] for the restored values, and when a session override is set or cleared. It is not called for pending changes in [constant APPLY_MODE_MANUAL], nor by [method confirm_changes] (the values reached the engine already). Values with [constant SETTING_FLAG_NO_ENGINE_TARGET] are included: they count as applied when [method apply] stores them.
+				Emit the typed signals of your domain here, for example [code]volume_changed(volume)[/code], so the game does not compare value names. The built-in domains emit theirs from the C++ counterpart of this method, for example [code]bus_volume_changed[/code] of [AudioBusSettingsServer].
+			</description>
+		</method>
 		<method name="apply">
 			<return type="int" enum="Error" />
 			<description>
