@@ -263,8 +263,8 @@ void register_server_types() {
 	input_settings_server = memnew(InputSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputSettingsServer", InputSettingsServer::get_singleton(), "InputSettingsServer"));
 	settings_server_manager->register_server(input_settings_server);
-	GDREGISTER_INTERNAL_CLASS(InputMapSettingsRow);
-	GDREGISTER_INTERNAL_CLASS(InputMapSettingsRows);
+	GDREGISTER_CLASS(InputMapSettingsRow);
+	GDREGISTER_CLASS(InputMapSettingsRows);
 	GDREGISTER_ABSTRACT_CLASS(InputMapSettingsServer);
 	input_map_settings_server = memnew(InputMapSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
