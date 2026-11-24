@@ -393,7 +393,7 @@
 	<signals>
 		<signal name="bus_layout_changed">
 			<description>
-				Emitted when an audio bus is added, deleted, or moved.
+				Emitted when an audio bus is added, deleted, or moved, and when the whole layout is replaced with [method set_bus_layout].
 			</description>
 		</signal>
 		<signal name="bus_renamed">
