@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="KeyBindingList" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [KeyBindingSettingsServer]: the key bindings of all actions.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"key_bindings"[/code]: one [KeyBinding] per bound slot of every action, grouped by action. It holds nothing but the list, so [KeyBindingSettingsServer] can store it as CSV with one row per event. [KeyBindingSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [KeyBindingSettingsServer] to change the bindings.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="bindings" type="KeyBinding[]" setter="set_bindings" getter="get_bindings" default="[]">
+			The rows, one per slot. An action without any binding has one empty row that carries its [member KeyBinding.deadzone].
+		</member>
+	</members>
+</class>
