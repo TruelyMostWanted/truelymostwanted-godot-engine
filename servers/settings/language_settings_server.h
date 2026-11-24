@@ -63,7 +63,7 @@ class LanguageSettingsServer : public SettingsServer {
 	void _push_pending_root_values();
 
 	void _on_loaded();
-	void _on_startup_applied(int p_phase);
+	void _on_startup_applied(ApplyPhase p_phase);
 
 protected:
 	static void _bind_methods();

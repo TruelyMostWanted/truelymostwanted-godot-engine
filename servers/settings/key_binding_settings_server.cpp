@@ -116,7 +116,7 @@ void KeyBindingSettingsServer::_add_action_rows(const StringName &p_action, Type
 	}
 }
 
-void KeyBindingSettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
+void KeyBindingSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	InputMap *input_map = InputMap::get_singleton();
 	if (input_map == nullptr) {
 		return;

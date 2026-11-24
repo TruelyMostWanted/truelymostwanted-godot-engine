@@ -33,11 +33,11 @@
 #include "core/object/ref_counted.h"
 #include "core/variant/dictionary.h"
 
-// The result of `PckPackageServer::extract()`. Read-only after creation.
-class PckExtractResult : public RefCounted {
-	GDCLASS(PckExtractResult, RefCounted);
+// The result of `PCKPackageServer::extract()`. Read-only after creation.
+class PCKExtractResult : public RefCounted {
+	GDCLASS(PCKExtractResult, RefCounted);
 
-	friend class PckPackageServer;
+	friend class PCKPackageServer;
 
 	Error error = OK;
 	// Target paths of the files that were written, in pack order.

@@ -56,14 +56,14 @@ void EditorContextMenuPluginPck::get_options(const OptionsData &p_data) {
 }
 
 void EditorInspectorPluginPckExtract::_extract_pressed(Object *p_package) {
-	Ref<PckPackage> package(Object::cast_to<PckPackage>(p_package));
+	Ref<PCKPackage> package(Object::cast_to<PCKPackage>(p_package));
 	if (package.is_valid() && PckExtractDialog::get_singleton()) {
 		PckExtractDialog::get_singleton()->popup_for_package(package);
 	}
 }
 
 bool EditorInspectorPluginPckExtract::can_handle(Object *p_object) {
-	const PckPackage *package = Object::cast_to<PckPackage>(p_object);
+	const PCKPackage *package = Object::cast_to<PCKPackage>(p_object);
 	return package && !package->is_description();
 }
 
