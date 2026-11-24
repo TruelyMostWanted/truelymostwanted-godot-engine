@@ -30,18 +30,28 @@
 
 #pragma once
 
+#include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/object/object.h"
 
 // One place for `.pck` files: open and inspect without mounting, read single files, verify,
-// build a new pack, mount and unmount packs, and find the pack that provides a `res://` file.
+// build a new pack, extract a pack into a folder, mount and unmount packs, and find the pack that provides a `res://` file.
 // The mounted packs live in `PackedData`; the server keeps no state of its own.
 class PckPackageServer : public Object {
 	GDCLASS(PckPackageServer, Object);
 
+public:
+	enum ExtractPolicy {
+		EXTRACT_SKIP,
+		EXTRACT_OVERWRITE,
+		EXTRACT_RENAME,
+	};
+
+private:
 	static PckPackageServer *singleton;
 
 	void _emit_deferred(const StringName &p_signal, const String &p_path);
+	void _emit_extract_progress(const String &p_path, int p_done, int p_total);
 
 protected:
 	static void _bind_methods();
@@ -53,6 +63,9 @@ public:
 	Vector<uint8_t> read_file(const Ref<PckPackage> &p_package, const String &p_path);
 	Error verify(const Ref<PckPackage> &p_package);
 	Error build(const Ref<PckPackage> &p_package, const String &p_target_path, const String &p_key = String());
+	// Writes the files of `p_package` below `p_target_dir`. `p_paths` filters (files, folders or `*`/`?` patterns;
+	// empty: all files). Sidecars (`.import`, `.uid`) follow the decision for their source file.
+	Ref<PckExtractResult> extract(const Ref<PckPackage> &p_package, const String &p_target_dir, const PackedStringArray &p_paths = PackedStringArray(), ExtractPolicy p_policy = EXTRACT_SKIP, bool p_skip_engine_files = true);
 
 	Error mount(const String &p_path, bool p_replace_files = true, uint64_t p_offset = 0);
 	Error unmount(const String &p_path);
@@ -64,3 +77,5 @@ public:
 	PckPackageServer();
 	~PckPackageServer();
 };
+
+VARIANT_ENUM_CAST(PckPackageServer::ExtractPolicy);

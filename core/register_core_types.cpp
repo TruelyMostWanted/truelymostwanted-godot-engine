@@ -61,6 +61,7 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
@@ -388,6 +389,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(PckExtractResult);
 	GDREGISTER_CLASS(PckPackage);
 	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
 	GDREGISTER_CLASS(PreloadList);

@@ -4,7 +4,7 @@
 		Reads, edits, builds, mounts and unmounts [code].pck[/code] files.
 	</brief_description>
 	<description>
-		[PckPackageServer] is the one place for everything about [code].pck[/code] files. It opens a pack and lists its content without mounting it ([method open]), reads and verifies single files, builds a new pack from a [PckPackage] ([method build]), mounts and unmounts packs, and tells which pack provides a [code]res://[/code] file ([method get_pack_of]). Mods, DLC, patches and level editors use it to inspect and change packs at runtime.
+		[PckPackageServer] is the one place for everything about [code].pck[/code] files. It opens a pack and lists its content without mounting it ([method open]), reads and verifies single files, builds a new pack from a [PckPackage] ([method build]), writes the files of a pack into a folder ([method extract]), mounts and unmounts packs, and tells which pack provides a [code]res://[/code] file ([method get_pack_of]). Mods, DLC, patches and level editors use it to inspect and change packs at runtime.
 		[codeblocks]
 		[gdscript]
 		# Inspect a pack without mounting it.
@@ -51,6 +51,40 @@
 				Returns [constant ERR_BUSY] if [param target_path] is mounted (unmount it first), [constant ERR_FILE_NOT_FOUND] if source files added with [method PckPackage.add_file] are missing (all of them are listed in the error, and nothing is written), and [constant ERR_UNAVAILABLE] if the package has delta patches, which can't be rebuilt.
 			</description>
 		</method>
+		<method name="extract">
+			<return type="PckExtractResult" />
+			<param index="0" name="package" type="PckPackage" />
+			<param index="1" name="target_dir" type="String" />
+			<param index="2" name="paths" type="PackedStringArray" default="PackedStringArray()" />
+			<param index="3" name="policy" type="int" enum="PckPackageServer.ExtractPolicy" default="0" />
+			<param index="4" name="skip_engine_files" type="bool" default="true" />
+			<description>
+				Writes the files of [param package] into the folder [param target_dir], keeping their paths: [code]res://levels/a.tscn[/code] becomes [code]target_dir/levels/a.tscn[/code]. Missing folders are created. The pack does not need to be mounted. Returns a [PckExtractResult] that lists the written, skipped, renamed and not editable files, the dropped UIDs and the errors. [signal extract_progress] is emitted after each file.
+				[param paths] selects the files to extract; an empty array extracts all files. Each entry is a file path, a folder (every file below it, for example [code]"res://levels/"[/code]) or a pattern with [code]*[/code] and [code]?[/code] (see [method String.match]), with or without [code]res://[/code].
+				[param policy] decides what happens to files that already exist in [param target_dir]: they are skipped ([constant EXTRACT_SKIP]), overwritten ([constant EXTRACT_OVERWRITE]) or the file is written under a free name like [code]a_2.tscn[/code] ([constant EXTRACT_RENAME]). [code].import[/code] and [code].uid[/code] files follow the file they belong to: [code]icon.png.import[/code] is skipped, overwritten or renamed to [code]icon_2.png.import[/code] together with [code]icon.png[/code].
+				With [param skip_engine_files], files that can't be used as sources are left out: everything below [code].godot/[/code], [code].import[/code] and [code].uid[/code] files whose source file is not extracted, removal entries, and [code]project.binary[/code], [code].remap[/code] files and delta patches, which are listed in [member PckExtractResult.not_editable]. Exported packs contain imported and converted files instead of the sources, so for them extracting is a best-effort copy of the data; packs built from a [PckPackage] description with source files are extracted completely.
+				[b]UIDs:[/b] a UID from a [code].uid[/code] file, from the [code]uid="…"[/code] attribute of a [code].tscn[/code] or [code].tres[/code] header, from an [code].import[/code] file or from a binary [code].scn[/code]/[code].res[/code] file is kept if no other file uses it, and is registered with [ResourceUID] at once, so [code]uid://[/code] paths of the extracted files work before the next editor scan. A UID that already belongs to another file is dropped and listed in [member PckExtractResult.dropped_uids]: the [code].uid[/code] file is not written, the attribute is removed from text resources and [code].import[/code] files (the editor assigns a new UID on the next scan), and binary resources get a new UID.
+				[codeblocks]
+				[gdscript]
+				var package := PckPackageServer.open("user://downloads/mod.pck")
+				var result := PckPackageServer.extract(package, "user://mods/my_mod", [], PckPackageServer.EXTRACT_OVERWRITE)
+				if not result.is_ok():
+				    push_error("\n".join(result.errors))
+				print("%d files written" % result.written.size())
+				[/gdscript]
+				[csharp]
+				PckPackage package = PckPackageServer.Open("user://downloads/mod.pck");
+				PckExtractResult result = PckPackageServer.Extract(package, "user://mods/my_mod", [], PckPackageServer.ExtractPolicy.Overwrite);
+				if (!result.IsOk())
+				{
+				    GD.PushError(string.Join("\n", result.Errors));
+				}
+				GD.Print($"{result.Written.Length} files written");
+				[/csharp]
+				[/codeblocks]
+				[b]Platforms:[/b] works on every platform. [code]res://[/code] is writable only in the editor; exported games, Android and iOS extract into [code]user://[/code]. On the Web, files in [code]user://[/code] are persisted to IndexedDB asynchronously; one file at a time is held in memory.
+			</description>
+		</method>
 		<method name="get_mounted" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
@@ -86,6 +120,7 @@
 			<description>
 				Mounts the [code].pck[/code] or [code].zip[/code] file [param path] into [code]res://[/code] and emits [signal pack_mounted]. If [param replace_files] is [code]true[/code], files of this pack replace files with the same path from earlier packs. [param offset] is the position of the pack inside the file (only for [code].pck[/code] files). This is the same as [method ProjectSettings.load_resource_pack], which calls this method.
 				Returns [constant ERR_FILE_NOT_FOUND] if the file does not exist and [constant ERR_FILE_UNRECOGNIZED] if it is not a pack this engine can mount (for example a pack of a newer engine version). These errors are not printed, so that games can probe for optional packs.
+				Returns [constant ERR_CYCLIC_LINK] and prints an error if [param replace_files] is [code]true[/code] and [param path] is a [code]res://[/code] path that the pack itself contains: the pack would replace itself, and every later open of the pack would read from it again.
 				[b]Note:[/b] Encrypted packs are mounted with the script encryption key compiled into the engine.
 			</description>
 		</method>
@@ -125,6 +160,14 @@
 		</method>
 	</methods>
 	<signals>
+		<signal name="extract_progress">
+			<param index="0" name="path" type="String" />
+			<param index="1" name="done" type="int" />
+			<param index="2" name="total" type="int" />
+			<description>
+				Emitted by [method extract] after each selected file of the pack, whether it was written or not. [param path] is the path of the file in the pack ([code]res://…[/code]), [param done] the number of files handled so far and [param total] the number of selected files. Emitted on the main thread: when [method extract] runs on another thread, the signal is deferred.
+			</description>
+		</signal>
 		<signal name="pack_mounted">
 			<param index="0" name="path" type="String" />
 			<description>
@@ -138,4 +181,15 @@
 			</description>
 		</signal>
 	</signals>
+	<constants>
+		<constant name="EXTRACT_SKIP" value="0" enum="ExtractPolicy">
+			[method extract] leaves files that already exist in the target folder unchanged and lists them in [member PckExtractResult.skipped].
+		</constant>
+		<constant name="EXTRACT_OVERWRITE" value="1" enum="ExtractPolicy">
+			[method extract] overwrites files that already exist in the target folder.
+		</constant>
+		<constant name="EXTRACT_RENAME" value="2" enum="ExtractPolicy">
+			[method extract] writes files that already exist in the target folder under a free name ([code]a_2.txt[/code], [code]a_3.txt[/code], …) and lists them in [member PckExtractResult.renamed].
+		</constant>
+	</constants>
 </class>
