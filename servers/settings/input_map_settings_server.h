@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/input/input_actions.h"
+#include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 #include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
@@ -94,6 +95,9 @@ private:
 
 	SaveMode save_mode = SAVE_MODE_CUSTOM_ONLY; // Project setting `settings/input_map/save_mode`.
 	HashSet<String> warned_actions; // Saved actions missing in the project that were reported once.
+	// The text form of the pending events per action, for `action_events_changed`.
+	HashMap<StringName, String> event_texts;
+	bool event_texts_ready = false;
 
 	static bool _is_managed_event(const Ref<InputEvent> &p_event);
 	bool _is_managed_action(const StringName &p_action) const;
@@ -104,6 +108,8 @@ private:
 	static int _find_slot(const Ref<InputAction> &p_action, InputAction::InputDevice p_device, int p_slot);
 	static Ref<InputEvent> _normalized_event(const Ref<InputEvent> &p_event, Error &r_error);
 	void _merge_project_actions();
+	void _on_settings_changed(const PackedStringArray &p_names);
+	void _emit_action_events_changed();
 	static TypedArray<InputEvent> _parse_events(const String &p_text, PackedStringArray &r_invalid);
 	static TypedArray<InputEvent> _canonical_events(const TypedArray<InputEvent> &p_events);
 
@@ -117,6 +123,7 @@ protected:
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) override;
 
 public:
 	static InputMapSettingsServer *get_singleton();
