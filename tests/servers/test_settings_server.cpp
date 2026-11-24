@@ -88,6 +88,7 @@ class TestDomainServer : public SettingsServer {
 public:
 	String domain = "test_domain";
 	int version = 1;
+	ApplyPhase phase = APPLY_PHASE_SERVERS;
 	int apply_calls = 0;
 	PackedStringArray last_applied;
 
@@ -125,6 +126,7 @@ protected:
 public:
 	virtual StringName get_domain() const override { return domain; }
 	virtual int get_format_version() const override { return version; }
+	virtual ApplyPhase get_apply_phase() const override { return phase; }
 
 	TestDomainServer() {
 		bind_setting_callbacks("volume", callable_mp_static(&TestEngine::set_volume), callable_mp_static(&TestEngine::get_volume));
@@ -144,7 +146,7 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_level", "value"), &TestListEntry::set_level);
 		ClassDB::bind_method(D_METHOD("get_level"), &TestListEntry::get_level);
 		ADD_PROPERTY(PropertyInfo(Variant::STRING, "entry_name"), "set_entry_name", "get_entry_name");
-		ADD_PROPERTY(PropertyInfo(Variant::INT, "level"), "set_level", "get_level");
+		ADD_PROPERTY(PropertyInfo(Variant::INT, "level", PROPERTY_HINT_RANGE, "0,10"), "set_level", "get_level");
 	}
 
 public:
@@ -627,6 +629,165 @@ TEST_CASE("[SettingsServer] Manager startup applies registered domains") {
 	CHECK(int(server->get_value("quality")) == 1);
 	memdelete(late);
 	memdelete(server);
+}
+
+TEST_CASE("[SettingsServer] apply() during a pending confirmation keeps it first") {
+	TestSetup setup;
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	server->set_setting_flags("quality", SettingsServer::SETTING_FLAG_CONFIRM);
+	SIGNAL_WATCH(server, "confirmation_finished");
+
+	server->set_value("quality", 2);
+	CHECK(server->apply() == OK);
+	CHECK(server->is_confirmation_pending());
+
+	// A second change while the dialog is open: the pending confirmation is kept first.
+	server->set_value("volume", 0.25);
+	CHECK(server->apply() == OK);
+	CHECK_FALSE(server->is_confirmation_pending());
+	const Array kept_args = { { true } };
+	SIGNAL_CHECK("confirmation_finished", kept_args);
+	CHECK(TestEngine::volume == doctest::Approx(0.25));
+
+	// A new confirmation only reverts its own values.
+	server->set_value("quality", 0);
+	CHECK(server->apply_with_confirmation() == OK);
+	CHECK(server->is_confirmation_pending());
+	server->set_value("quality", 1);
+	CHECK(server->apply_with_confirmation() == OK);
+	CHECK(server->is_confirmation_pending());
+	SIGNAL_CHECK("confirmation_finished", kept_args);
+	server->cancel_confirmation();
+	CHECK(TestEngine::quality == 0);
+	CHECK(int(server->get_applied_value("quality")) == 0);
+	CHECK(TestEngine::volume == doctest::Approx(0.25));
+
+	SIGNAL_UNWATCH(server, "confirmation_finished");
+	memdelete(server);
+}
+
+TEST_CASE("[SettingsServer] Restart values are cleared on startup and when set back") {
+	TestSetup setup;
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->set_file_path(temp_file("restart.ini"));
+	server->startup();
+	server->set_setting_flags("quality", SettingsServer::SETTING_FLAG_RESTART_REQUIRED);
+	SIGNAL_WATCH(server, "restart_required");
+
+	server->set_value("quality", 2);
+	CHECK(server->get_restart_required_names() == PackedStringArray({ "quality" }));
+	Array restart_args;
+	restart_args.push_back(Array({ Variant(PackedStringArray({ "quality" })) }));
+	SIGNAL_CHECK("restart_required", restart_args);
+
+	// Another restart value keeps the name listed and emits nothing.
+	server->set_value("quality", 0);
+	CHECK(server->get_restart_required_names() == PackedStringArray({ "quality" }));
+	SIGNAL_CHECK_FALSE("restart_required");
+
+	// Back to the value the engine started with: no restart needed.
+	server->set_value("quality", 1);
+	CHECK(server->get_restart_required_names().is_empty());
+	Array cleared_args;
+	cleared_args.push_back(Array({ Variant(PackedStringArray()) }));
+	SIGNAL_CHECK("restart_required", cleared_args);
+
+	SIGNAL_UNWATCH(server, "restart_required");
+	server->set_value("quality", 2);
+	CHECK_FALSE(server->get_restart_required_names().is_empty());
+	memdelete(server);
+
+	// A new start: nothing waits for a restart.
+	TestEngine::quality = 1;
+	TestDomainServer *restarted = memnew(TestDomainServer);
+	restarted->set_setting_flags("quality", SettingsServer::SETTING_FLAG_RESTART_REQUIRED);
+	restarted->set_file_path(temp_file("restart_again.ini"));
+	restarted->set_value("quality", 2);
+	CHECK_FALSE(restarted->get_restart_required_names().is_empty());
+	restarted->startup();
+	CHECK(restarted->get_restart_required_names().is_empty());
+	memdelete(restarted);
+}
+
+TEST_CASE("[SettingsServer] List domain: unchanged entries are not written") {
+	TestSetup setup;
+	TestListServer *server = memnew(TestListServer);
+	// Defaults with one entry; the pending and applied lists hold copies of it (other resources, same values).
+	TypedArray<TestListEntry> default_entries;
+	default_entries.push_back(make_entry("a", 1));
+	server->get_default_settings()->set("entries", default_entries);
+	server->reset_to_defaults();
+	const String path = temp_file("list_defaults.ini");
+	server->set_file_path(path);
+	REQUIRE(server->get_entry_count() == 1);
+	const Ref<Resource> default_entry = default_entries[0];
+	CHECK(server->get_entry(0) != default_entry);
+	CHECK(server->save() == OK);
+	CHECK_FALSE(FileAccess::get_file_as_string(path).contains("entries"));
+
+	server->set_entry_value(0, "level", 4);
+	CHECK(server->save() == OK);
+	CHECK(FileAccess::get_file_as_string(path).contains("entries"));
+	memdelete(server);
+}
+
+TEST_CASE("[SettingsServer] List domain: entry values are validated") {
+	TestSetup setup;
+	TestListServer *server = memnew(TestListServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	server->add_entry(make_entry("a", 1));
+	server->set_entry_value(0, "level", 50);
+	CHECK(int64_t(server->get_entry_value(0, "level")) == 10);
+	server->set_entry_value(0, "level", -3);
+	CHECK(int64_t(server->get_entry_value(0, "level")) == 0);
+
+	// Hand-edited entries are clamped on load.
+	const String path = temp_file("list_clamp.json");
+	server->set_entry_value(0, "level", 7);
+	CHECK(server->apply() == OK);
+	server->set_file_path(path);
+	CHECK(server->save() == OK);
+	const String text = FileAccess::get_file_as_string(path);
+	REQUIRE(text.contains("7"));
+	{
+		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string(text.replace("7", "99"));
+	}
+	TestListServer *loaded = memnew(TestListServer);
+	loaded->set_file_path(path);
+	CHECK(loaded->load() == OK);
+	REQUIRE(loaded->get_entry_count() == 1);
+	CHECK(int64_t(loaded->get_entry_value(0, "level")) == 10);
+	memdelete(loaded);
+	memdelete(server);
+}
+
+TEST_CASE("[SettingsServer] Domains registered after their phase start at once") {
+	TestSetup setup;
+	SettingsServerManager *manager = SettingsServerManager::get_singleton();
+	manager->startup(SettingsServer::APPLY_PHASE_SERVERS);
+	REQUIRE(int(manager->get_startup_phase()) >= int(SettingsServer::APPLY_PHASE_SERVERS));
+
+	// Like a script domain from `settings/startup/custom_servers` that asks for an earlier phase.
+	TestDomainServer *early = memnew(TestDomainServer);
+	early->domain = "test_early_phase";
+	early->phase = SettingsServer::APPLY_PHASE_PRE_DISPLAY;
+	early->set_file_path(temp_file("early_phase.ini"));
+	CHECK(manager->register_server(early) == OK);
+	CHECK(early->is_started());
+
+	if (manager->get_startup_phase() < SettingsServer::APPLY_PHASE_SCENE) {
+		TestDomainServer *later = memnew(TestDomainServer);
+		later->domain = "test_scene_phase";
+		later->phase = SettingsServer::APPLY_PHASE_SCENE;
+		later->set_file_path(temp_file("scene_phase.ini"));
+		CHECK(manager->register_server(later) == OK);
+		CHECK_FALSE(later->is_started());
+		memdelete(later);
+	}
+	memdelete(early);
 }
 
 } // namespace TestSettingsServer
