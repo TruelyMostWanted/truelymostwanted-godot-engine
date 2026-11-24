@@ -7,13 +7,14 @@
 		The [PathPrefixServer] keeps a table of path prefixes. Each prefix is resolved by logic, a [PathPrefix] or a [Callable], that turns a prefixed path into a real path on the current platform. [FileAccess], [DirAccess], [ResourceLoader], [ResourceSaver] and [method ProjectSettings.globalize_path] resolve every registered prefix.
 		The engine prefixes are registered first and are locked: [code]res://[/code], [code]user://[/code], [code]uid://[/code], [code]pipe://[/code] and [code]exec://[/code]. [code]exec://[/code] is the folder of the executable in an exported project (on macOS the folder that contains the [code].app[/code] bundle) and the project folder in the editor. It is not available on Android, iOS and the Web.
 		If [member ProjectSettings.filesystem/path_prefixes/defaults] is enabled, [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] are registered at startup for the OS folders of [method OS.get_data_dir], [method OS.get_config_dir], [method OS.get_cache_dir] and [method OS.get_temp_dir]. They can be replaced or removed. On the Web only [code]temp://[/code] is registered, because the other folders are not persistent there.
+		A prefix whose folder is inside [code]res://[/code] or [code]user://[/code] (for example [code]register_prefix_folder("streaming://", "res://streaming_assets")[/code]) is passed on as that engine path by [method FileAccess.open], [method FileAccess.file_exists], [method DirAccess.open], [method DirAccess.dir_exists_absolute], [method DirAccess.make_dir_absolute], [method DirAccess.make_dir_recursive_absolute] and [method DirAccess.remove_absolute] (see [method resolve_engine_path]). It therefore reads from the PCK in exported projects, also on Android, iOS and the Web. [method FileAccess.get_path] of such a file returns the engine path. [ResourceLoader] does the same for prefixes into [code]res://[/code]: the loaded resource has the [code]res://[/code] path and shares the cache with it. Resources loaded through a prefix into [code]user://[/code] keep the prefixed path, so that saved references stay portable.
 		[method resolve] returns a [PathInfo] with all forms of a path. [method resolve_safe] does the same for untrusted paths from players, mods or the network.
 		[codeblocks]
 		[gdscript]
 		PathPrefixServer.register_prefix_folder("mods://", "exec://mods")
 		var file := FileAccess.open("mods://readme.txt", FileAccess.READ)
 
-		var info := PathPrefixServer.resolve_safe(player_path, true, ["user://saves/"])
+		var info := PathPrefixServer.resolve_safe(player_path, PathPrefixServer.ACCESS_WRITE, ["user://saves/"])
 		if not info.valid:
 			push_error(info.error_message)
 		[/gdscript]
@@ -21,7 +22,7 @@
 		PathPrefixServer.RegisterPrefixFolder("mods://", "exec://mods");
 		using var file = FileAccess.Open("mods://readme.txt", FileAccess.ModeFlags.Read);
 
-		PathInfo info = PathPrefixServer.ResolveSafe(playerPath, true, ["user://saves/"]);
+		PathInfo info = PathPrefixServer.ResolveSafe(playerPath, PathPrefixServer.AccessMode.Write, ["user://saves/"]);
 		if (!info.Valid)
 		{
 		    GD.PushError(info.ErrorMessage);
@@ -33,21 +34,21 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="create_folder_logic" qualifiers="const">
+		<method name="create_folder_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="folder" type="String" />
 			<description>
 				Returns a [PathPrefix] that maps a prefix to [param folder]. [param folder] is an absolute path or a path with another prefix, for example [code]exec://mods[/code]; it is resolved on every call.
 			</description>
 		</method>
-		<method name="create_os_path_logic" qualifiers="const">
+		<method name="create_os_path_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="path" type="int" enum="PathPrefixServer.OSPath" />
 			<description>
 				Returns a [PathPrefix] that maps a prefix to an OS folder, see [enum OSPath].
 			</description>
 		</method>
-		<method name="create_system_dir_logic" qualifiers="const">
+		<method name="create_system_dir_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="dir" type="int" enum="OS.SystemDir" />
 			<param index="1" name="shared_storage" type="bool" default="true" />
@@ -106,10 +107,10 @@
 		<method name="register_prefix">
 			<return type="int" enum="Error" />
 			<param index="0" name="prefix" type="String" />
-			<param index="1" name="logic" type="PathPrefix" />
+			<param index="1" name="path_prefix" type="PathPrefix" />
 			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Registers [param logic] for [param prefix]. [param prefix] consists of lowercase letters, digits and [code]_[/code], followed by [code]://[/code]; URL schemes such as [code]http://[/code] are not allowed.
+				Registers [param path_prefix] for [param prefix]. [param prefix] consists of lowercase letters, digits and [code]_[/code], followed by [code]://[/code]; URL schemes such as [code]http://[/code] are not allowed.
 				[param platforms] are feature tags (see [method OS.has_feature]), for example [code]["windows", "linux"][/code]. Empty means all platforms. A registration for named platforms that match wins over one for all platforms. Registering again with the same platforms replaces the logic.
 				Returns [constant ERR_LOCKED] for engine prefixes and [constant ERR_INVALID_PARAMETER] for invalid names.
 			</description>
@@ -123,7 +124,7 @@
 			<param index="4" name="is_available" type="Callable" default="Callable()" />
 			<description>
 				Registers a prefix whose logic is given as callables: [param globalize] receives the prefixed path and returns the real path, [param localize] receives a real path and returns the prefixed path or an empty string, [param is_available] returns a [bool]. See [method register_prefix] for [param prefix] and [param platforms].
-				[b]Note:[/b] The callables can be called from any thread and must be thread-safe.
+				[b]Note:[/b] The callables can be called from any thread and must be thread-safe. They must not load resources, because [ResourceLoader] may call them while it holds its internal lock.
 			</description>
 		</method>
 		<method name="register_prefix_folder">
@@ -132,7 +133,7 @@
 			<param index="1" name="folder" type="String" />
 			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Registers a prefix that maps to [param folder], see [method create_folder_logic] and [method register_prefix].
+				Registers a prefix that maps to [param folder], see [method create_folder_prefix] and [method register_prefix].
 			</description>
 		</method>
 		<method name="resolve" qualifiers="const">
@@ -142,13 +143,22 @@
 				Resolves [param path] into a [PathInfo]. [param path] is a prefixed path, an OS path below a known prefix, or a path relative to [code]res://[/code]. Separators ([code]\\[/code] to [code]/[/code]), the case of the prefix and [code].[/code]/[code]..[/code] segments are normalized. An unknown prefix gives an invalid result instead of the unchanged input.
 			</description>
 		</method>
+		<method name="resolve_engine_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Follows the prefix chain of [param path] until it reaches [code]res://[/code], [code]user://[/code] or [code]uid://[/code], and returns that path with [code].[/code]/[code]..[/code] segments resolved. For example [code]streaming://levels/a.json[/code] returns [code]res://streaming_assets/levels/a.json[/code] after [code]register_prefix_folder("streaming://", "res://streaming_assets")[/code]. A prefix whose folder uses another prefix is followed through it (at most 8 steps).
+				Returns [param path] unchanged if it has no registered prefix, if a prefix in the chain is unavailable, or if the chain ends in an OS path or loops. Engine paths are returned unchanged.
+				[FileAccess], [DirAccess] and [ResourceLoader] call this method, so that a prefix that points into [code]res://[/code] reads from the PCK in exported projects. [ResourceLoader] uses the result only if it starts with [code]res://[/code] or [code]uid://[/code].
+			</description>
+		</method>
 		<method name="resolve_safe" qualifiers="const">
 			<return type="PathInfo" />
 			<param index="0" name="path" type="String" />
-			<param index="1" name="for_write" type="bool" />
+			<param index="1" name="access" type="int" enum="PathPrefixServer.AccessMode" />
 			<param index="2" name="allowed_roots" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Resolves an untrusted [param path] like [method resolve], but the result is invalid with [constant ERR_FILE_BAD_PATH] for [code]..[/code] segments, paths without a prefix (including absolute OS paths), unknown or unavailable prefixes, and paths outside [param allowed_roots] (for example [code]["user://saves/", "exec://mods/"][/code]). If [param for_write] is [code]true[/code] and the prefix is read-only, the result is invalid with [constant ERR_FILE_NO_PERMISSION].
+				Resolves an untrusted [param path] like [method resolve], but the result is invalid with [constant ERR_FILE_BAD_PATH] for [code]..[/code] segments, paths without a prefix (including absolute OS paths), unknown or unavailable prefixes, and paths outside [param allowed_roots] (for example [code]["user://saves/", "exec://mods/"][/code]). If [param access] is [constant ACCESS_WRITE] and the prefix is read-only, the result is invalid with [constant ERR_FILE_NO_PERMISSION].
 				[b]Note:[/b] Symbolic links and Windows short names are not resolved before the check.
 			</description>
 		</method>
@@ -187,6 +197,12 @@
 		</constant>
 		<constant name="OS_PATH_TEMP" value="3" enum="OSPath">
 			The folder of [method OS.get_temp_dir].
+		</constant>
+		<constant name="ACCESS_READ" value="0" enum="AccessMode">
+			The path is only read. [method resolve_safe] accepts read-only prefixes.
+		</constant>
+		<constant name="ACCESS_WRITE" value="1" enum="AccessMode">
+			The path is written. [method resolve_safe] rejects read-only prefixes with [constant ERR_FILE_NO_PERMISSION].
 		</constant>
 	</constants>
 </class>

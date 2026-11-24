@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for input: sensitivity and inversion per device, deadzone, vibration, toggle actions and the input options of the engine.
+	</brief_description>
+	<description>
+		[InputSettingsServer] is the settings domain [code]"input"[/code]: it stores the input options chosen by the player, loads them when the game starts and offers helpers that apply them. The settings resource is an [InputSettings]. The file is [code]user://settings/input.ini[/code] by default; as a single record it is never stored as CSV.
+		Three values have an engine target and take effect at once: [member InputSettings.emulate_mouse_from_touch], [member InputSettings.emulate_touch_from_mouse] and [member InputSettings.use_accumulated_input] (see [Input]). Their defaults are the values the engine has when the domain starts, so they follow the project settings.
+		All other values (sensitivity, inversion, deadzone, smoothing, vibration, toggle actions, first player) have no engine target ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): no engine API reads them, and [Input] is never changed, so the GUI and games that scale on their own are not affected. The game applies them through the helpers of this class, which read the pending values, so a slider in an options menu takes effect while it is dragged. Connect to [signal SettingsServer.value_changed] to react to a change.
+		[codeblocks]
+		[gdscript]
+		extends CharacterBody3D
+
+		func _ready():
+			InputSettingsServer.set_mouse_captured(true)
+
+		func _unhandled_input(event):
+			if event is InputEventMouseMotion:
+				var look = InputSettingsServer.apply_to_mouse_motion(event.screen_relative)
+				rotate_y(-look.x * 0.002)
+				$Camera3D.rotate_x(-look.y * 0.002)
+
+		func _physics_process(delta):
+			var stick = Input.get_vector("look_left", "look_right", "look_up", "look_down", 0.0)
+			var look = InputSettingsServer.apply_to_stick(stick)
+			rotate_y(-look.x * 3.0 * delta)
+			var crouching = InputSettingsServer.is_action_active("crouch")
+		[/gdscript]
+		[csharp]
+		public partial class Player : CharacterBody3D
+		{
+		    public override void _Ready()
+		    {
+		        InputSettingsServer.SetMouseCaptured(true);
+		    }
+
+		    public override void _UnhandledInput(InputEvent @event)
+		    {
+		        if (@event is InputEventMouseMotion motion)
+		        {
+		            Vector2 look = InputSettingsServer.ApplyToMouseMotion(motion.ScreenRelative);
+		            RotateY(-look.X * 0.002f);
+		            GetNode&lt;Camera3D&gt;("Camera3D").RotateX(-look.Y * 0.002f);
+		        }
+		    }
+
+		    public override void _PhysicsProcess(double delta)
+		    {
+		        Vector2 stick = Input.GetVector("look_left", "look_right", "look_up", "look_down", 0.0f);
+		        Vector2 look = InputSettingsServer.ApplyToStick(stick);
+		        RotateY(-look.X * 3.0f * (float)delta);
+		        bool crouching = InputSettingsServer.IsActionActive("crouch");
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]InputSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]InputSettingsServer.Singleton[/code].
+		[b]Note:[/b] Key bindings are not part of this domain.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="apply_to_mouse_motion">
+			<return type="Vector2" />
+			<param index="0" name="relative" type="Vector2" />
+			<description>
+				Returns [param relative] (the motion of an [InputEventMouseMotion]) with the mouse sensitivity, inversion and smoothing applied. With [member InputSettings.mouse_smoothing] above [code]0.0[/code], the result is blended with the previous result, so call it once per motion event; [method reset_mouse_smoothing] forgets the previous result.
+			</description>
+		</method>
+		<method name="apply_to_stick" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="axis" type="Vector2" />
+			<description>
+				Returns the position of a stick with the radial deadzone, the gamepad sensitivity and the gamepad inversion applied. Inside [member InputSettings.gamepad_deadzone] the result is [constant Vector2.ZERO]; outside, the length is rescaled so that it starts at [code]0.0[/code] at the edge of the deadzone and reaches [code]1.0[/code] at full tilt, before the sensitivity is applied.
+				[codeblocks]
+				[gdscript]
+				var look = InputSettingsServer.apply_to_stick(Input.get_vector("look_left", "look_right", "look_up", "look_down", 0.0))
+				[/gdscript]
+				[csharp]
+				Vector2 look = InputSettingsServer.ApplyToStick(Input.GetVector("look_left", "look_right", "look_up", "look_down", 0.0f));
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] Pass the raw stick position (deadzone [code]0.0[/code]), otherwise the deadzone is applied twice.
+			</description>
+		</method>
+		<method name="apply_to_vector" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<param index="1" name="vector" type="Vector2" />
+			<description>
+				Returns [param vector] multiplied by the sensitivity of [param device], with its inverted axes negated. No deadzone and no smoothing.
+			</description>
+		</method>
+		<method name="get_first_player_device_id" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending value of [member InputSettings.first_player_device_id].
+			</description>
+		</method>
+		<method name="get_gamepad_deadzone" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member InputSettings.gamepad_deadzone].
+			</description>
+		</method>
+		<method name="get_look_vector">
+			<return type="Vector2" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the look input of [param event] with the settings applied: for an [InputEventMouseMotion], [method apply_to_mouse_motion] of its [member InputEventMouseMotion.screen_relative]; for an [InputEventJoypadMotion] of the right stick, [method apply_to_stick] of the whole right stick of its device. Returns [constant Vector2.ZERO] for all other events.
+				[codeblocks]
+				[gdscript]
+				func _unhandled_input(event):
+					var look = InputSettingsServer.get_look_vector(event)
+					rotate_y(-look.x * 0.002)
+					$Camera3D.rotate_x(-look.y * 0.002)
+				[/gdscript]
+				[csharp]
+				public override void _UnhandledInput(InputEvent @event)
+				{
+				    Vector2 look = InputSettingsServer.GetLookVector(@event);
+				    RotateY(-look.X * 0.002f);
+				    GetNode&lt;Camera3D&gt;("Camera3D").RotateX(-look.Y * 0.002f);
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] A joypad gives a position, not a motion: for smooth turning, read the stick every frame with [method apply_to_stick] instead.
+			</description>
+		</method>
+		<method name="get_mouse_smoothing" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member InputSettings.mouse_smoothing].
+			</description>
+		</method>
+		<method name="get_sensitivity" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<description>
+				Returns the pending sensitivity of [param device]: [member InputSettings.keyboard_sensitivity], [member InputSettings.mouse_sensitivity] or [member InputSettings.gamepad_sensitivity].
+			</description>
+		</method>
+		<method name="get_toggle_actions" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the pending value of [member InputSettings.toggle_actions].
+			</description>
+		</method>
+		<method name="get_vibration_strength" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member InputSettings.vibration_strength].
+			</description>
+		</method>
+		<method name="is_action_active">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns whether [param action] is active. For an action in [member InputSettings.toggle_actions], each press switches it on or off; for all other actions it is [method Input.is_action_pressed]. Call it every frame (from [method Node._process] or [method Node._physics_process], not both) so that no press is missed; several calls in one frame return the same state.
+			</description>
+		</method>
+		<method name="is_emulating_mouse_from_touch" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.emulate_mouse_from_touch].
+			</description>
+		</method>
+		<method name="is_emulating_touch_from_mouse" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.emulate_touch_from_mouse].
+			</description>
+		</method>
+		<method name="is_keyboard_allowed_for_current_player" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.allow_keyboard_for_current_player].
+			</description>
+		</method>
+		<method name="is_mouse_confined" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.mouse_confined].
+			</description>
+		</method>
+		<method name="is_player_event" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns whether [param event] belongs to the first player: joypad events if their device is [member InputSettings.first_player_device_id] (or that is [code]-1[/code]), [InputEventAction] always, keyboard, mouse and touch events if [member InputSettings.allow_keyboard_for_current_player] is [code]true[/code].
+			</description>
+		</method>
+		<method name="is_toggle_action" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns whether [param action] is in [member InputSettings.toggle_actions].
+			</description>
+		</method>
+		<method name="is_using_accumulated_input" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.use_accumulated_input].
+			</description>
+		</method>
+		<method name="is_vibration_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member InputSettings.vibration_enabled].
+			</description>
+		</method>
+		<method name="is_x_inverted" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<description>
+				Returns whether the horizontal axis of [param device] is inverted.
+			</description>
+		</method>
+		<method name="is_y_inverted" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<description>
+				Returns whether the vertical axis of [param device] is inverted.
+			</description>
+		</method>
+		<method name="reset_action_states">
+			<return type="void" />
+			<description>
+				Switches all toggle actions off, for example when a level starts or the player dies.
+			</description>
+		</method>
+		<method name="reset_mouse_smoothing">
+			<return type="void" />
+			<description>
+				Forgets the previous result of [method apply_to_mouse_motion], for example after a teleport or when the mouse is captured again.
+			</description>
+		</method>
+		<method name="set_allow_keyboard_for_current_player">
+			<return type="void" />
+			<param index="0" name="allow" type="bool" />
+			<description>
+				Sets [member InputSettings.allow_keyboard_for_current_player].
+			</description>
+		</method>
+		<method name="set_emulate_mouse_from_touch">
+			<return type="void" />
+			<param index="0" name="emulate" type="bool" />
+			<description>
+				Sets [member InputSettings.emulate_mouse_from_touch]. It takes effect at once.
+			</description>
+		</method>
+		<method name="set_emulate_touch_from_mouse">
+			<return type="void" />
+			<param index="0" name="emulate" type="bool" />
+			<description>
+				Sets [member InputSettings.emulate_touch_from_mouse]. It takes effect at once.
+			</description>
+		</method>
+		<method name="set_first_player_device_id">
+			<return type="void" />
+			<param index="0" name="device" type="int" />
+			<description>
+				Sets [member InputSettings.first_player_device_id].
+			</description>
+		</method>
+		<method name="set_gamepad_deadzone">
+			<return type="void" />
+			<param index="0" name="deadzone" type="float" />
+			<description>
+				Sets [member InputSettings.gamepad_deadzone]. The value is clamped to [code]0.0[/code] to [code]0.95[/code].
+			</description>
+		</method>
+		<method name="set_mouse_captured">
+			<return type="void" />
+			<param index="0" name="captured" type="bool" />
+			<description>
+				Sets [member Input.mouse_mode]: [constant Input.MOUSE_MODE_CAPTURED] if [param captured] is [code]true[/code] (gameplay), otherwise [constant Input.MOUSE_MODE_CONFINED] if [member InputSettings.mouse_confined] is [code]true[/code] and [constant Input.MOUSE_MODE_VISIBLE] if not (menus). The mouse mode itself is not stored, because the game switches it all the time.
+				[b]Note:[/b] On the Web, capturing the mouse needs a user gesture such as a click, and browsers do not support [constant Input.MOUSE_MODE_CONFINED].
+			</description>
+		</method>
+		<method name="set_mouse_confined">
+			<return type="void" />
+			<param index="0" name="confined" type="bool" />
+			<description>
+				Sets [member InputSettings.mouse_confined]. It takes effect at the next call of [method set_mouse_captured].
+			</description>
+		</method>
+		<method name="set_mouse_smoothing">
+			<return type="void" />
+			<param index="0" name="smoothing" type="float" />
+			<description>
+				Sets [member InputSettings.mouse_smoothing]. The value is clamped to [code]0.0[/code] to [code]0.95[/code].
+			</description>
+		</method>
+		<method name="set_sensitivity">
+			<return type="void" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<param index="1" name="sensitivity" type="float" />
+			<description>
+				Sets the sensitivity of [param device]. The value is clamped to [code]0.01[/code] to [code]10.0[/code].
+			</description>
+		</method>
+		<method name="set_toggle_actions">
+			<return type="void" />
+			<param index="0" name="actions" type="PackedStringArray" />
+			<description>
+				Sets [member InputSettings.toggle_actions]. Empty names and duplicates are removed, and all toggle actions are switched off.
+			</description>
+		</method>
+		<method name="set_use_accumulated_input">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+				Sets [member InputSettings.use_accumulated_input]. It takes effect at once.
+			</description>
+		</method>
+		<method name="set_vibration_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member InputSettings.vibration_enabled].
+			</description>
+		</method>
+		<method name="set_vibration_strength">
+			<return type="void" />
+			<param index="0" name="strength" type="float" />
+			<description>
+				Sets [member InputSettings.vibration_strength]. The value is clamped to [code]0.0[/code] to [code]1.0[/code].
+			</description>
+		</method>
+		<method name="set_x_inverted">
+			<return type="void" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<param index="1" name="inverted" type="bool" />
+			<description>
+				Sets whether the horizontal axis of [param device] is inverted.
+			</description>
+		</method>
+		<method name="set_y_inverted">
+			<return type="void" />
+			<param index="0" name="device" type="int" enum="InputSettingsServer.Device" />
+			<param index="1" name="inverted" type="bool" />
+			<description>
+				Sets whether the vertical axis of [param device] is inverted.
+			</description>
+		</method>
+		<method name="vibrate">
+			<return type="void" />
+			<param index="0" name="device" type="int" />
+			<param index="1" name="weak_magnitude" type="float" />
+			<param index="2" name="strong_magnitude" type="float" />
+			<param index="3" name="duration" type="float" default="0" />
+			<description>
+				Starts a vibration of the joypad [param device] with [method Input.start_joy_vibration], with both magnitudes multiplied by [member InputSettings.vibration_strength]. Does nothing if [member InputSettings.vibration_enabled] is [code]false[/code] or the strength is [code]0.0[/code].
+				[b]Note:[/b] On the Web, joypad vibration depends on the browser.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="DEVICE_KEYBOARD" value="0" enum="Device">
+			The keyboard: [member InputSettings.keyboard_sensitivity], [member InputSettings.keyboard_x_inverted] and [member InputSettings.keyboard_y_inverted].
+		</constant>
+		<constant name="DEVICE_MOUSE" value="1" enum="Device">
+			The mouse: [member InputSettings.mouse_sensitivity], [member InputSettings.mouse_x_inverted] and [member InputSettings.mouse_y_inverted].
+		</constant>
+		<constant name="DEVICE_GAMEPAD" value="2" enum="Device">
+			The look stick of a gamepad: [member InputSettings.gamepad_sensitivity], [member InputSettings.gamepad_x_inverted] and [member InputSettings.gamepad_y_inverted].
+		</constant>
+		<constant name="DEVICE_MAX" value="3" enum="Device">
+			The number of devices.
+		</constant>
+	</constants>
+</class>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PreloadList" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A resource that names resources to load once and keep in memory.
+	</brief_description>
+	<description>
+		A [PreloadList] names resources for [ResourceDatabase]: direct references ([member resources]), paths ([member paths]) and file manifests ([member manifests]), plus optional keys ([member keys]). Hand it to [method ResourceDatabase.preload_from_list], or save it as a resource and add its path to [member ProjectSettings.filesystem/resources/preload_lists] to preload it at startup.
+		[codeblocks]
+		[gdscript]
+		var list := PreloadList.new()
+		list.paths = PackedStringArray(["res://items/sword.tres"])
+		list.keys = { "hero_sword": "res://items/sword.tres" }
+		ResourceSaver.save(list, "res://preload/items.tres")
+		[/gdscript]
+		[csharp]
+		var list = new PreloadList();
+		list.Paths = ["res://items/sword.tres"];
+		list.Keys = new Godot.Collections.Dictionary&lt;string, string&gt; { { "hero_sword", "res://items/sword.tres" } };
+		ResourceSaver.Save(list, "res://preload/items.tres");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="is_empty" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the list names no resource, path or manifest.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="keys" type="Dictionary[String, String]" setter="set_keys" getter="get_keys" default="{}">
+			Extra names for the preloaded resources: keys as keys, paths as values. A key can be used instead of the path in [method ResourceDatabase.get_resource] and matches patterns in [method ResourceDatabase.find_resources]. Keys that are not paths are only known to [ResourceDatabase], not to [method ResourceLoader.load].
+		</member>
+		<member name="manifests" type="FilesManifest[]" setter="set_manifests" getter="get_manifests" default="[]">
+			File manifests whose files are preloaded. Their [member FilesManifest.type_hint] is used as the type hint when it is a native class.
+		</member>
+		<member name="paths" type="PackedStringArray" setter="set_paths" getter="get_paths" default="PackedStringArray()">
+			Paths of resources to preload. [code]uid://[/code] paths and the prefixes of [PathPrefixServer] can be used.
+		</member>
+		<member name="resources" type="Resource[]" setter="set_resources" getter="get_resources" default="[]">
+			Resources to store directly, under their resource path, or under their [member Resource.resource_name] if they have no path.
+		</member>
+	</members>
+</class>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioCommandList" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A list of [AudioCommand]s, savable as one CSV row per command.
+	</brief_description>
+	<description>
+		An [AudioCommandList] holds the audio commands of a soundboard, a level's ambience or a whole game. Edit it in the Inspector, save it as [code].tres[/code], JSON, INI or CSV, and register it with [method AudioMixerServer.register_commands] or in the project setting [code]audio/mixer/default_commands[/code]. [method AudioMixerServer.execute_list] runs all commands of a list once.
+		As CSV, the header row names the [AudioCommand] properties and each further row is one command; columns that all commands leave at the default are omitted, and missing cells keep the default. A CSV has no type of its own, so load it with a type hint:
+		[codeblocks]
+		[gdscript]
+		var board = ResourceLoader.load("res://audio/soundboard.csv", "AudioCommandList")
+		board.preload_streams() # No loading hitch on the first button press.
+		AudioMixerServer.register_commands(board)
+		[/gdscript]
+		[csharp]
+		var board = ResourceLoader.Load&lt;AudioCommandList&gt;("res://audio/soundboard.csv", "AudioCommandList");
+		board.PreloadStreams(); // No loading hitch on the first button press.
+		AudioMixerServer.RegisterCommands(board);
+		[/csharp]
+		[/codeblocks]
+		A soundboard file can look like this:
+		[codeblock lang=text]
+		command_name,channel,command,stream_path
+		horn,pad_1,Toggle,res://sounds/horn.wav
+		drums,pad_2,Toggle,res://sounds/drums.ogg
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_command">
+			<return type="void" />
+			<param index="0" name="command" type="AudioCommand" />
+			<description>
+				Appends [param command] to [member commands].
+			</description>
+		</method>
+		<method name="clear_preloaded_streams">
+			<return type="void" />
+			<description>
+				Releases the streams kept by [method preload_streams]. Streams that still play stay in memory until they end.
+			</description>
+		</method>
+		<method name="find_command" qualifiers="const">
+			<return type="AudioCommand" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the first command whose [member AudioCommand.command_name] is [param name], or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="get_preloaded_stream_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of different streams kept by [method preload_streams].
+			</description>
+		</method>
+		<method name="preload_streams">
+			<return type="int" enum="Error" />
+			<description>
+				Loads the [member AudioCommand.stream_path] of every command now and keeps the streams in memory while this list exists (or until [method clear_preloaded_streams]), so the first [method AudioMixerServer.execute] of a command does not load from disk. Streams already in the resource cache are shared, not loaded twice. Loads all streams it can; returns the first error and prints one message if a file is missing or not an [AudioStream].
+				[b]Note:[/b] On the Web (single-threaded), loading blocks the frame; call this method behind a loading screen.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="commands" type="AudioCommand[]" setter="set_commands" getter="get_commands" default="[]">
+			The commands, in the order [method AudioMixerServer.execute_list] runs them and [method AudioMixerServer.register_commands] registers them.
+		</member>
+	</members>
+</class>

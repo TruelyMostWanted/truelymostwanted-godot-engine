@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioMixerChannel" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The definition of one [AudioMixerServer] channel.
+	</brief_description>
+	<description>
+		An [AudioMixerChannel] defines one named channel of the [AudioMixerServer], for example [code]music[/code], [code]ambience[/code] or [code]voice[/code]: the audio bus it plays on, its volume and pitch, how many one-shots may overlap, and what happens at the end of its queue.
+		Channels are usually collected in an [AudioMixerLayout] that is loaded at startup (project setting [code]audio/mixer/default_layout[/code]), but they can also be added from code with [method AudioMixerServer.add_channel].
+		The channel plays on an existing bus of the [AudioServer]. The mixer never creates, removes or changes buses; the bus volume (for example a player's music volume) multiplies with the channel volume.
+		[b]Note:[/b] Changing a property of a channel that is already added to the [AudioMixerServer] does not change running voices. Call [method AudioMixerServer.add_channel] again with the changed channel to apply it.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="bus" type="StringName" setter="set_bus" getter="get_bus" default="&amp;&quot;Master&quot;">
+			The audio bus the channel plays on. If the bus does not exist when a voice starts, the voice plays on [code]Master[/code] and a warning is printed once.
+		</member>
+		<member name="channel_name" type="StringName" setter="set_channel_name" getter="get_channel_name" default="&amp;&quot;&quot;">
+			The name of the channel, used as key in all [AudioMixerServer] methods. It must not be empty.
+		</member>
+		<member name="default_fade_time" type="float" setter="set_default_fade_time" getter="get_default_fade_time" default="0.0">
+			The cross-fade time in seconds used by [method AudioMixerServer.play_next], [method AudioMixerServer.play_previous] and [method AudioMixerServer.set_queue_index] when their [code]fade_time[/code] is negative, and by [member stop_on_scene_change]. [code]0.0[/code] switches at once.
+		</member>
+		<member name="loop_current_entry" type="bool" setter="set_loop_current_entry" getter="is_loop_current_entry" default="false">
+			If [code]true[/code], the current entry starts again when it ends instead of advancing the queue. The restart happens in the next frame; for a seamless loop, use the loop setting of the stream itself (for example [member AudioStreamWAV.loop_mode]).
+		</member>
+		<member name="max_polyphony" type="int" setter="set_max_polyphony" getter="get_max_polyphony" default="1">
+			The maximum number of one-shots started with [method AudioMixerServer.play_one_shot] that play at the same time on this channel. When another one starts, the oldest one is stopped. Ranges from [code]1[/code] to [code]128[/code].
+		</member>
+		<member name="pause_with_tree" type="bool" setter="set_pause_with_tree" getter="is_pause_with_tree" default="false">
+			If [code]true[/code], the channel pauses while [member SceneTree.paused] is [code]true[/code] and resumes with the tree. If [code]false[/code], the channel keeps playing, for example music in a pause menu. Has no effect when the main loop is not a [SceneTree].
+		</member>
+		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
+			The pitch and tempo of the channel, as in [member AudioStreamPlayer.pitch_scale]. Must be greater than [code]0.0[/code].
+		</member>
+		<member name="preload_next" type="bool" setter="set_preload_next" getter="is_preload_next" default="false">
+			If [code]true[/code], the next queue entry given as a path is loaded in the background (with [method ResourceLoader.load_threaded_request]) while the current entry plays, so switching does not block. Not used in [constant QUEUE_MODE_SHUFFLE]. In exports without threads (the default Web export), the load still runs on the main thread, only earlier.
+		</member>
+		<member name="queue_mode" type="int" setter="set_queue_mode" getter="get_queue_mode" enum="AudioMixerChannel.QueueMode" default="0">
+			What happens when an entry of the queue ends. See [enum QueueMode].
+		</member>
+		<member name="stop_on_scene_change" type="bool" setter="set_stop_on_scene_change" getter="is_stop_on_scene_change" default="false">
+			If [code]true[/code], voices that were started in another scene than the current one are stopped (with a fade of [member default_fade_time]) after [method SceneTree.change_scene_to_file] or [method SceneTree.change_scene_to_packed]. If [code]false[/code], the channel keeps playing across scene changes. Has no effect when the main loop is not a [SceneTree].
+		</member>
+		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
+			The initial volume of the channel in decibels. Change the volume at runtime with [method AudioMixerServer.set_channel_volume_db].
+		</member>
+	</members>
+	<constants>
+		<constant name="QUEUE_MODE_STOP" value="0" enum="QueueMode">
+			After an entry ends, the next entry plays. After the last entry, the channel stops and [signal AudioMixerServer.queue_finished] is emitted.
+		</constant>
+		<constant name="QUEUE_MODE_LOOP_QUEUE" value="1" enum="QueueMode">
+			After an entry ends, the next entry plays. After the last entry, the queue starts again at the first entry.
+		</constant>
+		<constant name="QUEUE_MODE_SHUFFLE" value="2" enum="QueueMode">
+			After an entry ends, a random other entry plays. The queue never finishes.
+		</constant>
+	</constants>
+</class>

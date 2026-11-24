@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FilesManifestServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Registers, edits, validates, saves and watches file manifests by name.
+	</brief_description>
+	<description>
+		[FilesManifestServer] keeps [FilesManifest] resources under names. Mods, user content and level editors register a manifest once and then edit it through the server ([method add_folder], [method add_extension], ...), check it with [method validate], save it with [method save_manifest] and get its cached file list with [method get_file_paths]. Loading the files is done by [method ResourceLoader.load_manifest].
+		Watching ([method set_watching]) polls the folders of a manifest on the main thread every [member watch_interval] seconds and emits [signal file_added] and [signal file_removed]. It needs no threads and no OS file watchers, so it works the same on all platforms, including the Web export. With a [SceneTree], polling runs automatically; with another [MainLoop], call [method poll] yourself.
+		Manifests listed in [member ProjectSettings.filesystem/manifests/autoload] are registered on first use of the server. All paths can use the prefixes of [PathPrefixServer]. Use the server from the main thread.
+		[codeblocks]
+		[gdscript]
+		var manifest = FilesManifest.new()
+		FilesManifestServer.register_manifest("mods", manifest)
+		FilesManifestServer.add_folder("mods", "user://mods")
+		FilesManifestServer.add_extension("mods", "tres")
+		FilesManifestServer.file_added.connect(func(name, path): print("New file: ", path))
+		FilesManifestServer.set_watching("mods", true)
+		FilesManifestServer.save_manifest("mods", "user://mods.tres")
+		[/gdscript]
+		[csharp]
+		var manifest = new FilesManifest();
+		FilesManifestServer.RegisterManifest("mods", manifest);
+		FilesManifestServer.AddFolder("mods", "user://mods");
+		FilesManifestServer.AddExtension("mods", "tres");
+		FilesManifestServer.Singleton.FileAdded += (name, path) =&gt; GD.Print("New file: ", path);
+		FilesManifestServer.SetWatching("mods", true);
+		FilesManifestServer.SaveManifest("mods", "user://mods.tres");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="extension" type="String" />
+			<description>
+				Adds an extension to the manifest [param name] (normalized to lower case with a leading dot). Returns [constant ERR_ALREADY_EXISTS] if it is already there.
+			</description>
+		</method>
+		<method name="add_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Adds a single file to the manifest [param name]. The path is stored in its canonical form. Returns [constant ERR_ALREADY_EXISTS] if it is already there.
+			</description>
+		</method>
+		<method name="add_folder">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Adds a folder to the manifest [param name]. The path is stored in its canonical form. Returns [constant ERR_ALREADY_EXISTS] if it is already there.
+			</description>
+		</method>
+		<method name="create_missing_folders">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Creates the folders of the manifest [param name] that do not exist. Read-only paths (such as [code]res://[/code] in exported builds) are skipped with an error, and [constant ERR_FILE_NO_PERMISSION] is returned.
+			</description>
+		</method>
+		<method name="get_file_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the file list of the manifest [param name]. The list is cached and rebuilt after every change of the manifest; call [method refresh] to read the folders again.
+			</description>
+		</method>
+		<method name="get_manifest">
+			<return type="FilesManifest" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the manifest registered as [param name], or [code]null[/code] with an error.
+			</description>
+		</method>
+		<method name="get_manifest_names">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all registered manifests, sorted.
+			</description>
+		</method>
+		<method name="has_manifest">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if a manifest is registered as [param name].
+			</description>
+		</method>
+		<method name="is_watching">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if the folders of the manifest [param name] are watched.
+			</description>
+		</method>
+		<method name="poll">
+			<return type="void" />
+			<description>
+				Reads the folders of all watched manifests again and emits [signal file_added] and [signal file_removed] for the differences. Called automatically every [member watch_interval] seconds when the main loop is a [SceneTree].
+			</description>
+		</method>
+		<method name="refresh">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Reads the folders of the manifest [param name] again and updates the cached file list. If the manifest is watched, the differences are reported as signals.
+			</description>
+		</method>
+		<method name="register_manifest">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="manifest" type="FilesManifest" />
+			<description>
+				Registers [param manifest] as [param name]. An existing manifest with the same name is replaced (its watching state is kept).
+			</description>
+		</method>
+		<method name="register_manifest_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Loads the [FilesManifest] at [param path] and registers it as [param name]. [method save_manifest] without a path writes back to this file.
+			</description>
+		</method>
+		<method name="remove_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="extension" type="String" />
+			<description>
+				Removes an extension from the manifest [param name]. Returns [constant ERR_DOES_NOT_EXIST] if it is not there.
+			</description>
+		</method>
+		<method name="remove_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Removes a single file from the manifest [param name]. Returns [constant ERR_DOES_NOT_EXIST] if it is not there.
+			</description>
+		</method>
+		<method name="remove_folder">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Removes a folder from the manifest [param name]. Returns [constant ERR_DOES_NOT_EXIST] if it is not there.
+			</description>
+		</method>
+		<method name="save_manifest">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" default="&quot;&quot;" />
+			<description>
+				Saves the manifest [param name] through [ResourceSaver] to [param path] ([code].tres[/code], [code].res[/code], or [code].json[/code]/[code].ini[/code] with the text formats). Without [param path], the file it was loaded from or last saved to is used.
+			</description>
+		</method>
+		<method name="set_watching">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="enabled" type="bool" />
+			<description>
+				Starts or stops watching the folders of the manifest [param name]. While watching, added and removed files are reported with [signal file_added] and [signal file_removed].
+			</description>
+		</method>
+		<method name="unregister_manifest">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Removes the manifest registered as [param name] from the server. The resource itself is not changed.
+			</description>
+		</method>
+		<method name="validate">
+			<return type="FilesManifestValidation" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Checks the manifest [param name] and returns a [FilesManifestValidation] with the folders and files that do not exist and the extensions no resource loader recognizes. If no manifest is registered under [param name], an error is printed and the result has [constant ERR_DOES_NOT_EXIST] as [member FilesManifestValidation.error].
+				[codeblocks]
+				[gdscript]
+				var validation := FilesManifestServer.validate("mods")
+				if not validation.valid:
+					print("Missing folders: ", validation.missing_folders)
+				[/gdscript]
+				[csharp]
+				FilesManifestValidation validation = FilesManifestServer.Validate("mods");
+				if (!validation.Valid)
+				{
+				    GD.Print("Missing folders: ", validation.MissingFolders);
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="watch_interval" type="float" setter="set_watch_interval" getter="get_watch_interval">
+			Seconds between two automatic polls of the watched folders.
+		</member>
+	</members>
+	<signals>
+		<signal name="file_added">
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Emitted when a file appears in a folder of the watched manifest [param name].
+			</description>
+		</signal>
+		<signal name="file_removed">
+			<param index="0" name="name" type="String" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Emitted when a file disappears from a folder of the watched manifest [param name].
+			</description>
+		</signal>
+		<signal name="manifest_changed">
+			<param index="0" name="name" type="String" />
+			<description>
+				Emitted after the manifest [param name] was registered or edited through the server.
+			</description>
+		</signal>
+	</signals>
+</class>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ResourceDatabase" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Keeps resources in memory and finds them by path, key, type or pattern.
+	</brief_description>
+	<description>
+		[ResourceDatabase] loads resources once and holds strong references to them, so they stay in memory until they are removed, even when no scene uses them any more. Hand it a [PreloadList] with [method preload_from_list], or single paths with [method preload_resource], or store resources you created yourself with [method add_resource].
+		Loaded resources are stored under their resource path. As long as they are stored, [method ResourceLoader.load] of that path returns the stored instance without reading the disk again. A key that is not a path (for example [code]"hero_sword"[/code]) is only known to the database: [method get_resource] finds it, [method ResourceLoader.load] does not.
+		[method find_resources] and [method find_keys] find entries by pattern and type. Patterns are case-insensitive; [code]%[/code] matches any run of characters: [code]"items/sword"[/code] (exact), [code]"items/%"[/code] (prefix), [code]"%.tres"[/code] (suffix), [code]"%sword%"[/code] (contains). A pattern matches an entry if it matches its path or one of its keys. The type is a native class or a script [code]class_name[/code]; inherited classes match too.
+		The lists named in [member ProjectSettings.filesystem/resources/preload_lists] are preloaded at startup, before the autoloads (not in the editor).
+		Every stored resource stays in memory until [method remove_matching] or [method clear]. Preload small or frequently used resources; [method get_memory_usage] gives an estimate. All methods can be called from any thread; [signal preload_finished] is emitted on the main thread.
+		[b]Note:[/b] [constant ResourceLoader.CACHE_MODE_REPLACE] updates a stored resource in place. [constant ResourceLoader.CACHE_MODE_IGNORE] returns a new instance and leaves the database unchanged.
+		[b]Note:[/b] Without thread support (the default Web export) or on a single-core device, [method preload_from_list] always loads synchronously.
+		[codeblocks]
+		[gdscript]
+		var list := PreloadList.new()
+		list.paths = PackedStringArray(["res://items/sword.tres", "res://items/shield.tres"])
+		list.keys = { "hero_sword": "res://items/sword.tres" }
+		ResourceDatabase.preload_finished.connect(func(_list, error): print("Preloaded: ", error_string(error)))
+		ResourceDatabase.preload_from_list(list)
+
+		# Later, anywhere:
+		var sword: Item = ResourceDatabase.get_resource("hero_sword")
+		var swords := ResourceDatabase.find_resources("%sword%", "Item")
+		[/gdscript]
+		[csharp]
+		var list = new PreloadList();
+		list.Paths = ["res://items/sword.tres", "res://items/shield.tres"];
+		list.Keys = new Godot.Collections.Dictionary&lt;string, string&gt; { { "hero_sword", "res://items/sword.tres" } };
+		ResourceDatabase.Singleton.PreloadFinished += (preloadList, error) =&gt; GD.Print("Preloaded: ", error);
+		ResourceDatabase.PreloadFromList(list);
+
+		// Later, anywhere:
+		var sword = ResourceDatabase.GetResource("hero_sword");
+		var swords = ResourceDatabase.FindResources("%sword%", "Item");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_resource">
+			<return type="int" enum="Error" />
+			<param index="0" name="key" type="String" />
+			<param index="1" name="resource" type="Resource" />
+			<description>
+				Stores [param resource] under [param key], replacing an entry with the same key. If the resource has a path, it can also be found by that path. Returns [constant ERR_INVALID_PARAMETER] if [param key] is empty or [param resource] is [code]null[/code].
+			</description>
+		</method>
+		<method name="add_resource_if_missing">
+			<return type="bool" />
+			<param index="0" name="key" type="String" />
+			<param index="1" name="resource" type="Resource" />
+			<description>
+				Stores [param resource] under [param key] if nothing is stored under that key yet. Returns [code]true[/code] if it was stored. The check and the insertion happen atomically, so several threads can use it to store a resource only once.
+			</description>
+		</method>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes every entry. Resources that nothing else references are freed.
+			</description>
+		</method>
+		<method name="find_keys" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="pattern" type="String" default="&quot;&quot;" />
+			<param index="1" name="type" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Like [method find_resources], but returns the paths or keys under which the matching resources are stored.
+			</description>
+		</method>
+		<method name="find_resources" qualifiers="const">
+			<return type="Resource[]" />
+			<param index="0" name="pattern" type="String" default="&quot;&quot;" />
+			<param index="1" name="type" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the stored resources whose path or key matches [param pattern] and whose class is [param type] or inherits from it. [param type] can be a native class or a script [code]class_name[/code]. An empty pattern or type matches everything.
+			</description>
+		</method>
+		<method name="get_entry_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of stored entries. Keys added by [member PreloadList.keys] or [method preload_resource] are other names for an entry and are not counted.
+			</description>
+		</method>
+		<method name="get_memory_usage" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns an estimate in bytes of the memory used by the stored resources: the stored properties (strings, packed arrays, arrays, dictionaries and sub-resources, each resource counted once). Video memory (textures and meshes on the [RenderingServer]) and native data that is not a stored property are not counted.
+			</description>
+		</method>
+		<method name="get_resource" qualifiers="const">
+			<return type="Resource" />
+			<param index="0" name="key_or_path" type="String" />
+			<description>
+				Returns the resource stored under the path or key [param key_or_path], or [code]null[/code]. Paths can be given as [code]uid://[/code] paths too. Keys that are not paths are case-sensitive.
+			</description>
+		</method>
+		<method name="has_resource" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="key_or_path" type="String" />
+			<description>
+				Returns [code]true[/code] if a resource is stored under the path or key [param key_or_path].
+			</description>
+		</method>
+		<method name="is_preloading" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while a preload started with [method preload_from_list] on a worker thread has not finished (until its [signal preload_finished] is emitted).
+			</description>
+		</method>
+		<method name="preload_from_list">
+			<return type="int" enum="Error" />
+			<param index="0" name="list" type="PreloadList" />
+			<param index="1" name="use_threads" type="bool" default="true" />
+			<description>
+				Loads everything [param list] names and stores it: the resources of [member PreloadList.resources] under their path (or their [member Resource.resource_name] if they have no path), the files of [member PreloadList.paths] and [member PreloadList.manifests] under their resource path. Then the keys of [member PreloadList.keys] are added. Resources that are already loaded are not loaded again.
+				If [param use_threads] is [code]true[/code] and threads are available, the files load on a worker thread and the method returns at once; otherwise it returns when everything is loaded. [signal preload_finished] is emitted on the main thread in both cases.
+				Returns the first error found ([constant OK] if there was none). Files that fail to load are skipped; the others are still loaded.
+			</description>
+		</method>
+		<method name="preload_resource">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="key" type="String" default="&quot;&quot;" />
+			<description>
+				Loads the resource at [param path] now and stores it under its resource path. If [param key] is not empty, the resource can also be found by that key.
+			</description>
+		</method>
+		<method name="remove_matching">
+			<return type="int" />
+			<param index="0" name="pattern" type="String" />
+			<description>
+				Removes every entry whose path or key matches [param pattern] (see the class description) and returns the number of removed entries. An empty pattern matches every entry. Resources that nothing else references are freed.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="preload_finished">
+			<param index="0" name="list" type="PreloadList" />
+			<param index="1" name="error" type="int" enum="Error" />
+			<description>
+				Emitted on the main thread when [method preload_from_list] has loaded [param list]. [param error] is the first [enum Error] found, or [constant OK].
+			</description>
+		</signal>
+	</signals>
+</class>
