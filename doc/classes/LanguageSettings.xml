@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LanguageSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [LanguageSettingsServer]: locale, pseudolocalization, layout direction and auto-translate mode.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"language"[/code]. [LanguageSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/language.ini[/code]. Change the values through [method LanguageSettingsServer.set_locale] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		It can also be used as the project defaults of the domain: save a [LanguageSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/language[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="layout_direction" type="int" setter="set_layout_direction" getter="get_layout_direction" default="0">
+			The layout direction of the root window, one of the values of [enum Window.LayoutDirection]. [constant Window.LAYOUT_DIRECTION_INHERITED] follows [member ProjectSettings.internationalization/rendering/root_node_layout_direction].
+		</member>
+		<member name="locale" type="String" setter="set_locale" getter="get_locale" default="&quot;&quot;">
+			The locale chosen by the player, for example [code]"fr"[/code] or [code]"pt_BR"[/code]. An empty string follows the locale of the operating system (see [method OS.get_locale]), or [member ProjectSettings.internationalization/locale/test] if it is set. Leading and trailing spaces are removed.
+		</member>
+		<member name="pseudolocalization_enabled" type="bool" setter="set_pseudolocalization_enabled" getter="is_pseudolocalization_enabled" default="false">
+			If [code]true[/code], [TranslationServer] pseudolocalizes the texts (see [member TranslationServer.pseudolocalization_enabled]). Useful for testing and for players who help with translations.
+		</member>
+		<member name="root_auto_translate_mode" type="int" setter="set_root_auto_translate_mode" getter="get_root_auto_translate_mode" default="1">
+			The auto-translate mode of the root window, one of the values of [enum Node.AutoTranslateMode]. Its default comes from [member ProjectSettings.internationalization/rendering/root_node_auto_translate].
+		</member>
+	</members>
+</class>

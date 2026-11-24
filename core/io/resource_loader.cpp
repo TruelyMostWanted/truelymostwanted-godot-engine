@@ -35,6 +35,7 @@
 #include "core/core_bind.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/path_prefix_server.h"
 #include "core/io/resource_error_capture.h"
 #include "core/io/resource_importer.h"
 #include "core/object/callable_mp.h"
@@ -844,13 +845,22 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 }
 
 String ResourceLoader::_validate_local_path(const String &p_path) {
-	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(p_path);
+	// A registered prefix that resolves into `res://` or `uid://` loads like that path (cache, UIDs, remaps, PCK).
+	// Prefixes into `user://` keep their own resource path, so that saved references stay portable.
+	String path = p_path;
+	if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+		const String engine_path = PathPrefixServer::get_singleton()->resolve_engine_path(p_path);
+		if (engine_path.begins_with("res://") || engine_path.begins_with("uid://")) {
+			path = engine_path;
+		}
+	}
+	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(path);
 	if (uid != ResourceUID::INVALID_ID) {
 		return ResourceUID::get_singleton()->get_id_path(uid);
-	} else if (p_path.is_relative_path()) {
-		return ("res://" + p_path).simplify_path();
+	} else if (path.is_relative_path()) {
+		return ("res://" + path).simplify_path();
 	} else {
-		return ProjectSettings::get_singleton()->localize_path(p_path);
+		return ProjectSettings::get_singleton()->localize_path(path);
 	}
 }
 
