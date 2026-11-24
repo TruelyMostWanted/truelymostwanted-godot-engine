@@ -5,8 +5,8 @@
 	</brief_description>
 	<description>
 		A [ListSettingsServer] is a [SettingsServer] whose settings resource holds a list of entry resources in one typed [Array] property, for example the buses of an audio layout or the personas of a game. The entries are found by their index or by the value of a key property (see [method _get_entry_key]).
-		Every change of the list or of an entry emits [signal SettingsServer.value_changed] for the list property and, in [constant SettingsServer.APPLY_MODE_IMMEDIATE], applies the settings. The list property is the name that [method SettingsServer.get_dirty_values] and [signal SettingsServer.applied] report.
-		A list domain can be stored as CSV ([member ProjectSettings.settings/storage/format] [code]"csv"[/code]) if its settings resource has exactly one typed array of resources with simple properties (see [method ResourceTextSerializer.can_serialize] with [constant ResourceTextSerializer.FORMAT_CSV]). The file then has one row per entry. If the domain does not fit, INI is used and a warning is printed once.
+		Every change of the list or of an entry emits [signal SettingsServer.value_changed] for the list property and, in [constant SettingsServer.APPLY_MODE_IMMEDIATE], applies the settings. The list property is the name that [method SettingsServer.get_dirty_setting_names] and [signal SettingsServer.applied] report.
+		A list domain can be stored as CSV ([member ProjectSettings.settings/storage/format] set to [constant ResourceTextSerializer.FORMAT_CSV]) if its settings resource has exactly one typed array of resources with simple properties (see [method ResourceTextSerializer.can_serialize] with [constant ResourceTextSerializer.FORMAT_CSV]). The file then has one row per entry. If the domain does not fit, INI is used and a warning is printed once.
 		[codeblocks]
 		[gdscript]
 		# voices_settings.gd, listed in settings/startup/custom_servers.
@@ -65,6 +65,15 @@
 			<return type="StringName" />
 			<description>
 				Returns the name of the [Array] property of the settings resource that holds the entries. If it returns an empty [StringName] (the default), the first [Array] property of the settings resource is used.
+			</description>
+		</method>
+		<method name="_validate_entry_value" qualifiers="virtual const">
+			<return type="Variant" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="name" type="StringName" />
+			<param index="2" name="value" type="Variant" />
+			<description>
+				Returns the valid form of [param value] for the property [param name] of the entry at [param index], like [method SettingsServer._validate_value] does for single values. Called by [method set_entry_value] and for every entry value read by [method SettingsServer.load], after [param value] was checked against the range and enum hints of the entry's property. The default returns [param value] unchanged.
 			</description>
 		</method>
 		<method name="add_entry">
@@ -148,8 +157,8 @@
 			<param index="1" name="name" type="StringName" />
 			<param index="2" name="value" type="Variant" />
 			<description>
-				Sets the property [param name] of the entry at [param index]. Does nothing if the value does not change. Reports an error if [param index] is out of range or the entry has no such property. Emits [signal SettingsServer.value_changed] for the list property.
-				[b]Note:[/b] The value is not validated by [method SettingsServer._validate_value].
+				Sets the property [param name] of the entry at [param index]. The value is validated like a single value: a number is clamped to the range hint of the entry's property ([constant PROPERTY_HINT_RANGE]), a value that is not one of its enum values ([constant PROPERTY_HINT_ENUM]) is rejected with an error and the current value is kept, then [method _validate_entry_value] is called. Does nothing if the valid value does not change. Reports an error if [param index] is out of range or the entry has no such property. Emits [signal SettingsServer.value_changed] for the list property.
+				Entry values in a hand-edited settings file are validated the same way when it is loaded.
 			</description>
 		</method>
 	</methods>

@@ -1648,6 +1648,8 @@ void AudioServer::set_bus_layout(const Ref<AudioBusLayout> &p_bus_layout) {
 	unlock();
 
 	// Samples bus sync.
+
+	emit_signal(SNAME("bus_layout_changed"));
 }
 
 Ref<AudioBusLayout> AudioServer::generate_bus_layout() const {

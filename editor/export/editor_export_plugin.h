@@ -51,6 +51,12 @@ public:
 		Vector<String> products;
 	};
 
+	// A file or folder copied into the resources of an Apple app bundle, collected via add_bundle_resource().
+	struct BundleResource {
+		String path; // Source file or folder: `res://`, `user://` or an absolute OS path.
+		String target; // Path of the copy, relative to the bundle resources. Never empty.
+	};
+
 private:
 	String export_base_path;
 	Ref<EditorExportPreset> export_preset;
@@ -75,6 +81,8 @@ private:
 
 	Vector<String> macos_plugin_files;
 
+	Vector<BundleResource> bundle_resources;
+
 	_FORCE_INLINE_ void _clear() {
 		shared_objects.clear();
 		extra_files.clear();
@@ -90,6 +98,7 @@ private:
 		apple_embedded_platform_cpp_code = "";
 		apple_embedded_platform_spm_packages.clear();
 		macos_plugin_files.clear();
+		bundle_resources.clear();
 	}
 
 	// Export
@@ -119,6 +128,7 @@ protected:
 	void add_apple_embedded_platform_cpp_code(const String &p_code);
 	void add_apple_embedded_platform_spm_package(const String &p_url, const String &p_version, const PackedStringArray &p_products);
 	void add_macos_plugin_file(const String &p_path);
+	void add_bundle_resource(const String &p_path, const String &p_target = String());
 
 	void skip();
 
@@ -206,5 +216,10 @@ public:
 	String get_apple_embedded_platform_cpp_code() const;
 	Vector<AppleEmbeddedSPMPackage> get_apple_embedded_platform_spm_packages() const;
 	const Vector<String> &get_macos_plugin_files() const;
+	const Vector<BundleResource> &get_bundle_resources() const;
+	// Copies every registered bundle resource into `p_dest_dir` (macOS: `Contents/Resources`). Stops at the
+	// first failure and returns its source path in `r_failed_path`.
+	Error copy_bundle_resources(const String &p_dest_dir, String &r_failed_path) const;
+	static bool is_valid_bundle_target(const String &p_target);
 	Variant get_option(const StringName &p_name) const;
 };

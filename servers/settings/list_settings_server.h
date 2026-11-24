@@ -43,14 +43,17 @@ class ListSettingsServer : public SettingsServer {
 
 	Array _get_list() const;
 	void _set_list(const Array &p_list);
+	Variant _validate_entry(int p_index, const Ref<Resource> &p_entry, const StringName &p_name, const Variant &p_value) const;
 
 protected:
 	static void _bind_methods();
 
-	virtual String _get_default_extension() override;
+	virtual ResourceTextSerializer::Format _get_file_format() override;
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) override;
 
 	GDVIRTUAL0RC(StringName, _get_list_property)
 	GDVIRTUAL0RC(StringName, _get_entry_key)
+	GDVIRTUAL3RC(Variant, _validate_entry_value, int, StringName, Variant)
 
 public:
 	// The Array property with the entries; by default the first Array property of the settings resource.

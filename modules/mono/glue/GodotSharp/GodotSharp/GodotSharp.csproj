@@ -85,6 +85,7 @@
     <Compile Include="Core\Bridge\GCHandleBridge.cs" />
     <Compile Include="Core\Bridge\AlcReloadCfg.cs" />
     <Compile Include="Core\Bridge\ManagedCallbacks.cs" />
+    <Compile Include="Core\Bridge\RuntimeMetrics.cs" />
     <Compile Include="Core\Bridge\PropertyInfo.cs" />
     <Compile Include="Core\Bridge\ScriptManagerBridge.cs" />
     <Compile Include="Core\Bridge\ScriptManagerBridge.types.cs" />

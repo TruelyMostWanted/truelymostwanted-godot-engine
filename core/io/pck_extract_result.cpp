@@ -32,22 +32,22 @@
 
 #include "core/object/class_db.h"
 
-void PckExtractResult::_add_error(Error p_error, const String &p_message) {
+void PCKExtractResult::_add_error(Error p_error, const String &p_message) {
 	if (error == OK) {
 		error = p_error;
 	}
 	errors.push_back(p_message);
 }
 
-void PckExtractResult::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_error"), &PckExtractResult::get_error);
-	ClassDB::bind_method(D_METHOD("is_ok"), &PckExtractResult::is_ok);
-	ClassDB::bind_method(D_METHOD("get_written"), &PckExtractResult::get_written);
-	ClassDB::bind_method(D_METHOD("get_skipped"), &PckExtractResult::get_skipped);
-	ClassDB::bind_method(D_METHOD("get_renamed"), &PckExtractResult::get_renamed);
-	ClassDB::bind_method(D_METHOD("get_not_editable"), &PckExtractResult::get_not_editable);
-	ClassDB::bind_method(D_METHOD("get_dropped_uids"), &PckExtractResult::get_dropped_uids);
-	ClassDB::bind_method(D_METHOD("get_errors"), &PckExtractResult::get_errors);
+void PCKExtractResult::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_error"), &PCKExtractResult::get_error);
+	ClassDB::bind_method(D_METHOD("is_ok"), &PCKExtractResult::is_ok);
+	ClassDB::bind_method(D_METHOD("get_written"), &PCKExtractResult::get_written);
+	ClassDB::bind_method(D_METHOD("get_skipped"), &PCKExtractResult::get_skipped);
+	ClassDB::bind_method(D_METHOD("get_renamed"), &PCKExtractResult::get_renamed);
+	ClassDB::bind_method(D_METHOD("get_not_editable"), &PCKExtractResult::get_not_editable);
+	ClassDB::bind_method(D_METHOD("get_dropped_uids"), &PCKExtractResult::get_dropped_uids);
+	ClassDB::bind_method(D_METHOD("get_errors"), &PCKExtractResult::get_errors);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "error"), "", "get_error");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "written"), "", "get_written");
