@@ -81,6 +81,8 @@
 #include "servers/settings/audio_bus_settings_server.h"
 #include "servers/settings/audio_settings.h"
 #include "servers/settings/audio_settings_server.h"
+#include "servers/settings/language_settings.h"
+#include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
@@ -163,6 +165,7 @@ static TtsServer *tts_server = nullptr;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioSettingsServer *audio_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
+static LanguageSettingsServer *language_settings_server = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -201,6 +204,11 @@ void register_server_types() {
 	audio_bus_settings_server = memnew(AudioBusSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioBusSettingsServer", AudioBusSettingsServer::get_singleton(), "AudioBusSettingsServer"));
 	settings_server_manager->register_server(audio_bus_settings_server);
+	GDREGISTER_CLASS(LanguageSettings);
+	GDREGISTER_ABSTRACT_CLASS(LanguageSettingsServer);
+	language_settings_server = memnew(LanguageSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("LanguageSettingsServer", LanguageSettingsServer::get_singleton(), "LanguageSettingsServer"));
+	settings_server_manager->register_server(language_settings_server);
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -437,6 +445,8 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+	memdelete(language_settings_server);
+	language_settings_server = nullptr;
 	memdelete(audio_bus_settings_server);
 	audio_bus_settings_server = nullptr;
 	memdelete(audio_settings_server);
