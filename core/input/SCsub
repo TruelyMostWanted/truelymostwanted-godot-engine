@@ -17,5 +17,13 @@ gensource = env.CommandNoCache(
     env.Run(input_builders.make_default_controller_mappings),
 )
 
+# Godot's built-in input actions (`ui_*`) of InputMap::get_builtins().
+builtin_actions_source = env.CommandNoCache(
+    "builtin_input_actions.gen.cpp",
+    "builtin_input_actions.json",
+    env.Run(input_builders.make_builtin_input_actions),
+)
+
 env.add_source_files(env.core_sources, "*.cpp")
 env.add_source_files(env.core_sources, gensource)
+env.add_source_files(env.core_sources, builtin_actions_source)
