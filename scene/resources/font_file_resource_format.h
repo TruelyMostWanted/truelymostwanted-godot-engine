@@ -35,14 +35,14 @@
 
 // Loads font files that have no import (for example from `user://` or a mod folder) as `FontFile` at runtime:
 // dynamic fonts (TrueType, OpenType, WOFF, WOFF2, Type 1) and BMFont. Paths with a `.import` file are left
-// to `ResourceFormatImporter`.
+// to `ResourceFormatImporter`, unless the importer is "keep" or "skip" (the file is not imported).
 class ResourceFormatLoaderFontFile : public ResourceFormatLoader {
 	GDSOFTCLASS(ResourceFormatLoaderFontFile, ResourceFormatLoader);
 
 public:
 	virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = nullptr, bool p_use_sub_threads = false, float *r_progress = nullptr, CacheMode p_cache_mode = CACHE_MODE_REUSE) override;
 	virtual void get_recognized_extensions(List<String> *p_extensions) const override;
-	// Narrows the extension list: paths with a `.import` file are not recognized, so the importer keeps precedence.
+	// Narrows the extension list: imported paths (see `FontFileResourceFormat::is_imported_path()`) are not recognized, so the importer keeps precedence.
 	// The loader still recognizes paths by extension only, so it stays in ResourceLoader's extension index.
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const override;
 	virtual bool handles_type(const String &p_type) const override;
@@ -82,5 +82,8 @@ bool is_kind_valid_for_extension(DataKind p_kind, const String &p_extension);
 bool is_dynamic_font_extension(const String &p_extension);
 // Extensions read with `FontFile::load_bitmap_font()` (BMFont).
 bool is_bitmap_font_extension(const String &p_extension);
+// True if the path has a `.import` file whose importer imports it, so `ResourceFormatImporter` loads it.
+// False for no `.import` file and for the "keep" (Keep File) and "skip" (Skip File) importers.
+bool is_imported_path(const String &p_path);
 
 } // namespace FontFileResourceFormat

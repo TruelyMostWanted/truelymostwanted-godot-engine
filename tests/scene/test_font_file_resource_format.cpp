@@ -141,9 +141,20 @@ TEST_CASE("[FontFileResourceFormat] Imported paths are left to the importer") {
 	_write_file(source, _fake_sfnt());
 	_write_text(source + ".import", "[remap]\n\nimporter=\"font_data_dynamic\"\ntype=\"FontFile\"\n");
 
+	CHECK(FontFileResourceFormat::is_imported_path(source));
 	ResourceFormatLoaderFontFile loader;
 	CHECK_FALSE(loader.recognize_path(source));
 	CHECK(loader.get_resource_type(source).is_empty());
+
+	// "Keep File (exported as is)" and "Skip File" do not import: the runtime loader takes the file.
+	_write_text(source + ".import", "[remap]\n\nimporter=\"keep\"\n");
+	CHECK_FALSE(FontFileResourceFormat::is_imported_path(source));
+	CHECK(loader.recognize_path(source));
+	CHECK(loader.get_resource_type(source) == "FontFile");
+
+	_write_text(source + ".import", "[remap]\n\nimporter=\"skip\"\n");
+	CHECK_FALSE(FontFileResourceFormat::is_imported_path(source));
+	CHECK(loader.recognize_path(source));
 
 	DirAccess::remove_absolute(source + ".import");
 	CHECK(loader.recognize_path(source));

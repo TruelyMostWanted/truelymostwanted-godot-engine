@@ -30,6 +30,7 @@
 
 #include "font_file_resource_format.h"
 
+#include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include "scene/resources/font.h"
@@ -112,6 +113,20 @@ bool is_bitmap_font_extension(const String &p_extension) {
 	return false;
 }
 
+bool is_imported_path(const String &p_path) {
+	const String import_path = p_path + ".import";
+	if (!FileAccess::exists(import_path)) {
+		return false;
+	}
+	Ref<ConfigFile> config;
+	config.instantiate();
+	if (config->load(import_path) != OK) {
+		return true; // Unreadable `.import` file: leave the path to the importer, which reports the error.
+	}
+	const String importer = config->get_value("remap", "importer", String());
+	return importer != "keep" && importer != "skip";
+}
+
 } // namespace FontFileResourceFormat
 
 using namespace FontFileResourceFormat;
@@ -168,7 +183,7 @@ bool ResourceFormatLoaderFontFile::recognize_path(const String &p_path, const St
 		return false;
 	}
 	// Imported fonts are loaded by ResourceFormatImporter (same rule as the other source formats).
-	return !FileAccess::exists(p_path + ".import");
+	return !is_imported_path(p_path);
 }
 
 bool ResourceFormatLoaderFontFile::handles_type(const String &p_type) const {
@@ -180,7 +195,7 @@ String ResourceFormatLoaderFontFile::get_resource_type(const String &p_path) con
 	if (!is_dynamic_font_extension(extension) && !is_bitmap_font_extension(extension)) {
 		return String();
 	}
-	if (FileAccess::exists(p_path + ".import")) {
+	if (is_imported_path(p_path)) {
 		return String();
 	}
 	return "FontFile";
