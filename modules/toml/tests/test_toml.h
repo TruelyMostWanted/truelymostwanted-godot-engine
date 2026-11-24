@@ -504,7 +504,7 @@ TEST_CASE("[TOML] Stringify keeps key order and reads back") {
 
 TEST_CASE("[TOML] Resource round trip as text") {
 	const Ref<TOMLTestSettings> settings = make_toml_settings();
-	const String text = TOML::resource_to_toml(settings);
+	const String text = TOML::serialize(settings);
 	CHECK(text.begins_with("\"$type\" = \"TOMLTestSettings\"\n\"$format_version\" = 1\n"));
 	// Plain keys in property order, then sub-tables and arrays of tables in property order.
 	CHECK(text.find("volume = ") < text.find("title = "));
@@ -520,18 +520,18 @@ TEST_CASE("[TOML] Resource round trip as text") {
 	CHECK(text.contains("\"key with spaces\" = true"));
 	CHECK(text.count("\"$type\"") == 1);
 
-	check_toml_settings(TOML::toml_to_resource(text));
+	check_toml_settings(TOML::deserialize(text));
 
 	// Without "$type", the type hint gives the class.
 	const String untyped = text.replace("\"$type\" = \"TOMLTestSettings\"\n", "");
-	check_toml_settings(TOML::toml_to_resource(untyped, "TOMLTestSettings"));
+	check_toml_settings(TOML::deserialize(untyped, "TOMLTestSettings"));
 	ERR_PRINT_OFF;
-	CHECK(TOML::toml_to_resource(untyped).is_null());
+	CHECK(TOML::deserialize(untyped).is_null());
 	ERR_PRINT_ON;
 
-	const String numbers = TOML::resource_to_toml(settings, { { "enums_as_names", false } });
+	const String numbers = TOML::serialize(settings, { { "enums_as_names", false } });
 	CHECK(numbers.contains("mode = 5"));
-	check_toml_settings(TOML::toml_to_resource(numbers));
+	check_toml_settings(TOML::deserialize(numbers));
 }
 
 TEST_CASE("[TOML] Hand-written resource file") {
@@ -549,7 +549,7 @@ name = "Ann"
 level = 0x10
 offset = [1.5, 2]
 )";
-	const Ref<TOMLTestSettings> settings = TOML::toml_to_resource(text);
+	const Ref<TOMLTestSettings> settings = TOML::deserialize(text);
 	REQUIRE(settings.is_valid());
 	CHECK(settings->get_volume() == 1.0);
 	CHECK(settings->get_title() == "Literal \\ title");
@@ -572,6 +572,18 @@ TEST_CASE("[TOML] Through ResourceSaver and ResourceLoader") {
 	check_toml_settings(ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE));
 	check_toml_settings(ResourceLoader::load(path, "TOMLTestSettings", ResourceFormatLoader::CACHE_MODE_IGNORE));
 	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[TOML] Registered as text format \"toml\"") {
+	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
+	REQUIRE(serializer != nullptr);
+	CHECK(serializer->get_formats().has("toml"));
+	CHECK(serializer->has_format("toml"));
+
+	const Ref<TOMLTestSettings> settings = make_toml_settings();
+	const String text = serializer->serialize(settings, "toml");
+	CHECK(text == TOML::serialize(settings));
+	check_toml_settings(serializer->deserialize(text, "toml"));
 }
 
 } // namespace TestTOML

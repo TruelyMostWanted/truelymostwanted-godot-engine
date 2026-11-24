@@ -1,43 +1,52 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="ResourceTextSerializer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Converts any [Resource] to JSON, INI or CSV text and back, based on its stored properties.
+		Converts any [Resource] to JSON, INI, CSV, XML or TOML text and back, based on its stored properties.
 	</brief_description>
 	<description>
-		[ResourceTextSerializer] maps the properties of a [Resource] that have [constant @GlobalScope.PROPERTY_USAGE_STORAGE] to text that players and other tools can read and edit. The same mapping is used by [ResourceSaver] and [ResourceLoader] for the file extensions [code].json[/code], [code].ini[/code] and [code].csv[/code], so in most cases a call to [method ResourceSaver.save] and [method ResourceLoader.load] is all that is needed. The methods of this class do the same with strings, for example to send a resource over the network or to store it in a database.
+		[ResourceTextSerializer] maps the properties of a [Resource] that have [constant @GlobalScope.PROPERTY_USAGE_STORAGE] to text that players and other tools can read and edit. The same mapping is used by [ResourceSaver] and [ResourceLoader] for the file extensions [code].json[/code], [code].ini[/code], [code].csv[/code] and [code].xml[/code] (and [code].toml[/code] with the TOML module), so in most cases a call to [method ResourceSaver.save] and [method ResourceLoader.load] is all that is needed. [method serialize] and [method deserialize] do the same with strings, for example to send a resource over the network or to store it in a database. The format is given by name; [method get_formats] lists the available ones.
 		[codeblocks]
 		[gdscript]
 		var settings = AudioBusSettings.new() # A Resource with class_name AudioBusSettings.
 		settings.master_volume = 0.8
 		ResourceSaver.save(settings, "user://audio.json")
-		ResourceSaver.save(settings, "user://audio.ini")
+		ResourceSaver.save(settings, "user://audio.xml")
 
 		var loaded = ResourceLoader.load("user://audio.json") as AudioBusSettings
 		print(loaded.master_volume) # Prints 0.8
 
 		# The same as text, without a file:
-		var text = ResourceTextSerializer.resource_to_json(settings)
-		var copy = ResourceTextSerializer.json_to_resource(text)
+		var text = ResourceTextSerializer.serialize(settings, &amp;"xml")
+		var copy = ResourceTextSerializer.deserialize(text, &amp;"xml") as AudioBusSettings
+		print(ResourceTextSerializer.get_formats()) # Prints ["json", "ini", "csv", "xml", "toml"]
 		[/gdscript]
 		[csharp]
 		var settings = new AudioBusSettings(); // A [GlobalClass] Resource.
 		settings.MasterVolume = 0.8f;
 		ResourceSaver.Save(settings, "user://audio.json");
-		ResourceSaver.Save(settings, "user://audio.ini");
+		ResourceSaver.Save(settings, "user://audio.xml");
 
 		var loaded = ResourceLoader.Load&lt;AudioBusSettings&gt;("user://audio.json");
 		GD.Print(loaded.MasterVolume); // Prints 0.8
 
 		// The same as text, without a file:
-		string text = ResourceTextSerializer.ResourceToJson(settings);
-		var copy = (AudioBusSettings)ResourceTextSerializer.JsonToResource(text);
+		string text = ResourceTextSerializer.Serialize(settings, "xml");
+		var copy = (AudioBusSettings)ResourceTextSerializer.Deserialize(text, "xml");
+		GD.Print(string.Join(", ", ResourceTextSerializer.GetFormats())); // Prints json, ini, csv, xml, toml
 		[/csharp]
 		[/codeblocks]
-		[b]JSON:[/b] one object per resource. The root object has the keys [code]"$type"[/code] (the class name, for example [code]"AudioBusSettings"[/code]) and [code]"$format_version"[/code] (see [constant FORMAT_VERSION]), followed by one key per property in property order. Nested resources are nested objects, arrays of resources are arrays of objects. A nested object only has a [code]"$type"[/code] key if its class differs from the declared type of the property. A [code].json[/code] file without a [code]"$type"[/code] key that names a [Resource] class is still loaded as [JSON], as before; [method ResourceLoader.load] with a type hint (for example [code]load(path, "AudioBusSettings")[/code]) also reads such files as that type.
-		[b]INI:[/b] one section per resource. The root resource is in [code][root][/code] with the key [code]$type[/code]; a nested resource is in its own section named after its path, for example [code][root/entries/0][/code]. By default the values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). With [member ProjectSettings.filesystem/resources/text_formats/ini_plain_values] or the option [code]"plain"[/code], values are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code], [code]color=#ff0000ff[/code]), so other tools can read them. Both styles are read.
-		[b]CSV:[/b] only for list resources: a resource with exactly one typed array of resources (for example [code]Array[Entry][/code]) whose elements have only simple properties (no resources, arrays or dictionaries). The file has a header row with the property names and one row per element. A CSV file contains no type, so it must be loaded with a type hint: [code]ResourceLoader.load("user://voices.csv", "VoiceList")[/code]. A resource that does not fit gives an error and no file is written; check it first with [method can_save_as_csv].
+		[b]JSON[/b] ([code]"json"[/code]): one object per resource. The root object has the keys [code]"$type"[/code] (the class name, for example [code]"AudioBusSettings"[/code]) and [code]"$format_version"[/code] (see [constant FORMAT_VERSION]), followed by one key per property in property order. Nested resources are nested objects, arrays of resources are arrays of objects. A nested object only has a [code]"$type"[/code] key if its class differs from the declared type of the property. A [code].json[/code] file without a [code]"$type"[/code] key that names a [Resource] class is still loaded as [JSON], as before; [method ResourceLoader.load] with a type hint (for example [code]load(path, "AudioBusSettings")[/code]) also reads such files as that type.
+		[b]INI[/b] ([code]"ini"[/code]): one section per resource. The root resource is in [code][root][/code] with the key [code]$type[/code]; a nested resource is in its own section named after its path, for example [code][root/entries/0][/code]. By default the values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). With [member ProjectSettings.filesystem/resources/text_formats/ini_plain_values] or the option [code]"plain"[/code], values are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code], [code]color=#ff0000ff[/code]), so other tools can read them. Both styles are read.
+		[b]CSV[/b] ([code]"csv"[/code]): only for list resources: a resource with exactly one typed array of resources (for example [code]Array[Entry][/code]) whose elements have only simple properties (no resources, arrays or dictionaries). The file has a header row with the property names and one row per element. A CSV file contains no type, so it must be loaded with a type hint: [code]ResourceLoader.load("user://voices.csv", "VoiceList")[/code] or [code]deserialize(text, &amp;"csv", "VoiceList")[/code]. A resource that does not fit gives an error and no file is written; check it first with [method can_save_as_csv].
+		[b]XML[/b] ([code]"xml"[/code]): the root element [code]&lt;resource type="AudioBusSettings" format_version="1"&gt;[/code] has one child element per property, in property order: [code]&lt;master_volume&gt;0.8&lt;/master_volume&gt;[/code]. Integers, floats, booleans and strings are text; a float always has a [code].[/code] ([code]1.0[/code]). Nested resources and dictionaries are elements with one child element per key; a key that is not a valid XML name is written as [code]&lt;entry key="my key"&gt;[/code]. Arrays have [code]kind="array"[/code]: arrays of numbers (vectors, packed arrays) as one text ([code]&lt;offset kind="array"&gt;0.5, -2.0&lt;/offset&gt;[/code]), other arrays with one [code]&lt;item&gt;[/code] per element. [code]kind="string"[/code] marks a string that would otherwise be read as a number or boolean ([code]&lt;code kind="string"&gt;007&lt;/code&gt;[/code]), [code]kind="null"[/code] marks [code]null[/code], [code]kind="dictionary"[/code] an empty dictionary. A nested resource has a [code]type[/code] attribute only if its class differs from the declared type. Comments and CDATA sections are allowed when editing by hand. A [code].xml[/code] file is only loaded as a resource if its root element is [code]&lt;resource&gt;[/code] with a [code]type[/code] attribute that names a [Resource] class; other XML files are left to other loaders.
 		[b]Values:[/b] [Color] is written as [code]"#rrggbbaa"[/code] when that is exact, otherwise as an array of floats; vectors, rectangles and matrices as arrays of numbers; enums as their names (see [member ProjectSettings.filesystem/resources/text_formats/enums_as_names]); [StringName] and [NodePath] as strings. A resource that is saved in its own file is written as its path and loaded from that path. When loading, a key that is missing keeps the default value of the class, and an unknown key is skipped with a warning. Values are converted to the type of the property, so a hand-edited [code]"0.5"[/code] or [code]"yes"[/code] is accepted for a [float] or [bool] property.
-		[b]Note:[/b] JSON has only one number type. Integers above 2^53 lose precision, and properties of type [Variant] get [float] values back where [int] values were saved. In plain INI and in CSV, properties of type [Variant] come back as [String].
+		[b]Options[/b] of [method serialize] (options that are not given come from the project settings under [code]filesystem/resources/text_formats/[/code]):
+		- [code]"indent"[/code] ([String]): indentation of JSON and XML; an empty string writes one line.
+		- [code]"enums_as_names"[/code] ([bool]): enum properties as names or as numbers (all formats).
+		- [code]"plain"[/code] ([bool]): INI values without type syntax.
+		- [code]"delimiter"[/code] ([String], one character): CSV delimiter; also read by [method deserialize].
+		- [code]"defaults"[/code] ([Resource]): JSON and INI: values of the root resource that are equal to the same property of [code]"defaults"[/code] are not written (metadata is always written). Nested resources are written completely.
+		[b]Note:[/b] JSON has only one number type. Integers above 2^53 lose precision, and properties of type [Variant] get [float] values back where [int] values were saved. In plain INI and in CSV, properties of type [Variant] come back as [String]. XML and TOML keep [int], [float], [bool] and [String] apart.
 		[b]Note:[/b] [code].csv[/code] files in [code]res://[/code] are imported as translations by the editor. Keep CSV resources in [code]user://[/code], or set their importer to "Keep File" in the Import dock.
 		[b]Note:[/b] The methods of this class can be called from any thread.
 	</description>
@@ -51,13 +60,22 @@
 				Returns [code]true[/code] if [param resource] fits the CSV format: exactly one typed array of resources, elements of that type with only simple properties, and no other property that differs from its default value.
 			</description>
 		</method>
-		<method name="csv_to_resource" qualifiers="const">
+		<method name="deserialize" qualifiers="const">
 			<return type="Resource" />
 			<param index="0" name="text" type="String" />
-			<param index="1" name="type_hint" type="String" />
-			<param index="2" name="options" type="Dictionary" default="{}" />
+			<param index="1" name="format" type="StringName" />
+			<param index="2" name="type_hint" type="String" default="&quot;&quot;" />
+			<param index="3" name="options" type="Dictionary" default="{}" />
 			<description>
-				Creates a resource of the class [param type_hint] from CSV [param text]. The first row is the header with the property names of the list elements. The option [code]"delimiter"[/code] sets the delimiter (one character), the default comes from [member ProjectSettings.filesystem/resources/text_formats/csv_delimiter]. Returns [code]null[/code] and prints an error if the text can't be read.
+				Creates a resource from [param text] in the text format [param format] (see [method get_formats]). The class comes from the type stored in the text ([code]"$type"[/code] in JSON and TOML, [code]$type[/code] in the INI section [code][root][/code], the [code]type[/code] attribute of the XML root element), or from [param type_hint]. CSV text has no type, so [param type_hint] is required there. Option: [code]"delimiter"[/code] for CSV. Returns [code]null[/code] and prints an error if the text can't be read or the format is unknown.
+				[codeblocks]
+				[gdscript]
+				var list = ResourceTextSerializer.deserialize(csv_text, &amp;"csv", "VoiceList", { "delimiter": ";" })
+				[/gdscript]
+				[csharp]
+				var list = ResourceTextSerializer.Deserialize(csvText, "csv", "VoiceList", new Godot.Collections.Dictionary { { "delimiter", ";" } });
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="dictionary_to_resource" qualifiers="const">
@@ -68,28 +86,17 @@
 				Creates a resource from [param data], a [Dictionary] in the layout of [method resource_to_dictionary]. If [param data] has no [code]"$type"[/code] key, [param type_hint] gives the class. Returns [code]null[/code] and prints an error if no resource can be created.
 			</description>
 		</method>
-		<method name="ini_to_resource" qualifiers="const">
-			<return type="Resource" />
-			<param index="0" name="text" type="String" />
-			<param index="1" name="type_hint" type="String" default="&quot;&quot;" />
+		<method name="get_formats" qualifiers="const">
+			<return type="PackedStringArray" />
 			<description>
-				Creates a resource from INI [param text]. The class comes from the key [code]$type[/code] in the section [code][root][/code], or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read.
+				Returns the names of the text formats that [method serialize] and [method deserialize] accept, in the order they were registered: [code]"json"[/code], [code]"ini"[/code], [code]"csv"[/code] and [code]"xml"[/code] from the engine core, followed by formats of modules ([code]"toml"[/code] if the TOML module is part of the build).
 			</description>
 		</method>
-		<method name="json_to_resource" qualifiers="const">
-			<return type="Resource" />
-			<param index="0" name="text" type="String" />
-			<param index="1" name="type_hint" type="String" default="&quot;&quot;" />
+		<method name="has_format" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="format" type="StringName" />
 			<description>
-				Creates a resource from JSON [param text]. The class comes from the key [code]"$type"[/code] of the root object, or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read.
-			</description>
-		</method>
-		<method name="resource_to_csv" qualifiers="const">
-			<return type="String" />
-			<param index="0" name="resource" type="Resource" />
-			<param index="1" name="options" type="Dictionary" default="{}" />
-			<description>
-				Returns [param resource] as CSV text. Options: [code]"delimiter"[/code] (one character) and [code]"enums_as_names"[/code] ([bool]). Returns an empty string and prints an error if the resource does not fit CSV (see [method can_save_as_csv]).
+				Returns [code]true[/code] if [param format] is a registered text format (see [method get_formats]). Case and a leading dot are ignored, so [code]".JSON"[/code] is the same as [code]"json"[/code].
 			</description>
 		</method>
 		<method name="resource_to_dictionary" qualifiers="const">
@@ -97,29 +104,24 @@
 			<param index="0" name="resource" type="Resource" />
 			<param index="1" name="options" type="Dictionary" default="{}" />
 			<description>
-				Returns [param resource] as a [Dictionary] that contains only JSON types ([Dictionary], [Array], [String], numbers, booleans and [code]null[/code]): the same layout as the JSON format. Option: [code]"enums_as_names"[/code] ([bool]).
+				Returns [param resource] as a [Dictionary] that contains only JSON types ([Dictionary], [Array], [String], numbers, booleans and [code]null[/code]): the same layout as the JSON format. Options: [code]"enums_as_names"[/code] ([bool]) and [code]"defaults"[/code] ([Resource]): values of the root resource that are equal to the same property of [code]"defaults"[/code] are not written (metadata is always written).
 			</description>
 		</method>
-		<method name="resource_to_ini" qualifiers="const">
+		<method name="serialize" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="resource" type="Resource" />
-			<param index="1" name="options" type="Dictionary" default="{}" />
+			<param index="1" name="format" type="StringName" />
+			<param index="2" name="options" type="Dictionary" default="{}" />
 			<description>
-				Returns [param resource] as INI text. Options: [code]"plain"[/code] ([bool], values without type syntax) and [code]"enums_as_names"[/code] ([bool]).
-			</description>
-		</method>
-		<method name="resource_to_json" qualifiers="const">
-			<return type="String" />
-			<param index="0" name="resource" type="Resource" />
-			<param index="1" name="options" type="Dictionary" default="{}" />
-			<description>
-				Returns [param resource] as JSON text. Options: [code]"indent"[/code] ([String], an empty string writes one line) and [code]"enums_as_names"[/code] ([bool]). Options that are not given come from the project settings under [code]filesystem/resources/text_formats/[/code].
+				Returns [param resource] as text in the format [param format]: [code]&amp;"json"[/code], [code]&amp;"ini"[/code], [code]&amp;"csv"[/code], [code]&amp;"xml"[/code], or a format of a module such as [code]&amp;"toml"[/code] (see [method get_formats]). The text is the same that [ResourceSaver] writes into a file with that extension. See the class description for the [param options]. Returns an empty string and prints an error if the format is unknown or the resource can't be written (for example if it contains itself, or does not fit CSV).
 				[codeblocks]
 				[gdscript]
-				var compact = ResourceTextSerializer.resource_to_json(settings, { "indent": "", "enums_as_names": false })
+				var compact = ResourceTextSerializer.serialize(settings, &amp;"json", { "indent": "", "enums_as_names": false })
+				var xml = ResourceTextSerializer.serialize(settings, &amp;"xml")
 				[/gdscript]
 				[csharp]
-				string compact = ResourceTextSerializer.ResourceToJson(settings, new Godot.Collections.Dictionary { { "indent", "" }, { "enums_as_names", false } });
+				string compact = ResourceTextSerializer.Serialize(settings, "json", new Godot.Collections.Dictionary { { "indent", "" }, { "enums_as_names", false } });
+				string xml = ResourceTextSerializer.Serialize(settings, "xml");
 				[/csharp]
 				[/codeblocks]
 			</description>
@@ -127,7 +129,7 @@
 	</methods>
 	<constants>
 		<constant name="FORMAT_VERSION" value="1">
-			Version of the text layout. It is written as [code]"$format_version"[/code] into JSON files and into the INI section [code][root][/code]. A file with a higher version is read with a warning.
+			Version of the text layout. It is written as [code]"$format_version"[/code] into JSON and TOML files, into the INI section [code][root][/code] and as the attribute [code]format_version[/code] of the XML root element. A file with a higher version is read with a warning.
 		</constant>
 	</constants>
 </class>

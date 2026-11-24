@@ -228,3 +228,18 @@ bool ResourceFormatSaverResourceCSV::_can_save(const Ref<Resource> &p_resource) 
 	String error;
 	return ResourceTextSerializer::check_csv(p_resource, error) == OK;
 }
+
+/////////////////////////////////////////////////////////////////////////////
+// XML.
+
+Error ResourceFormatLoaderResourceXML::_parse_text(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error) const {
+	return ResourceTextSerializer::parse_xml(p_text, p_type_hint, r_resource, r_error);
+}
+
+String ResourceFormatLoaderResourceXML::_get_marker_type(const String &p_text) const {
+	return ResourceTextSerializer::get_xml_marker_type(p_text);
+}
+
+Error ResourceFormatSaverResourceXML::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
+	return ResourceTextSerializer::write_xml(p_resource, ResourceTextSerializer::get_default_options(), r_text, r_error);
+}

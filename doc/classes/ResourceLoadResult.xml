@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ResourceLoadResult" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The result of a resource load: the resource, or the error code and the loader's message.
+	</brief_description>
+	<description>
+		A [ResourceLoadResult] is returned by [method ResourceLoader.load_result] and [method ResourceLoader.load_threaded_get_result]. Unlike [method ResourceLoader.load], which returns [code]null[/code] on failure and only prints the reason, it tells the caller [i]why[/i] a load failed: [member error] is the [enum Error] code and [member error_message] is the message the loader printed. It is read-only after creation.
+		It is a [RefCounted] and not a struct because the binding layer (GDScript, C#, GDExtension) cannot expose C++ structs; like a value, it is freed automatically when no longer used.
+		[codeblocks]
+		[gdscript]
+		var result := ResourceLoader.load_result("res://levels/level_1.tres", "PackedScene")
+		if result.ok:
+			add_child(result.resource.instantiate())
+		elif result.error == ERR_FILE_NOT_FOUND:
+			print("No such level: ", result.path)
+		else:
+			push_error(result.error_message)
+		[/gdscript]
+		[csharp]
+		ResourceLoadResult result = ResourceLoader.LoadResult("res://levels/level_1.tres", "PackedScene");
+		if (result.Ok)
+		{
+		    AddChild(((PackedScene)result.Resource).Instantiate());
+		}
+		else if (result.Error == Error.FileNotFound)
+		{
+		    GD.Print("No such level: ", result.Path);
+		}
+		else
+		{
+		    GD.PushError(result.ErrorMessage);
+		}
+		[/csharp]
+		[/codeblocks]
+		In C#, [code]ResourceLoader.TryLoad&lt;T&gt;(path, out T resource)[/code] and [code]ResourceLoader.TryLoad&lt;T&gt;(path, out T resource, out Error error)[/code] wrap this class in the usual [code]Try[/code] pattern.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="error" type="int" setter="" getter="get_error" enum="Error" default="3">
+			[constant OK] if the load succeeded. Otherwise [constant ERR_FILE_NOT_FOUND] if there is no file at [member path], [constant ERR_INVALID_DATA] if the loaded resource is not of the requested type hint, [constant ERR_INVALID_PARAMETER] if [method ResourceLoader.load_threaded_get_result] was called without a request, or the code returned by the loader, for example [constant ERR_FILE_CORRUPT] or [constant ERR_PARSE_ERROR].
+		</member>
+		<member name="error_message" type="String" setter="" getter="get_error_message" default="&quot;&quot;">
+			Empty if the load succeeded. Otherwise the errors printed while the resource and its dependencies were loaded, one per line and oldest first (at most 16 lines), including those printed on worker threads of a threaded load. If nothing was printed, for example because a loader only returned an [enum Error] code, it is the name of [member error] followed by the path.
+		</member>
+		<member name="ok" type="bool" setter="" getter="is_ok" default="false">
+			[code]true[/code] if the load succeeded and [member resource] holds the resource; the same as [code]error == OK[/code].
+		</member>
+		<member name="path" type="String" setter="" getter="get_path" default="&quot;&quot;">
+			The path that was loaded, resolved as [ResourceLoader] resolves it: a [code]uid://[/code] path becomes the path of its file, a relative path is prefixed with [code]res://[/code], and a path inside the project is localized.
+		</member>
+		<member name="resource" type="Resource" setter="" getter="get_resource">
+			The loaded resource, the same (cached) instance that [method ResourceLoader.load] returns. [code]null[/code] if the load failed.
+		</member>
+	</members>
+</class>

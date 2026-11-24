@@ -502,6 +502,9 @@
 			If [code]true[/code], text-to-speech support is enabled on startup, otherwise it is enabled the first time any TTS method is used. See also [method DisplayServer.tts_get_voices] and [method DisplayServer.tts_speak].
 			[b]Note:[/b] Enabling TTS can cause additional idle CPU usage and interfere with the sleep mode, so consider disabling it if TTS is not used.
 		</member>
+		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.load_layout].
+		</member>
 		<member name="audio/video/video_delay_compensation_ms" type="int" setter="" getter="" default="0">
 			Setting to hardcode audio delay when playing video. Best to leave this unchanged unless you know what you are doing.
 		</member>
@@ -698,6 +701,17 @@
 		</member>
 		<member name="debug/gdscript/warnings/unused_variable" type="int" setter="" getter="" default="1">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when a local variable is unused.
+		</member>
+		<member name="debug/performance_recording/enabled" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [PerformanceRecorder] starts recording when the project starts, with the profile from [member debug/performance_recording/profile]. It does not start in the editor or the project manager. Use feature tags to enable it only for some exports, for example [code]debug/performance_recording/enabled.web[/code].
+			This can be specified on the command line with [code]--record-performance &lt;file&gt;[/code], which also sets the output path.
+		</member>
+		<member name="debug/performance_recording/output_path" type="String" setter="" getter="" default="&quot;&quot;">
+			If not empty, overrides [member PerformanceRecordingProfile.output_path] of the profile used at startup. Supports the placeholders [code]{date}[/code], [code]{time}[/code] and [code]{platform}[/code]. A path under [code]user://[/code] is recommended; on Web it is the only writable location.
+		</member>
+		<member name="debug/performance_recording/profile" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to a [PerformanceRecordingProfile] resource used when recording starts at startup. If empty, a new [PerformanceRecordingProfile] with its default columns is used.
+			This can be specified on the command line with [code]--record-performance-profile &lt;file&gt;[/code].
 		</member>
 		<member name="debug/settings/crash_handler/message" type="String" setter="" getter="" default="&quot;Please include this when reporting the bug to the project developer.&quot;">
 			Message to be displayed before the backtrace when the engine crashes. By default, this message is only used in exported projects due to the editor-only override applied to this setting.
@@ -3635,6 +3649,30 @@
 			- 8×4 = rgb(255, 170, 0) - #ffaa00 - Not supported on most hardware
 			- 8×8 = rgb(255, 255, 0) - #ffff00 - Not supported on most hardware
 			[/codeblock]
+		</member>
+		<member name="settings/apply/confirmation_timeout" type="float" setter="" getter="" default="15.0">
+			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_pending] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
+		</member>
+		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
+		</member>
+		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
+		</member>
+		<member name="settings/startup/custom_servers" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Scripts of the settings servers of your game: paths to [code].gd[/code] or [code].cs[/code] files (or the names of global classes) whose class extends [SettingsServer]. [SettingsServerManager] creates one instance of each in [constant SettingsServer.APPLY_PHASE_SCENE], registers it and frees it when the game exits. Not used in the editor and the project manager.
+		</member>
+		<member name="settings/storage/autosave" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_pending]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
+		</member>
+		<member name="settings/storage/folder" type="String" setter="" getter="" default="&quot;user://settings&quot;">
+			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
+		</member>
+		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
+			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_save_as_csv]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+		</member>
+		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
 		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">
 			The ratio of [WorkerThreadPool]'s threads that will be reserved for low-priority tasks. For example, if 10 threads are available and this value is set to [code]0.3[/code], 3 of the worker threads will be reserved for low-priority tasks. The actual value won't exceed the number of CPU cores minus one, and if possible, at least one worker thread will be dedicated to low-priority tasks.
