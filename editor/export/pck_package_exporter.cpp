@@ -97,10 +97,11 @@ bool _is_sidecar(const String &p_path) {
 
 } // namespace
 
-PCKPackageExporter::Plan PCKPackageExporter::make_plan(const Ref<PCKPackage> &p_description) {
-	Plan plan;
+Ref<PCKBuildPlan> PCKPackageExporter::plan_description(const Ref<PCKPackage> &p_description) {
+	Ref<PCKBuildPlan> plan;
+	plan.instantiate();
 	if (p_description.is_null()) {
-		plan.errors.push_back("The description is null.");
+		plan->errors.push_back("The description is null.");
 		return plan;
 	}
 
@@ -109,20 +110,20 @@ PCKPackageExporter::Plan PCKPackageExporter::make_plan(const Ref<PCKPackage> &p_
 	for (const KeyValue<String, PCKPackage::Entry> &kv : p_description->get_entry_map()) {
 		const PCKPackage::Entry &entry = kv.value;
 		if (entry.removal) {
-			plan.removals.push_back(kv.key);
+			plan->removals.push_back(kv.key);
 			continue;
 		}
 		if (entry.delta) {
-			plan.errors.push_back(vformat("\"%s\" is a delta patch: packs with delta patches can't be rebuilt.", kv.key));
+			plan->errors.push_back(vformat("\"%s\" is a delta patch: packs with delta patches can't be rebuilt.", kv.key));
 			continue;
 		}
 		if (entry.source_type != PCKPackage::SOURCE_FILE || !entry.source_path.begins_with("res://")) {
-			plan.raw_files.push_back(kv.key);
+			plan->raw_files.push_back(kv.key);
 			continue;
 		}
 		const String source = entry.source_path.simplify_path();
 		if (source.trim_prefix("res://") != kv.key) {
-			plan.errors.push_back(vformat("\"%s\": the target must be the source path \"%s\", because the export keeps \"res://\" paths. Rename the target or copy the source.", kv.key, source.trim_prefix("res://")));
+			plan->errors.push_back(vformat("\"%s\": the target must be the source path \"%s\", because the export keeps \"res://\" paths. Rename the target or copy the source.", kv.key, source.trim_prefix("res://")));
 			continue;
 		}
 		if (_is_sidecar(source)) {
@@ -130,30 +131,19 @@ PCKPackageExporter::Plan PCKPackageExporter::make_plan(const Ref<PCKPackage> &p_
 			continue;
 		}
 		sources.insert(source);
-		plan.export_sources.push_back(source);
+		plan->export_sources.push_back(source);
 	}
 
 	// The export writes `.import`, `.remap` and `.uid` files for their source. Listed alone, they would be
 	// exported without the file they describe.
 	for (const String &sidecar : sidecars) {
 		if (sources.has("res://" + sidecar.get_basename())) {
-			plan.skipped.push_back(sidecar);
+			plan->skipped.push_back(sidecar);
 		} else {
-			plan.errors.push_back(vformat("\"%s\": add its source \"%s\" instead; the export writes this file for it.", sidecar, sidecar.get_basename()));
+			plan->errors.push_back(vformat("\"%s\": add its source \"%s\" instead; the export writes this file for it.", sidecar, sidecar.get_basename()));
 		}
 	}
 	return plan;
-}
-
-Dictionary PCKPackageExporter::plan_description(const Ref<PCKPackage> &p_description) {
-	const Plan plan = make_plan(p_description);
-	Dictionary result;
-	result["export_sources"] = plan.export_sources;
-	result["raw_files"] = plan.raw_files;
-	result["removals"] = plan.removals;
-	result["skipped"] = plan.skipped;
-	result["errors"] = plan.errors;
-	return result;
 }
 
 bool PCKPackageExporter::matches_encryption_filters(const String &p_path, const PackedStringArray &p_include_filters, const PackedStringArray &p_exclude_filters) {
@@ -378,17 +368,17 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	ERR_FAIL_COND_V_MSG(server && server->is_mounted(p_target_path), ERR_BUSY, vformat("Pack \"%s\" is mounted: unmount it before building over it.", p_target_path));
 
-	const Plan plan = make_plan(p_description);
-	ERR_FAIL_COND_V_MSG(!plan.errors.is_empty(), ERR_INVALID_PARAMETER, vformat("Can't export pack description to \"%s\": %s", p_target_path, String(" ").join(plan.errors)));
+	const Ref<PCKBuildPlan> plan = plan_description(p_description);
+	ERR_FAIL_COND_V_MSG(!plan->is_valid(), ERR_INVALID_PARAMETER, vformat("Can't export pack description to \"%s\": %s", p_target_path, String(" ").join(plan->errors)));
 
 	const HashMap<String, PCKPackage::Entry> &entries = p_description->get_entry_map();
 	PackedStringArray missing;
-	for (const String &source : plan.export_sources) {
+	for (const String &source : plan->export_sources) {
 		if (!FileAccess::exists(source)) {
 			missing.push_back(source);
 		}
 	}
-	for (const String &path : plan.raw_files) {
+	for (const String &path : plan->raw_files) {
 		const PCKPackage::Entry &entry = entries[path];
 		if (entry.source_type == PCKPackage::SOURCE_FILE && !FileAccess::exists(entry.source_path)) {
 			missing.push_back(entry.source_path);
@@ -397,7 +387,7 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 	ERR_FAIL_COND_V_MSG(!missing.is_empty(), ERR_FILE_NOT_FOUND, vformat("Can't export pack description to \"%s\": %d source files are missing: %s.", p_target_path, missing.size(), String(", ").join(missing)));
 
 	PackState state;
-	for (const String &source : plan.export_sources) {
+	for (const String &source : plan->export_sources) {
 		if (p_include_dependencies) {
 			_add_dependencies(source, state.wanted);
 		} else {
@@ -407,7 +397,7 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 			state.encrypted_sources.insert(source);
 		}
 	}
-	for (const String &path : plan.raw_files) {
+	for (const String &path : plan->raw_files) {
 		state.raw_paths.insert(path);
 	}
 
@@ -428,8 +418,8 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 		return err;
 	}
 
-	if (!plan.export_sources.is_empty()) {
-		const Ref<EditorExportPreset> pack_preset = _make_pack_preset(p_preset, plan.export_sources);
+	if (!plan->export_sources.is_empty()) {
+		const Ref<EditorExportPreset> pack_preset = _make_pack_preset(p_preset, plan->export_sources);
 		if (pack_preset.is_null()) {
 			err = ERR_CANT_CREATE;
 		} else {
@@ -447,7 +437,7 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 
 	PackedStringArray not_exported;
 	if (err == OK) {
-		for (const String &source : plan.export_sources) {
+		for (const String &source : plan->export_sources) {
 			if (!state.exported_sources.has(source)) {
 				not_exported.push_back(source);
 			}
@@ -457,8 +447,8 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 		}
 	}
 
-	for (int i = 0; err == OK && i < plan.raw_files.size(); i++) {
-		const String &path = plan.raw_files[i];
+	for (int i = 0; err == OK && i < plan->raw_files.size(); i++) {
+		const String &path = plan->raw_files[i];
 		Vector<uint8_t> data;
 		err = p_description->read_entry(path, data);
 		if (err == OK) {
@@ -466,8 +456,8 @@ Error PCKPackageExporter::export_description_with_preset(const Ref<PCKPackage> &
 			err = state.packer->add_file_from_buffer(path, data, encrypt);
 		}
 	}
-	for (int i = 0; err == OK && i < plan.removals.size(); i++) {
-		err = state.packer->add_file_removal(plan.removals[i]);
+	for (int i = 0; err == OK && i < plan->removals.size(); i++) {
+		err = state.packer->add_file_removal(plan->removals[i]);
 	}
 
 	const Error flush_err = state.packer->flush();

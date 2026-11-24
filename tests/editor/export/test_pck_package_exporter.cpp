@@ -45,7 +45,7 @@ static Vector<uint8_t> bytes(const String &p_text) {
 	return p_text.to_utf8_buffer();
 }
 
-TEST_CASE("[PCKPackageExporter] make_plan sorts the entries") {
+TEST_CASE("[PCKPackageExporter] plan_description sorts the entries") {
 	Ref<PCKPackage> description;
 	description.instantiate();
 	REQUIRE(description->add_file("art/a.png", "res://art/a.png") == OK);
@@ -54,83 +54,86 @@ TEST_CASE("[PCKPackageExporter] make_plan sorts the entries") {
 	REQUIRE(description->add_file_from_buffer("data/c.json", bytes("{}")) == OK);
 	REQUIRE(description->add_removal("old/d.png") == OK);
 
-	const Exporter::Plan plan = Exporter::make_plan(description);
-	CHECK(plan.errors.is_empty());
-	CHECK(plan.export_sources.size() == 2);
-	CHECK(plan.export_sources.has("res://art/a.png"));
-	CHECK(plan.export_sources.has("res://scenes/b.tscn"));
-	CHECK(plan.raw_files.size() == 2);
-	CHECK(plan.raw_files.has("config/user.cfg"));
-	CHECK(plan.raw_files.has("data/c.json"));
-	CHECK(plan.removals.size() == 1);
-	CHECK(plan.removals[0] == "old/d.png");
-	CHECK(plan.skipped.is_empty());
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(description);
+	CHECK(plan->get_errors().is_empty());
+	CHECK(plan->get_export_sources().size() == 2);
+	CHECK(plan->get_export_sources().has("res://art/a.png"));
+	CHECK(plan->get_export_sources().has("res://scenes/b.tscn"));
+	CHECK(plan->get_raw_files().size() == 2);
+	CHECK(plan->get_raw_files().has("config/user.cfg"));
+	CHECK(plan->get_raw_files().has("data/c.json"));
+	CHECK(plan->get_removals().size() == 1);
+	CHECK(plan->get_removals()[0] == "old/d.png");
+	CHECK(plan->get_skipped().is_empty());
 }
 
-TEST_CASE("[PCKPackageExporter] make_plan refuses renamed res:// targets") {
+TEST_CASE("[PCKPackageExporter] plan_description refuses renamed res:// targets") {
 	Ref<PCKPackage> description;
 	description.instantiate();
 	REQUIRE(description->add_file("textures/a.png", "res://art/a.png") == OK);
 	REQUIRE(description->add_file("art/b.png", "res://art/./b.png") == OK);
 
-	const Exporter::Plan plan = Exporter::make_plan(description);
-	REQUIRE(plan.errors.size() == 1);
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(description);
+	REQUIRE(plan->get_errors().size() == 1);
 	// The message names the entry and the source.
-	CHECK(plan.errors[0].contains("textures/a.png"));
-	CHECK(plan.errors[0].contains("art/a.png"));
+	CHECK(plan->get_errors()[0].contains("textures/a.png"));
+	CHECK(plan->get_errors()[0].contains("art/a.png"));
 	// A source that only needs simplifying is not renamed.
-	CHECK(plan.export_sources.size() == 1);
-	CHECK(plan.export_sources[0] == "res://art/b.png");
+	CHECK(plan->get_export_sources().size() == 1);
+	CHECK(plan->get_export_sources()[0] == "res://art/b.png");
 }
 
-TEST_CASE("[PCKPackageExporter] make_plan handles .import, .remap and .uid entries") {
+TEST_CASE("[PCKPackageExporter] plan_description handles .import, .remap and .uid entries") {
 	Ref<PCKPackage> description;
 	description.instantiate();
 	REQUIRE(description->add_file("art/a.png", "res://art/a.png") == OK);
 	REQUIRE(description->add_file("art/a.png.import", "res://art/a.png.import") == OK);
 	REQUIRE(description->add_file("scripts/s.gd.uid", "res://scripts/s.gd.uid") == OK);
 
-	const Exporter::Plan plan = Exporter::make_plan(description);
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(description);
 	// The export writes the .import file of a.png itself.
-	CHECK(plan.skipped.size() == 1);
-	CHECK(plan.skipped[0] == "art/a.png.import");
+	CHECK(plan->get_skipped().size() == 1);
+	CHECK(plan->get_skipped()[0] == "art/a.png.import");
 	// A sidecar without its source can't be exported.
-	REQUIRE(plan.errors.size() == 1);
-	CHECK(plan.errors[0].contains("scripts/s.gd.uid"));
-	CHECK(plan.export_sources.size() == 1);
+	REQUIRE(plan->get_errors().size() == 1);
+	CHECK(plan->get_errors()[0].contains("scripts/s.gd.uid"));
+	CHECK(plan->get_export_sources().size() == 1);
 }
 
-TEST_CASE("[PCKPackageExporter] make_plan copies sidecars from outside res:// as they are") {
+TEST_CASE("[PCKPackageExporter] plan_description copies sidecars from outside res:// as they are") {
 	Ref<PCKPackage> description;
 	description.instantiate();
 	REQUIRE(description->add_file("mods/x.png.import", "user://mods/x.png.import") == OK);
 
-	const Exporter::Plan plan = Exporter::make_plan(description);
-	CHECK(plan.errors.is_empty());
-	CHECK(plan.raw_files.size() == 1);
-	CHECK(plan.export_sources.is_empty());
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(description);
+	CHECK(plan->get_errors().is_empty());
+	CHECK(plan->get_raw_files().size() == 1);
+	CHECK(plan->get_export_sources().is_empty());
 }
 
-TEST_CASE("[PCKPackageExporter] make_plan with a null description") {
-	const Exporter::Plan plan = Exporter::make_plan(Ref<PCKPackage>());
-	CHECK(plan.errors.size() == 1);
+TEST_CASE("[PCKPackageExporter] plan_description with a null description") {
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(Ref<PCKPackage>());
+	CHECK(plan->get_errors().size() == 1);
 }
 
-TEST_CASE("[PCKPackageExporter] plan_description returns a dictionary") {
+TEST_CASE("[PCKPackageExporter] plan_description returns a PCKBuildPlan") {
 	Ref<PCKPackage> description;
 	description.instantiate();
 	REQUIRE(description->add_file("art/a.png", "res://art/a.png") == OK);
 	REQUIRE(description->add_removal("old/d.png") == OK);
 
-	const Dictionary plan = Exporter::plan_description(description);
-	CHECK(plan.has("export_sources"));
-	CHECK(plan.has("raw_files"));
-	CHECK(plan.has("removals"));
-	CHECK(plan.has("skipped"));
-	CHECK(plan.has("errors"));
-	CHECK(PackedStringArray(plan["export_sources"]).size() == 1);
-	CHECK(PackedStringArray(plan["removals"]).size() == 1);
-	CHECK(PackedStringArray(plan["errors"]).is_empty());
+	const Ref<PCKBuildPlan> plan = Exporter::plan_description(description);
+	REQUIRE(plan.is_valid());
+	CHECK(plan->is_valid());
+	CHECK(bool(plan->get("valid")));
+	CHECK(PackedStringArray(plan->get("export_sources")).size() == 1);
+	CHECK(PackedStringArray(plan->get("removals")).size() == 1);
+	CHECK(PackedStringArray(plan->get("errors")).is_empty());
+
+	CHECK(plan->get_export_sources()[0] == "res://art/a.png");
+
+	const Ref<PCKBuildPlan> invalid = Exporter::plan_description(Ref<PCKPackage>());
+	CHECK_FALSE(invalid->is_valid());
 }
 
 TEST_CASE("[PCKPackageExporter] matches_encryption_filters") {
