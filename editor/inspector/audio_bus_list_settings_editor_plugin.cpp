@@ -314,7 +314,11 @@ bool EditorInspectorPluginAudioBusListSettings::can_handle(Object *p_object) {
 	return Object::cast_to<AudioBusListSettings>(p_object) != nullptr;
 }
 
-void EditorInspectorPluginAudioBusListSettings::parse_begin(Object *p_object) {
+void EditorInspectorPluginAudioBusListSettings::parse_category(Object *p_object, const String &p_category) {
+	// Below the class header of AudioBusListSettings, like the class's own properties.
+	if (p_category != "AudioBusListSettings") {
+		return;
+	}
 	Ref<AudioBusListSettings> settings(Object::cast_to<AudioBusListSettings>(p_object));
 	if (settings.is_null()) {
 		return;
