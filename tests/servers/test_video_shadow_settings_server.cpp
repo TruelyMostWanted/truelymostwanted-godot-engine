@@ -335,7 +335,11 @@ TEST_CASE("[VideoShadowSettingsServer] Typed signals fire once per applied chang
 	server->reset_to_defaults();
 	SIGNAL_CHECK_FALSE("directional_shadow_atlas_size_changed");
 	CHECK(server->apply() == OK);
-	const Array default_args = { { default_value } };
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
 	SIGNAL_CHECK("directional_shadow_atlas_size_changed", default_args);
 
 	SIGNAL_UNWATCH(server, "directional_shadow_atlas_size_changed");
