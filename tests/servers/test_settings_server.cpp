@@ -108,7 +108,7 @@ protected:
 		}
 	}
 
-	virtual void _retrieve_settings(const Ref<Resource> &p_settings) override {
+	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override {
 		p_settings->set("quality", TestEngine::quality);
 	}
 
@@ -217,7 +217,7 @@ struct TestSetup {
 	}
 	~TestSetup() {
 		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/format", "ini");
+		ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
 	}
 };
 
@@ -245,7 +245,8 @@ TEST_CASE("[SettingsServer] Manager singleton, registration and project settings
 	CHECK(Engine::get_singleton()->has_singleton("SettingsServerManager"));
 	CHECK(ProjectSettings::get_singleton()->has_setting("settings/storage/folder"));
 	CHECK(ProjectSettings::get_singleton()->has_setting("settings/startup/apply_on_startup"));
-	CHECK(SettingsServer::get_storage_folder() == "user://settings");
+	CHECK(manager->get_storage_folder() == "user://settings");
+	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_INI);
 
 	TestDomainServer *server = memnew(TestDomainServer);
 	CHECK(manager->register_server(server) == OK);
@@ -253,6 +254,14 @@ TEST_CASE("[SettingsServer] Manager singleton, registration and project settings
 	CHECK(manager->get_server("test_domain") == server);
 	CHECK(manager->get_domains().has("test_domain"));
 	CHECK(server->get_file_path() == "user://settings/test_domain.ini");
+
+	// The format is an enum; a name written by hand into project.godot is accepted too.
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_JSON);
+	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_JSON);
+	CHECK(server->get_file_path() == "user://settings/test_domain.json");
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", "json");
+	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_JSON);
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
 
 	TestDomainServer *duplicate = memnew(TestDomainServer);
 	ERR_PRINT_OFF;
@@ -324,7 +333,7 @@ TEST_CASE("[SettingsServer] revert() after set_value() gives back the applied st
 	server->set_value("volume", 0.9);
 	server->set_value("quality", 2);
 	CHECK(server->is_dirty());
-	CHECK(server->get_dirty_values().size() == 2);
+	CHECK(server->get_dirty_setting_names().size() == 2);
 	CHECK(TestEngine::volume == doctest::Approx(0.25));
 
 	server->revert();
@@ -340,9 +349,9 @@ TEST_CASE("[SettingsServer] revert() after set_value() gives back the applied st
 	memdelete(server);
 }
 
-TEST_CASE("[SettingsServer] Save, restart and apply on startup (INI and JSON)") {
+TEST_CASE("[SettingsServer] Save, restart and apply on startup (INI, JSON and XML)") {
 	TestSetup setup;
-	for (const String &extension : { String("ini"), String("json") }) {
+	for (const String &extension : { String("ini"), String("json"), String("xml") }) {
 		const String path = temp_file("startup." + extension);
 		// Every round starts from the project defaults of the engine.
 		TestEngine::volume = 0.5;
@@ -463,7 +472,7 @@ TEST_CASE("[SettingsServer] Confirmation keeps or reverts the applied values") {
 	server->set_value("quality", 2);
 	CHECK(server->is_confirmation_pending());
 	CHECK(TestEngine::quality == 2);
-	server->cancel_pending();
+	server->cancel_confirmation();
 	CHECK_FALSE(server->is_confirmation_pending());
 	CHECK(TestEngine::quality == 1);
 	CHECK(int(server->get_value("quality")) == 1);
@@ -473,7 +482,7 @@ TEST_CASE("[SettingsServer] Confirmation keeps or reverts the applied values") {
 	server->set_value("quality", 0);
 	CHECK(server->is_confirmation_pending());
 	CHECK(server->get_confirmation_time_left() > 0.0);
-	server->confirm_pending();
+	server->confirm_changes();
 	CHECK(TestEngine::quality == 0);
 	CHECK(int(server->get_applied_value("quality")) == 0);
 	const Array kept_args = { { true } };
@@ -509,7 +518,7 @@ TEST_CASE("[SettingsServer] Restart flags and values without an engine target") 
 	server->set_value("quality", 2);
 	CHECK(TestEngine::quality == 1);
 	CHECK(server->apply_calls == 0);
-	CHECK(server->get_restart_values() == PackedStringArray({ "quality" }));
+	CHECK(server->get_restart_required_names() == PackedStringArray({ "quality" }));
 	Array restart_args;
 	restart_args.push_back(Array({ Variant(PackedStringArray({ "quality" })) }));
 	SIGNAL_CHECK("restart_required", restart_args);
@@ -534,7 +543,7 @@ TEST_CASE("[SettingsServer] Autosave writes once after apply") {
 
 TEST_CASE("[SettingsServer] List domain: entries and the same values in CSV, JSON and INI") {
 	TestSetup setup;
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", "csv");
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
 	TestListServer *server = memnew(TestListServer);
 	CHECK(server->get_file_path() == "user://settings/test_list.csv");
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
@@ -574,7 +583,7 @@ TEST_CASE("[SettingsServer] List domain: entries and the same values in CSV, JSO
 
 TEST_CASE("[SettingsServer] Single domains fall back from CSV to INI") {
 	TestSetup setup;
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", "csv");
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
 	TestDomainServer *server = memnew(TestDomainServer);
 	ERR_PRINT_OFF;
 	CHECK(server->get_file_path().get_extension() == "ini");
@@ -603,6 +612,7 @@ TEST_CASE("[SettingsServer] Manager startup applies registered domains") {
 	CHECK(server->is_started());
 	CHECK(TestEngine::quality == 0);
 	CHECK(manager->get_startup_phase() >= SettingsServer::APPLY_PHASE_SERVERS);
+	CHECK(manager->get_startup_phase() != SettingsServer::APPLY_PHASE_NONE);
 
 	// Registered after its phase: started at once.
 	TestDomainServer *late = memnew(TestDomainServer);
