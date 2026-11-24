@@ -126,12 +126,12 @@ int64_t SeedServer::get_global_seed() const {
 	return (int64_t)global_seed;
 }
 
-int64_t SeedServer::text_to_seed(const String &p_text) const {
+int64_t SeedServer::get_seed_from_text(const String &p_text) const {
 	return (int64_t)_splitmix64(_fnv1a_64(p_text));
 }
 
 int64_t SeedServer::set_seed_from_text(const String &p_text) {
-	const int64_t seed = text_to_seed(p_text);
+	const int64_t seed = get_seed_from_text(p_text);
 	set_global_seed(seed);
 	return seed;
 }
@@ -221,7 +221,7 @@ bool SeedServer::has_noise(const String &p_name) const {
 	return noises.has(p_name);
 }
 
-void SeedServer::remove_noise(const String &p_name) {
+void SeedServer::unregister_noise(const String &p_name) {
 	MutexLock lock(mutex);
 	noises.erase(p_name);
 }
@@ -278,7 +278,7 @@ void SeedServer::clear() {
 void SeedServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_global_seed", "seed"), &SeedServer::set_global_seed);
 	ClassDB::bind_method(D_METHOD("get_global_seed"), &SeedServer::get_global_seed);
-	ClassDB::bind_method(D_METHOD("text_to_seed", "text"), &SeedServer::text_to_seed);
+	ClassDB::bind_method(D_METHOD("get_seed_from_text", "text"), &SeedServer::get_seed_from_text);
 	ClassDB::bind_method(D_METHOD("set_seed_from_text", "text"), &SeedServer::set_seed_from_text);
 	ClassDB::bind_method(D_METHOD("randomize_seed"), &SeedServer::randomize_seed);
 	ClassDB::bind_method(D_METHOD("get_derived_seed", "name"), &SeedServer::get_derived_seed);
@@ -293,7 +293,7 @@ void SeedServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_noise", "name"), &SeedServer::get_noise);
 	ClassDB::bind_method(D_METHOD("register_noise", "name", "noise"), &SeedServer::register_noise);
 	ClassDB::bind_method(D_METHOD("has_noise", "name"), &SeedServer::has_noise);
-	ClassDB::bind_method(D_METHOD("remove_noise", "name"), &SeedServer::remove_noise);
+	ClassDB::bind_method(D_METHOD("unregister_noise", "name"), &SeedServer::unregister_noise);
 	ClassDB::bind_method(D_METHOD("get_noise_names"), &SeedServer::get_noise_names);
 
 	ClassDB::bind_method(D_METHOD("get_state"), &SeedServer::get_state);

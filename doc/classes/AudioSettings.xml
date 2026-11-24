@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [AudioSettingsServer]: the audio output and input device.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"audio"[/code]. [AudioSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/audio.ini[/code]. Change the values through [method AudioSettingsServer.set_output_device] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		It can also be used as the project defaults of the domain: save an [AudioSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/audio[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="input_device" type="String" setter="set_input_device" getter="get_input_device" default="&quot;Default&quot;">
+			The name of the input device, as listed by [method AudioServer.get_input_device_list]. [code]"Default"[/code] is the default device of the system. An empty string is stored as [code]"Default"[/code].
+		</member>
+		<member name="output_device" type="String" setter="set_output_device" getter="get_output_device" default="&quot;Default&quot;">
+			The name of the output device, as listed by [method AudioServer.get_output_device_list]. [code]"Default"[/code] is the default device of the system. An empty string is stored as [code]"Default"[/code].
+		</member>
+	</members>
+</class>

@@ -31,6 +31,7 @@
 #include "register_types.h"
 
 #include "audio_stream_mp3.h"
+#include "audio_stream_mp3_resource_format.h"
 
 #include "core/io/resource_importer.h"
 #include "core/object/class_db.h"
@@ -54,9 +55,15 @@ static void _editor_init() {
 }
 #endif
 
+static Ref<ResourceFormatLoaderAudioStreamMP3> resource_loader_mp3;
+
 void initialize_mp3_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
 		GDREGISTER_CLASS(AudioStreamMP3);
+
+		// Not at the front: ResourceFormatImporter keeps precedence for imported MP3 files.
+		resource_loader_mp3.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_mp3);
 	}
 
 #ifdef TOOLS_ENABLED
@@ -69,4 +76,8 @@ void initialize_mp3_module(ModuleInitializationLevel p_level) {
 }
 
 void uninitialize_mp3_module(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && resource_loader_mp3.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_mp3);
+		resource_loader_mp3.unref();
+	}
 }

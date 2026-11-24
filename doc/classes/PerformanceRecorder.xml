@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceRecorder" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Records per-frame performance metrics into a ring buffer and a CSV file.
+	</brief_description>
+	<description>
+		[PerformanceRecorder] records one row per frame (or every few frames, see [member PerformanceRecordingProfile.sample_interval_frames]) with engine timings, [Performance] monitors, process memory, metrics pushed by the game, and values of native metric sources. The rows go into a ring buffer that is allocated when recording starts, and are appended to a CSV file every [member PerformanceRecordingProfile.flush_interval_frames] rows. It works in release builds, without the editor or debugger, on every platform including Web.
+		Unlike [Performance], whose time monitors are the maximum of the last second, the recorder sees the exact time of every frame. The engine calls it once per frame, after rendering; when not recording, this costs a single check.
+		Recording can start in three ways, all with the same result: by calling [method start], with the project setting [member ProjectSettings.debug/performance_recording/enabled], or with the command line option [code]--record-performance &lt;file&gt;[/code] (together with [code]--record-performance-profile &lt;file&gt;[/code], [code]--fixed-fps[/code] and [code]--quit-after[/code] for benchmark runs).
+		[codeblocks]
+		[gdscript]
+		var enemies_id = PerformanceRecorder.register_metric(&amp;"enemies_alive")
+		var spawned_id = PerformanceRecorder.register_metric(&amp;"enemies_spawned", PerformanceRecorder.METRIC_COUNTER)
+
+		func _ready():
+			PerformanceRecorder.start(load("res://perf/default.tres"))
+
+		func _process(_delta):
+			PerformanceRecorder.set_metric(enemies_id, enemies.size())
+
+		func spawn_enemy():
+			PerformanceRecorder.add_metric(spawned_id, 1)
+		[/gdscript]
+		[csharp]
+		private int _enemiesId = PerformanceRecorder.RegisterMetric("enemies_alive");
+		private int _spawnedId = PerformanceRecorder.RegisterMetric("enemies_spawned", PerformanceRecorder.MetricKind.Counter);
+
+		public override void _Ready()
+		{
+			PerformanceRecorder.Start(GD.Load&lt;PerformanceRecordingProfile&gt;("res://perf/default.tres"));
+		}
+
+		public override void _Process(double delta)
+		{
+			PerformanceRecorder.SetMetric(_enemiesId, _enemies.Count);
+		}
+
+		private void SpawnEnemy()
+		{
+			PerformanceRecorder.AddMetric(_spawnedId, 1);
+		}
+		[/csharp]
+		[/codeblocks]
+		Missing values are written as empty CSV cells and returned as [constant @GDScript.NAN] by [method get_column]: for example a gauge that was never set, or the process memory on a platform that cannot report it.
+		[b]Note:[/b] On Android, iOS and Web the application can be closed without a clean shutdown. Rows that are not written yet are lost, so call [method flush] when the application is paused (see [constant Node.NOTIFICATION_APPLICATION_PAUSED] and [constant Node.NOTIFICATION_APPLICATION_FOCUS_OUT]).
+		[b]Note:[/b] On Web, the CSV file lives in IndexedDB ([code]user://[/code]). Every write opens, appends and closes the file, so it is persisted. Read it with [method FileAccess.get_file_as_bytes] and offer it with [method JavaScriptBridge.download_buffer].
+		[b]Note:[/b] [method start], [method stop], [method flush] and the methods that read recorded data must be called on the main thread. [method register_metric], [method set_metric] and [method add_metric] can be called from any thread.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_metric">
+			<return type="void" />
+			<param index="0" name="id" type="int" />
+			<param index="1" name="delta" type="float" />
+			<description>
+				Adds [param delta] to the metric [param id]. For a [constant METRIC_COUNTER] the sum is recorded and reset to [code]0[/code] after each row. A gauge that was never set starts from [code]0[/code]. Lock-free and thread-safe.
+			</description>
+		</method>
+		<method name="flush">
+			<return type="int" enum="Error" />
+			<description>
+				Writes all rows that are not written yet to the CSV file at once, ignoring [member PerformanceRecordingProfile.flush_budget_usec]. Works while recording and after [method stop]. With [member PerformanceRecordingProfile.flush_interval_frames] set to [code]0[/code], this writes the last [member PerformanceRecordingProfile.buffer_frames] rows. Emits [signal flushed] if rows were written.
+				Returns [constant ERR_UNCONFIGURED] if there is no output path, and [constant ERR_FILE_CANT_WRITE] if the file cannot be written.
+			</description>
+		</method>
+		<method name="get_column" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the values of the column [param name] that are still in the ring buffer, oldest first: the last [member PerformanceRecordingProfile.buffer_frames] rows at most. Missing values are [constant @GDScript.NAN]. The data stays available after [method stop] until the next [method start]. Useful for in-game graphs.
+			</description>
+		</method>
+		<method name="get_column_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the columns of the current (or last) recording, in CSV order: builtins, [Performance] monitors, custom monitors, metric sources ([code]source/value[/code]), then pushed metrics.
+			</description>
+		</method>
+		<method name="get_metric_id" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the id of the metric [param name], or [code]-1[/code] if it is not registered.
+			</description>
+		</method>
+		<method name="get_output_path" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the path of the CSV file of the current (or last) recording, with the placeholders replaced. Returns an empty string if the rows stay in memory only.
+			</description>
+		</method>
+		<method name="get_recorded_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of rows recorded since [method start], including rows that are no longer in the ring buffer.
+			</description>
+		</method>
+		<method name="has_metric_source" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a native metric source called [param name] is registered. Metric sources are registered by engine modules in C++, for example the .NET runtime metrics.
+			</description>
+		</method>
+		<method name="is_recording" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while recording.
+			</description>
+		</method>
+		<method name="register_metric">
+			<return type="int" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="kind" type="int" enum="PerformanceRecorder.MetricKind" default="0" />
+			<description>
+				Registers a metric that the game pushes with [method set_metric] or [method add_metric], and returns its id. If [param name] is already registered, its id is returned and its kind is set to [param kind]. At most 256 metrics can be registered; returns [code]-1[/code] if the limit is reached.
+				Metrics registered while recording get a column from the next [method start]. Thread-safe.
+			</description>
+		</method>
+		<method name="set_metric">
+			<return type="void" />
+			<param index="0" name="id" type="int" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Sets the value of the metric [param id]. The value is recorded in the next row. Lock-free and thread-safe.
+			</description>
+		</method>
+		<method name="start">
+			<return type="int" enum="Error" />
+			<param index="0" name="profile" type="PerformanceRecordingProfile" default="null" />
+			<description>
+				Starts recording with [param profile], or with a new [PerformanceRecordingProfile] (default columns) if [param profile] is [code]null[/code]. A running recording is stopped first. Allocates the ring buffer, creates missing directories of the output path and emits [signal recording_started]. The CSV file is created at the first write.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops recording, writes all remaining rows to the CSV file and emits [signal recording_stopped]. The engine also writes the remaining rows when it quits normally.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="flushed">
+			<param index="0" name="rows" type="int" />
+			<description>
+				Emitted on the main thread after [param rows] rows were appended to the CSV file. A flush split over several frames emits it once per frame.
+			</description>
+		</signal>
+		<signal name="recording_started">
+			<description>
+				Emitted when recording starts.
+			</description>
+		</signal>
+		<signal name="recording_stopped">
+			<param index="0" name="path" type="String" />
+			<description>
+				Emitted by [method stop] after the remaining rows are written. [param path] is the CSV file, or an empty string if nothing was written.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="BUILTIN_FRAME" value="0" enum="Builtin">
+			Column [code]frame[/code]: the frame number ([method Engine.get_process_frames]).
+		</constant>
+		<constant name="BUILTIN_TIME_USEC" value="1" enum="Builtin">
+			Column [code]time_usec[/code]: microseconds since recording started.
+		</constant>
+		<constant name="BUILTIN_FRAME_TIME" value="2" enum="Builtin">
+			Column [code]frame_time[/code]: microseconds the engine spent on this frame (physics, process and rendering), without the wait for the next frame.
+		</constant>
+		<constant name="BUILTIN_PROCESS_TIME" value="3" enum="Builtin">
+			Column [code]process_time[/code]: microseconds spent in process and rendering this frame.
+		</constant>
+		<constant name="BUILTIN_PHYSICS_TIME" value="4" enum="Builtin">
+			Column [code]physics_time[/code]: microseconds of the longest physics step of this frame ([code]0[/code] if no step ran).
+		</constant>
+		<constant name="BUILTIN_PHYSICS_STEPS" value="5" enum="Builtin">
+			Column [code]physics_steps[/code]: number of physics steps in this frame.
+		</constant>
+		<constant name="BUILTIN_PROCESS_MEMORY" value="6" enum="Builtin">
+			Column [code]process_memory[/code]: memory used by the process in bytes ([method OS.get_process_memory_usage]), read every [member PerformanceRecordingProfile.process_memory_interval_frames] frames. Empty if the platform cannot report it.
+		</constant>
+		<constant name="BUILTIN_PROCESS_MEMORY_PEAK" value="7" enum="Builtin">
+			Column [code]process_memory_peak[/code]: highest [code]process_memory[/code] value read since recording started. For the peak of the whole process, see [method OS.get_process_memory_info].
+		</constant>
+		<constant name="BUILTIN_GPU_TIME" value="8" enum="Builtin">
+			Column [code]gpu_time[/code]: GPU time of the root viewport in milliseconds ([method RenderingServer.viewport_get_measured_render_time_gpu]). The measurement is enabled on the root viewport while recording and disabled by [method stop]. The value is from the latest frame whose GPU results are available, usually a few frames earlier. [code]0[/code] with the Compatibility renderer and on Web.
+		</constant>
+		<constant name="BUILTIN_RECORDER_TIME" value="9" enum="Builtin">
+			Column [code]recorder_time[/code]: microseconds the recorder spent on this row, including the CSV writes done since the previous row. Use it to check the cost of a recording.
+		</constant>
+		<constant name="BUILTIN_MAX" value="10" enum="Builtin">
+			Represents the size of the [enum Builtin] enum.
+		</constant>
+		<constant name="METRIC_GAUGE" value="0" enum="MetricKind">
+			The metric keeps its value until it is set again, for example a number of enemies.
+		</constant>
+		<constant name="METRIC_COUNTER" value="1" enum="MetricKind">
+			The metric is reset to [code]0[/code] after each recorded row, so a row holds what was added since the previous row, for example spawned enemies.
+		</constant>
+	</constants>
+</class>

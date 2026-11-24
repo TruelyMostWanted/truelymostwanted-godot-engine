@@ -1,0 +1,311 @@
+/**************************************************************************/
+/*  audio_bus_settings_server.cpp                                         */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#include "audio_bus_settings_server.h"
+
+#include "core/config/project_settings.h"
+#include "core/math/math_funcs.h"
+#include "core/object/callable_mp.h"
+#include "core/object/class_db.h"
+#include "servers/audio/audio_server.h"
+
+static constexpr const char *SETTING_CREATE_MISSING_BUSES = "settings/audio/create_missing_buses";
+
+AudioBusSettingsServer *AudioBusSettingsServer::singleton = nullptr;
+
+AudioBusSettingsServer *AudioBusSettingsServer::get_singleton() {
+	return singleton;
+}
+
+void AudioBusSettingsServer::register_settings() {
+	GLOBAL_DEF(SETTING_CREATE_MISSING_BUSES, false);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Domain.
+
+StringName AudioBusSettingsServer::get_domain() const {
+	return SNAME("audio_buses");
+}
+
+SettingsServer::ApplyPhase AudioBusSettingsServer::get_apply_phase() const {
+	// After AudioServer::init() and load_default_bus_layout(), before any AudioStreamPlayer can play.
+	return APPLY_PHASE_SERVERS;
+}
+
+StringName AudioBusSettingsServer::get_list_property() const {
+	return SNAME("buses");
+}
+
+StringName AudioBusSettingsServer::get_entry_key() const {
+	return SNAME("bus_name");
+}
+
+Ref<Resource> AudioBusSettingsServer::_create_default_settings() const {
+	Ref<AudioBusListSettings> default_settings;
+	default_settings.instantiate();
+	return default_settings;
+}
+
+Ref<AudioBusSettings> AudioBusSettingsServer::_make_entry_from_engine(int p_bus) {
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	Ref<AudioBusSettings> entry;
+	entry.instantiate();
+	entry->set_bus_name(audio_server->get_bus_name(p_bus));
+	entry->set_volume_db(audio_server->get_bus_volume_db(p_bus));
+	entry->set_mute(audio_server->is_bus_mute(p_bus));
+	entry->set_solo(audio_server->is_bus_solo(p_bus));
+	return entry;
+}
+
+void AudioBusSettingsServer::_apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) {
+	const StringName property = get_list_property();
+	AudioServer *audio_server = AudioServer::get_singleton();
+	if (audio_server == nullptr || !p_names.has(String(property))) {
+		return;
+	}
+	const Array buses = p_settings->get(property);
+	PackedStringArray missing;
+	for (int i = 0; i < buses.size(); i++) {
+		const Ref<Resource> entry = buses[i];
+		if (entry.is_null()) {
+			continue;
+		}
+		const String bus_name = entry->get(SNAME("bus_name"));
+		if (bus_name.is_empty()) {
+			continue;
+		}
+		int bus = audio_server->get_bus_index(bus_name);
+		if (bus < 0) {
+			if (!create_missing_buses) {
+				// Kept in the settings, so the value comes back if a later layout has the bus again.
+				if (!warned_buses.has(bus_name)) {
+					warned_buses.insert(bus_name);
+					missing.push_back(bus_name);
+				}
+				continue;
+			}
+			audio_server->add_bus();
+			bus = audio_server->get_bus_count() - 1;
+			audio_server->set_bus_name(bus, bus_name);
+		}
+		audio_server->set_bus_volume_db(bus, entry->get(SNAME("volume_db")));
+		audio_server->set_bus_mute(bus, entry->get(SNAME("mute")));
+		audio_server->set_bus_solo(bus, entry->get(SNAME("solo")));
+	}
+	if (!missing.is_empty()) {
+		WARN_PRINT(vformat("Audio bus settings: the bus layout has no bus %s; the stored values are kept but not applied. Enable the project setting \"%s\" to create them.", String(", ").join(missing), SETTING_CREATE_MISSING_BUSES));
+	}
+}
+
+void AudioBusSettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	if (audio_server == nullptr) {
+		return;
+	}
+	TypedArray<AudioBusSettings> buses;
+	for (int i = 0; i < audio_server->get_bus_count(); i++) {
+		buses.push_back(_make_entry_from_engine(i));
+	}
+	p_settings->set(get_list_property(), buses);
+}
+
+void AudioBusSettingsServer::_merge_layout_buses() {
+	// A file from an older game version has no entries for buses added since: they keep their layout values.
+	const StringName property = get_list_property();
+	const Ref<Resource> pending = get_pending_settings();
+	const Array layout = get_default_settings()->get(property);
+	const Array current = pending->get(property);
+	if (layout.is_empty()) {
+		return;
+	}
+	TypedArray<AudioBusSettings> merged;
+	HashSet<String> used;
+	for (int i = 0; i < layout.size(); i++) {
+		const Ref<Resource> layout_entry = layout[i];
+		if (layout_entry.is_null()) {
+			continue;
+		}
+		const String bus_name = layout_entry->get(SNAME("bus_name"));
+		used.insert(bus_name);
+		Variant stored;
+		for (int j = 0; j < current.size(); j++) {
+			const Ref<Resource> entry = current[j];
+			if (entry.is_valid() && String(entry->get(SNAME("bus_name"))) == bus_name) {
+				stored = current[j];
+				break;
+			}
+		}
+		merged.push_back(stored.get_type() != Variant::NIL ? stored : copy_value(layout_entry));
+	}
+	// Entries of buses that the layout does not have (see create_missing_buses) follow at the end.
+	for (int j = 0; j < current.size(); j++) {
+		const Ref<Resource> entry = current[j];
+		if (entry.is_valid() && !used.has(String(entry->get(SNAME("bus_name"))))) {
+			merged.push_back(current[j]);
+		}
+	}
+	if (!values_equal(merged, current)) {
+		pending->set(property, merged);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Typed API.
+
+void AudioBusSettingsServer::set_create_missing_buses(bool p_enabled) {
+	create_missing_buses = p_enabled;
+}
+
+bool AudioBusSettingsServer::is_create_missing_buses_enabled() const {
+	return create_missing_buses;
+}
+
+PackedStringArray AudioBusSettingsServer::get_bus_names() const {
+	PackedStringArray names;
+	const TypedArray<Resource> entries = get_entries();
+	for (int i = 0; i < entries.size(); i++) {
+		const Ref<Resource> entry = entries[i];
+		if (entry.is_valid()) {
+			names.push_back(entry->get(SNAME("bus_name")));
+		}
+	}
+	return names;
+}
+
+bool AudioBusSettingsServer::has_bus(const StringName &p_bus) const {
+	if (find_entry(String(p_bus)) >= 0) {
+		return true;
+	}
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	return audio_server != nullptr && audio_server->get_bus_index(p_bus) >= 0;
+}
+
+void AudioBusSettingsServer::_set_bus_value(const StringName &p_bus, const StringName &p_name, const Variant &p_value) {
+	const int index = find_entry(String(p_bus));
+	if (index >= 0) {
+		set_entry_value(index, p_name, p_value);
+		return;
+	}
+	// A bus of the layout without an entry yet: the entry starts from the engine values.
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	const int bus = audio_server != nullptr ? audio_server->get_bus_index(p_bus) : -1;
+	ERR_FAIL_COND_MSG(bus < 0, vformat("Audio bus settings: there is no bus \"%s\".", p_bus));
+	const Ref<AudioBusSettings> entry = _make_entry_from_engine(bus);
+	entry->set(p_name, p_value);
+	add_entry(entry, bus);
+}
+
+Variant AudioBusSettingsServer::_get_bus_value(const StringName &p_bus, const StringName &p_name) const {
+	const int index = find_entry(String(p_bus));
+	if (index >= 0) {
+		return get_entry_value(index, p_name);
+	}
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	const int bus = audio_server != nullptr ? audio_server->get_bus_index(p_bus) : -1;
+	ERR_FAIL_COND_V_MSG(bus < 0, Variant(), vformat("Audio bus settings: there is no bus \"%s\".", p_bus));
+	return _make_entry_from_engine(bus)->get(p_name);
+}
+
+void AudioBusSettingsServer::set_bus_volume_db(const StringName &p_bus, float p_volume_db) {
+	const float volume_db = Math::is_nan(p_volume_db) ? 0.0f : CLAMP(p_volume_db, AudioBusSettings::MIN_VOLUME_DB, AudioBusSettings::MAX_VOLUME_DB);
+	_set_bus_value(p_bus, SNAME("volume_db"), volume_db);
+}
+
+float AudioBusSettingsServer::get_bus_volume_db(const StringName &p_bus) const {
+	const Variant value = _get_bus_value(p_bus, SNAME("volume_db"));
+	return value.get_type() == Variant::NIL ? 0.0f : float(value);
+}
+
+void AudioBusSettingsServer::set_bus_volume_linear(const StringName &p_bus, float p_volume_linear) {
+	set_bus_volume_db(p_bus, p_volume_linear > 0.0f ? Math::linear_to_db(p_volume_linear) : AudioBusSettings::MIN_VOLUME_DB);
+}
+
+float AudioBusSettingsServer::get_bus_volume_linear(const StringName &p_bus) const {
+	const Variant value = _get_bus_value(p_bus, SNAME("volume_db"));
+	if (value.get_type() == Variant::NIL) {
+		return 0.0f;
+	}
+	const float volume_db = value;
+	return volume_db <= AudioBusSettings::MIN_VOLUME_DB ? 0.0f : Math::db_to_linear(volume_db);
+}
+
+void AudioBusSettingsServer::set_bus_mute(const StringName &p_bus, bool p_mute) {
+	_set_bus_value(p_bus, SNAME("mute"), p_mute);
+}
+
+bool AudioBusSettingsServer::is_bus_mute(const StringName &p_bus) const {
+	const Variant value = _get_bus_value(p_bus, SNAME("mute"));
+	return value.get_type() != Variant::NIL && bool(value);
+}
+
+void AudioBusSettingsServer::set_bus_solo(const StringName &p_bus, bool p_solo) {
+	_set_bus_value(p_bus, SNAME("solo"), p_solo);
+}
+
+bool AudioBusSettingsServer::is_bus_solo(const StringName &p_bus) const {
+	const Variant value = _get_bus_value(p_bus, SNAME("solo"));
+	return value.get_type() != Variant::NIL && bool(value);
+}
+
+void AudioBusSettingsServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_create_missing_buses", "enabled"), &AudioBusSettingsServer::set_create_missing_buses);
+	ClassDB::bind_method(D_METHOD("is_create_missing_buses_enabled"), &AudioBusSettingsServer::is_create_missing_buses_enabled);
+	ClassDB::bind_method(D_METHOD("get_bus_names"), &AudioBusSettingsServer::get_bus_names);
+	ClassDB::bind_method(D_METHOD("has_bus", "bus"), &AudioBusSettingsServer::has_bus);
+	ClassDB::bind_method(D_METHOD("set_bus_volume_db", "bus", "volume_db"), &AudioBusSettingsServer::set_bus_volume_db);
+	ClassDB::bind_method(D_METHOD("get_bus_volume_db", "bus"), &AudioBusSettingsServer::get_bus_volume_db);
+	ClassDB::bind_method(D_METHOD("set_bus_volume_linear", "bus", "volume_linear"), &AudioBusSettingsServer::set_bus_volume_linear);
+	ClassDB::bind_method(D_METHOD("get_bus_volume_linear", "bus"), &AudioBusSettingsServer::get_bus_volume_linear);
+	ClassDB::bind_method(D_METHOD("set_bus_mute", "bus", "mute"), &AudioBusSettingsServer::set_bus_mute);
+	ClassDB::bind_method(D_METHOD("is_bus_mute", "bus"), &AudioBusSettingsServer::is_bus_mute);
+	ClassDB::bind_method(D_METHOD("set_bus_solo", "bus", "solo"), &AudioBusSettingsServer::set_bus_solo);
+	ClassDB::bind_method(D_METHOD("is_bus_solo", "bus"), &AudioBusSettingsServer::is_bus_solo);
+
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "create_missing_buses"), "set_create_missing_buses", "is_create_missing_buses_enabled");
+}
+
+AudioBusSettingsServer::AudioBusSettingsServer() {
+	if (singleton == nullptr) {
+		singleton = this;
+	}
+	register_settings();
+	const ProjectSettings *project_settings = ProjectSettings::get_singleton();
+	if (project_settings != nullptr && project_settings->has_setting(SETTING_CREATE_MISSING_BUSES)) {
+		create_missing_buses = project_settings->get_setting_with_override(SETTING_CREATE_MISSING_BUSES);
+	}
+	connect(SNAME("loaded"), callable_mp(this, &AudioBusSettingsServer::_merge_layout_buses));
+}
+
+AudioBusSettingsServer::~AudioBusSettingsServer() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
+}

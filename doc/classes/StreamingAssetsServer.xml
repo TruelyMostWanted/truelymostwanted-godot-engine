@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="StreamingAssetsServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Finds the streaming assets of the running game and serves them through the [code]streaming://[/code] path prefix.
+	</brief_description>
+	<description>
+		Streaming assets are files that ship with a game unchanged, outside the import pipeline: videos, large audio files, configuration files, data for native libraries or files that players may replace (mods). They live in one folder of the project, [member ProjectSettings.filesystem/streaming_assets/source_folder], and are turned on with [member ProjectSettings.filesystem/streaming_assets/enabled].
+		[StreamingAssetsServer] owns these project settings and the locked [code]streaming://[/code] path prefix of [PathPrefixServer]. Once at startup, after the project settings and the main pack are loaded, it finds where the files are on this run (see [enum Location]) and points [code]streaming://[/code] there:
+		- in the editor and in games run from the editor: the source folder of the project ([constant LOCATION_SOURCE_FOLDER]);
+		- in [code]Raw[/code] mode on Windows and Linux: the folder [member ProjectSettings.filesystem/streaming_assets/target_folder] next to the executable ([constant LOCATION_EXTERNAL_FOLDER]);
+		- in [code]Raw[/code] mode on macOS and iOS: the same folder inside the bundle resources ([constant LOCATION_BUNDLE]);
+		- in [code]Pack[/code] mode: the streaming pack [member ProjectSettings.filesystem/streaming_assets/pack_file] next to the main pack, which is mounted at startup ([constant LOCATION_PACK]);
+		- otherwise, with the [code]Embed[/code] fallback (Android, the Web): the copy of the folder inside the main pack ([constant LOCATION_EMBEDDED]).
+		Games read the files the same way on every platform, with [FileAccess], [DirAccess] and the runtime loaders:
+		[codeblocks]
+		[gdscript]
+		var file = FileAccess.open("streaming://config/levels.json", FileAccess.READ)
+		var levels = JSON.parse_string(file.get_as_text())
+		var image = Image.load_from_file("streaming://textures/skybox.png")
+		print(StreamingAssetsServer.get_location())
+		# An OS path for native libraries, or "" if the files are inside a pack.
+		print(StreamingAssetsServer.get_os_path("streaming://video/intro.ogv"))
+		[/gdscript]
+		[csharp]
+		using var file = FileAccess.Open("streaming://config/levels.json", FileAccess.ModeFlags.Read);
+		var levels = Json.ParseString(file.GetAsText());
+		var image = Image.LoadFromFile("streaming://textures/skybox.png");
+		GD.Print(StreamingAssetsServer.GetLocation());
+		// An OS path for native libraries, or "" if the files are inside a pack.
+		GD.Print(StreamingAssetsServer.GetOsPath("streaming://video/intro.ogv"));
+		[/csharp]
+		[/codeblocks]
+		The settings need a restart: the location is resolved once. Debug builds and the editor accept the command line argument [code]--streaming-assets-path=&lt;folder&gt;[/code], which forces [constant LOCATION_EXTERNAL_FOLDER] with that folder, for example to test the layout of an export.
+		[b]Note:[/b] [code]streaming://[/code] is read-only except for the source folder in the editor. It can't be replaced or removed with [method PathPrefixServer.register_prefix] or [method PathPrefixServer.unregister_prefix].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="expand_template" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="template" type="String" />
+			<param index="1" name="exe_name" type="String" />
+			<description>
+				Expands the placeholders of [member ProjectSettings.filesystem/streaming_assets/target_folder] and [member ProjectSettings.filesystem/streaming_assets/pack_file]. The export plugin and the runtime use this method, so that both arrive at the same folder:
+				- [code]{exe_name}[/code]: [param exe_name], the base name of the executable without its extension;
+				- [code]{app_name}[/code]: [member ProjectSettings.application/config/name], made safe for file names, or [param exe_name] if the name is empty;
+				- [code]{version}[/code]: [member ProjectSettings.application/config/version], made safe for file names.
+				Other placeholders are left unchanged.
+				[codeblock]
+				print(StreamingAssetsServer.expand_template("{exe_name}_Data/StreamingAssets", "MyGame")) # Prints "MyGame_Data/StreamingAssets".
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_exe_name" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns the [code]{exe_name}[/code] of the running game: the base name of the executable without its extension ([code]MyGame[/code] for [code]MyGame.exe[/code] or [code]MyGame.x86_64[/code]). Inside a macOS app bundle, it is the name of the bundle ([code]MyGame[/code] for [code]MyGame.app[/code]), because the binary inside the bundle may be named differently.
+			</description>
+		</method>
+		<method name="get_fallback" qualifiers="const">
+			<return type="int" enum="StreamingAssetsServer.Fallback" />
+			<description>
+				Returns the value of [member ProjectSettings.filesystem/streaming_assets/fallback] that was read at startup.
+			</description>
+		</method>
+		<method name="get_location" qualifiers="const">
+			<return type="int" enum="StreamingAssetsServer.Location" />
+			<description>
+				Returns where the streaming assets are on this run. [constant LOCATION_NONE] if the feature is disabled or the files are not shipped.
+			</description>
+		</method>
+		<method name="get_mode" qualifiers="const">
+			<return type="int" enum="StreamingAssetsServer.Mode" />
+			<description>
+				Returns the value of [member ProjectSettings.filesystem/streaming_assets/mode] that was read at startup.
+			</description>
+		</method>
+		<method name="get_os_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="streaming_path" type="String" />
+			<description>
+				Returns the absolute OS path of [param streaming_path], for code that can't read through [FileAccess], such as native libraries or video players that open files themselves. [param streaming_path] is a [code]streaming://[/code] path or a path relative to the streaming assets folder.
+				Returns an empty string if the files have no OS path on this run ([constant LOCATION_EMBEDDED], [constant LOCATION_PACK] and [constant LOCATION_NONE], for example on Android and the Web), if the path uses another prefix or if it leaves the folder with [code]..[/code].
+			</description>
+		</method>
+		<method name="get_root" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the folder behind [code]streaming://[/code]: an absolute OS path for [constant LOCATION_EXTERNAL_FOLDER] and [constant LOCATION_BUNDLE], the [code]res://[/code] source folder for [constant LOCATION_SOURCE_FOLDER], [constant LOCATION_EMBEDDED] and [constant LOCATION_PACK], and an empty string for [constant LOCATION_NONE].
+			</description>
+		</method>
+		<method name="get_source_folder" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the [code]res://[/code] folder of the project that holds the streaming assets, without a trailing slash. This is [member ProjectSettings.filesystem/streaming_assets/source_folder], or [code]"res://streaming_assets"[/code] if the setting is not a folder below [code]res://[/code].
+			</description>
+		</method>
+		<method name="is_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [member ProjectSettings.filesystem/streaming_assets/enabled] was on at startup.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="MODE_RAW" value="0" enum="Mode">
+			The files are shipped unchanged in a folder and read through [code]streaming://[/code].
+		</constant>
+		<constant name="MODE_PACK" value="1" enum="Mode">
+			The folder is shipped as a second pack, mounted at startup. The files keep their [code]res://[/code] paths.
+		</constant>
+		<constant name="FALLBACK_EMBED" value="0" enum="Fallback">
+			Where there is no external folder or pack, the files stay in the main pack.
+		</constant>
+		<constant name="FALLBACK_NONE" value="1" enum="Fallback">
+			Where there is no external folder or pack, the files are not shipped.
+		</constant>
+		<constant name="LOCATION_SOURCE_FOLDER" value="0" enum="Location">
+			The editor or a game run from the editor: [code]streaming://[/code] points to the source folder of the project.
+		</constant>
+		<constant name="LOCATION_EXTERNAL_FOLDER" value="1" enum="Location">
+			A folder next to the executable (Windows, Linux), or the folder given with [code]--streaming-assets-path=[/code].
+		</constant>
+		<constant name="LOCATION_BUNDLE" value="2" enum="Location">
+			A folder inside the bundle resources (macOS, iOS).
+		</constant>
+		<constant name="LOCATION_EMBEDDED" value="3" enum="Location">
+			The copy of the source folder inside the main pack (Android, the Web, or a missing folder with the [code]Embed[/code] fallback). There is no OS path.
+		</constant>
+		<constant name="LOCATION_PACK" value="4" enum="Location">
+			The streaming pack, mounted at startup. Its files are below the source folder in [code]res://[/code]. There is no OS path.
+		</constant>
+		<constant name="LOCATION_NONE" value="5" enum="Location">
+			The feature is disabled, or the files are not shipped on this platform. [code]streaming://[/code] is not available.
+		</constant>
+	</constants>
+</class>

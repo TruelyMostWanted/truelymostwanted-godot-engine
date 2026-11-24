@@ -32,12 +32,12 @@
 
 #include "core/io/resource.h"
 
-// A voice with its settings for TtsServer. The persona name is a separate property
-// (not `resource_name`), because it is the key in TtsServer's persona list.
-class TtsPersona : public Resource {
-	GDCLASS(TtsPersona, Resource);
+// A voice with its settings for TTSServer. The persona name is a separate property
+// (not `resource_name`), because it is the key in TTSServer's persona list.
+class TTSPersona : public Resource {
+	GDCLASS(TTSPersona, Resource);
 
-	String persona_name;
+	StringName persona_name;
 	String voice;
 	String language;
 	int volume = 50;
@@ -49,8 +49,8 @@ protected:
 	static void _bind_methods();
 
 public:
-	void set_persona_name(const String &p_name);
-	String get_persona_name() const;
+	void set_persona_name(const StringName &p_name);
+	StringName get_persona_name() const;
 
 	void set_voice(const String &p_voice);
 	String get_voice() const;
