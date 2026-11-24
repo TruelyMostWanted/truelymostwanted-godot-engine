@@ -425,7 +425,29 @@
 			<param index="0" name="name" type="StringName" />
 			<param index="1" name="value" type="Variant" />
 			<description>
-				Changes the pending value of the setting [param name]. The value is validated first (range hints are clamped, invalid enum values are rejected with an error, then [method _validate_value] is called). A session override of the setting is removed. If the value changed, [signal value_changed] and [signal settings_changed] are emitted and, in [constant APPLY_MODE_IMMEDIATE], [method apply] is called. Reports an error if the domain has no such setting.
+				Changes the pending value of the setting [param name]. The value is validated first (a [float] is snapped to the step of its range hint or to [code]0.001[/code] with [method snap_float], range hints are clamped, invalid enum values are rejected with an error, then [method _validate_value] is called and a [float] it returns is snapped again). A session override of the setting is removed. If the value changed, [signal value_changed] and [signal settings_changed] are emitted and, in [constant APPLY_MODE_IMMEDIATE], [method apply] is called. Reports an error if the domain has no such setting.
+			</description>
+		</method>
+		<method name="snap_float" qualifiers="static">
+			<return type="float" />
+			<param index="0" name="value" type="float" />
+			<param index="1" name="step" type="float" default="0.001" />
+			<param index="2" name="offset" type="float" default="0.0" />
+			<description>
+				Returns [param value] with at most three decimals, as the settings servers store every [float] setting: snapped to [param step] relative to [param offset] (a step below [code]0.001[/code] counts as [code]0.001[/code]), then to [code]0.001[/code]. [code]-0.0[/code] becomes [code]0.0[/code]; infinite and NaN values are returned unchanged.
+				The settings servers use the step and the minimum of the property's range hint ([code]"-80,24,0.1"[/code] snaps to [code]0.1[/code]); a [float] without a range hint or with a smaller step is snapped to [code]0.001[/code]. This applies to [method set_value], session overrides, loaded files, defaults, values read from the engine and the float fields of list entries ([ListSettingsServer]). [method get_value], [method get_applied_value], [method get_default_value] and [signal value_changed] return the snapped value, also for a setting stored as a 32-bit float ([code]0.2[/code], not [code]0.20000000298023224[/code]).
+				[codeblocks]
+				[gdscript]
+				print(SettingsServer.snap_float(0.30000000000000004)) # 0.3
+				print(SettingsServer.snap_float(-6.0206, 0.1)) # -6.0
+				print(SettingsServer.snap_float(-0.0000014)) # 0.0
+				[/gdscript]
+				[csharp]
+				GD.Print(SettingsServer.SnapFloat(0.30000000000000004)); // 0.3
+				GD.Print(SettingsServer.SnapFloat(-6.0206, 0.1)); // -6
+				GD.Print(SettingsServer.SnapFloat(-0.0000014)); // 0
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="unbind_setting">
