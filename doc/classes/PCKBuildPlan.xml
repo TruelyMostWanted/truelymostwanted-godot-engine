@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="PCKBuildPlan" inherits="RefCounted" api_type="editor" keywords="pck, pack, export, description" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="PCKBuildPlan" inherits="RefCounted" api_type="core" keywords="pck, pack, export, description" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		The result of [method PCKPackageExporter.plan_description].
 	</brief_description>

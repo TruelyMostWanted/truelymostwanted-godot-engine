@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/pck_build_plan.h"
 #include "core/io/pck_package.h"
 #include "core/object/object.h"
 #include "core/templates/hash_set.h"
