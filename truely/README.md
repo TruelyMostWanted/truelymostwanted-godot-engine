@@ -7,13 +7,13 @@ Eigene Version der Godot Engine. Sie bleibt mit [godotengine/godot](https://gith
 ```
 upstream/master
  │
- └─► master                      reine Kopie von upstream, keine eigenen Commits
-      ├─► <pr-branch>            Beitrag an Godot  ──► PR an godotengine/godot
-      ├─► <pr-branch>                 │
-      │                               └──(merge)──┐
-      └──(merge)──► truely-godot-engine ◄─────────┘   die eigene Engine, wird gebaut
-                      ├─► <feature-branch>        nur für die eigene Engine
-                      └─► <feature-branch>
+ └─► master                               reine Kopie von upstream, keine eigenen Commits
+      ├─► 195-feature-opus-audio, …        mitgeführte Godot-PRs (upstream-prs.tsv), merge-chain.ps1
+      ├─► <pr-branch>                      Beitrag an Godot  ──► PR an godotengine/godot
+      └──(merge)──► truely-godot-engine    die eigene Engine: Entwicklung, CI, keine Releases
+                      ├─► <nn>-feature-…   Feature-Branches (Squash-Merge, bleiben bestehen)
+                      └──(Fast-forward, release.ps1)──► truely-godot-engine-releases
+                                                         freigegebene Stände: CI → Builds → Release
 ```
 
 | Branch                | Zweigt ab von         | Wird gemergt in                                   |
@@ -22,6 +22,7 @@ upstream/master
 | `truely-godot-engine` | `master`              | – (erhält `master`, PR- und Feature-Branches)     |
 | PR-Branch             | `master`              | PR an Godot **und** `truely-godot-engine`         |
 | Feature-Branch        | `truely-godot-engine` | `truely-godot-engine`                             |
+| `truely-godot-engine-releases` | `truely-godot-engine` | – (nur Fast-forward per `release.ps1`; ein grüner CI-Lauf veröffentlicht) |
 
 Feature-Branches tragen als Präfix die Nummer ihres Issues, mindestens zweistellig, z. B. `01-feature-resource-paths-retrieval` (siehe `CONVENTIONS.md`). Die Namen der PR-Branches sind frei wählbar. Präfixe wie `pr/…` oder `feature/…` sind optional. Viele Git-Tools zeigen sie als Ordner an.
 
