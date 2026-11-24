@@ -46,6 +46,8 @@ TEST_FORCE_LINK(test_audio_settings_server)
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
+#include <cmath>
+
 namespace TestAudioSettingsServer {
 
 // Test names contain "[Audio]": the test runner then creates an AudioServer with the dummy driver
@@ -149,7 +151,13 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Defaults come from the bus layout; on
 	server->set_bus_volume_db("Music", -12.0);
 	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-12.0));
 	server->set_bus_volume_linear("Master", 0.5);
-	CHECK(audio_server->get_bus_volume_db(0) == doctest::Approx(Math::linear_to_db(0.5)).epsilon(0.001));
+	// -6.0206 dB, snapped to the 0.1 dB step of the volume (#189).
+	CHECK(audio_server->get_bus_volume_db(0) == doctest::Approx(-6.0));
+	CHECK(double(server->get_entry_value(server->find_entry(String("Master")), "volume_db")) == -6.0);
+	server->set_bus_volume_linear("Master", 1.0);
+	const double master_db = server->get_entry_value(server->find_entry(String("Master")), "volume_db");
+	CHECK(master_db == 0.0);
+	CHECK_FALSE(std::signbit(master_db));
 	server->set_bus_mute("Music", true);
 	CHECK(audio_server->is_bus_mute(1));
 	CHECK(server->is_bus_mute("Music"));
