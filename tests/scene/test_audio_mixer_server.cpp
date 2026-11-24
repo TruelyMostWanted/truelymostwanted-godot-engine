@@ -109,18 +109,18 @@ TEST_CASE("[AudioMixerServer] AudioMixerChannel defaults and value ranges") {
 	CHECK(channel->get_bus() == StringName("Master"));
 	CHECK(channel->get_volume_db() == doctest::Approx(0.0));
 	CHECK(channel->get_pitch_scale() == doctest::Approx(1.0));
-	CHECK(channel->get_polyphony() == 1);
+	CHECK(channel->get_max_polyphony() == 1);
 	CHECK(channel->get_queue_mode() == AudioMixerChannel::QUEUE_MODE_STOP);
-	CHECK_FALSE(channel->is_loop_entry());
+	CHECK_FALSE(channel->is_loop_current_entry());
 	CHECK(channel->get_default_fade_time() == doctest::Approx(0.0));
 	CHECK_FALSE(channel->is_pause_with_tree());
 	CHECK_FALSE(channel->is_stop_on_scene_change());
 	CHECK_FALSE(channel->is_preload_next());
 
-	channel->set_polyphony(0);
-	CHECK(channel->get_polyphony() == 1);
-	channel->set_polyphony(1000);
-	CHECK(channel->get_polyphony() == 128);
+	channel->set_max_polyphony(0);
+	CHECK(channel->get_max_polyphony() == 1);
+	channel->set_max_polyphony(1000);
+	CHECK(channel->get_max_polyphony() == 128);
 	channel->set_default_fade_time(-2.0f);
 	CHECK(channel->get_default_fade_time() == doctest::Approx(0.0));
 	ERR_PRINT_OFF;
@@ -166,7 +166,7 @@ TEST_CASE("[AudioMixerServer] Channels from a layout") {
 	layout.instantiate();
 	layout->add_channel(make_channel("music"));
 	layout->add_channel(make_channel("ambience"));
-	mixer->load_layout(layout);
+	mixer->apply_layout(layout);
 
 	CHECK(mixer->has_channel("music"));
 	CHECK(mixer->has_channel("ambience"));
@@ -191,7 +191,7 @@ TEST_CASE("[AudioMixerServer] Channels from a layout") {
 	Ref<AudioMixerLayout> other;
 	other.instantiate();
 	other->add_channel(make_channel("voice"));
-	mixer->load_layout(other);
+	mixer->apply_layout(other);
 	CHECK(mixer->get_channel_names().size() == 1);
 	CHECK(mixer->has_channel("voice"));
 
@@ -216,38 +216,38 @@ TEST_CASE("[AudioMixerServer] Queue editing and cursor without playback") {
 	CHECK(queue[0] == "res://a.ogg");
 	CHECK(queue[1] == "res://b.ogg");
 	CHECK(queue[2] == "res://c.ogg");
-	CHECK(mixer->get_index("music") == -1);
+	CHECK(mixer->get_queue_index("music") == -1);
 
-	// Not playing: next(), previous() and change_index() only move the cursor.
-	mixer->next("music");
-	CHECK(mixer->get_index("music") == 0);
-	mixer->next("music");
-	CHECK(mixer->get_index("music") == 1);
-	mixer->change_index("music", 2);
-	CHECK(mixer->get_index("music") == 2);
-	mixer->next("music"); // QUEUE_MODE_STOP: no entry after the last one.
-	CHECK(mixer->get_index("music") == 2);
-	mixer->previous("music");
-	CHECK(mixer->get_index("music") == 1);
+	// Not playing: play_next(), play_previous() and set_queue_index() only move the cursor.
+	mixer->play_next("music");
+	CHECK(mixer->get_queue_index("music") == 0);
+	mixer->play_next("music");
+	CHECK(mixer->get_queue_index("music") == 1);
+	mixer->set_queue_index("music", 2);
+	CHECK(mixer->get_queue_index("music") == 2);
+	mixer->play_next("music"); // QUEUE_MODE_STOP: no entry after the last one.
+	CHECK(mixer->get_queue_index("music") == 2);
+	mixer->play_previous("music");
+	CHECK(mixer->get_queue_index("music") == 1);
 	CHECK_FALSE(mixer->is_playing("music"));
 
 	// Removing the current entry moves the cursor to the entry before it.
 	mixer->dequeue("music", 1);
-	CHECK(mixer->get_index("music") == 0);
+	CHECK(mixer->get_queue_index("music") == 0);
 	CHECK(mixer->get_queue("music").size() == 2);
 	mixer->dequeue("music"); // Last entry.
 	CHECK(mixer->get_queue("music").size() == 1);
 	CHECK(mixer->get_queue("music")[0] == "res://a.ogg");
 
 	ERR_PRINT_OFF;
-	mixer->change_index("music", 5);
+	mixer->set_queue_index("music", 5);
 	mixer->dequeue("music", 7);
 	ERR_PRINT_ON;
-	CHECK(mixer->get_index("music") == 0);
+	CHECK(mixer->get_queue_index("music") == 0);
 
 	mixer->clear_queue("music");
 	CHECK(mixer->get_queue("music").is_empty());
-	CHECK(mixer->get_index("music") == -1);
+	CHECK(mixer->get_queue_index("music") == -1);
 
 	// LOOP_QUEUE wraps around in both directions.
 	Ref<AudioMixerChannel> looped = make_channel("loop");
@@ -255,10 +255,10 @@ TEST_CASE("[AudioMixerServer] Queue editing and cursor without playback") {
 	mixer->add_channel(looped);
 	mixer->enqueue("loop", "res://1.ogg");
 	mixer->enqueue("loop", "res://2.ogg");
-	mixer->previous("loop");
-	CHECK(mixer->get_index("loop") == 1);
-	mixer->next("loop");
-	CHECK(mixer->get_index("loop") == 0);
+	mixer->play_previous("loop");
+	CHECK(mixer->get_queue_index("loop") == 1);
+	mixer->play_next("loop");
+	CHECK(mixer->get_queue_index("loop") == 0);
 }
 
 TEST_CASE("[Audio][AudioMixerServer] Play, pause, resume and stop") {
@@ -386,23 +386,23 @@ TEST_CASE("[Audio][AudioMixerServer] Queue jumps with a cross-fade") {
 
 	SIGNAL_WATCH(mixer, "channel_started");
 	mixer->play("music");
-	CHECK(mixer->get_index("music") == 0);
+	CHECK(mixer->get_queue_index("music") == 0);
 	Array started;
 	started.push_back(args3(StringName("music"), 0, String()));
 	SIGNAL_CHECK("channel_started", started);
 
-	mixer->next("music");
-	CHECK(mixer->get_index("music") == 1);
+	mixer->play_next("music");
+	CHECK(mixer->get_queue_index("music") == 1);
 	CHECK(mixer->get_voice_count("music") == 2);
 	CHECK(mixer->is_fading("music"));
 	mixer->process(0.6);
 	CHECK(mixer->get_voice_count("music") == 1);
 	CHECK_FALSE(mixer->is_fading("music"));
 
-	mixer->previous("music", 0.2f);
-	CHECK(mixer->get_index("music") == 0);
-	mixer->change_index("music", 2, 0.0f);
-	CHECK(mixer->get_index("music") == 2);
+	mixer->play_previous("music", 0.2f);
+	CHECK(mixer->get_queue_index("music") == 0);
+	mixer->set_queue_index("music", 2, 0.0f);
+	CHECK(mixer->get_queue_index("music") == 2);
 	CHECK(mixer->get_voice_count("music") == 1);
 	SIGNAL_UNWATCH(mixer, "channel_started");
 }
@@ -412,7 +412,7 @@ TEST_CASE("[Audio][AudioMixerServer] Channel volume fade and one-shots") {
 	AudioMixerServer *mixer = AudioMixerServer::get_singleton();
 	REQUIRE(mixer != nullptr);
 	Ref<AudioMixerChannel> sfx = make_channel("sfx");
-	sfx->set_polyphony(2);
+	sfx->set_max_polyphony(2);
 	mixer->add_channel(sfx);
 	Ref<AudioStreamWAV> wav = make_wav(10.0);
 
@@ -437,7 +437,7 @@ TEST_CASE("[Audio][AudioMixerServer] Channel volume fade and one-shots") {
 	CHECK(mixer->get_voice_count("sfx") == 0);
 
 	ERR_PRINT_OFF;
-	mixer->switch_clip("sfx", "intro"); // Not playing: error only.
+	mixer->switch_to_clip("sfx", "intro"); // Not playing: error only.
 	ERR_PRINT_ON;
 }
 
@@ -451,19 +451,19 @@ TEST_CASE("[Audio][AudioMixerServer] The queue advances at the end of a stream")
 
 	SIGNAL_WATCH(mixer, "queue_finished");
 	mixer->play("music");
-	CHECK(mixer->get_index("music") == 0);
+	CHECK(mixer->get_queue_index("music") == 0);
 
 	// The dummy driver mixes in its own thread; wait until both entries have ended.
 	bool reached_second = false;
 	for (int i = 0; i < 300 && mixer->is_playing("music"); i++) {
 		OS::get_singleton()->delay_usec(10000);
 		mixer->process(0.01);
-		if (mixer->get_index("music") == 1) {
+		if (mixer->get_queue_index("music") == 1) {
 			reached_second = true;
 		}
 	}
 	CHECK(reached_second);
-	CHECK(mixer->get_index("music") == 1);
+	CHECK(mixer->get_queue_index("music") == 1);
 	CHECK_FALSE(mixer->is_playing("music"));
 	Array finished;
 	finished.push_back(args1(StringName("music")));

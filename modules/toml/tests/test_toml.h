@@ -529,7 +529,10 @@ TEST_CASE("[TOML] Resource round trip as text") {
 	CHECK(TOML::deserialize(untyped).is_null());
 	ERR_PRINT_ON;
 
-	const String numbers = TOML::serialize(settings, { { "enums_as_names", false } });
+	Ref<SerializerOptions> numbers_options;
+	numbers_options.instantiate();
+	numbers_options->set_enums_as_names(false);
+	const String numbers = TOML::serialize(settings, numbers_options);
 	CHECK(numbers.contains("mode = 5"));
 	check_toml_settings(TOML::deserialize(numbers));
 }
@@ -574,16 +577,17 @@ TEST_CASE("[TOML] Through ResourceSaver and ResourceLoader") {
 	DirAccess::remove_absolute(path);
 }
 
-TEST_CASE("[TOML] Registered as text format \"toml\"") {
+TEST_CASE("[TOML] Registered as text format FORMAT_TOML") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	REQUIRE(serializer != nullptr);
-	CHECK(serializer->get_formats().has("toml"));
-	CHECK(serializer->has_format("toml"));
+	CHECK(serializer->get_available_formats().has(ResourceTextSerializer::FORMAT_TOML));
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_TOML));
+	CHECK(serializer->can_serialize(make_toml_settings(), ResourceTextSerializer::FORMAT_TOML));
 
 	const Ref<TOMLTestSettings> settings = make_toml_settings();
-	const String text = serializer->serialize(settings, "toml");
+	const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_TOML);
 	CHECK(text == TOML::serialize(settings));
-	check_toml_settings(serializer->deserialize(text, "toml"));
+	check_toml_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_TOML));
 }
 
 } // namespace TestTOML

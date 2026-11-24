@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  texture_atlas_editor_plugin.h                                         */
+/*  sprite_sheet_editor_plugin.h                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -35,7 +35,7 @@
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 #include "scene/gui/box_container.h"
-#include "scene/resources/texture_atlas.h"
+#include "scene/resources/sprite_sheet.h"
 
 class Button;
 class ConfirmationDialog;
@@ -45,30 +45,30 @@ class LineEdit;
 class OptionButton;
 class SpinBox;
 class Tree;
-class TextureAtlasEditor;
+class SpriteSheetEditor;
 
-// Undoable changes of the regions of a TextureAtlas: every change is a snapshot of `regions` and `margins`
+// Undoable changes of the regions of a SpriteSheet: every change is a snapshot of `regions` and `margins`
 // (do: the new state, undo: the old state), so deletes, renames and sorting restore the order as well.
-class TextureAtlasEditing {
+class SpriteSheetEditing {
 public:
-	static void commit(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
+	static void commit(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
 	// Old state = the current state of the atlas.
-	static void commit_regions(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
-	static void remove(const Ref<TextureAtlas> &p_atlas, const PackedStringArray &p_names);
-	static void rename(const Ref<TextureAtlas> &p_atlas, const StringName &p_from, const StringName &p_to);
-	static void add(const Ref<TextureAtlas> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
+	static void commit_regions(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
+	static void remove(const Ref<SpriteSheet> &p_atlas, const PackedStringArray &p_names);
+	static void rename(const Ref<SpriteSheet> &p_atlas, const StringName &p_from, const StringName &p_to);
+	static void add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
 	// Text "x, y, width, height" to a rectangle.
 	static bool parse_rect(const String &p_text, Rect2i &r_rect);
 	// A warning for the inspector and the dock, empty if the texture is usable.
-	static String get_texture_warning(const Ref<TextureAtlas> &p_atlas);
+	static String get_texture_warning(const Ref<SpriteSheet> &p_atlas);
 };
 
 // List of the regions with thumbnail, name and rectangle; rename and rectangle editing in place, filter,
 // multi-select, and drag of a sprite onto a Texture2D property. Used in the inspector and in the dock.
-class TextureAtlasRegionList : public VBoxContainer {
-	GDCLASS(TextureAtlasRegionList, VBoxContainer);
+class SpriteSheetRegionList : public VBoxContainer {
+	GDCLASS(SpriteSheetRegionList, VBoxContainer);
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	LineEdit *filter = nullptr;
 	Tree *tree = nullptr;
 	bool update_queued = false;
@@ -84,20 +84,20 @@ public:
 	// Called (deferred) when the user changes the selection.
 	Callable selection_changed_callback;
 
-	void set_atlas(const Ref<TextureAtlas> &p_atlas);
+	void set_atlas(const Ref<SpriteSheet> &p_atlas);
 	void update_list();
 	PackedStringArray get_selected_names() const;
 	void set_selected_names(const PackedStringArray &p_names);
 	void set_tree_minimum_height(int p_height);
 
-	TextureAtlasRegionList();
+	SpriteSheetRegionList();
 };
 
 // The sprite sheet with all regions: zoom, pan, select, draw, move, resize, snap and nudge.
-class TextureAtlasCanvas : public Control {
-	GDCLASS(TextureAtlasCanvas, Control);
+class SpriteSheetCanvas : public Control {
+	GDCLASS(SpriteSheetCanvas, Control);
 
-	friend class TextureAtlasEditor;
+	friend class SpriteSheetEditor;
 
 	enum DragMode {
 		DRAG_NONE,
@@ -107,7 +107,7 @@ class TextureAtlasCanvas : public Control {
 		DRAG_RESIZE,
 	};
 
-	TextureAtlasEditor *editor = nullptr;
+	SpriteSheetEditor *editor = nullptr;
 	float zoom = 1.0f;
 	Vector2 view_offset; // Screen position of the texture origin.
 	DragMode drag_mode = DRAG_NONE;
@@ -139,23 +139,23 @@ public:
 	float get_zoom() const { return zoom; }
 	void fit();
 
-	TextureAtlasCanvas();
+	SpriteSheetCanvas();
 };
 
-// Bottom dock "TextureAtlas": canvas, region list, slicing, import and export.
-class TextureAtlasEditor : public EditorDock {
-	GDCLASS(TextureAtlasEditor, EditorDock);
+// Bottom dock "SpriteSheet": canvas, region list, slicing, import and export.
+class SpriteSheetEditor : public EditorDock {
+	GDCLASS(SpriteSheetEditor, EditorDock);
 
-	friend class TextureAtlasCanvas;
+	friend class SpriteSheetCanvas;
 
 	enum SnapMode {
 		SNAP_PIXEL,
 		SNAP_GRID,
 	};
 
-	static TextureAtlasEditor *singleton;
+	static SpriteSheetEditor *singleton;
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	PackedStringArray selection;
 
 	Label *warning = nullptr;
@@ -165,8 +165,8 @@ class TextureAtlasEditor : public EditorDock {
 	SpinBox *grid_offset_x = nullptr;
 	SpinBox *grid_offset_y = nullptr;
 	LineEdit *name_prefix = nullptr;
-	TextureAtlasCanvas *canvas = nullptr;
-	TextureAtlasRegionList *region_list = nullptr;
+	SpriteSheetCanvas *canvas = nullptr;
+	SpriteSheetRegionList *region_list = nullptr;
 
 	ConfirmationDialog *grid_dialog = nullptr;
 	SpinBox *grid_cell[2] = {};
@@ -202,10 +202,10 @@ protected:
 	void _notification(int p_what);
 
 public:
-	static TextureAtlasEditor *get_singleton() { return singleton; }
+	static SpriteSheetEditor *get_singleton() { return singleton; }
 
-	void edit(const Ref<TextureAtlas> &p_atlas);
-	Ref<TextureAtlas> get_atlas() const { return atlas; }
+	void edit(const Ref<SpriteSheet> &p_atlas);
+	Ref<SpriteSheet> get_atlas() const { return atlas; }
 
 	void set_selection(const PackedStringArray &p_names);
 	const PackedStringArray &get_selection() const { return selection; }
@@ -214,17 +214,17 @@ public:
 	Vector2i get_grid_offset() const;
 	String make_new_region_name() const;
 
-	TextureAtlasEditor();
-	~TextureAtlasEditor();
+	SpriteSheetEditor();
+	~SpriteSheetEditor();
 };
 
-// Inspector of a TextureAtlas: texture warning, "Edit Regions" button and the region list with add and delete.
-class TextureAtlasInspector : public VBoxContainer {
-	GDCLASS(TextureAtlasInspector, VBoxContainer);
+// Inspector of a SpriteSheet: texture warning, "Edit Regions" button and the region list with add and delete.
+class SpriteSheetInspector : public VBoxContainer {
+	GDCLASS(SpriteSheetInspector, VBoxContainer);
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	Label *warning = nullptr;
-	TextureAtlasRegionList *region_list = nullptr;
+	SpriteSheetRegionList *region_list = nullptr;
 	Button *delete_button = nullptr;
 
 	void _atlas_changed();
@@ -234,27 +234,27 @@ class TextureAtlasInspector : public VBoxContainer {
 	void _selection_changed();
 
 public:
-	TextureAtlasInspector(const Ref<TextureAtlas> &p_atlas);
+	SpriteSheetInspector(const Ref<SpriteSheet> &p_atlas);
 };
 
-class EditorInspectorPluginTextureAtlas : public EditorInspectorPlugin {
-	GDCLASS(EditorInspectorPluginTextureAtlas, EditorInspectorPlugin);
+class EditorInspectorPluginSpriteSheet : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginSpriteSheet, EditorInspectorPlugin);
 
 public:
 	virtual bool can_handle(Object *p_object) override;
 	virtual void parse_begin(Object *p_object) override;
 };
 
-class TextureAtlasEditorPlugin : public EditorPlugin {
-	GDCLASS(TextureAtlasEditorPlugin, EditorPlugin);
+class SpriteSheetEditorPlugin : public EditorPlugin {
+	GDCLASS(SpriteSheetEditorPlugin, EditorPlugin);
 
-	TextureAtlasEditor *atlas_editor = nullptr;
+	SpriteSheetEditor *atlas_editor = nullptr;
 
 public:
-	virtual String get_plugin_name() const override { return "TextureAtlas"; }
+	virtual String get_plugin_name() const override { return "SpriteSheet"; }
 	virtual void edit(Object *p_object) override;
 	virtual bool handles(Object *p_object) const override;
 	virtual void make_visible(bool p_visible) override;
 
-	TextureAtlasEditorPlugin();
+	SpriteSheetEditorPlugin();
 };

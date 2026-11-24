@@ -105,45 +105,45 @@ TEST_CASE("[ResourceDatabase] Patterns, keys, types and removal") {
 
 	Ref<FilesManifest> sword_manifest;
 	sword_manifest.instantiate();
-	CHECK(db->insert("items/Sword_Iron", _named("iron")) == OK);
-	CHECK(db->insert("items/sword_gold", sword_manifest) == OK);
-	CHECK(db->insert("items/shield", _named("shield")) == OK);
-	CHECK(db->count() == 3);
+	CHECK(db->add_resource("items/Sword_Iron", _named("iron")) == OK);
+	CHECK(db->add_resource("items/sword_gold", sword_manifest) == OK);
+	CHECK(db->add_resource("items/shield", _named("shield")) == OK);
+	CHECK(db->get_entry_count() == 3);
 
 	CHECK(db->has_resource("items/shield"));
 	CHECK_FALSE(db->has_resource("items/SHIELD")); // Keys are case-sensitive, patterns are not.
 	CHECK(db->get_resource("items/shield")->get_name() == "shield");
 
-	CHECK(db->select().size() == 3);
-	CHECK(db->select("items/shield").size() == 1);
-	CHECK(db->select("items/%").size() == 3);
-	CHECK(db->select("%_iron").size() == 1);
-	CHECK(db->select("%SWORD%").size() == 2);
-	CHECK(db->select("items/%gold").size() == 1);
-	CHECK(db->select("%sword%", "FilesManifest").size() == 1);
-	CHECK(db->select("%sword%", "Resource").size() == 2);
-	CHECK(db->select("%sword%", "PreloadList").is_empty());
-	CHECK(db->select_keys("%sword%", "FilesManifest") == PackedStringArray({ "items/sword_gold" }));
+	CHECK(db->find_resources().size() == 3);
+	CHECK(db->find_resources("items/shield").size() == 1);
+	CHECK(db->find_resources("items/%").size() == 3);
+	CHECK(db->find_resources("%_iron").size() == 1);
+	CHECK(db->find_resources("%SWORD%").size() == 2);
+	CHECK(db->find_resources("items/%gold").size() == 1);
+	CHECK(db->find_resources("%sword%", "FilesManifest").size() == 1);
+	CHECK(db->find_resources("%sword%", "Resource").size() == 2);
+	CHECK(db->find_resources("%sword%", "PreloadList").is_empty());
+	CHECK(db->find_keys("%sword%", "FilesManifest") == PackedStringArray({ "items/sword_gold" }));
 
-	CHECK_FALSE(db->insert_if_absent("items/shield", _named("other")));
+	CHECK_FALSE(db->add_resource_if_missing("items/shield", _named("other")));
 	CHECK(db->get_resource("items/shield")->get_name() == "shield");
-	CHECK(db->insert_if_absent("items/helmet", _named("helmet")));
-	CHECK(db->insert("items/shield", _named("shield2")) == OK);
+	CHECK(db->add_resource_if_missing("items/helmet", _named("helmet")));
+	CHECK(db->add_resource("items/shield", _named("shield2")) == OK);
 	CHECK(db->get_resource("items/shield")->get_name() == "shield2");
-	CHECK(db->count() == 4);
+	CHECK(db->get_entry_count() == 4);
 
 	CHECK(db->get_memory_usage() > 0);
 
-	CHECK(db->remove("%sword%") == 2);
-	CHECK(db->count() == 2);
-	CHECK(db->remove("nothing") == 0);
+	CHECK(db->remove_matching("%sword%") == 2);
+	CHECK(db->get_entry_count() == 2);
+	CHECK(db->remove_matching("nothing") == 0);
 	db->clear();
-	CHECK(db->count() == 0);
+	CHECK(db->get_entry_count() == 0);
 	CHECK(db->get_resource("items/shield").is_null());
 
 	ERR_PRINT_OFF;
-	CHECK(db->insert("", _named("x")) == ERR_INVALID_PARAMETER);
-	CHECK(db->insert("x", Ref<Resource>()) == ERR_INVALID_PARAMETER);
+	CHECK(db->add_resource("", _named("x")) == ERR_INVALID_PARAMETER);
+	CHECK(db->add_resource("x", Ref<Resource>()) == ERR_INVALID_PARAMETER);
 	ERR_PRINT_ON;
 }
 
@@ -186,20 +186,20 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	CHECK_FALSE(list->is_empty());
 
 	SIGNAL_WATCH(db, "preload_finished");
-	CHECK(db->preload_list(list, false) == OK);
+	CHECK(db->preload_from_list(list, false) == OK);
 	MessageQueue::get_singleton()->flush();
 	SIGNAL_CHECK("preload_finished", _finished_args(list));
 	SIGNAL_UNWATCH(db, "preload_finished");
 
-	CHECK(db->count() == 6);
+	CHECK(db->get_entry_count() == 6);
 	CHECK(loader->loads.get() == 3);
 	// By name (direct resources), by path, by key, by type.
 	CHECK(db->has_resource("direct_a"));
 	CHECK(db->has_resource("res://db_b.dbcount"));
 	CHECK(db->get_resource("sword") == db->get_resource("res://db_a.dbcount"));
-	CHECK(db->select("%from_manifest%").size() == 1);
-	CHECK(db->select("", "Resource").size() == 6);
-	CHECK(db->select("sword").size() == 1); // Keys match like paths.
+	CHECK(db->find_resources("%from_manifest%").size() == 1);
+	CHECK(db->find_resources("", "Resource").size() == 6);
+	CHECK(db->find_resources("sword").size() == 1); // Keys match like paths.
 
 	// `ResourceLoader.load()` returns the stored instance without loading again.
 	const Ref<Resource> stored = db->get_resource("res://db_a.dbcount");
@@ -209,8 +209,8 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	// The database keeps the resources alive (and in `ResourceCache`) without other references.
 	CHECK(ResourceCache::has("res://db_b.dbcount"));
 
-	// `preload_path()` with an extra key.
-	CHECK(db->preload_path("res://db_c.dbcount", "shield") == OK);
+	// `preload_resource()` with an extra key.
+	CHECK(db->preload_resource("res://db_c.dbcount", "shield") == OK);
 	CHECK(db->get_resource("shield") == db->get_resource("res://db_c.dbcount"));
 	CHECK(loader->loads.get() == 4);
 
@@ -219,7 +219,7 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	list2.instantiate();
 	list2->set_paths(PackedStringArray({ "res://db_t1.dbcount", "res://db_t2.dbcount" }));
 	SIGNAL_WATCH(db, "preload_finished");
-	CHECK(db->preload_list(list2, true) == OK);
+	CHECK(db->preload_from_list(list2, true) == OK);
 	_wait_for_preloads(db);
 	MessageQueue::get_singleton()->flush();
 	SIGNAL_CHECK("preload_finished", _finished_args(list2));
@@ -242,20 +242,20 @@ struct ThreadData {
 	SafeNumeric<uint32_t> *failures = nullptr;
 };
 
-static void _insert_and_select(void *p_userdata) {
+static void _add_and_find(void *p_userdata) {
 	ThreadData *data = static_cast<ThreadData *>(p_userdata);
 	for (int i = 0; i < 100; i++) {
 		const String key = vformat("thread%d/item%d", data->index, i);
-		if (data->db->insert(key, _named(key)) != OK) {
+		if (data->db->add_resource(key, _named(key)) != OK) {
 			data->failures->increment();
 		}
-		if (data->db->select(vformat("thread%d/%%", data->index)).size() != i + 1) {
+		if (data->db->find_resources(vformat("thread%d/%%", data->index)).size() != i + 1) {
 			data->failures->increment();
 		}
 	}
 }
 
-TEST_CASE("[ResourceDatabase] Parallel insert and select") {
+TEST_CASE("[ResourceDatabase] Parallel add and find") {
 	ResourceDatabase *db = ResourceDatabase::get_singleton();
 	REQUIRE(db);
 	db->clear();
@@ -267,14 +267,14 @@ TEST_CASE("[ResourceDatabase] Parallel insert and select") {
 		data[i].db = db;
 		data[i].index = i;
 		data[i].failures = &failures;
-		threads[i].start(_insert_and_select, &data[i]);
+		threads[i].start(_add_and_find, &data[i]);
 	}
 	for (int i = 0; i < 4; i++) {
 		threads[i].wait_to_finish();
 	}
 	CHECK(failures.get() == 0);
-	CHECK(db->count() == 400);
-	CHECK(db->select("thread2/%").size() == 100);
+	CHECK(db->get_entry_count() == 400);
+	CHECK(db->find_resources("thread2/%").size() == 100);
 	db->clear();
 }
 
