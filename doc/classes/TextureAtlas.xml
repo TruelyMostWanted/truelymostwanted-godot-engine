@@ -37,6 +37,34 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="add_regions">
+			<return type="PackedStringArray" />
+			<param index="0" name="rects" type="Rect2i[]" />
+			<param index="1" name="prefix" type="String" default="&quot;sprite_&quot;" />
+			<description>
+				Adds one region per rectangle of [param rects], at the end of the region order, and returns the new names. The names are [param prefix] followed by a number, counting up from [code]0[/code] and skipping names that exist already ([code]sprite_0[/code], [code]sprite_1[/code], ...).
+				Adding is all-or-nothing: if one rectangle is invalid (see [method set_region]) or [param prefix] cannot start a valid name (see [method is_valid_region_name]), an error is printed, no region is added and an empty array is returned.
+				[codeblocks]
+				[gdscript]
+				var cells = TextureAtlas.make_grid_rects(atlas.texture.get_size(), Vector2i(32, 32))
+				var names = atlas.add_regions(cells, "tile_")
+				[/gdscript]
+				[csharp]
+				var cells = TextureAtlas.MakeGridRects((Vector2I)atlas.Texture.GetSize(), new Vector2I(32, 32));
+				string[] names = atlas.AddRegions(cells, "tile_");
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="auto_slice">
+			<return type="PackedStringArray" />
+			<param index="0" name="prefix" type="String" default="&quot;sprite_&quot;" />
+			<param index="1" name="alpha_threshold" type="float" default="0.1" />
+			<description>
+				Finds every sprite in the image of [member texture] with [method detect_sprite_rects] and adds a region for each one that is not a region yet (no region has exactly that rectangle), named like in [method add_regions]. Returns the names of the new regions. Running it again after new sprites were painted into the sheet adds only the new ones.
+				Fails with an error and returns an empty array if [member texture] is [code]null[/code] or has no image data (see [method Texture2D.get_image]).
+			</description>
+		</method>
 		<method name="clear_regions">
 			<return type="void" />
 			<description>
@@ -62,6 +90,15 @@
 				hero.Play("hero_walk");
 				[/csharp]
 				[/codeblocks]
+			</description>
+		</method>
+		<method name="detect_sprite_rects" qualifiers="static">
+			<return type="Rect2i[]" />
+			<param index="0" name="image" type="Image" />
+			<param index="1" name="alpha_threshold" type="float" default="0.1" />
+			<description>
+				Returns the bounding rectangles of all sprites in [param image] (the "Auto Slice" of the editor). A pixel is opaque if its alpha is greater than [param alpha_threshold] (0 to 1). Opaque pixels that touch, also diagonally, form one sprite; sprite boxes that overlap or touch afterwards are merged into one. Sprites need at least one transparent pixel between their boxes to stay apart.
+				The rectangles are sorted in rows: top to bottom, and left to right within a row. A row starts with the topmost remaining box and contains every box that starts above its bottom edge. Compressed images are decompressed on a copy; [param image] is not changed.
 			</description>
 		</method>
 		<method name="get_region" qualifiers="const">
@@ -149,6 +186,24 @@
 			<description>
 				Replaces the texture and all regions with the content of a JSON text in the layout described in the class description, keeping the order of [code]AtlasImages[/code].
 				The texture path is stored in [member texture_path]. If it equals [member texture_path] or the resource path of the current [member texture], the current texture is kept; otherwise it is loaded with [method ResourceLoader.load] (any path the engine can load, including [code]uid://[/code] and path prefixes such as [code]mods://[/code]). A missing [code]TexturePath[/code], a texture that cannot be loaded, an invalid name or a region outside the texture is an error; the atlas is then not changed.
+			</description>
+		</method>
+		<method name="make_grid_rects" qualifiers="static">
+			<return type="Rect2i[]" />
+			<param index="0" name="area_size" type="Vector2i" />
+			<param index="1" name="cell_size" type="Vector2i" />
+			<param index="2" name="separation" type="Vector2i" default="Vector2i(0, 0)" />
+			<param index="3" name="offset" type="Vector2i" default="Vector2i(0, 0)" />
+			<description>
+				Returns the cells of a uniform grid on an area of [param area_size] pixels, row by row: cells of [param cell_size], starting at [param offset], with [param separation] pixels between two cells. Only cells that lie completely inside the area are returned. Use it with [method add_regions] to cut a sheet into equal sprites.
+				Returns an empty array and prints an error if [param cell_size] is not greater than 0, or if [param separation] or [param offset] is negative.
+			</description>
+		</method>
+		<method name="make_unique_region_name" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="prefix" type="String" />
+			<description>
+				Returns [param prefix] followed by the smallest number from [code]0[/code] up that is not the name of a region yet, for example [code]"sprite_3"[/code]. Returns an empty string and prints an error if [code]prefix + "0"[/code] is not a valid name (see [method is_valid_region_name]).
 			</description>
 		</method>
 		<method name="remove_region">

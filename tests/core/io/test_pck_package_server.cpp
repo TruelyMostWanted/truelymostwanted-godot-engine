@@ -32,10 +32,13 @@
 
 TEST_FORCE_LINK(test_pck_package_server)
 
+#include "core/config/project_settings.h"
+#include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
+#include "core/io/resource_uid.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -193,6 +196,175 @@ TEST_CASE("[PckPackageServer] Encrypted packs") {
 	CHECK(server->read_file(wrong, "res://secret.txt").is_empty());
 	CHECK(server->verify(wrong) != OK);
 	ERR_PRINT_ON;
+}
+
+// An empty folder for extraction tests.
+static String _clean_dir(const String &p_name) {
+	const String dir = TestUtils::get_temp_path(p_name);
+	Ref<DirAccess> da = DirAccess::open(dir);
+	if (da.is_valid()) {
+		da->erase_contents_recursive();
+	}
+	DirAccess::make_dir_recursive_absolute(dir);
+	return dir;
+}
+
+TEST_CASE("[PckPackageServer] Extract skips engine files and reports not editable files") {
+	PckPackageServer *server = PckPackageServer::get_singleton();
+	const String pack_path = TestUtils::get_temp_path("pck_extract_engine.pck");
+	const String out = _clean_dir("pck_extract_engine_out");
+	Dictionary files;
+	files["a.txt"] = "Alpha";
+	files["sub/b.txt"] = "Beta";
+	files["art/icon.png"] = "PNG";
+	files["art/icon.png.import"] = "[remap]\n";
+	files["art/orphan.png.import"] = "[remap]\n";
+	files[".godot/imported/icon.png-123.ctex"] = "CTEX";
+	files["level.tscn.remap"] = "[remap]\npath=\"res://.godot/exported/level.scn\"\n";
+	files["project.binary"] = "BIN";
+	_write_pack(pack_path, files);
+	Ref<PckPackage> package = server->open(pack_path);
+	REQUIRE(package.is_valid());
+
+	Ref<PckExtractResult> result = server->extract(package, out);
+	REQUIRE(result.is_valid());
+	CHECK(result->is_ok());
+	CHECK(result->get_errors().is_empty());
+	CHECK(result->get_written() == PackedStringArray({ out.path_join("a.txt"), out.path_join("sub/b.txt"), out.path_join("art/icon.png"), out.path_join("art/icon.png.import") }));
+	CHECK(result->get_skipped() == PackedStringArray({ "res://art/orphan.png.import", "res://.godot/imported/icon.png-123.ctex" }));
+	CHECK(result->get_not_editable() == PackedStringArray({ "res://level.tscn", "res://project.binary" }));
+	CHECK(result->get_renamed().is_empty());
+	CHECK(FileAccess::get_file_as_string(out.path_join("sub/b.txt")) == "Beta");
+	CHECK_FALSE(FileAccess::exists(out.path_join("level.tscn.remap")));
+	CHECK_FALSE(DirAccess::exists(out.path_join(".godot")));
+
+	// Without the engine file rules, everything is written as it is.
+	const String raw_out = _clean_dir("pck_extract_engine_raw_out");
+	Ref<PckExtractResult> raw = server->extract(package, raw_out, PackedStringArray(), PckPackageServer::EXTRACT_SKIP, false);
+	CHECK(raw->is_ok());
+	CHECK(raw->get_written().size() == 8);
+	CHECK(FileAccess::get_file_as_string(raw_out.path_join(".godot/imported/icon.png-123.ctex")) == "CTEX");
+
+	ERR_PRINT_OFF;
+	Ref<PckPackage> null_package;
+	CHECK(server->extract(null_package, out)->get_error() == ERR_INVALID_PARAMETER);
+	CHECK(server->extract(package, "")->get_error() == ERR_INVALID_PARAMETER);
+	ERR_PRINT_ON;
+}
+
+TEST_CASE("[PckPackageServer] Extract progress signal") {
+	PckPackageServer *server = PckPackageServer::get_singleton();
+	const String pack_path = TestUtils::get_temp_path("pck_extract_progress.pck");
+	const String out = _clean_dir("pck_extract_progress_out");
+	Dictionary files;
+	files["a.txt"] = "Alpha";
+	files["b.txt"] = "Beta";
+	_write_pack(pack_path, files);
+	Ref<PckPackage> package = server->open(pack_path);
+	REQUIRE(package.is_valid());
+
+	SIGNAL_WATCH(server, "extract_progress");
+	CHECK(server->extract(package, out)->is_ok());
+	SIGNAL_CHECK("extract_progress", Array({ Array({ "res://a.txt", 1, 2 }), Array({ "res://b.txt", 2, 2 }) }));
+	SIGNAL_UNWATCH(server, "extract_progress");
+}
+
+TEST_CASE("[PckPackageServer] Extract filters and conflict policies") {
+	PckPackageServer *server = PckPackageServer::get_singleton();
+	const String pack_path = TestUtils::get_temp_path("pck_extract_policy.pck");
+	const String out = _clean_dir("pck_extract_policy_out");
+	Dictionary files;
+	files["a.txt"] = "Alpha";
+	files["sub/b.txt"] = "Beta";
+	files["sub/c.json"] = "{}";
+	files["img.png"] = "PNG";
+	files["img.png.import"] = "[remap]\n";
+	_write_pack(pack_path, files);
+	Ref<PckPackage> package = server->open(pack_path);
+	REQUIRE(package.is_valid());
+
+	// Filters: folders, patterns and paths with or without `res://`.
+	CHECK(server->extract(package, out, PackedStringArray({ "res://sub/" }))->get_written() == PackedStringArray({ out.path_join("sub/b.txt"), out.path_join("sub/c.json") }));
+	CHECK(server->extract(package, out, PackedStringArray({ "*.txt" }), PckPackageServer::EXTRACT_OVERWRITE)->get_written() == PackedStringArray({ out.path_join("a.txt"), out.path_join("sub/b.txt") }));
+	CHECK(server->extract(package, out, PackedStringArray({ "img.png" }))->get_written() == PackedStringArray({ out.path_join("img.png"), out.path_join("img.png.import") }));
+
+	// Skip: existing files stay, and sidecars follow their source.
+	{
+		Ref<FileAccess> f = FileAccess::open(out.path_join("a.txt"), FileAccess::WRITE);
+		REQUIRE(f.is_valid());
+		f->store_string("Edited");
+	}
+	Ref<PckExtractResult> skipped = server->extract(package, out);
+	CHECK(skipped->is_ok());
+	CHECK(skipped->get_written().is_empty());
+	CHECK(skipped->get_skipped().size() == 5);
+	CHECK(FileAccess::get_file_as_string(out.path_join("a.txt")) == "Edited");
+
+	// Overwrite.
+	Ref<PckExtractResult> overwritten = server->extract(package, out, PackedStringArray({ "a.txt" }), PckPackageServer::EXTRACT_OVERWRITE);
+	CHECK(overwritten->get_written() == PackedStringArray({ out.path_join("a.txt") }));
+	CHECK(FileAccess::get_file_as_string(out.path_join("a.txt")) == "Alpha");
+
+	// Rename: the sidecar gets the new name of its source.
+	Ref<PckExtractResult> renamed = server->extract(package, out, PackedStringArray({ "a.txt", "img.png" }), PckPackageServer::EXTRACT_RENAME);
+	CHECK(renamed->is_ok());
+	CHECK(renamed->get_written() == PackedStringArray({ out.path_join("a_2.txt"), out.path_join("img_2.png"), out.path_join("img_2.png.import") }));
+	const Dictionary renamed_map = renamed->get_renamed();
+	CHECK(String(renamed_map["res://a.txt"]) == out.path_join("a_2.txt"));
+	CHECK(String(renamed_map["res://img.png.import"]) == out.path_join("img_2.png.import"));
+	CHECK(FileAccess::get_file_as_string(out.path_join("a_2.txt")) == "Alpha");
+
+	// A second rename picks the next free name.
+	CHECK(server->extract(package, out, PackedStringArray({ "a.txt" }), PckPackageServer::EXTRACT_RENAME)->get_written() == PackedStringArray({ out.path_join("a_3.txt") }));
+}
+
+TEST_CASE("[PckPackageServer] Extract keeps free UIDs and drops colliding ones") {
+	PckPackageServer *server = PckPackageServer::get_singleton();
+	ResourceUID *uids = ResourceUID::get_singleton();
+	REQUIRE(uids);
+	const String pack_path = TestUtils::get_temp_path("pck_extract_uid.pck");
+	const String out = _clean_dir("pck_extract_uid_out");
+
+	const ResourceUID::ID taken_script = uids->create_id();
+	const ResourceUID::ID taken_resource = uids->create_id();
+	const ResourceUID::ID free_script = uids->create_id();
+	uids->add_id(taken_script, "res://some/other_script.gd");
+	uids->add_id(taken_resource, "res://some/other_resource.tres");
+	const String taken_script_text = uids->id_to_text(taken_script);
+	const String taken_resource_text = uids->id_to_text(taken_resource);
+	const String free_script_text = uids->id_to_text(free_script);
+
+	Dictionary files;
+	files["taken.gd"] = "extends Node";
+	files["taken.gd.uid"] = taken_script_text + "\n";
+	files["free.gd"] = "extends Node";
+	files["free.gd.uid"] = free_script_text + "\n";
+	files["data.tres"] = "[gd_resource type=\"Resource\" format=3 uid=\"" + taken_resource_text + "\"]\n\n[resource]\n";
+	_write_pack(pack_path, files);
+	Ref<PckPackage> package = server->open(pack_path);
+	REQUIRE(package.is_valid());
+
+	Ref<PckExtractResult> result = server->extract(package, out);
+	CHECK(result->is_ok());
+	CHECK(result->get_dropped_uids() == PackedStringArray({ taken_script_text, taken_resource_text }));
+	CHECK(FileAccess::exists(out.path_join("taken.gd")));
+	CHECK_FALSE(FileAccess::exists(out.path_join("taken.gd.uid")));
+	CHECK(result->get_skipped() == PackedStringArray({ "res://taken.gd.uid" }));
+	CHECK(FileAccess::get_file_as_string(out.path_join("free.gd.uid")).strip_edges() == free_script_text);
+	CHECK(FileAccess::get_file_as_string(out.path_join("data.tres")) == "[gd_resource type=\"Resource\" format=3]\n\n[resource]\n");
+
+	// Kept UIDs are registered at once.
+	CHECK(uids->has_id(free_script));
+	CHECK(uids->get_id_path(free_script) == ProjectSettings::get_singleton()->localize_path(out.path_join("free.gd")));
+
+	// Extracting again to the same place keeps the UID: it already belongs to that file.
+	Ref<PckExtractResult> again = server->extract(package, out, PackedStringArray({ "free.gd" }), PckPackageServer::EXTRACT_OVERWRITE);
+	CHECK(again->get_dropped_uids().is_empty());
+	CHECK(again->get_written().has(out.path_join("free.gd.uid")));
+
+	uids->remove_id(taken_script);
+	uids->remove_id(taken_resource);
+	uids->remove_id(free_script);
 }
 
 TEST_CASE("[PckPackageServer] Mount, pack of a file, unmount") {
