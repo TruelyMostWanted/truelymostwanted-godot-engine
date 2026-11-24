@@ -14,7 +14,7 @@
 		PathPrefixServer.register_prefix_folder("mods://", "exec://mods")
 		var file := FileAccess.open("mods://readme.txt", FileAccess.READ)
 
-		var info := PathPrefixServer.resolve_safe(player_path, true, ["user://saves/"])
+		var info := PathPrefixServer.resolve_safe(player_path, PathPrefixServer.ACCESS_WRITE, ["user://saves/"])
 		if not info.valid:
 			push_error(info.error_message)
 		[/gdscript]
@@ -22,7 +22,7 @@
 		PathPrefixServer.RegisterPrefixFolder("mods://", "exec://mods");
 		using var file = FileAccess.Open("mods://readme.txt", FileAccess.ModeFlags.Read);
 
-		PathInfo info = PathPrefixServer.ResolveSafe(playerPath, true, ["user://saves/"]);
+		PathInfo info = PathPrefixServer.ResolveSafe(playerPath, PathPrefixServer.AccessMode.Write, ["user://saves/"]);
 		if (!info.Valid)
 		{
 		    GD.PushError(info.ErrorMessage);
@@ -34,21 +34,21 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="create_folder_logic" qualifiers="const">
+		<method name="create_folder_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="folder" type="String" />
 			<description>
 				Returns a [PathPrefix] that maps a prefix to [param folder]. [param folder] is an absolute path or a path with another prefix, for example [code]exec://mods[/code]; it is resolved on every call.
 			</description>
 		</method>
-		<method name="create_os_path_logic" qualifiers="const">
+		<method name="create_os_path_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="path" type="int" enum="PathPrefixServer.OSPath" />
 			<description>
 				Returns a [PathPrefix] that maps a prefix to an OS folder, see [enum OSPath].
 			</description>
 		</method>
-		<method name="create_system_dir_logic" qualifiers="const">
+		<method name="create_system_dir_prefix" qualifiers="const">
 			<return type="PathPrefix" />
 			<param index="0" name="dir" type="int" enum="OS.SystemDir" />
 			<param index="1" name="shared_storage" type="bool" default="true" />
@@ -107,10 +107,10 @@
 		<method name="register_prefix">
 			<return type="int" enum="Error" />
 			<param index="0" name="prefix" type="String" />
-			<param index="1" name="logic" type="PathPrefix" />
+			<param index="1" name="path_prefix" type="PathPrefix" />
 			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Registers [param logic] for [param prefix]. [param prefix] consists of lowercase letters, digits and [code]_[/code], followed by [code]://[/code]; URL schemes such as [code]http://[/code] are not allowed.
+				Registers [param path_prefix] for [param prefix]. [param prefix] consists of lowercase letters, digits and [code]_[/code], followed by [code]://[/code]; URL schemes such as [code]http://[/code] are not allowed.
 				[param platforms] are feature tags (see [method OS.has_feature]), for example [code]["windows", "linux"][/code]. Empty means all platforms. A registration for named platforms that match wins over one for all platforms. Registering again with the same platforms replaces the logic.
 				Returns [constant ERR_LOCKED] for engine prefixes and [constant ERR_INVALID_PARAMETER] for invalid names.
 			</description>
@@ -133,7 +133,7 @@
 			<param index="1" name="folder" type="String" />
 			<param index="2" name="platforms" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Registers a prefix that maps to [param folder], see [method create_folder_logic] and [method register_prefix].
+				Registers a prefix that maps to [param folder], see [method create_folder_prefix] and [method register_prefix].
 			</description>
 		</method>
 		<method name="resolve" qualifiers="const">
@@ -155,10 +155,10 @@
 		<method name="resolve_safe" qualifiers="const">
 			<return type="PathInfo" />
 			<param index="0" name="path" type="String" />
-			<param index="1" name="for_write" type="bool" />
+			<param index="1" name="access" type="int" enum="PathPrefixServer.AccessMode" />
 			<param index="2" name="allowed_roots" type="PackedStringArray" default="PackedStringArray()" />
 			<description>
-				Resolves an untrusted [param path] like [method resolve], but the result is invalid with [constant ERR_FILE_BAD_PATH] for [code]..[/code] segments, paths without a prefix (including absolute OS paths), unknown or unavailable prefixes, and paths outside [param allowed_roots] (for example [code]["user://saves/", "exec://mods/"][/code]). If [param for_write] is [code]true[/code] and the prefix is read-only, the result is invalid with [constant ERR_FILE_NO_PERMISSION].
+				Resolves an untrusted [param path] like [method resolve], but the result is invalid with [constant ERR_FILE_BAD_PATH] for [code]..[/code] segments, paths without a prefix (including absolute OS paths), unknown or unavailable prefixes, and paths outside [param allowed_roots] (for example [code]["user://saves/", "exec://mods/"][/code]). If [param access] is [constant ACCESS_WRITE] and the prefix is read-only, the result is invalid with [constant ERR_FILE_NO_PERMISSION].
 				[b]Note:[/b] Symbolic links and Windows short names are not resolved before the check.
 			</description>
 		</method>
@@ -197,6 +197,12 @@
 		</constant>
 		<constant name="OS_PATH_TEMP" value="3" enum="OSPath">
 			The folder of [method OS.get_temp_dir].
+		</constant>
+		<constant name="ACCESS_READ" value="0" enum="AccessMode">
+			The path is only read. [method resolve_safe] accepts read-only prefixes.
+		</constant>
+		<constant name="ACCESS_WRITE" value="1" enum="AccessMode">
+			The path is written. [method resolve_safe] rejects read-only prefixes with [constant ERR_FILE_NO_PERMISSION].
 		</constant>
 	</constants>
 </class>
