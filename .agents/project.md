@@ -114,10 +114,9 @@ UPDATED='2026-11-24'
 
 Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
 
-**Stand am Limit (2026-11-24, spät):** Gemergt seit dem letzten Eintrag: #88, #84, #93, #75, #18, #20, #89/#101 CI-Fixes, #99-Umbenennungen für #3, #7, #8, #9, #11, #12, #74, #75, #50 (TextureAtlas → SpriteSheet), #51, #35; CONVENTIONS 1.2a. Wiki aktuell bis #20 + Umbenennungen.
-**Offen, fertig gebaut und geprüft (kombinierte Checks grün):** #99-Kette 37 → 53 → 10 (Branch 37 hat `truely-godot-engine` schon ohne Konflikt hereingeholt; mit `scratch/merge-part.sh` nacheinander mergen, vorher jeweils `git merge truely-godot-engine`, Konflikte einzeln mit `checkout --ours` lösen; Test-Branch 70 enthält einen Fix für #35 → auch nach main mergen). Hilfs-Worktree `scratch/issues/99/c10` (Branch `tmp-c10`) danach entfernen.
-**Offen, ungebaut:** #99 Settings #15–#19 (+#20-Anpassung) auf ihren Branches (`scratch/issues/99/applied-15…`, `applied-16…`, `applied-17-18-19…`), Reihenfolge 15 → 16 → 17 → 18 → 19 → 20; WIP-Stopps #26, #73, #90 (knowledge.md im Scratch). Wiki für #99 (35/37/53/10/15–19) fehlt.
-**Laufende Agenten:** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
+**Stand (2026-11-24, Vormittag):** #99 komplett gemergt und geschlossen (alle Features umbenannt, Wiki aktuell, CONVENTIONS 1.2a). #90 + #89-Bundle-Placement gemergt. Testprojekt: `.gitignore` schließt `*.translation` aus → Ausnahme für #17 (Branch 17).
+**Laufende Agenten:** #26 und #73 (fertigstellen), #85 (PCK-Inspector), #86 (PCK-Exporter), Wiki #90. Danach: #91, #21–#25, #27–#30, #71, #76, #79, #80, #121, #122, YAML-Folge-Issue aus #73.
+**Alt (überholt):** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
 
 **Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
 
