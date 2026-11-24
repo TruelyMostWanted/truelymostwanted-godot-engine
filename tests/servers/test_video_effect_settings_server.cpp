@@ -40,6 +40,7 @@ TEST_FORCE_LINK(test_video_effect_settings_server)
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "scene/resources/environment.h"
+#include "servers/rendering/rendering_method.h"
 #include "servers/rendering/rendering_server_globals.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_effect_settings.h"
