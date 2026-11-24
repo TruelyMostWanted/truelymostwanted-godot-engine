@@ -80,7 +80,7 @@ public:
 	Vector<String> get_recognized_extensions_for_type(const String &p_type);
 	void add_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader, bool p_at_front);
 	void remove_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader);
-	void refresh_format_index();
+	void rebuild_extension_index();
 	void set_abort_on_missing_resources(bool p_abort);
 	PackedStringArray get_dependencies(const String &p_path);
 	bool has_cached(const String &p_path);

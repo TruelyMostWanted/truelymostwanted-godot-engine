@@ -328,7 +328,7 @@
 				[b]Note:[/b] In builds without threads (the default Web export), the worker thread pool runs each request on the calling thread, so this method blocks until all resources are loaded, like [method load_manifest].
 			</description>
 		</method>
-		<method name="refresh_format_index">
+		<method name="rebuild_extension_index">
 			<return type="void" />
 			<description>
 				Reads the recognized extensions of every registered [ResourceFormatLoader] again and rebuilds the index that finds loaders by the extension of a path.
@@ -337,12 +337,12 @@
 				[codeblocks]
 				[gdscript]
 				my_loader.extensions = PackedStringArray(["mydata"])
-				ResourceLoader.refresh_format_index()
+				ResourceLoader.rebuild_extension_index()
 				print(ResourceLoader.exists("res://level.mydata")) # Asks my_loader.
 				[/gdscript]
 				[csharp]
 				myLoader.Extensions = ["mydata"];
-				ResourceLoader.RefreshFormatIndex();
+				ResourceLoader.RebuildExtensionIndex();
 				GD.Print(ResourceLoader.Exists("res://level.mydata")); // Asks myLoader.
 				[/csharp]
 				[/codeblocks]

@@ -107,8 +107,8 @@ void ResourceLoader::remove_resource_format_loader(RequiredParam<ResourceFormatL
 	::ResourceLoader::remove_resource_format_loader(format_loader);
 }
 
-void ResourceLoader::refresh_format_index() {
-	::ResourceLoader::refresh_format_index();
+void ResourceLoader::rebuild_extension_index() {
+	::ResourceLoader::rebuild_extension_index();
 }
 
 void ResourceLoader::set_abort_on_missing_resources(bool p_abort) {
@@ -314,7 +314,7 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_recognized_extensions_for_type", "type"), &ResourceLoader::get_recognized_extensions_for_type);
 	ClassDB::bind_method(D_METHOD("add_resource_format_loader", "format_loader", "at_front"), &ResourceLoader::add_resource_format_loader, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_loader", "format_loader"), &ResourceLoader::remove_resource_format_loader);
-	ClassDB::bind_method(D_METHOD("refresh_format_index"), &ResourceLoader::refresh_format_index);
+	ClassDB::bind_method(D_METHOD("rebuild_extension_index"), &ResourceLoader::rebuild_extension_index);
 	ClassDB::bind_method(D_METHOD("set_abort_on_missing_resources", "abort"), &ResourceLoader::set_abort_on_missing_resources);
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
