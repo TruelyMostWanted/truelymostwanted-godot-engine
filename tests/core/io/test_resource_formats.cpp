@@ -399,7 +399,7 @@ TEST_CASE("[ResourceLoader] The binary loader is indexed and follows new ClassDB
 	CHECK_MESSAGE(ClassDB::get_resource_base_extensions_version() == same, "Adding a known extension again changes nothing.");
 }
 
-TEST_CASE("[ResourceLoader] refresh_format_index() reads changed extension lists again") {
+TEST_CASE("[ResourceLoader] rebuild_extension_index() reads changed extension lists again") {
 	Ref<IndexTestLoader> loader = make_index_loader({ "idxold" });
 	ResourceLoader::add_resource_format_loader(loader, true);
 	CHECK(recognized_by_index(ResourceLoader::get_format_snapshot(), "res://a.idxold") == Vector<int>({ 0 }));
@@ -409,7 +409,7 @@ TEST_CASE("[ResourceLoader] refresh_format_index() reads changed extension lists
 	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxnew").is_empty(), "A changed list is not seen before the refresh.");
 	CHECK_MESSAGE(recognized_by_index(snapshot, "res://a.idxold").is_empty(), "A removed extension is still checked with recognize_path().");
 
-	ResourceLoader::refresh_format_index();
+	ResourceLoader::rebuild_extension_index();
 	snapshot = ResourceLoader::get_format_snapshot();
 	CHECK(recognized_by_index(snapshot, "res://a.idxnew") == Vector<int>({ 0 }));
 	CHECK(recognized_by_index(snapshot, "res://a.idxnew2") == Vector<int>({ 0 }));

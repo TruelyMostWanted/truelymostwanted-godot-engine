@@ -38,50 +38,50 @@
 #include "scene/resources/texture.h"
 #include "scene/scene_string_names.h"
 
-void EditorContextMenuPluginPck::_extract(const Dictionary &p_data) {
+void EditorContextMenuPluginPCK::_extract(const Dictionary &p_data) {
 	const PackedStringArray selected = p_data.get("selected_files", PackedStringArray());
-	if (selected.size() == 1 && PckExtractDialog::get_singleton()) {
-		PckExtractDialog::get_singleton()->popup_for_path(selected[0]);
+	if (selected.size() == 1 && PCKExtractDialog::get_singleton()) {
+		PCKExtractDialog::get_singleton()->popup_for_path(selected[0]);
 	}
 }
 
-void EditorContextMenuPluginPck::get_options(const OptionsData &p_data) {
+void EditorContextMenuPluginPCK::get_options(const OptionsData &p_data) {
 	EditorContextMenuPlugin::get_options(p_data);
 	const PackedStringArray selected = p_data.get("selected_files", PackedStringArray());
 	if (selected.size() != 1 || selected[0].get_extension().to_lower() != "pck") {
 		return;
 	}
 	Ref<Texture2D> icon = EditorNode::get_singleton()->get_gui_base()->get_editor_theme_icon(SNAME("Load"));
-	add_context_menu_item(TTR("Extract Pack..."), callable_mp(this, &EditorContextMenuPluginPck::_extract), icon);
+	add_context_menu_item(TTR("Extract Pack..."), callable_mp(this, &EditorContextMenuPluginPCK::_extract), icon);
 }
 
-void EditorInspectorPluginPckExtract::_extract_pressed(Object *p_package) {
-	Ref<PckPackage> package(Object::cast_to<PckPackage>(p_package));
-	if (package.is_valid() && PckExtractDialog::get_singleton()) {
-		PckExtractDialog::get_singleton()->popup_for_package(package);
+void EditorInspectorPluginPCKExtract::_extract_pressed(Object *p_package) {
+	Ref<PCKPackage> package(Object::cast_to<PCKPackage>(p_package));
+	if (package.is_valid() && PCKExtractDialog::get_singleton()) {
+		PCKExtractDialog::get_singleton()->popup_for_package(package);
 	}
 }
 
-bool EditorInspectorPluginPckExtract::can_handle(Object *p_object) {
-	const PckPackage *package = Object::cast_to<PckPackage>(p_object);
+bool EditorInspectorPluginPCKExtract::can_handle(Object *p_object) {
+	const PCKPackage *package = Object::cast_to<PCKPackage>(p_object);
 	return package && !package->is_description();
 }
 
-void EditorInspectorPluginPckExtract::parse_begin(Object *p_object) {
+void EditorInspectorPluginPCKExtract::parse_begin(Object *p_object) {
 	Button *button = memnew(Button(TTR("Extract...")));
 	button->set_tooltip_text(TTR("Write the files of this pack into a folder of the project."));
-	button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginPckExtract::_extract_pressed).bind(p_object));
+	button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginPCKExtract::_extract_pressed).bind(p_object));
 	add_custom_control(button);
 }
 
-PckExtractEditorPlugin::PckExtractEditorPlugin() {
-	dialog = memnew(PckExtractDialog);
+PCKExtractEditorPlugin::PCKExtractEditorPlugin() {
+	dialog = memnew(PCKExtractDialog);
 	EditorNode::get_singleton()->get_gui_base()->add_child(dialog);
 
 	context_menu_plugin.instantiate();
 	add_context_menu_plugin(EditorContextMenuPlugin::CONTEXT_SLOT_FILESYSTEM, context_menu_plugin);
 
-	Ref<EditorInspectorPluginPckExtract> inspector_plugin;
+	Ref<EditorInspectorPluginPCKExtract> inspector_plugin;
 	inspector_plugin.instantiate();
 	add_inspector_plugin(inspector_plugin);
 }

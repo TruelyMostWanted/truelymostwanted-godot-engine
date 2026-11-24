@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="EngineSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [EngineSettingsServer]: frame rate limit, time scale, physics rate, audio speed and low-processor mode.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"engine"[/code]. [EngineSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/engine.ini[/code]. Change the values through the methods of [EngineSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are clamped and applied.
+		The setters store values as they are; [EngineSettingsServer] clamps values out of range with a warning when they are set or loaded. The Inspector shows the usual range of each value.
+		It can also be used as the project defaults of the domain: save an [EngineSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/engine[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="audio_playback_speed_scale" type="float" setter="set_audio_playback_speed_scale" getter="get_audio_playback_speed_scale" default="1.0">
+			The playback speed of all audio, pushed to [member AudioServer.playback_speed_scale]. Valid range: [code]0.01[/code] to [code]4.0[/code]. A simulation value, see [member ProjectSettings.settings/engine/allow_simulation_values].
+		</member>
+		<member name="low_processor_mode" type="bool" setter="set_low_processor_mode_enabled" getter="is_low_processor_mode_enabled" default="false">
+			If [code]true[/code], the engine only redraws when something changes and sleeps between frames, pushed to [member OS.low_processor_usage_mode]. Saves power in menus and calm scenes, but a game that animates every frame gains little.
+		</member>
+		<member name="low_processor_mode_sleep_usec" type="int" setter="set_low_processor_mode_sleep_usec" getter="get_low_processor_mode_sleep_usec" default="6900">
+			The time the engine sleeps between frames in low-processor mode, in microseconds, pushed to [member OS.low_processor_usage_mode_sleep_usec]. Valid range: [code]0[/code] to [code]1000000[/code]. Has no effect in the Web export.
+		</member>
+		<member name="max_fps" type="int" setter="set_max_fps" getter="get_max_fps" default="0">
+			The frame rate limit, pushed to [member Engine.max_fps]. [code]0[/code] means unlimited. Negative values are clamped to [code]0[/code].
+		</member>
+		<member name="max_physics_steps_per_frame" type="int" setter="set_max_physics_steps_per_frame" getter="get_max_physics_steps_per_frame" default="8">
+			The maximum number of physics steps per rendered frame, pushed to [member Engine.max_physics_steps_per_frame]. Valid range: [code]1[/code] to [code]100[/code]. A simulation value.
+		</member>
+		<member name="physics_interpolation" type="bool" setter="set_physics_interpolation_enabled" getter="is_physics_interpolation_enabled" default="false">
+			If [code]true[/code], physics objects are drawn between two physics ticks, pushed to [member SceneTree.physics_interpolation]. Smooths motion when the frame rate and the physics rate differ.
+		</member>
+		<member name="physics_jitter_fix" type="float" setter="set_physics_jitter_fix" getter="get_physics_jitter_fix" default="0.5">
+			The physics jitter fix threshold, pushed to [member Engine.physics_jitter_fix]. Valid range: [code]0.0[/code] to [code]2.0[/code]. A simulation value.
+		</member>
+		<member name="physics_ticks_per_second" type="int" setter="set_physics_ticks_per_second" getter="get_physics_ticks_per_second" default="60">
+			The physics rate, pushed to [member Engine.physics_ticks_per_second]. Valid range: [code]1[/code] to [code]1000[/code]. A simulation value: changing it changes how the game behaves.
+		</member>
+		<member name="time_scale" type="float" setter="set_time_scale" getter="get_time_scale" default="1.0">
+			The game speed, pushed to [member Engine.time_scale]. Valid range: [code]0.01[/code] to [code]100.0[/code]; [code]0[/code] is not allowed as a stored value. A simulation value.
+		</member>
+	</members>
+</class>

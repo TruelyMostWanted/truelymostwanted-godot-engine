@@ -1865,7 +1865,15 @@ Error ResourceTextSerializer::write_ini(const Ref<Resource> &p_resource, const O
 	return OK;
 }
 
-Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error) {
+String ResourceTextSerializer::ini_value_to_text(const Variant &p_value, bool p_plain) {
+	return p_plain ? _ini_plain_text(p_value) : _ini_variant_text(p_value);
+}
+
+Variant ResourceTextSerializer::ini_text_to_value(const String &p_text) {
+	return _ini_parse_value(p_text);
+}
+
+Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error, int *r_error_line) {
 	r_sections.clear();
 	int current = -1;
 	const Vector<String> lines = p_text.split("\n");
@@ -1880,6 +1888,9 @@ Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVect
 		if (line[0] == '[') {
 			if (!line.ends_with("]")) {
 				r_error = vformat("Line %d: ']' expected.", i + 1);
+				if (r_error_line != nullptr) {
+					*r_error_line = i + 1;
+				}
 				return ERR_PARSE_ERROR;
 			}
 			r_sections.push_back(Section(line.substr(1, line.length() - 2).strip_edges(), Dictionary()));
@@ -1889,6 +1900,9 @@ Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVect
 		const int equal = line.find_char('=');
 		if (equal <= 0) {
 			r_error = vformat("Line %d: 'key=value' expected.", i + 1);
+			if (r_error_line != nullptr) {
+				*r_error_line = i + 1;
+			}
 			return ERR_PARSE_ERROR;
 		}
 		String key = line.substr(0, equal).strip_edges();
@@ -2033,11 +2047,22 @@ Error ResourceTextSerializer::parse_ini(const String &p_text, const String &p_ty
 // CSV.
 
 Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_text, char32_t p_delimiter) {
+	// An unclosed quote takes the rest of the text as its cell.
 	Vector<Vector<String>> rows;
+	String error;
+	int error_line = 0;
+	parse_csv_rows(p_text, p_delimiter, rows, error, error_line);
+	return rows;
+}
+
+Error ResourceTextSerializer::parse_csv_rows(const String &p_text, char32_t p_delimiter, Vector<Vector<String>> &r_rows, String &r_error, int &r_error_line) {
+	r_rows.clear();
 	Vector<String> row;
 	String cell;
 	bool in_quotes = false;
 	bool row_has_content = false;
+	int line = 1;
+	int quote_line = 0;
 	int start = 0;
 	if (!p_text.is_empty() && p_text[0] == 0xFEFF) {
 		start = 1; // UTF-8 byte order mark.
@@ -2045,6 +2070,9 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 	const int length = p_text.length();
 	for (int i = start; i < length; i++) {
 		const char32_t c = p_text[i];
+		if (c == '\n') {
+			line++;
+		}
 		if (in_quotes) {
 			if (c == '"') {
 				if (i + 1 < length && p_text[i + 1] == '"') {
@@ -2060,6 +2088,7 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 		}
 		if (c == '"' && cell.is_empty()) {
 			in_quotes = true;
+			quote_line = line;
 			row_has_content = true;
 		} else if (c == p_delimiter) {
 			row.push_back(cell);
@@ -2068,10 +2097,11 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 		} else if (c == '\n' || c == '\r') {
 			if (c == '\r' && i + 1 < length && p_text[i + 1] == '\n') {
 				i++;
+				line++;
 			}
 			if (row_has_content || !cell.is_empty()) {
 				row.push_back(cell);
-				rows.push_back(row);
+				r_rows.push_back(row);
 			}
 			row.clear();
 			cell = String();
@@ -2082,9 +2112,18 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 	}
 	if (row_has_content || !cell.is_empty()) {
 		row.push_back(cell);
-		rows.push_back(row);
+		r_rows.push_back(row);
 	}
-	return rows;
+	if (in_quotes) {
+		r_error = vformat("Line %d: the quoted cell is not closed.", quote_line);
+		r_error_line = quote_line;
+		return ERR_PARSE_ERROR;
+	}
+	return OK;
+}
+
+char32_t ResourceTextSerializer::get_csv_delimiter(const Options &p_options) {
+	return _csv_delimiter(p_options);
 }
 
 String ResourceTextSerializer::write_csv_row(const Vector<String> &p_cells, char32_t p_delimiter) {

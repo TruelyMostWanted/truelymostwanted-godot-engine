@@ -34,31 +34,31 @@
 #include "core/object/class_db.h"
 
 /////////////////////////////////////////////////////////////////////////////
-// AudioSettings.
+// AudioDeviceSettings.
 
-void AudioSettings::set_output_device(const String &p_device) {
+void AudioDeviceSettings::set_output_device(const String &p_device) {
 	output_device = p_device.is_empty() ? String("Default") : p_device;
 	emit_changed();
 }
 
-String AudioSettings::get_output_device() const {
+String AudioDeviceSettings::get_output_device() const {
 	return output_device;
 }
 
-void AudioSettings::set_input_device(const String &p_device) {
+void AudioDeviceSettings::set_input_device(const String &p_device) {
 	input_device = p_device.is_empty() ? String("Default") : p_device;
 	emit_changed();
 }
 
-String AudioSettings::get_input_device() const {
+String AudioDeviceSettings::get_input_device() const {
 	return input_device;
 }
 
-void AudioSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioSettings::set_output_device);
-	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioSettings::get_output_device);
-	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioSettings::set_input_device);
-	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioSettings::get_input_device);
+void AudioDeviceSettings::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioDeviceSettings::set_output_device);
+	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioDeviceSettings::get_output_device);
+	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioDeviceSettings::set_input_device);
+	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioDeviceSettings::get_input_device);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "output_device"), "set_output_device", "get_output_device");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "input_device"), "set_input_device", "get_input_device");

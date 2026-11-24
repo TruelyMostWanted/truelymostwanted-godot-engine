@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  audio_settings_server.h                                               */
+/*  register_types.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,42 +30,7 @@
 
 #pragma once
 
-#include "servers/settings/settings_server.h"
+#include "modules/register_module_types.h"
 
-// Settings domain `audio`: the output and the input device of AudioServer (AudioSettings).
-// The bus values are a separate list domain (AudioBusSettingsServer), so that list can be stored as CSV.
-class AudioSettingsServer : public SettingsServer {
-	GDCLASS(AudioSettingsServer, SettingsServer);
-
-	static AudioSettingsServer *singleton;
-
-	static void _push_output_device(const String &p_device);
-	static String _pull_output_device();
-	static void _push_input_device(const String &p_device);
-	static String _pull_input_device();
-	static String _validate_device(const String &p_device, bool p_input);
-
-protected:
-	static void _bind_methods();
-
-	virtual Ref<Resource> _create_default_settings() const override;
-	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
-
-public:
-	static AudioSettingsServer *get_singleton();
-
-	// True if the active audio driver can switch devices (WASAPI, PulseAudio, ALSA, CoreAudio on macOS).
-	static bool is_device_selection_supported();
-
-	virtual StringName get_domain() const override;
-	virtual ApplyPhase get_apply_phase() const override;
-	virtual bool is_value_supported(const StringName &p_name) const override;
-
-	void set_output_device(const String &p_device);
-	String get_output_device() const;
-	void set_input_device(const String &p_device);
-	String get_input_device() const;
-
-	AudioSettingsServer();
-	~AudioSettingsServer();
-};
+void initialize_yaml_module(ModuleInitializationLevel p_level);
+void uninitialize_yaml_module(ModuleInitializationLevel p_level);

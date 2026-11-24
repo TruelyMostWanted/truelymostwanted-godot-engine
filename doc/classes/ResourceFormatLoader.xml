@@ -48,7 +48,7 @@
 			<return type="PackedStringArray" />
 			<description>
 				Gets the list of extensions for files this loader is able to read.
-				[b]Note:[/b] [ResourceLoader] finds loaders through an index by extension. The list returned by this method is read once, when the loader is added with [method ResourceLoader.add_resource_format_loader]. If the list changes later, call [method ResourceLoader.refresh_format_index] (or remove and add the loader again); until then, paths with a new extension do not reach this loader. Extensions are matched case-insensitively, and an extension with dots like [code]"tar.gz"[/code] is indexed by its last part.
+				[b]Note:[/b] [ResourceLoader] finds loaders through an index by extension. The list returned by this method is read once, when the loader is added with [method ResourceLoader.add_resource_format_loader]. If the list changes later, call [method ResourceLoader.rebuild_extension_index] (or remove and add the loader again); until then, paths with a new extension do not reach this loader. Extensions are matched case-insensitively, and an extension with dots like [code]"tar.gz"[/code] is indexed by its last part.
 			</description>
 		</method>
 		<method name="_get_resource_script_class" qualifiers="virtual const">

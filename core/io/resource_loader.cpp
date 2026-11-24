@@ -65,7 +65,7 @@ ResourceLoaderFormatSnapshot ResourceLoader::_get_loaders() {
 	MutexLock lock(loaders_mutex);
 	if (unlikely(loaders.class_db_version != class_db_version)) {
 		// ClassDB registered new resource extensions (the binary loader's list): read the C++ lists again.
-		// C++ loaders neither print nor lock here; script lists are only read by refresh_format_index(), outside the lock.
+		// C++ loaders neither print nor lock here; script lists are only read by rebuild_extension_index(), outside the lock.
 		loaders.class_db_version = class_db_version;
 		for (int i = 0; i < loaders.formats.size(); i++) {
 			if (!loaders.entries[i].scripted) {
@@ -197,7 +197,7 @@ ResourceLoaderFormatSnapshot::Candidates::Iterator ResourceLoaderFormatSnapshot:
 
 bool ResourceFormatLoader::recognizes_path_by_extension() const {
 	// A script, C# or GDExtension `_recognize_path` may accept any path. A `_get_recognized_extensions` list is indexed;
-	// loaders that change it call ResourceLoader::refresh_format_index().
+	// loaders that change it call ResourceLoader::rebuild_extension_index().
 	return !GDVIRTUAL_IS_OVERRIDDEN(_recognize_path);
 }
 
@@ -1470,7 +1470,7 @@ void ResourceLoader::remove_resource_format_loader(Ref<ResourceFormatLoader> p_f
 	ERR_FAIL_COND(index < 0); // Not found; reported after releasing the lock.
 }
 
-void ResourceLoader::refresh_format_index() {
+void ResourceLoader::rebuild_extension_index() {
 	// Read every list outside the lock (script code may run), then store the entries of the loaders still registered.
 	const ResourceLoaderFormatSnapshot current = _get_loaders();
 	Vector<ResourceLoaderFormatSnapshot::Entry> fresh;
