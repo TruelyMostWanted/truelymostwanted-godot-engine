@@ -49,10 +49,10 @@ namespace TestVideoWindowSettingsServer {
 // Autosave off; the test display server has no screen, so the window values are kept by the domain.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 

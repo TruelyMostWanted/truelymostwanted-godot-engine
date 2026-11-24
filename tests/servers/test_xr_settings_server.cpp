@@ -141,10 +141,10 @@ struct TestSetup {
 			GDREGISTER_CLASS(XRSettingsTestInterface);
 			registered = true;
 		}
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 
