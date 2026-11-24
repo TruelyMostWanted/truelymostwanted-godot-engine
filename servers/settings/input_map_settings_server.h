@@ -74,6 +74,9 @@ private:
 	void _merge_project_actions();
 	void _on_settings_changed(const PackedStringArray &p_names);
 	void _emit_action_events_changed();
+	// The text form of the pending events per action, for `action_events_changed`.
+	HashMap<StringName, String> event_texts;
+	bool event_texts_ready = false;
 
 	// For InputActionRebinder (#191).
 	friend class InputActionRebinder;
