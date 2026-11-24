@@ -52,15 +52,15 @@ enum {
 	COLUMN_STATUS,
 };
 
-bool PckExtractDialog::_is_engine_file(const String &p_key) {
+bool PCKExtractDialog::_is_engine_file(const String &p_key) {
 	return p_key.begins_with(".godot/");
 }
 
-bool PckExtractDialog::_is_not_editable(const String &p_key) {
+bool PCKExtractDialog::_is_not_editable(const String &p_key) {
 	return p_key == "project.binary" || p_key.ends_with(".remap");
 }
 
-void PckExtractDialog::_open_package() {
+void PCKExtractDialog::_open_package() {
 	package.unref();
 	status_label->set_text(String());
 	if (!opened_path.is_empty()) {
@@ -72,7 +72,7 @@ void PckExtractDialog::_open_package() {
 	_update_tree();
 }
 
-void PckExtractDialog::_update_tree() {
+void PCKExtractDialog::_update_tree() {
 	updating = true;
 	tree->clear();
 	TreeItem *root = tree->create_item();
@@ -96,7 +96,7 @@ void PckExtractDialog::_update_tree() {
 	_update_preview();
 }
 
-void PckExtractDialog::_update_preview() {
+void PCKExtractDialog::_update_preview() {
 	const String target = target_edit->get_text().strip_edges();
 	const bool skip_engine = skip_engine_check->is_pressed();
 	int checked = 0;
@@ -146,13 +146,13 @@ void PckExtractDialog::_update_preview() {
 	get_ok_button()->set_disabled(package.is_null() || checked == 0 || target.is_empty());
 }
 
-void PckExtractDialog::_tree_item_edited() {
+void PCKExtractDialog::_tree_item_edited() {
 	if (!updating) {
 		_update_preview();
 	}
 }
 
-void PckExtractDialog::_set_all_checked(bool p_checked) {
+void PCKExtractDialog::_set_all_checked(bool p_checked) {
 	TreeItem *root = tree->get_root();
 	for (TreeItem *item = root ? root->get_first_child() : nullptr; item; item = item->get_next()) {
 		item->set_checked(COLUMN_PATH, p_checked);
@@ -160,7 +160,7 @@ void PckExtractDialog::_set_all_checked(bool p_checked) {
 	_update_preview();
 }
 
-void PckExtractDialog::_use_preset_key() {
+void PCKExtractDialog::_use_preset_key() {
 	EditorExport *exporter = EditorExport::get_singleton();
 	if (exporter) {
 		for (int i = 0; i < exporter->get_export_preset_count(); i++) {
@@ -180,36 +180,36 @@ void PckExtractDialog::_use_preset_key() {
 	status_label->set_text(TTR("No export preset has an encryption key."));
 }
 
-void PckExtractDialog::_browse_target() {
+void PCKExtractDialog::_browse_target() {
 	const String target = target_edit->get_text().strip_edges();
 	target_dialog->set_current_dir(target.begins_with("res://") ? target : String("res://"));
 	target_dialog->popup_file_dialog();
 }
 
-void PckExtractDialog::_target_selected(const String &p_dir) {
+void PCKExtractDialog::_target_selected(const String &p_dir) {
 	target_edit->set_text(p_dir);
 	_update_preview();
 }
 
-void PckExtractDialog::_target_changed(const String &p_text) {
+void PCKExtractDialog::_target_changed(const String &p_text) {
 	_update_preview();
 }
 
-void PckExtractDialog::_option_changed(int p_index) {
+void PCKExtractDialog::_option_changed(int p_index) {
 	_update_preview();
 }
 
-void PckExtractDialog::_skip_engine_toggled(bool p_pressed) {
+void PCKExtractDialog::_skip_engine_toggled(bool p_pressed) {
 	_update_tree();
 }
 
-void PckExtractDialog::_extract_progress(const String &p_path, int p_done, int p_total) {
+void PCKExtractDialog::_extract_progress(const String &p_path, int p_done, int p_total) {
 	if (progress) {
 		progress->step(p_path, p_done);
 	}
 }
 
-void PckExtractDialog::_show_result(const Ref<PCKExtractResult> &p_result, const String &p_target) {
+void PCKExtractDialog::_show_result(const Ref<PCKExtractResult> &p_result, const String &p_target) {
 	String text = vformat(TTR("%d files were written to \"%s\"."), p_result->get_written().size(), p_target);
 	if (!p_result->get_renamed().is_empty()) {
 		text += "\n" + vformat(TTR("%d of them under a new name."), p_result->get_renamed().size());
@@ -229,7 +229,7 @@ void PckExtractDialog::_show_result(const Ref<PCKExtractResult> &p_result, const
 	EditorNode::get_singleton()->show_warning(text, TTR("Extract Pack"));
 }
 
-void PckExtractDialog::ok_pressed() {
+void PCKExtractDialog::ok_pressed() {
 	if (package.is_null()) {
 		return;
 	}
@@ -246,7 +246,7 @@ void PckExtractDialog::ok_pressed() {
 	}
 
 	PCKPackageServer *server = PCKPackageServer::get_singleton();
-	const Callable progress_callable = callable_mp(this, &PckExtractDialog::_extract_progress);
+	const Callable progress_callable = callable_mp(this, &PCKExtractDialog::_extract_progress);
 	progress = memnew(EditorProgress("extract_pck", TTR("Extracting Pack"), paths.size()));
 	server->connect(SNAME("extract_progress"), progress_callable);
 	const Ref<PCKExtractResult> result = server->extract(package, target, paths, PCKPackageServer::ExtractPolicy(policy_option->get_selected_id()), skip_engine_check->is_pressed());
@@ -261,7 +261,7 @@ void PckExtractDialog::ok_pressed() {
 	_show_result(result, target);
 }
 
-void PckExtractDialog::popup_for_path(const String &p_pack_path) {
+void PCKExtractDialog::popup_for_path(const String &p_pack_path) {
 	opened_path = p_pack_path;
 	key_edit->set_text(String());
 	key_edit->set_editable(true);
@@ -272,7 +272,7 @@ void PckExtractDialog::popup_for_path(const String &p_pack_path) {
 	popup_centered_clamped(Size2(800, 600) * EDSCALE, 0.8);
 }
 
-void PckExtractDialog::popup_for_package(const Ref<PCKPackage> &p_package) {
+void PCKExtractDialog::popup_for_package(const Ref<PCKPackage> &p_package) {
 	ERR_FAIL_COND(p_package.is_null());
 	opened_path = p_package->get_pack_path();
 	package = p_package;
@@ -287,7 +287,7 @@ void PckExtractDialog::popup_for_package(const Ref<PCKPackage> &p_package) {
 	popup_centered_clamped(Size2(800, 600) * EDSCALE, 0.8);
 }
 
-void PckExtractDialog::_notification(int p_what) {
+void PCKExtractDialog::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_THEME_CHANGED: {
 			target_browse->set_button_icon(get_editor_theme_icon(SNAME("Folder")));
@@ -295,7 +295,7 @@ void PckExtractDialog::_notification(int p_what) {
 	}
 }
 
-PckExtractDialog::PckExtractDialog() {
+PCKExtractDialog::PCKExtractDialog() {
 	singleton = this;
 	set_title(TTR("Extract Pack"));
 	set_ok_button_text(TTR("Extract"));
@@ -318,10 +318,10 @@ PckExtractDialog::PckExtractDialog() {
 	key_edit->set_accessibility_name(TTRC("Key"));
 	key_hb->add_child(key_edit);
 	preset_key_button = memnew(Button(TTR("Use Key from Export Preset")));
-	preset_key_button->connect(SceneStringName(pressed), callable_mp(this, &PckExtractDialog::_use_preset_key));
+	preset_key_button->connect(SceneStringName(pressed), callable_mp(this, &PCKExtractDialog::_use_preset_key));
 	key_hb->add_child(preset_key_button);
 	reopen_button = memnew(Button(TTR("Open")));
-	reopen_button->connect(SceneStringName(pressed), callable_mp(this, &PckExtractDialog::_open_package));
+	reopen_button->connect(SceneStringName(pressed), callable_mp(this, &PCKExtractDialog::_open_package));
 	key_hb->add_child(reopen_button);
 
 	status_label = memnew(Label);
@@ -331,10 +331,10 @@ PckExtractDialog::PckExtractDialog() {
 	HBoxContainer *select_hb = memnew(HBoxContainer);
 	main_vb->add_child(select_hb);
 	Button *select_all = memnew(Button(TTR("Select All")));
-	select_all->connect(SceneStringName(pressed), callable_mp(this, &PckExtractDialog::_set_all_checked).bind(true));
+	select_all->connect(SceneStringName(pressed), callable_mp(this, &PCKExtractDialog::_set_all_checked).bind(true));
 	select_hb->add_child(select_all);
 	Button *select_none = memnew(Button(TTR("Select None")));
-	select_none->connect(SceneStringName(pressed), callable_mp(this, &PckExtractDialog::_set_all_checked).bind(false));
+	select_none->connect(SceneStringName(pressed), callable_mp(this, &PCKExtractDialog::_set_all_checked).bind(false));
 	select_hb->add_child(select_none);
 
 	tree = memnew(Tree);
@@ -351,7 +351,7 @@ PckExtractDialog::PckExtractDialog() {
 	tree->set_column_custom_minimum_width(COLUMN_STATUS, 120 * EDSCALE);
 	tree->set_hide_root(true);
 	tree->set_accessibility_name(TTRC("Files"));
-	tree->connect("item_edited", callable_mp(this, &PckExtractDialog::_tree_item_edited));
+	tree->connect("item_edited", callable_mp(this, &PCKExtractDialog::_tree_item_edited));
 	main_vb->add_child(tree);
 
 	HBoxContainer *target_hb = memnew(HBoxContainer);
@@ -362,11 +362,11 @@ PckExtractDialog::PckExtractDialog() {
 	target_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	target_edit->set_text("res://");
 	target_edit->set_accessibility_name(TTRC("Target Folder"));
-	target_edit->connect(SceneStringName(text_changed), callable_mp(this, &PckExtractDialog::_target_changed));
+	target_edit->connect(SceneStringName(text_changed), callable_mp(this, &PCKExtractDialog::_target_changed));
 	target_hb->add_child(target_edit);
 	target_browse = memnew(Button);
 	target_browse->set_accessibility_name(TTRC("Browse"));
-	target_browse->connect(SceneStringName(pressed), callable_mp(this, &PckExtractDialog::_browse_target));
+	target_browse->connect(SceneStringName(pressed), callable_mp(this, &PCKExtractDialog::_browse_target));
 	target_hb->add_child(target_browse);
 
 	HBoxContainer *options_hb = memnew(HBoxContainer);
@@ -378,12 +378,12 @@ PckExtractDialog::PckExtractDialog() {
 	policy_option->add_item(TTR("Overwrite"), PCKPackageServer::EXTRACT_OVERWRITE);
 	policy_option->add_item(TTR("Rename"), PCKPackageServer::EXTRACT_RENAME);
 	policy_option->set_accessibility_name(TTRC("Existing Files"));
-	policy_option->connect(SceneStringName(item_selected), callable_mp(this, &PckExtractDialog::_option_changed));
+	policy_option->connect(SceneStringName(item_selected), callable_mp(this, &PCKExtractDialog::_option_changed));
 	options_hb->add_child(policy_option);
 	skip_engine_check = memnew(CheckBox(TTR("Skip Engine Files")));
 	skip_engine_check->set_pressed(true);
 	skip_engine_check->set_tooltip_text(TTR("Skip files below .godot/, .import files without their source, .remap files and project.binary.\nExported packs contain imported and converted files, not the sources."));
-	skip_engine_check->connect(SceneStringName(toggled), callable_mp(this, &PckExtractDialog::_skip_engine_toggled));
+	skip_engine_check->connect(SceneStringName(toggled), callable_mp(this, &PCKExtractDialog::_skip_engine_toggled));
 	options_hb->add_child(skip_engine_check);
 
 	preview_label = memnew(Label);
@@ -394,11 +394,11 @@ PckExtractDialog::PckExtractDialog() {
 	target_dialog = memnew(EditorFileDialog);
 	target_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_DIR);
 	target_dialog->set_access(EditorFileDialog::ACCESS_RESOURCES);
-	target_dialog->connect("dir_selected", callable_mp(this, &PckExtractDialog::_target_selected));
+	target_dialog->connect("dir_selected", callable_mp(this, &PCKExtractDialog::_target_selected));
 	add_child(target_dialog);
 }
 
-PckExtractDialog::~PckExtractDialog() {
+PCKExtractDialog::~PCKExtractDialog() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}
