@@ -208,13 +208,13 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	ctrl->set_ctrl_pressed(true);
 	CHECK(rebinder->update(ctrl));
 	CHECK(rebinder->is_active());
-	CHECK(events_text(server, JUMP) == "Key:Space; JoypadButton:X");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
 	Ref<InputEventKey> ctrl_s = make_key(Key::S);
 	ctrl_s->set_ctrl_pressed(true);
 	CHECK(rebinder->update(ctrl_s));
 	CHECK_FALSE(rebinder->is_active());
-	CHECK(recorder->last() == vformat("completed:%s:0:PhysicalKey:Ctrl+S", JUMP));
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Ctrl+S; JoypadButton:X");
+	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Ctrl+S", JUMP));
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X@Any");
 
 	// A modifier released before another key is bound alone (Shift to sprint).
 	CHECK(rebinder->begin(JUMP, 1) == OK);
@@ -224,8 +224,8 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	CHECK(rebinder->is_active());
 	CHECK(rebinder->update(make_key(Key::SHIFT, false)));
 	CHECK_FALSE(rebinder->is_active());
-	CHECK(recorder->last() == vformat("completed:%s:1:PhysicalKey:Shift", JUMP));
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Ctrl+S; JoypadButton:X; PhysicalKey:Shift");
+	CHECK(recorder->last() == vformat("completed:%s:1:Keyboard:Shift", JUMP));
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X@Any; Keyboard:Shift");
 
 	// Gamepad: a weak stick move is ignored, a strong one keeps its direction; another pad is ignored.
 	rebinder->set_device_filter(InputActionRebinder::DEVICE_GAMEPAD);
@@ -235,9 +235,9 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	CHECK_FALSE(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.3f, 1)));
 	CHECK_FALSE(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.9f, 0)));
 	CHECK(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.9f, 1)));
-	CHECK(recorder->last() == vformat("completed:%s:0:JoypadMotion:LeftY-", JUMP));
+	CHECK(recorder->last() == vformat("completed:%s:0:GamepadAxis:LeftY-", JUMP));
 	// Stored for all pads, so the binding still works after the pad is reconnected with another id.
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Ctrl+S; JoypadMotion:LeftY-; PhysicalKey:Shift");
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; GamepadAxis:LeftY-; Keyboard:Shift");
 	CHECK(is_action(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -1.0f, 3), JUMP));
 
 	// Errors of begin().
@@ -267,20 +267,23 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_REJECT emits conflict and w
 	CHECK(recorder->last() == vformat("conflict:%s:0:%s:0", FIRE, JUMP));
 	CHECK(rebinder->is_active());
 	CHECK_FALSE(rebinder->is_conflict_pending());
-	CHECK(InputAction::event_to_text(rebinder->get_conflict_event()) == "PhysicalKey:Space");
-	CHECK(events_text(server, FIRE) == "MouseButton:Left");
-	CHECK(events_text(server, JUMP) == "Key:Space; JoypadButton:X");
+	CHECK(InputAction::event_to_text(rebinder->get_conflict_event()) == "Keyboard:Space");
+	CHECK(events_text(server, FIRE) == "Mouse:Left");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
 
 	CHECK(rebinder->update(make_key(Key::F)));
-	CHECK(recorder->last() == vformat("completed:%s:0:PhysicalKey:F", FIRE));
-	CHECK(events_text(server, FIRE) == "PhysicalKey:F");
+	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:F", FIRE));
+	CHECK(events_text(server, FIRE) == "Keyboard:F");
 	CHECK(is_action(make_key(Key::F), FIRE));
 
 	// An ignored action is no conflict.
-	rebinder->set_ignored_actions(PackedStringArray({ JUMP }));
+	// Keep the built-in actions ignored (Space is also ui_select) and add JUMP.
+	PackedStringArray ignored = rebinder->get_ignored_actions();
+	ignored.push_back(JUMP);
+	rebinder->set_ignored_actions(ignored);
 	CHECK(rebinder->begin(FIRE, 0) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
-	CHECK(recorder->last() == vformat("completed:%s:0:PhysicalKey:Space", FIRE));
+	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Space", FIRE));
 
 	rebinder.unref();
 	memdelete(server);
@@ -301,8 +304,8 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_SWAP exchanges both events 
 	CHECK(rebinder->begin(FIRE, 0) == OK);
 	recorder->log.clear();
 	CHECK(rebinder->update(make_key(Key::SPACE)));
-	CHECK(events_text(server, FIRE) == "PhysicalKey:Space");
-	CHECK(events_text(server, JUMP) == "MouseButton:Left; JoypadButton:X");
+	CHECK(events_text(server, FIRE) == "Keyboard:Space");
+	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X@Any");
 	CHECK(is_action(make_key(Key::SPACE), FIRE));
 	CHECK_FALSE(is_action(make_key(Key::SPACE), JUMP));
 	CHECK(is_action(make_mouse_button(MouseButton::LEFT), JUMP));
@@ -313,7 +316,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_SWAP exchanges both events 
 	CHECK(recorder->log[0] == "value_changed:actions");
 	CHECK(recorder->log.has(vformat("changed:%s", FIRE)));
 	CHECK(recorder->log.has(vformat("changed:%s", JUMP)));
-	CHECK(recorder->log[3] == vformat("completed:%s:0:PhysicalKey:Space", FIRE));
+	CHECK(recorder->log[3] == vformat("completed:%s:0:Keyboard:Space", FIRE));
 
 	rebinder.unref();
 	memdelete(server);
@@ -331,9 +334,9 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ALLOW binds the event to bo
 	// DEVICE_ANY: index 2 is behind the last event of fire, so the event is added.
 	CHECK(rebinder->begin(FIRE, 2) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
-	CHECK(recorder->last() == vformat("completed:%s:1:PhysicalKey:Space", FIRE));
-	CHECK(events_text(server, FIRE) == "MouseButton:Left; PhysicalKey:Space");
-	CHECK(events_text(server, JUMP) == "Key:Space; JoypadButton:X");
+	CHECK(recorder->last() == vformat("completed:%s:1:Keyboard:Space", FIRE));
+	CHECK(events_text(server, FIRE) == "Mouse:Left; Keyboard:Space");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
 	CHECK(is_action(make_key(Key::SPACE), FIRE));
 	CHECK(is_action(make_key(Key::SPACE), JUMP));
 
@@ -360,8 +363,8 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	// The key of the slot itself is no conflict; the slot gets the stored form of the pressed key.
 	CHECK(rebinder->begin(JUMP, 0) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
-	CHECK(recorder->last() == vformat("completed:%s:0:PhysicalKey:Space", JUMP));
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Space; JoypadButton:X");
+	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Space", JUMP));
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
 
 	// Cancel: nothing changes.
 	CHECK(rebinder->begin(FIRE, 0) == OK);
@@ -374,32 +377,32 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	CHECK(recorder->log == PackedStringArray({ vformat("canceled:%s:0", FIRE) }));
 	CHECK_FALSE(rebinder->is_active());
 	CHECK_FALSE(rebinder->is_conflict_pending());
-	CHECK(events_text(server, FIRE) == "MouseButton:Left");
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Space; JoypadButton:X");
+	CHECK(events_text(server, FIRE) == "Mouse:Left");
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
 
 	// Allow.
 	CHECK(rebinder->begin(FIRE, 0) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
 	CHECK(rebinder->resolve_conflict_allow() == OK);
 	CHECK_FALSE(rebinder->is_active());
-	CHECK(recorder->last() == vformat("completed:%s:0:PhysicalKey:Space", FIRE));
-	CHECK(events_text(server, FIRE) == "PhysicalKey:Space");
-	CHECK(events_text(server, JUMP) == "PhysicalKey:Space; JoypadButton:X");
+	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Space", FIRE));
+	CHECK(events_text(server, FIRE) == "Keyboard:Space");
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
 
 	// Swap: jump takes the old event of fire's slot; the server signals come before completed.
 	server->reset_action(FIRE);
-	CHECK(events_text(server, FIRE) == "MouseButton:Left");
+	CHECK(events_text(server, FIRE) == "Mouse:Left");
 	CHECK(rebinder->begin(FIRE, 0) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
 	CHECK(rebinder->is_conflict_pending());
 	recorder->log.clear();
 	CHECK(rebinder->resolve_conflict_swap() == OK);
-	CHECK(events_text(server, FIRE) == "PhysicalKey:Space");
-	CHECK(events_text(server, JUMP) == "MouseButton:Left; JoypadButton:X");
+	CHECK(events_text(server, FIRE) == "Keyboard:Space");
+	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X@Any");
 	REQUIRE(recorder->log.size() == 3);
 	CHECK(recorder->log[0].begins_with("changed:"));
 	CHECK(recorder->log[1].begins_with("changed:"));
-	CHECK(recorder->log[2] == vformat("completed:%s:0:PhysicalKey:Space", FIRE));
+	CHECK(recorder->log[2] == vformat("completed:%s:0:Keyboard:Space", FIRE));
 
 	rebinder.unref();
 	memdelete(server);
@@ -428,7 +431,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Cancel without an event changes noth
 	recorder->log.clear();
 	keyboard->cancel(); // No session: no signal.
 	CHECK(recorder->log.is_empty());
-	CHECK(events_text(server, JUMP) == "Key:Space; JoypadButton:X");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
 
 	// begin() during a session cancels it first.
 	CHECK(keyboard->begin(JUMP, 0) == OK);
@@ -448,7 +451,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Cancel without an event changes noth
 	CHECK_FALSE(pad->update(make_key(Key::W)));
 	CHECK(keyboard->update(make_key(Key::W)));
 	CHECK_FALSE(keyboard->is_active());
-	CHECK(events_text(server, JUMP) == "PhysicalKey:W; JoypadButton:Y");
+	CHECK(events_text(server, JUMP) == "Keyboard:W; Gamepad:Y@Any");
 
 	keyboard.unref();
 	pad.unref();
@@ -492,7 +495,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Built-in actions count as conflicts;
 	}
 	CHECK(accept_conflict);
 	CHECK(rebinder->is_active()); // Handled like CONFLICT_REJECT.
-	CHECK(events_text(server, JUMP) == "Key:Space; JoypadButton:X");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
 	rebinder->cancel();
 
 	rebinder.unref();
@@ -526,13 +529,13 @@ TEST_CASE("[SceneTree][InputActionRebinder] The committed event is the event a s
 		CHECK(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::TRIGGER_RIGHT, 0.8f, 2)));
 		committed_text = recorder->last();
 		stored_text = events_text(server, JUMP);
-		CHECK(stored_text == "PhysicalKey:Ctrl+W; JoypadMotion:TriggerRight+");
+		CHECK(stored_text == "Keyboard:Ctrl+W; GamepadAxis:TriggerRight+");
 		CHECK(server->save() == OK);
 		rebinder.unref();
 		memdelete(server);
 		memdelete(recorder);
 	}
-	CHECK(committed_text == vformat("completed:%s:1:JoypadMotion:TriggerRight+", JUMP));
+	CHECK(committed_text == vformat("completed:%s:1:GamepadAxis:TriggerRight+", JUMP));
 
 	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 	server->set_file_path(path);
