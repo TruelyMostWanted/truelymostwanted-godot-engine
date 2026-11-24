@@ -78,7 +78,7 @@
 		game.SetValue("difficulty", 2);
 		[/csharp]
 		[/codeblocks]
-		[b]Note:[/b] In C#, the settings server of a C++ domain that is an engine singleton is reached through its [code]Singleton[/code] property, for example [code]AudioSettingsServer.Singleton.Apply()[/code]. The generator only puts the methods of the class itself into the static class, so the methods of [SettingsServer] are not available as [code]AudioSettingsServer.Apply()[/code].
+		[b]Note:[/b] In C#, the settings server of a C++ domain that is an engine singleton is reached through its [code]Singleton[/code] property, for example [code]AudioDeviceSettingsServer.Singleton.Apply()[/code]. The generator only puts the methods of the class itself into the static class, so the methods of [SettingsServer] are not available as [code]AudioDeviceSettingsServer.Apply()[/code].
 		[b]Note:[/b] The API is for the main thread only. Signals are emitted on the main thread.
 		[b]Note:[/b] Settings files are stored in [code]user://[/code], which is available on all platforms, including the Web export.
 	</description>
