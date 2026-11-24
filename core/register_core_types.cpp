@@ -50,6 +50,7 @@
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
 #include "core/io/files_manifest_server.h"
+#include "core/io/files_manifest_validation.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
@@ -393,6 +394,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
+	GDREGISTER_CLASS(FilesManifestValidation);
 	GDREGISTER_CLASS(PckExtractResult);
 	GDREGISTER_CLASS(PckPackage);
 	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
