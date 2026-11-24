@@ -36,19 +36,19 @@
 #include "core/os/os.h"
 #include "servers/display/display_server.h"
 
-TtsServer *TtsServer::singleton = nullptr;
+TTSServer *TTSServer::singleton = nullptr;
 
-TtsServer *TtsServer::get_singleton() {
+TTSServer *TTSServer::get_singleton() {
 	return singleton;
 }
 
 // Platforms write languages as "en_US", "en-US" or "en". Compare them as lower case with underscores.
-String TtsServer::_normalize_language(const String &p_language) {
+String TTSServer::_normalize_language(const String &p_language) {
 	return p_language.strip_edges().replace_char('-', '_').to_lower();
 }
 
 // An empty language matches every voice. "en" matches "en_US" and "en_GB", "en_US" matches only "en_US".
-bool TtsServer::_language_matches(const String &p_voice_language, const String &p_language) {
+bool TTSServer::_language_matches(const String &p_voice_language, const String &p_language) {
 	const String language = _normalize_language(p_language);
 	if (language.is_empty()) {
 		return true;
@@ -63,7 +63,7 @@ bool TtsServer::_language_matches(const String &p_voice_language, const String &
 	return false;
 }
 
-String TtsServer::_find_voice_for_language(const TypedArray<Dictionary> &p_voices, const String &p_language) {
+String TTSServer::_find_voice_for_language(const TypedArray<Dictionary> &p_voices, const String &p_language) {
 	const String language = _normalize_language(p_language);
 	if (language.is_empty()) {
 		return String();
@@ -86,7 +86,7 @@ String TtsServer::_find_voice_for_language(const TypedArray<Dictionary> &p_voice
 	return String();
 }
 
-String TtsServer::_get_unavailable_reason() const {
+String TTSServer::_get_unavailable_reason() const {
 	if (!bool(GLOBAL_GET("audio/general/text_to_speech"))) {
 		return "Text to speech is disabled. Enable the project setting \"audio/general/text_to_speech\" and restart the project.";
 	}
@@ -100,9 +100,9 @@ String TtsServer::_get_unavailable_reason() const {
 	return String();
 }
 
-Ref<TtsPersona> TtsServer::_get_default_persona_locked() const {
+Ref<TTSPersona> TTSServer::_get_default_persona_locked() const {
 	if (!default_persona_name.is_empty()) {
-		const Ref<TtsPersona> *persona = personas.getptr(default_persona_name);
+		const Ref<TTSPersona> *persona = personas.getptr(default_persona_name);
 		if (persona != nullptr) {
 			return *persona;
 		}
@@ -113,7 +113,7 @@ Ref<TtsPersona> TtsServer::_get_default_persona_locked() const {
 	return builtin_persona;
 }
 
-void TtsServer::_emit_utterance_event(int p_event, int64_t p_id, int p_char_pos) {
+void TTSServer::_emit_utterance_event(int p_event, int64_t p_id, int p_char_pos) {
 	switch (p_event) {
 		case DisplayServerEnums::TTS_UTTERANCE_STARTED: {
 			emit_signal(SNAME("utterance_started"), p_id);
@@ -140,27 +140,27 @@ void TtsServer::_emit_utterance_event(int p_event, int64_t p_id, int p_char_pos)
 	}
 }
 
-void TtsServer::post_utterance_event(int p_event, int64_t p_id, int p_char_pos) {
+void TTSServer::post_utterance_event(int p_event, int64_t p_id, int p_char_pos) {
 	ERR_FAIL_INDEX(p_event, DisplayServerEnums::TTS_UTTERANCE_MAX);
 	// Platform callbacks may come from other threads in rapid succession: signals are always sent on the main thread.
-	callable_mp(this, &TtsServer::_emit_utterance_event).call_deferred(p_event, p_id, p_char_pos);
+	callable_mp(this, &TTSServer::_emit_utterance_event).call_deferred(p_event, p_id, p_char_pos);
 }
 
-bool TtsServer::is_available() const {
+bool TTSServer::is_available() const {
 	return _get_unavailable_reason().is_empty();
 }
 
-int64_t TtsServer::speak(const String &p_text, const Ref<TtsPersona> &p_persona) {
+int64_t TTSServer::speak(const String &p_text, const Ref<TTSPersona> &p_persona) {
 	ERR_FAIL_COND_V_MSG(p_text.is_empty(), -1, "Cannot speak an empty text.");
 	const String reason = _get_unavailable_reason();
 	ERR_FAIL_COND_V_MSG(!reason.is_empty(), -1, reason);
 
-	Ref<TtsPersona> persona = p_persona;
+	Ref<TTSPersona> persona = p_persona;
 	if (persona.is_null()) {
 		MutexLock lock(mutex);
 		persona = _get_default_persona_locked();
 	}
-	const String voice = resolve_voice(persona);
+	const String voice = resolve_voice_id(persona);
 
 	int64_t id = 0;
 	{
@@ -172,7 +172,7 @@ int64_t TtsServer::speak(const String &p_text, const Ref<TtsPersona> &p_persona)
 	return id;
 }
 
-void TtsServer::stop() {
+void TTSServer::stop() {
 	{
 		MutexLock lock(mutex);
 		pending.clear();
@@ -182,33 +182,33 @@ void TtsServer::stop() {
 	}
 }
 
-void TtsServer::pause() {
+void TTSServer::pause() {
 	if (is_available()) {
 		DisplayServer::get_singleton()->tts_pause();
 	}
 }
 
-void TtsServer::resume() {
+void TTSServer::resume() {
 	if (is_available()) {
 		DisplayServer::get_singleton()->tts_resume();
 	}
 }
 
-bool TtsServer::is_speaking() const {
+bool TTSServer::is_speaking() const {
 	if (!is_available()) {
 		return false;
 	}
 	return DisplayServer::get_singleton()->tts_is_speaking();
 }
 
-bool TtsServer::is_paused() const {
+bool TTSServer::is_paused() const {
 	if (!is_available()) {
 		return false;
 	}
 	return DisplayServer::get_singleton()->tts_is_paused();
 }
 
-PackedInt64Array TtsServer::get_pending_utterances() const {
+PackedInt64Array TTSServer::get_pending_utterances() const {
 	MutexLock lock(mutex);
 	PackedInt64Array ids;
 	for (const int64_t id : pending) {
@@ -218,77 +218,83 @@ PackedInt64Array TtsServer::get_pending_utterances() const {
 	return ids;
 }
 
-void TtsServer::add_persona(const Ref<TtsPersona> &p_persona) {
+void TTSServer::add_persona(const Ref<TTSPersona> &p_persona) {
 	ERR_FAIL_COND_MSG(p_persona.is_null(), "Cannot add a null persona.");
-	const String name = p_persona->get_persona_name();
-	ERR_FAIL_COND_MSG(name.is_empty(), "Cannot add a persona without a name.");
+	const StringName persona_key = p_persona->get_persona_name();
+	ERR_FAIL_COND_MSG(persona_key.is_empty(), "Cannot add a persona without a name.");
 	MutexLock lock(mutex);
-	personas[name] = p_persona;
+	personas[persona_key] = p_persona;
 }
 
-void TtsServer::remove_persona(const String &p_name) {
+void TTSServer::remove_persona(const StringName &p_name) {
 	MutexLock lock(mutex);
 	personas.erase(p_name);
 	if (default_persona_name == p_name) {
-		default_persona_name = String();
+		default_persona_name = StringName();
 	}
 }
 
-bool TtsServer::has_persona(const String &p_name) const {
+bool TTSServer::has_persona(const StringName &p_name) const {
 	MutexLock lock(mutex);
 	return personas.has(p_name);
 }
 
-Ref<TtsPersona> TtsServer::get_persona(const String &p_name) const {
+Ref<TTSPersona> TTSServer::get_persona(const StringName &p_name) const {
 	MutexLock lock(mutex);
-	const Ref<TtsPersona> *persona = personas.getptr(p_name);
+	const Ref<TTSPersona> *persona = personas.getptr(p_name);
 	if (persona == nullptr) {
-		return Ref<TtsPersona>();
+		return Ref<TTSPersona>();
 	}
 	return *persona;
 }
 
-TypedArray<TtsPersona> TtsServer::get_personas() const {
+TypedArray<TTSPersona> TTSServer::get_personas() const {
 	MutexLock lock(mutex);
-	TypedArray<TtsPersona> list;
-	for (const KeyValue<String, Ref<TtsPersona>> &E : personas) {
+	TypedArray<TTSPersona> list;
+	for (const KeyValue<StringName, Ref<TTSPersona>> &E : personas) {
 		list.push_back(E.value);
 	}
 	return list;
 }
 
-PackedStringArray TtsServer::get_persona_names() const {
+PackedStringArray TTSServer::get_persona_names() const {
 	MutexLock lock(mutex);
 	PackedStringArray names;
-	for (const KeyValue<String, Ref<TtsPersona>> &E : personas) {
+	for (const KeyValue<StringName, Ref<TTSPersona>> &E : personas) {
 		names.push_back(E.key);
 	}
 	return names;
 }
 
-void TtsServer::clear_personas() {
+void TTSServer::clear_personas() {
 	MutexLock lock(mutex);
 	personas.clear();
-	default_persona_name = String();
+	default_persona_name = StringName();
 }
 
-void TtsServer::set_default_persona(const String &p_name) {
-	MutexLock lock(mutex);
-	ERR_FAIL_COND_MSG(!p_name.is_empty() && !personas.has(p_name), vformat("No persona named \"%s\". Add it with add_persona() first.", p_name));
-	default_persona_name = p_name;
+void TTSServer::set_default_persona(const StringName &p_name) {
+	bool found = true;
+	{
+		MutexLock lock(mutex);
+		found = p_name.is_empty() || personas.has(p_name);
+		if (found) {
+			default_persona_name = p_name;
+		}
+	}
+	ERR_FAIL_COND_MSG(!found, vformat("No persona named \"%s\". Add it with add_persona() first.", p_name));
 }
 
-Ref<TtsPersona> TtsServer::get_default_persona() const {
+Ref<TTSPersona> TTSServer::get_default_persona() const {
 	MutexLock lock(mutex);
 	return _get_default_persona_locked();
 }
 
-String TtsServer::get_default_persona_name() const {
+StringName TTSServer::get_default_persona_name() const {
 	MutexLock lock(mutex);
 	return default_persona_name;
 }
 
-TypedArray<Dictionary> TtsServer::get_voices(const String &p_language) const {
+TypedArray<Dictionary> TTSServer::get_voices(const String &p_language) const {
 	TypedArray<Dictionary> result;
 	if (!is_available()) {
 		return result;
@@ -303,8 +309,8 @@ TypedArray<Dictionary> TtsServer::get_voices(const String &p_language) const {
 	return result;
 }
 
-String TtsServer::resolve_voice(const Ref<TtsPersona> &p_persona) const {
-	Ref<TtsPersona> persona = p_persona;
+String TTSServer::resolve_voice_id(const Ref<TTSPersona> &p_persona) const {
+	Ref<TTSPersona> persona = p_persona;
 	if (persona.is_null()) {
 		MutexLock lock(mutex);
 		persona = _get_default_persona_locked();
@@ -352,31 +358,31 @@ String TtsServer::resolve_voice(const Ref<TtsPersona> &p_persona) const {
 	return first.get("id", String());
 }
 
-void TtsServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("is_available"), &TtsServer::is_available);
+void TTSServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("is_available"), &TTSServer::is_available);
 
-	ClassDB::bind_method(D_METHOD("speak", "text", "persona"), &TtsServer::speak, DEFVAL(Variant()));
-	ClassDB::bind_method(D_METHOD("stop"), &TtsServer::stop);
-	ClassDB::bind_method(D_METHOD("pause"), &TtsServer::pause);
-	ClassDB::bind_method(D_METHOD("resume"), &TtsServer::resume);
-	ClassDB::bind_method(D_METHOD("is_speaking"), &TtsServer::is_speaking);
-	ClassDB::bind_method(D_METHOD("is_paused"), &TtsServer::is_paused);
-	ClassDB::bind_method(D_METHOD("get_pending_utterances"), &TtsServer::get_pending_utterances);
+	ClassDB::bind_method(D_METHOD("speak", "text", "persona"), &TTSServer::speak, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("stop"), &TTSServer::stop);
+	ClassDB::bind_method(D_METHOD("pause"), &TTSServer::pause);
+	ClassDB::bind_method(D_METHOD("resume"), &TTSServer::resume);
+	ClassDB::bind_method(D_METHOD("is_speaking"), &TTSServer::is_speaking);
+	ClassDB::bind_method(D_METHOD("is_paused"), &TTSServer::is_paused);
+	ClassDB::bind_method(D_METHOD("get_pending_utterances"), &TTSServer::get_pending_utterances);
 
-	ClassDB::bind_method(D_METHOD("add_persona", "persona"), &TtsServer::add_persona);
-	ClassDB::bind_method(D_METHOD("remove_persona", "name"), &TtsServer::remove_persona);
-	ClassDB::bind_method(D_METHOD("has_persona", "name"), &TtsServer::has_persona);
-	ClassDB::bind_method(D_METHOD("get_persona", "name"), &TtsServer::get_persona);
-	ClassDB::bind_method(D_METHOD("get_personas"), &TtsServer::get_personas);
-	ClassDB::bind_method(D_METHOD("get_persona_names"), &TtsServer::get_persona_names);
-	ClassDB::bind_method(D_METHOD("clear_personas"), &TtsServer::clear_personas);
+	ClassDB::bind_method(D_METHOD("add_persona", "persona"), &TTSServer::add_persona);
+	ClassDB::bind_method(D_METHOD("remove_persona", "name"), &TTSServer::remove_persona);
+	ClassDB::bind_method(D_METHOD("has_persona", "name"), &TTSServer::has_persona);
+	ClassDB::bind_method(D_METHOD("get_persona", "name"), &TTSServer::get_persona);
+	ClassDB::bind_method(D_METHOD("get_personas"), &TTSServer::get_personas);
+	ClassDB::bind_method(D_METHOD("get_persona_names"), &TTSServer::get_persona_names);
+	ClassDB::bind_method(D_METHOD("clear_personas"), &TTSServer::clear_personas);
 
-	ClassDB::bind_method(D_METHOD("set_default_persona", "name"), &TtsServer::set_default_persona);
-	ClassDB::bind_method(D_METHOD("get_default_persona"), &TtsServer::get_default_persona);
-	ClassDB::bind_method(D_METHOD("get_default_persona_name"), &TtsServer::get_default_persona_name);
+	ClassDB::bind_method(D_METHOD("set_default_persona", "name"), &TTSServer::set_default_persona);
+	ClassDB::bind_method(D_METHOD("get_default_persona"), &TTSServer::get_default_persona);
+	ClassDB::bind_method(D_METHOD("get_default_persona_name"), &TTSServer::get_default_persona_name);
 
-	ClassDB::bind_method(D_METHOD("get_voices", "language"), &TtsServer::get_voices, DEFVAL(String()));
-	ClassDB::bind_method(D_METHOD("resolve_voice", "persona"), &TtsServer::resolve_voice, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("get_voices", "language"), &TTSServer::get_voices, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("resolve_voice_id", "persona"), &TTSServer::resolve_voice_id, DEFVAL(Variant()));
 
 	ADD_SIGNAL(MethodInfo("utterance_started", PropertyInfo(Variant::INT, "id")));
 	ADD_SIGNAL(MethodInfo("utterance_ended", PropertyInfo(Variant::INT, "id")));
@@ -384,11 +390,11 @@ void TtsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("utterance_boundary", PropertyInfo(Variant::INT, "id"), PropertyInfo(Variant::INT, "char_pos")));
 }
 
-TtsServer::TtsServer() {
+TTSServer::TTSServer() {
 	singleton = this;
 }
 
-TtsServer::~TtsServer() {
+TTSServer::~TTSServer() {
 	singleton = nullptr;
 	personas.clear();
 	builtin_persona.unref();

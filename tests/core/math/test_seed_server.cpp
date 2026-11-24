@@ -43,7 +43,7 @@ static const uint32_t LOOT_FIRST[5] = { 1463604985u, 632838076u, 1232541005u, 34
 
 TEST_CASE("[SeedServer] Stable seeds from text and names") {
 	SeedServer server;
-	CHECK(server.text_to_seed("Daily-2026-11-23") == DAILY_SEED);
+	CHECK(server.get_seed_from_text("Daily-2026-11-23") == DAILY_SEED);
 	CHECK(server.set_seed_from_text("Daily-2026-11-23") == DAILY_SEED);
 	CHECK(server.get_global_seed() == DAILY_SEED);
 
