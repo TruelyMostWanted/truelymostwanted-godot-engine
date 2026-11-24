@@ -530,8 +530,8 @@ Error PathPrefixServer::_register(const String &p_prefix, const Ref<PathPrefix> 
 	return OK;
 }
 
-Error PathPrefixServer::register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_logic, const PackedStringArray &p_platforms) {
-	return _register(p_prefix, p_logic, p_platforms, false);
+Error PathPrefixServer::register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_path_prefix, const PackedStringArray &p_platforms) {
+	return _register(p_prefix, p_path_prefix, p_platforms, false);
 }
 
 Error PathPrefixServer::register_prefix_callable(const String &p_prefix, const Callable &p_globalize, const PackedStringArray &p_platforms, const Callable &p_localize, const Callable &p_is_available) {
@@ -549,7 +549,7 @@ Error PathPrefixServer::register_prefix_folder(const String &p_prefix, const Str
 	const String prefix = normalize_prefix(p_prefix);
 	ERR_FAIL_COND_V_MSG(is_prefix_locked(prefix), ERR_LOCKED, vformat("The path prefix '%s' is an engine prefix and cannot be changed.", prefix));
 	ERR_FAIL_COND_V_MSG(p_folder.to_lower().begins_with(prefix), ERR_INVALID_PARAMETER, vformat("The folder of the path prefix '%s' must not use the same prefix.", prefix));
-	return _register(prefix, create_folder_logic(p_folder), p_platforms, false);
+	return _register(prefix, create_folder_prefix(p_folder), p_platforms, false);
 }
 
 Error PathPrefixServer::unregister_prefix(const String &p_prefix, const PackedStringArray &p_platforms) {
@@ -831,7 +831,7 @@ Ref<PathInfo> PathPrefixServer::resolve(const String &p_path) const {
 	return info;
 }
 
-Ref<PathInfo> PathPrefixServer::resolve_safe(const String &p_path, bool p_for_write, const PackedStringArray &p_allowed_roots) const {
+Ref<PathInfo> PathPrefixServer::resolve_safe(const String &p_path, AccessMode p_access, const PackedStringArray &p_allowed_roots) const {
 	const String path = p_path.replace_char('\\', '/');
 	String prefix;
 	String rest;
@@ -877,14 +877,14 @@ Ref<PathInfo> PathPrefixServer::resolve_safe(const String &p_path, bool p_for_wr
 		}
 	}
 
-	if (p_for_write && info->read_only) {
+	if (p_access == ACCESS_WRITE && info->read_only) {
 		info->_set_error(ERR_FILE_NO_PERMISSION, vformat("The path '%s' is read-only.", p_path));
 		return info;
 	}
 	return info;
 }
 
-Ref<PathPrefix> PathPrefixServer::create_folder_logic(const String &p_folder) const {
+Ref<PathPrefix> PathPrefixServer::create_folder_prefix(const String &p_folder) const {
 	Ref<PathPrefixFolder> logic;
 	logic.instantiate();
 	logic->mode = PathPrefixFolder::MODE_FOLDER;
@@ -892,7 +892,7 @@ Ref<PathPrefix> PathPrefixServer::create_folder_logic(const String &p_folder) co
 	return logic;
 }
 
-Ref<PathPrefix> PathPrefixServer::create_system_dir_logic(CoreBind::OS::SystemDir p_dir, bool p_shared_storage) const {
+Ref<PathPrefix> PathPrefixServer::create_system_dir_prefix(CoreBind::OS::SystemDir p_dir, bool p_shared_storage) const {
 	Ref<PathPrefixFolder> logic;
 	logic.instantiate();
 	logic->mode = PathPrefixFolder::MODE_SYSTEM_DIR;
@@ -901,7 +901,7 @@ Ref<PathPrefix> PathPrefixServer::create_system_dir_logic(CoreBind::OS::SystemDi
 	return logic;
 }
 
-Ref<PathPrefix> PathPrefixServer::create_os_path_logic(OSPath p_path) const {
+Ref<PathPrefix> PathPrefixServer::create_os_path_prefix(OSPath p_path) const {
 	Ref<PathPrefixFolder> logic;
 	logic.instantiate();
 	logic->mode = PathPrefixFolder::MODE_OS_PATH;
@@ -930,15 +930,15 @@ void PathPrefixServer::register_default_prefixes() {
 	}
 #ifndef WEB_ENABLED
 	// On the Web these folders live in memory and are lost on reload; only `user://` persists there.
-	register_prefix("appdata://", create_os_path_logic(OS_PATH_DATA));
-	register_prefix("config://", create_os_path_logic(OS_PATH_CONFIG));
-	register_prefix("cache://", create_os_path_logic(OS_PATH_CACHE));
+	register_prefix("appdata://", create_os_path_prefix(OS_PATH_DATA));
+	register_prefix("config://", create_os_path_prefix(OS_PATH_CONFIG));
+	register_prefix("cache://", create_os_path_prefix(OS_PATH_CACHE));
 #endif
-	register_prefix("temp://", create_os_path_logic(OS_PATH_TEMP));
+	register_prefix("temp://", create_os_path_prefix(OS_PATH_TEMP));
 }
 
 void PathPrefixServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("register_prefix", "prefix", "logic", "platforms"), &PathPrefixServer::register_prefix, DEFVAL(PackedStringArray()));
+	ClassDB::bind_method(D_METHOD("register_prefix", "prefix", "path_prefix", "platforms"), &PathPrefixServer::register_prefix, DEFVAL(PackedStringArray()));
 	ClassDB::bind_method(D_METHOD("register_prefix_callable", "prefix", "globalize", "platforms", "localize", "is_available"), &PathPrefixServer::register_prefix_callable, DEFVAL(PackedStringArray()), DEFVAL(Callable()), DEFVAL(Callable()));
 	ClassDB::bind_method(D_METHOD("register_prefix_folder", "prefix", "folder", "platforms"), &PathPrefixServer::register_prefix_folder, DEFVAL(PackedStringArray()));
 	ClassDB::bind_method(D_METHOD("unregister_prefix", "prefix", "platforms"), &PathPrefixServer::unregister_prefix, DEFVAL(PackedStringArray()));
@@ -953,11 +953,11 @@ void PathPrefixServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("localize", "global_path"), &PathPrefixServer::localize);
 	ClassDB::bind_method(D_METHOD("resolve_engine_path", "path"), &PathPrefixServer::resolve_engine_path);
 	ClassDB::bind_method(D_METHOD("resolve", "path"), &PathPrefixServer::resolve);
-	ClassDB::bind_method(D_METHOD("resolve_safe", "path", "for_write", "allowed_roots"), &PathPrefixServer::resolve_safe, DEFVAL(PackedStringArray()));
+	ClassDB::bind_method(D_METHOD("resolve_safe", "path", "access", "allowed_roots"), &PathPrefixServer::resolve_safe, DEFVAL(PackedStringArray()));
 
-	ClassDB::bind_method(D_METHOD("create_folder_logic", "folder"), &PathPrefixServer::create_folder_logic);
-	ClassDB::bind_method(D_METHOD("create_system_dir_logic", "dir", "shared_storage"), &PathPrefixServer::create_system_dir_logic, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("create_os_path_logic", "path"), &PathPrefixServer::create_os_path_logic);
+	ClassDB::bind_method(D_METHOD("create_folder_prefix", "folder"), &PathPrefixServer::create_folder_prefix);
+	ClassDB::bind_method(D_METHOD("create_system_dir_prefix", "dir", "shared_storage"), &PathPrefixServer::create_system_dir_prefix, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("create_os_path_prefix", "path"), &PathPrefixServer::create_os_path_prefix);
 
 	ADD_SIGNAL(MethodInfo("prefix_registered", PropertyInfo(Variant::STRING, "prefix")));
 	ADD_SIGNAL(MethodInfo("prefix_unregistered", PropertyInfo(Variant::STRING, "prefix")));
@@ -966,6 +966,9 @@ void PathPrefixServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(OS_PATH_CONFIG);
 	BIND_ENUM_CONSTANT(OS_PATH_CACHE);
 	BIND_ENUM_CONSTANT(OS_PATH_TEMP);
+
+	BIND_ENUM_CONSTANT(ACCESS_READ);
+	BIND_ENUM_CONSTANT(ACCESS_WRITE);
 }
 
 PathPrefixServer::PathPrefixServer() {
