@@ -122,6 +122,7 @@ struct ManagedCallbacks {
 	using FuncDebuggingUtils_GetCurrentStackInfo = void(GD_CLR_STDCALL *)(Vector<ScriptLanguage::StackInfo> *);
 	using FuncDisposablesTracker_OnGodotShuttingDown = void(GD_CLR_STDCALL *)();
 	using FuncGD_OnCoreApiAssemblyLoaded = void(GD_CLR_STDCALL *)(bool);
+	using FuncRuntimeMetrics_Sample = int32_t(GD_CLR_STDCALL *)(double *, int32_t);
 
 	FuncSignalAwaiter_SignalCallback SignalAwaiter_SignalCallback;
 	FuncDelegateUtils_InvokeWithVariantArgs DelegateUtils_InvokeWithVariantArgs;
@@ -166,6 +167,7 @@ struct ManagedCallbacks {
 	FuncDebuggingUtils_GetCurrentStackInfo DebuggingUtils_GetCurrentStackInfo;
 	FuncDisposablesTracker_OnGodotShuttingDown DisposablesTracker_OnGodotShuttingDown;
 	FuncGD_OnCoreApiAssemblyLoaded GD_OnCoreApiAssemblyLoaded;
+	FuncRuntimeMetrics_Sample RuntimeMetrics_Sample;
 };
 
 extern ManagedCallbacks managed_callbacks;

@@ -30,6 +30,7 @@
 
 #include "csharp_script.h"
 
+#include "dotnet_metric_source.h"
 #include "godotsharp_defs.h"
 #include "godotsharp_dirs.h"
 #include "mono_gd/gd_mono_cache.h"
@@ -131,6 +132,10 @@ void CSharpLanguage::init() {
 	if (gdmono->should_initialize()) {
 		gdmono->initialize();
 	}
+
+	if (gdmono->is_runtime_initialized()) {
+		DotNetMetricSource::create_singleton();
+	}
 }
 
 void CSharpLanguage::finish() {
@@ -147,6 +152,8 @@ void CSharpLanguage::finalize() {
 	}
 
 	finalizing = true;
+
+	DotNetMetricSource::free_singleton();
 
 	// Make sure all script binding gchandles are released before finalizing GDMono.
 	for (KeyValue<Object *, CSharpScriptBinding> &E : script_bindings) {
