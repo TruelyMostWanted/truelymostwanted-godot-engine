@@ -1651,6 +1651,9 @@
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
 		</member>
+		<member name="PerformanceRecorder" type="PerformanceRecorder" setter="" getter="">
+			The [PerformanceRecorder] singleton.
+		</member>
 		<member name="PhysicsServer2D" type="PhysicsServer2D" setter="" getter="">
 			The [PhysicsServer2D] singleton.
 		</member>
