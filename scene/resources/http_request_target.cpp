@@ -273,11 +273,11 @@ String HTTPRequestTarget::build_url(const Dictionary &p_variables) const {
 PackedStringArray HTTPRequestTarget::build_headers(const Dictionary &p_variables) const {
 	PackedStringArray result;
 	for (const KeyValue<Variant, Variant> &kv : headers) {
-		const String name = fill_placeholders(String(kv.key), p_variables).strip_edges();
-		if (name.is_empty()) {
+		const String header_name = fill_placeholders(String(kv.key), p_variables).strip_edges();
+		if (header_name.is_empty()) {
 			continue;
 		}
-		result.push_back(name + ": " + fill_placeholders(String(kv.value), p_variables).strip_edges());
+		result.push_back(header_name + ": " + fill_placeholders(String(kv.value), p_variables).strip_edges());
 	}
 	const String content_type = get_content_type();
 	if (!content_type.is_empty() && !_has_header("Content-Type")) {
