@@ -1,0 +1,323 @@
+{
+	"_comment": [
+		"Godot's built-in input actions (ui_*), the data of InputMap::get_builtins().",
+		"core/input/input_builders.py turns this file into builtin_input_actions.gen.cpp at build time.",
+		"An entry with 'feature' replaces the entry of the same name when OS::has_feature(feature) is true.",
+		"Event types: key (keycode: Key enum name, modifiers: KeyModifierMask names), joypad_button (button: JoyButton name), joypad_motion (axis: JoyAxis name, axis_value)."
+	],
+	"actions": [
+		{ "name": "ui_accept", "events": [
+			{"type": "key", "keycode": "ENTER"},
+			{"type": "key", "keycode": "KP_ENTER"},
+			{"type": "key", "keycode": "SPACE"}
+		] },
+		{ "name": "ui_select", "events": [
+			{"type": "joypad_button", "button": "Y"},
+			{"type": "key", "keycode": "SPACE"}
+		] },
+		{ "name": "ui_cancel", "events": [
+			{"type": "key", "keycode": "ESCAPE"}
+		] },
+		{ "name": "ui_close_dialog", "events": [
+			{"type": "key", "keycode": "ESCAPE"}
+		] },
+		{ "name": "ui_close_dialog", "feature": "macos", "events": [
+			{"type": "key", "keycode": "W", "modifiers": ["META"]},
+			{"type": "key", "keycode": "ESCAPE"}
+		] },
+		{ "name": "ui_focus_next", "events": [
+			{"type": "key", "keycode": "TAB"}
+		] },
+		{ "name": "ui_focus_prev", "events": [
+			{"type": "key", "keycode": "TAB", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_left", "events": [
+			{"type": "key", "keycode": "LEFT"},
+			{"type": "joypad_button", "button": "DPAD_LEFT"},
+			{"type": "joypad_motion", "axis": "LEFT_X", "axis_value": -1.0}
+		] },
+		{ "name": "ui_right", "events": [
+			{"type": "key", "keycode": "RIGHT"},
+			{"type": "joypad_button", "button": "DPAD_RIGHT"},
+			{"type": "joypad_motion", "axis": "LEFT_X", "axis_value": 1.0}
+		] },
+		{ "name": "ui_up", "events": [
+			{"type": "key", "keycode": "UP"},
+			{"type": "joypad_button", "button": "DPAD_UP"},
+			{"type": "joypad_motion", "axis": "LEFT_Y", "axis_value": -1.0}
+		] },
+		{ "name": "ui_down", "events": [
+			{"type": "key", "keycode": "DOWN"},
+			{"type": "joypad_button", "button": "DPAD_DOWN"},
+			{"type": "joypad_motion", "axis": "LEFT_Y", "axis_value": 1.0}
+		] },
+		{ "name": "ui_page_up", "events": [
+			{"type": "key", "keycode": "PAGEUP"}
+		] },
+		{ "name": "ui_page_down", "events": [
+			{"type": "key", "keycode": "PAGEDOWN"}
+		] },
+		{ "name": "ui_home", "events": [
+			{"type": "key", "keycode": "HOME"}
+		] },
+		{ "name": "ui_end", "events": [
+			{"type": "key", "keycode": "END"}
+		] },
+		{ "name": "ui_accessibility_drag_and_drop", "events": [] },
+		{ "name": "ui_cut", "events": [
+			{"type": "key", "keycode": "X", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "KEY_DELETE", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_copy", "events": [
+			{"type": "key", "keycode": "C", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "INSERT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_focus_mode", "events": [
+			{"type": "key", "keycode": "M", "modifiers": ["CTRL"]}
+		] },
+		{ "name": "ui_paste", "events": [
+			{"type": "key", "keycode": "V", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "INSERT", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_undo", "events": [
+			{"type": "key", "keycode": "Z", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_redo", "events": [
+			{"type": "key", "keycode": "Z", "modifiers": ["CMD_OR_CTRL", "SHIFT"]},
+			{"type": "key", "keycode": "Y", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_completion_query", "events": [
+			{"type": "key", "keycode": "SPACE", "modifiers": ["CTRL"]}
+		] },
+		{ "name": "ui_text_completion_accept", "events": [
+			{"type": "key", "keycode": "TAB"},
+			{"type": "key", "keycode": "ENTER"},
+			{"type": "key", "keycode": "KP_ENTER"}
+		] },
+		{ "name": "ui_text_completion_replace", "events": [
+			{"type": "key", "keycode": "TAB", "modifiers": ["SHIFT"]},
+			{"type": "key", "keycode": "ENTER", "modifiers": ["SHIFT"]},
+			{"type": "key", "keycode": "KP_ENTER", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_text_newline", "events": [
+			{"type": "key", "keycode": "ENTER"},
+			{"type": "key", "keycode": "KP_ENTER"},
+			{"type": "key", "keycode": "ENTER", "modifiers": ["SHIFT"]},
+			{"type": "key", "keycode": "KP_ENTER", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_text_newline_blank", "events": [
+			{"type": "key", "keycode": "ENTER", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "KP_ENTER", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_newline_above", "events": [
+			{"type": "key", "keycode": "ENTER", "modifiers": ["SHIFT", "CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "KP_ENTER", "modifiers": ["SHIFT", "CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_indent", "events": [
+			{"type": "key", "keycode": "TAB"}
+		] },
+		{ "name": "ui_text_dedent", "events": [
+			{"type": "key", "keycode": "TAB", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_text_backspace", "events": [
+			{"type": "key", "keycode": "BACKSPACE"},
+			{"type": "key", "keycode": "BACKSPACE", "modifiers": ["SHIFT"]}
+		] },
+		{ "name": "ui_text_backspace_word", "events": [
+			{"type": "key", "keycode": "BACKSPACE", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_backspace_word", "feature": "macos", "events": [
+			{"type": "key", "keycode": "BACKSPACE", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_text_backspace_all_to_left", "events": [] },
+		{ "name": "ui_text_backspace_all_to_left", "feature": "macos", "events": [
+			{"type": "key", "keycode": "BACKSPACE", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_delete", "events": [
+			{"type": "key", "keycode": "KEY_DELETE"}
+		] },
+		{ "name": "ui_text_delete_word", "events": [
+			{"type": "key", "keycode": "KEY_DELETE", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_delete_word", "feature": "macos", "events": [
+			{"type": "key", "keycode": "KEY_DELETE", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_text_delete_all_to_right", "events": [] },
+		{ "name": "ui_text_delete_all_to_right", "feature": "macos", "events": [
+			{"type": "key", "keycode": "KEY_DELETE", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_left", "events": [
+			{"type": "key", "keycode": "LEFT"}
+		] },
+		{ "name": "ui_text_caret_word_left", "events": [
+			{"type": "key", "keycode": "LEFT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_word_left", "feature": "macos", "events": [
+			{"type": "key", "keycode": "LEFT", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_text_caret_right", "events": [
+			{"type": "key", "keycode": "RIGHT"}
+		] },
+		{ "name": "ui_text_caret_word_right", "events": [
+			{"type": "key", "keycode": "RIGHT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_word_right", "feature": "macos", "events": [
+			{"type": "key", "keycode": "RIGHT", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_text_caret_up", "events": [
+			{"type": "key", "keycode": "UP"}
+		] },
+		{ "name": "ui_text_caret_down", "events": [
+			{"type": "key", "keycode": "DOWN"}
+		] },
+		{ "name": "ui_text_caret_line_start", "events": [
+			{"type": "key", "keycode": "HOME"}
+		] },
+		{ "name": "ui_text_caret_line_start", "feature": "macos", "events": [
+			{"type": "key", "keycode": "A", "modifiers": ["CTRL"]},
+			{"type": "key", "keycode": "LEFT", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "HOME"}
+		] },
+		{ "name": "ui_text_caret_line_end", "events": [
+			{"type": "key", "keycode": "END"}
+		] },
+		{ "name": "ui_text_caret_line_end", "feature": "macos", "events": [
+			{"type": "key", "keycode": "E", "modifiers": ["CTRL"]},
+			{"type": "key", "keycode": "RIGHT", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "END"}
+		] },
+		{ "name": "ui_text_caret_page_up", "events": [
+			{"type": "key", "keycode": "PAGEUP"}
+		] },
+		{ "name": "ui_text_caret_page_down", "events": [
+			{"type": "key", "keycode": "PAGEDOWN"}
+		] },
+		{ "name": "ui_text_caret_document_start", "events": [
+			{"type": "key", "keycode": "HOME", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_document_start", "feature": "macos", "events": [
+			{"type": "key", "keycode": "UP", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "HOME", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_document_end", "events": [
+			{"type": "key", "keycode": "END", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_document_end", "feature": "macos", "events": [
+			{"type": "key", "keycode": "DOWN", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "END", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_add_below", "events": [
+			{"type": "key", "keycode": "DOWN", "modifiers": ["SHIFT", "CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_add_below", "feature": "macos", "events": [
+			{"type": "key", "keycode": "L", "modifiers": ["SHIFT", "CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_add_above", "events": [
+			{"type": "key", "keycode": "UP", "modifiers": ["SHIFT", "CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_caret_add_above", "feature": "macos", "events": [
+			{"type": "key", "keycode": "O", "modifiers": ["SHIFT", "CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_scroll_up", "events": [
+			{"type": "key", "keycode": "UP", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_scroll_up", "feature": "macos", "events": [
+			{"type": "key", "keycode": "UP", "modifiers": ["CMD_OR_CTRL", "ALT"]}
+		] },
+		{ "name": "ui_text_scroll_down", "events": [
+			{"type": "key", "keycode": "DOWN", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_scroll_down", "feature": "macos", "events": [
+			{"type": "key", "keycode": "DOWN", "modifiers": ["CMD_OR_CTRL", "ALT"]}
+		] },
+		{ "name": "ui_text_select_all", "events": [
+			{"type": "key", "keycode": "A", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_select_word_under_caret", "events": [
+			{"type": "key", "keycode": "G", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_text_select_word_under_caret", "feature": "macos", "events": [
+			{"type": "key", "keycode": "G", "modifiers": ["CTRL", "META"]}
+		] },
+		{ "name": "ui_text_add_selection_for_next_occurrence", "events": [
+			{"type": "key", "keycode": "D", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_text_skip_selection_for_next_occurrence", "events": [
+			{"type": "key", "keycode": "D", "modifiers": ["CMD_OR_CTRL", "ALT"]}
+		] },
+		{ "name": "ui_text_clear_carets_and_selection", "events": [
+			{"type": "key", "keycode": "ESCAPE"}
+		] },
+		{ "name": "ui_text_toggle_insert_mode", "events": [
+			{"type": "key", "keycode": "INSERT"}
+		] },
+		{ "name": "ui_menu", "events": [
+			{"type": "key", "keycode": "MENU"}
+		] },
+		{ "name": "ui_text_submit", "events": [
+			{"type": "key", "keycode": "ENTER"},
+			{"type": "key", "keycode": "KP_ENTER"}
+		] },
+		{ "name": "ui_unicode_start", "events": [
+			{"type": "key", "keycode": "U", "modifiers": ["CTRL", "SHIFT"]}
+		] },
+		{ "name": "ui_graph_duplicate", "events": [
+			{"type": "key", "keycode": "D", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_graph_delete", "events": [
+			{"type": "key", "keycode": "KEY_DELETE"}
+		] },
+		{ "name": "ui_graph_delete", "feature": "macos", "events": [
+			{"type": "key", "keycode": "BACKSPACE"},
+			{"type": "key", "keycode": "KEY_DELETE"}
+		] },
+		{ "name": "ui_graph_follow_left", "events": [
+			{"type": "key", "keycode": "LEFT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_graph_follow_left", "feature": "macos", "events": [
+			{"type": "key", "keycode": "LEFT", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_graph_follow_right", "events": [
+			{"type": "key", "keycode": "RIGHT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_graph_follow_right", "feature": "macos", "events": [
+			{"type": "key", "keycode": "RIGHT", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_filedialog_delete", "events": [
+			{"type": "key", "keycode": "KEY_DELETE"}
+		] },
+		{ "name": "ui_filedialog_up_one_level", "events": [
+			{"type": "key", "keycode": "BACKSPACE"}
+		] },
+		{ "name": "ui_filedialog_refresh", "events": [
+			{"type": "key", "keycode": "F5"}
+		] },
+		{ "name": "ui_filedialog_show_hidden", "events": [
+			{"type": "key", "keycode": "H"}
+		] },
+		{ "name": "ui_filedialog_find", "events": [
+			{"type": "key", "keycode": "F", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_filedialog_focus_path", "events": [
+			{"type": "key", "keycode": "L", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_filedialog_focus_path", "feature": "macos", "events": [
+			{"type": "key", "keycode": "G", "modifiers": ["CMD_OR_CTRL"]},
+			{"type": "key", "keycode": "L", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_swap_input_direction", "events": [
+			{"type": "key", "keycode": "QUOTELEFT", "modifiers": ["CMD_OR_CTRL"]}
+		] },
+		{ "name": "ui_colorpicker_delete_preset", "events": [
+			{"type": "joypad_button", "button": "X"},
+			{"type": "key", "keycode": "KEY_DELETE"}
+		] },
+		{ "name": "ui_toggle_fullscreen", "events": [
+			{"type": "key", "keycode": "ENTER", "modifiers": ["ALT"]}
+		] },
+		{ "name": "ui_toggle_fullscreen", "feature": "macos", "events": [
+			{"type": "key", "keycode": "F", "modifiers": ["CTRL", "META"]},
+			{"type": "key", "keycode": "ENTER", "modifiers": ["ALT"]}
+		] }
+	]
+}

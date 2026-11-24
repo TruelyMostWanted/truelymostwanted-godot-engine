@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_settings.h                                                  */
+/*  builtin_input_actions.h                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,21 +30,35 @@
 
 #pragma once
 
-#include "core/io/resource.h"
-#include "core/variant/typed_array.h"
-#include "servers/settings/input_map_action.h"
+#include "core/input/input_enums.h"
+#include "core/os/keyboard.h"
 
-// Settings of the `input_map` domain (#18): one InputMapAction per bound slot of all actions. It holds
-// nothing but the list, so it can be stored as CSV (one row per event).
-class InputMapSettings : public Resource {
-	GDCLASS(InputMapSettings, Resource);
+// Godot's built-in input actions (`ui_*`), the data of InputMap::get_builtins() (#172).
+// The table is generated at build time from `core/input/builtin_input_actions.json`
+// (see `make_builtin_input_actions()` in `core/input/input_builders.py`), so no file is read at runtime.
+// An action name with a feature suffix (`ui_text_backspace_word.macos`) replaces the plain action
+// when OS::has_feature() is true for the feature.
+struct BuiltinInputActions {
+	enum EventType {
+		EVENT_KEY,
+		EVENT_JOYPAD_BUTTON,
+		EVENT_JOYPAD_MOTION,
+	};
 
-	TypedArray<InputMapAction> actions;
+	struct Event {
+		EventType type;
+		Key key; // EVENT_KEY: keycode with modifier masks.
+		JoyButton button; // EVENT_JOYPAD_BUTTON.
+		JoyAxis axis; // EVENT_JOYPAD_MOTION.
+		float axis_value; // EVENT_JOYPAD_MOTION.
+	};
 
-protected:
-	static void _bind_methods();
+	struct Action {
+		const char *name;
+		const Event *events;
+		int event_count;
+	};
 
-public:
-	void set_actions(const TypedArray<InputMapAction> &p_actions);
-	TypedArray<InputMapAction> get_actions() const;
+	static const Action actions[];
+	static const int action_count;
 };

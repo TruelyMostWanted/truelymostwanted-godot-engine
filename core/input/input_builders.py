@@ -61,3 +61,57 @@ def make_default_controller_mappings(target, source, env):
             file.write(f"#endif // {variable}_ENABLED\n")
 
         file.write("\tnullptr\n};\n")
+
+
+def make_builtin_input_actions(target, source, env):
+    """Generates the table of Godot's built-in input actions (InputMap::get_builtins()) from builtin_input_actions.json."""
+    import json
+
+    with open(str(source[0]), "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    events = []
+    actions = []
+    for action in data["actions"]:
+        name = action["name"]
+        if action.get("feature"):
+            name += "." + action["feature"]
+        first = len(events)
+        for event in action["events"]:
+            event_type = event["type"]
+            if event_type == "key":
+                key = " | ".join(
+                    ["Key::" + event["keycode"]] + ["KeyModifierMask::" + m for m in event.get("modifiers", [])]
+                )
+                events.append(
+                    f"{{ BuiltinInputActions::EVENT_KEY, {key}, JoyButton::INVALID, JoyAxis::INVALID, 0.0f }}"
+                )
+            elif event_type == "joypad_button":
+                events.append(
+                    f"{{ BuiltinInputActions::EVENT_JOYPAD_BUTTON, Key::NONE, JoyButton::{event['button']}, JoyAxis::INVALID, 0.0f }}"
+                )
+            elif event_type == "joypad_motion":
+                value = float(event["axis_value"])
+                events.append(
+                    f"{{ BuiltinInputActions::EVENT_JOYPAD_MOTION, Key::NONE, JoyButton::INVALID, JoyAxis::{event['axis']}, {value!r}f }}"
+                )
+            else:
+                raise ValueError(f'builtin_input_actions.json: unknown event type "{event_type}" in "{name}".')
+        count = len(events) - first
+        pointer = f"&_builtin_input_events[{first}]" if count > 0 else "nullptr"
+        actions.append(f'{{ "{name}", {pointer}, {count} }}')
+
+    with methods.generated_wrapper(str(target[0])) as file:
+        file.write("""\
+#include "core/input/builtin_input_actions.h"
+
+""")
+        file.write("static const BuiltinInputActions::Event _builtin_input_events[] = {\n")
+        for event in events:
+            file.write(f"\t{event},\n")
+        file.write("};\n\n")
+        file.write("const BuiltinInputActions::Action BuiltinInputActions::actions[] = {\n")
+        for action in actions:
+            file.write(f"\t{action},\n")
+        file.write("};\n\n")
+        file.write(f"const int BuiltinInputActions::action_count = {len(actions)};\n")
