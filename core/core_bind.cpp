@@ -202,15 +202,15 @@ Error ResourceLoader::load_threaded_request_manifest(const Ref<FilesManifest> &p
 	return p_manifest->load_threaded_request_resources(p_use_sub_threads, ResourceFormatLoader::CacheMode(p_cache_mode));
 }
 
-Error ResourceLoader::register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type, bool p_at_front) {
-	return ResourceFormatLoaderCallable::register_extension(p_extension, p_load, p_type, p_at_front);
+Error ResourceLoader::register_extension_loader(const String &p_extension, const Callable &p_loader, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatLoaderCallable::register_extension(p_extension, p_loader, p_type, p_at_front);
 }
 
-Error ResourceLoader::unregister_extension(const String &p_extension) {
+Error ResourceLoader::unregister_extension_loader(const String &p_extension) {
 	return ResourceFormatLoaderCallable::unregister_extension(p_extension);
 }
 
-bool ResourceLoader::is_extension_registered(const String &p_extension) {
+bool ResourceLoader::has_extension_loader(const String &p_extension) {
 	return ResourceFormatLoaderCallable::is_extension_registered(p_extension);
 }
 
@@ -330,9 +330,9 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_manifest_paths", "manifest"), &ResourceLoader::get_manifest_paths);
 	ClassDB::bind_method(D_METHOD("load_manifest", "manifest", "cache_mode"), &ResourceLoader::load_manifest, DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_request_manifest", "manifest", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request_manifest, DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
-	ClassDB::bind_method(D_METHOD("register_extension", "extension", "load", "type", "at_front"), &ResourceLoader::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceLoader::unregister_extension);
-	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceLoader::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("register_extension_loader", "extension", "loader", "type", "at_front"), &ResourceLoader::register_extension_loader, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension_loader", "extension"), &ResourceLoader::unregister_extension_loader);
+	ClassDB::bind_method(D_METHOD("has_extension_loader", "extension"), &ResourceLoader::has_extension_loader);
 	ClassDB::bind_method(D_METHOD("load_result", "path", "type_hint", "cache_mode"), &ResourceLoader::load_result, DEFVAL(""), DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_get_result", "path"), &ResourceLoader::load_threaded_get_result);
 
@@ -383,15 +383,15 @@ ResourceUID::ID ResourceSaver::get_resource_id_for_path(const String &p_path, bo
 	return ::ResourceSaver::get_resource_id_for_path(p_path, p_generate);
 }
 
-Error ResourceSaver::register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type, bool p_at_front) {
-	return ResourceFormatSaverCallable::register_extension(p_extension, p_save, p_type, p_at_front);
+Error ResourceSaver::register_extension_saver(const String &p_extension, const Callable &p_saver, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatSaverCallable::register_extension(p_extension, p_saver, p_type, p_at_front);
 }
 
-Error ResourceSaver::unregister_extension(const String &p_extension) {
+Error ResourceSaver::unregister_extension_saver(const String &p_extension) {
 	return ResourceFormatSaverCallable::unregister_extension(p_extension);
 }
 
-bool ResourceSaver::is_extension_registered(const String &p_extension) {
+bool ResourceSaver::has_extension_saver(const String &p_extension) {
 	return ResourceFormatSaverCallable::is_extension_registered(p_extension);
 }
 
@@ -419,9 +419,9 @@ void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_resource_format_saver", "format_saver", "at_front"), &ResourceSaver::add_resource_format_saver, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_saver", "format_saver"), &ResourceSaver::remove_resource_format_saver);
 	ClassDB::bind_method(D_METHOD("get_resource_id_for_path", "path", "generate"), &ResourceSaver::get_resource_id_for_path, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("register_extension", "extension", "save", "type", "at_front"), &ResourceSaver::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceSaver::unregister_extension);
-	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceSaver::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("register_extension_saver", "extension", "saver", "type", "at_front"), &ResourceSaver::register_extension_saver, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension_saver", "extension"), &ResourceSaver::unregister_extension_saver);
+	ClassDB::bind_method(D_METHOD("has_extension_saver", "extension"), &ResourceSaver::has_extension_saver);
 	ClassDB::bind_method(D_METHOD("save_result", "resource", "path", "flags"), &ResourceSaver::save_result, DEFVAL(""), DEFVAL((uint32_t)FLAG_NONE));
 
 	BIND_BITFIELD_FLAG(FLAG_NONE);

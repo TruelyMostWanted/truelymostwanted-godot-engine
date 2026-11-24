@@ -36,7 +36,7 @@
 #include "core/templates/hash_map.h"
 
 // Simple resource formats registered with one call from GDScript, C# or GDExtension
-// (`ResourceLoader.register_extension()`, `ResourceSaver.register_extension()`).
+// (`ResourceLoader.register_extension_loader()`, `ResourceSaver.register_extension_saver()`).
 // Each registered extension gets one wrapper that is added through the normal
 // `add_resource_format_loader()` / `add_resource_format_saver()`, so order, cache, threading and the
 // extension index behave exactly like for a hand-written format.

@@ -865,7 +865,7 @@ void Main::test_cleanup() {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
-	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
 	PropertyListHelper::clear_base_helpers();
@@ -5351,7 +5351,7 @@ void Main::cleanup(bool p_force) {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
-	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
 	PropertyListHelper::clear_base_helpers();
