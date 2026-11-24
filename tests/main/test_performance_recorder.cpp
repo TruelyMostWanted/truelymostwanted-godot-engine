@@ -107,6 +107,8 @@ TEST_CASE("[PerformanceRecorder] Default profile") {
 	CHECK(profile->get_flush_interval_frames() == 300);
 	CHECK(profile->get_output_path() == "user://performance/{date}_{time}.csv");
 	CHECK(profile->get_delimiter() == ",");
+	CHECK(profile->get_hitch_threshold_usec() == 50000);
+	CHECK_FALSE(profile->is_write_summary_json());
 
 	profile->set_sample_interval_frames(0);
 	CHECK(profile->get_sample_interval_frames() == 1);

@@ -656,7 +656,39 @@ RenderingServerEnums::ViewportOcclusionCullingBuildQuality VideoQualitySettingsS
 	return RenderingServerEnums::ViewportOcclusionCullingBuildQuality(int(get_value(SNAME("occlusion_culling_build_quality"))));
 }
 
+void VideoQualitySettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"scaling_3d_mode",
+		"scaling_3d_scale",
+		"fsr_sharpness",
+		"mesh_lod_threshold",
+		"msaa_2d",
+		"msaa_3d",
+		"screen_space_aa",
+		"use_taa",
+		"use_debanding",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoQualitySettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("scaling_3d_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.Scaling3DMode")));
+	ADD_SIGNAL(MethodInfo("scaling_3d_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
+	ADD_SIGNAL(MethodInfo("fsr_sharpness_changed", PropertyInfo(Variant::FLOAT, "sharpness")));
+	ADD_SIGNAL(MethodInfo("mesh_lod_threshold_changed", PropertyInfo(Variant::FLOAT, "threshold")));
+	ADD_SIGNAL(MethodInfo("msaa_2d_changed", PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.MSAA")));
+	ADD_SIGNAL(MethodInfo("msaa_3d_changed", PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.MSAA")));
+	ADD_SIGNAL(MethodInfo("screen_space_aa_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.ScreenSpaceAA")));
+	ADD_SIGNAL(MethodInfo("use_taa_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("use_debanding_changed", PropertyInfo(Variant::BOOL, "enabled")));
+
 	ClassDB::bind_method(D_METHOD("set_scaling_3d_mode", "mode"), &VideoQualitySettingsServer::set_scaling_3d_mode);
 	ClassDB::bind_method(D_METHOD("get_scaling_3d_mode"), &VideoQualitySettingsServer::get_scaling_3d_mode);
 	ClassDB::bind_method(D_METHOD("set_scaling_3d_scale", "scale"), &VideoQualitySettingsServer::set_scaling_3d_scale);

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceBudgetRule" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One limit of a [PerformanceBudget].
+	</brief_description>
+	<description>
+		A [PerformanceBudgetRule] says that a statistic of a recorded column must not be greater than [member limit], for example "the 95th percentile of [code]frame_time[/code] is at most 16667 microseconds". A rule with [constant STATISTIC_HITCH_COUNT] limits the number of hitches instead and ignores [member column].
+		To limit a value from below (for example a minimum FPS), record its inverse or a negated custom metric: every rule is an upper limit.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_description" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns a short text of the rule, such as [code]"frame_time p95"[/code], [code]"process_memory max"[/code] or [code]"hitch count"[/code]. Used in [method PerformanceBudgetFailure.get_message].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="column" type="String" setter="set_column" getter="get_column" default="&quot;frame_time&quot;">
+			Name of the recorded column, as in [method PerformanceRecorder.get_column_names]. Ignored with [constant STATISTIC_HITCH_COUNT].
+		</member>
+		<member name="limit" type="float" setter="set_limit" getter="get_limit" default="16667.0">
+			Largest allowed value of the statistic, in the unit of the column (microseconds for the time builtins, bytes for memory). The rule fails if the statistic is greater than this value.
+		</member>
+		<member name="percentile" type="float" setter="set_percentile" getter="get_percentile" default="95.0">
+			Percentile between [code]0.0[/code] and [code]100.0[/code] used with [constant STATISTIC_PERCENTILE].
+		</member>
+		<member name="statistic" type="int" setter="set_statistic" getter="get_statistic" enum="PerformanceBudgetRule.Statistic" default="3">
+			Which statistic of the column is compared with [member limit].
+		</member>
+	</members>
+	<constants>
+		<constant name="STATISTIC_MINIMUM" value="0" enum="Statistic">
+			The smallest value of the column ([method PerformanceColumnSummary.get_minimum]).
+		</constant>
+		<constant name="STATISTIC_MAXIMUM" value="1" enum="Statistic">
+			The largest value of the column ([method PerformanceColumnSummary.get_maximum]).
+		</constant>
+		<constant name="STATISTIC_MEAN" value="2" enum="Statistic">
+			The average value of the column ([method PerformanceColumnSummary.get_mean]).
+		</constant>
+		<constant name="STATISTIC_PERCENTILE" value="3" enum="Statistic">
+			The percentile [member percentile] of the column ([method PerformanceColumnSummary.get_percentile]).
+		</constant>
+		<constant name="STATISTIC_HITCH_COUNT" value="4" enum="Statistic">
+			The number of hitches of the run ([method PerformanceSummary.get_hitch_count]). [member column] is ignored.
+		</constant>
+		<constant name="STATISTIC_MAX" value="5" enum="Statistic">
+			Represents the size of the [enum Statistic] enum.
+		</constant>
+	</constants>
+</class>

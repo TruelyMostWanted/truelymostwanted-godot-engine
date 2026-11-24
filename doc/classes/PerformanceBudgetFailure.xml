@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceBudgetFailure" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One failed rule of a [PerformanceBudget] check.
+	</brief_description>
+	<description>
+		A [PerformanceBudgetFailure] is part of a [PerformanceBudgetResult]. It tells which rule failed, why, and the measured value.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_actual_value" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the measured value of the statistic. [code]0.0[/code] with [constant REASON_COLUMN_MISSING] and [constant REASON_NO_SAMPLES].
+			</description>
+		</method>
+		<method name="get_limit" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the limit of the rule at the time of the check ([member PerformanceBudgetRule.limit]).
+			</description>
+		</method>
+		<method name="get_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns a readable message, for example [code]"frame_time p95 = 18200 exceeds the limit 16667."[/code].
+			</description>
+		</method>
+		<method name="get_reason" qualifiers="const">
+			<return type="int" enum="PerformanceBudgetFailure.Reason" />
+			<description>
+				Returns why the rule failed.
+			</description>
+		</method>
+		<method name="get_rule" qualifiers="const">
+			<return type="PerformanceBudgetRule" />
+			<description>
+				Returns the rule that failed.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="REASON_OVER_LIMIT" value="0" enum="Reason">
+			The statistic is greater than the limit.
+		</constant>
+		<constant name="REASON_COLUMN_MISSING" value="1" enum="Reason">
+			The column of the rule was not recorded. Add it to the [PerformanceRecordingProfile].
+		</constant>
+		<constant name="REASON_NO_SAMPLES" value="2" enum="Reason">
+			The column was recorded, but all its cells are empty.
+		</constant>
+		<constant name="REASON_MAX" value="3" enum="Reason">
+			Represents the size of the [enum Reason] enum.
+		</constant>
+	</constants>
+</class>

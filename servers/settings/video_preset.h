@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_settings.h                                                  */
+/*  video_preset.h                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -31,20 +31,46 @@
 #pragma once
 
 #include "core/io/resource.h"
-#include "core/variant/typed_array.h"
-#include "servers/settings/input_map_action.h"
+#include "servers/settings/video_effect_settings.h"
+#include "servers/settings/video_quality_settings.h"
+#include "servers/settings/video_shadow_settings.h"
+#include "servers/settings/video_texture_settings.h"
 
-// Settings of the `input_map` domain (#18): one InputMapAction per bound slot of all actions. It holds
-// nothing but the list, so it can be stored as CSV (one row per event).
-class InputMapSettings : public Resource {
-	GDCLASS(InputMapSettings, Resource);
+// A graphics preset (#25): a name and one settings resource per video settings domain (`video_quality`,
+// `video_texture`, `video_shadow`, `video_effect`), the same classes the domains store. A domain resource sets
+// all values of its domain; a null resource leaves the domain as it is.
+// VideoPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
+// replace presets with `.tres` files (project setting `settings/video_preset/presets`).
+class VideoPreset : public Resource {
+	GDCLASS(VideoPreset, Resource);
 
-	TypedArray<InputMapAction> actions;
+	String preset_name;
+	Ref<VideoQualitySettings> video_quality;
+	Ref<VideoTextureSettings> video_texture;
+	Ref<VideoShadowSettings> video_shadow;
+	Ref<VideoEffectSettings> video_effect;
 
 protected:
 	static void _bind_methods();
 
 public:
-	void set_actions(const TypedArray<InputMapAction> &p_actions);
-	TypedArray<InputMapAction> get_actions() const;
+	// The settings domains a preset covers, in the order they are applied.
+	static PackedStringArray get_domains();
+
+	void set_preset_name(const String &p_name);
+	String get_preset_name() const;
+
+	void set_video_quality(const Ref<VideoQualitySettings> &p_settings);
+	Ref<VideoQualitySettings> get_video_quality() const;
+	void set_video_texture(const Ref<VideoTextureSettings> &p_settings);
+	Ref<VideoTextureSettings> get_video_texture() const;
+	void set_video_shadow(const Ref<VideoShadowSettings> &p_settings);
+	Ref<VideoShadowSettings> get_video_shadow() const;
+	void set_video_effect(const Ref<VideoEffectSettings> &p_settings);
+	Ref<VideoEffectSettings> get_video_effect() const;
+
+	// Generic access by domain name (one of get_domains()); `p_settings` must be the class of the domain or null.
+	void set_domain_settings(const StringName &p_domain, const Ref<Resource> &p_settings);
+	Ref<Resource> get_domain_settings(const StringName &p_domain) const;
+	bool has_domain_settings(const StringName &p_domain) const;
 };

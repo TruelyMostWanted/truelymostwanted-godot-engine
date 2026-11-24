@@ -1084,22 +1084,25 @@ void Input::_parse_input_event_impl(const Ref<InputEvent> &p_event, bool p_is_em
 		}
 	}
 
-	for (const KeyValue<StringName, InputMap::Action> &E : InputMap::get_singleton()->get_action_map()) {
-		const int event_index = InputMap::get_singleton()->event_get_index(p_event, E.key);
+	// Only the actions that can match the event (reverse index of InputMap, #172), in the order of the action map.
+	LocalVector<StringName> candidate_actions;
+	InputMap::get_singleton()->get_event_candidate_actions(p_event, candidate_actions);
+	for (const StringName &action : candidate_actions) {
+		const int event_index = InputMap::get_singleton()->event_get_index(p_event, action);
 		if (event_index == -1) {
 			continue;
 		}
 		ERR_FAIL_COND_MSG(event_index >= (int)MAX_EVENT, vformat("Input singleton does not support more than %d events assigned to an action.", MAX_EVENT));
 
 		int device_id = p_event->get_device();
-		bool is_pressed = p_event->is_action_pressed(E.key, true);
-		ActionState &action_state = action_states[E.key];
+		bool is_pressed = p_event->is_action_pressed(action, true);
+		ActionState &action_state = action_states[action];
 
 		// Update the action's per-device state.
 		ActionState::DeviceState &device_state = action_state.device_states[device_id];
 		device_state.pressed[event_index] = is_pressed;
-		device_state.strength[event_index] = p_event->get_action_strength(E.key);
-		device_state.raw_strength[event_index] = p_event->get_action_raw_strength(E.key);
+		device_state.strength[event_index] = p_event->get_action_strength(action);
+		device_state.raw_strength[event_index] = p_event->get_action_raw_strength(action);
 		device_state.event_type[event_index] = p_event->get_type();
 
 		// Update the action's global state and cache.
@@ -1107,10 +1110,10 @@ void Input::_parse_input_event_impl(const Ref<InputEvent> &p_event, bool p_is_em
 			action_state.api_pressed = false; // Always release the event from action_press() method.
 			action_state.api_strength = 0.0;
 		}
-		action_state.exact = InputMap::get_singleton()->event_is_action(p_event, E.key, true);
+		action_state.exact = InputMap::get_singleton()->event_is_action(p_event, action, true);
 
 		bool was_pressed = action_state.cache.pressed;
-		_update_action_cache(E.key, action_state);
+		_update_action_cache(action, action_state);
 		// As input may come in part way through a physics tick, the earliest we can react to it is the next physics tick.
 		if (action_state.cache.pressed && !was_pressed) {
 			action_state.pressed_event_id = p_event->get_instance_id();

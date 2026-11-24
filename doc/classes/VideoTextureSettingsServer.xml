@@ -228,4 +228,32 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="anisotropic_filtering_level_changed">
+			<param index="0" name="level" type="int" enum="Viewport.AnisotropicFiltering" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.anisotropic_filtering_level] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] that renders the game.
+			</description>
+		</signal>
+		<signal name="canvas_item_default_texture_filter_changed">
+			<param index="0" name="filter" type="int" enum="Viewport.DefaultCanvasItemTextureFilter" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.canvas_item_default_texture_filter] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] with 2D content.
+			</description>
+		</signal>
+		<signal name="canvas_item_default_texture_repeat_changed">
+			<param index="0" name="repeat" type="int" enum="Viewport.DefaultCanvasItemTextureRepeat" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.canvas_item_default_texture_repeat] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="texture_mipmap_bias_changed">
+			<param index="0" name="bias" type="float" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.texture_mipmap_bias] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>
