@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="EngineSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the frame rate limit, time scale, physics rate, audio speed and low-processor mode.
+	</brief_description>
+	<description>
+		[EngineSettingsServer] is the settings domain [code]"engine"[/code]: it stores the frame rate limit ([member Engine.max_fps]), the time scale ([member Engine.time_scale]), the physics rate and its limits ([member Engine.physics_ticks_per_second], [member Engine.max_physics_steps_per_frame], [member Engine.physics_jitter_fix]), physics interpolation ([member SceneTree.physics_interpolation]), the audio playback speed ([member AudioServer.playback_speed_scale]) and the low-processor mode ([member OS.low_processor_usage_mode], [member OS.low_processor_usage_mode_sleep_usec]) for the player. Every value takes effect at once. The settings resource is an [EngineSettings]; the file is [code]user://settings/engine.ini[/code] by default (INI or JSON, never CSV).
+		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the [SceneTree] exists and before the main scene is loaded. The defaults are the project settings ([member ProjectSettings.application/run/max_fps], [member ProjectSettings.physics/common/physics_ticks_per_second], [member ProjectSettings.application/run/low_processor_mode] and the others), and [code]1.0[/code] for the time scale and the audio speed.
+		[b]Simulation values:[/b] [code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code] change how the game behaves, not only how it looks: a different physics rate changes jump heights and collisions of fast bodies and breaks deterministic or networked games, a different speed can be a cheat. They stay at the project values unless [member ProjectSettings.settings/engine/allow_simulation_values] is enabled; a game that offers a speed option (accessibility, slow motion for tests) enables it. See [method is_simulation_locked].
+		Values out of range are clamped with a warning, whether they come from the API, a hand-edited file or the command line: [code]max_fps[/code] at least [code]0[/code], [code]time_scale[/code] [code]0.01[/code] to [code]100[/code], [code]physics_ticks_per_second[/code] [code]1[/code] to [code]1000[/code], [code]max_physics_steps_per_frame[/code] [code]1[/code] to [code]100[/code], [code]physics_jitter_fix[/code] [code]0[/code] to [code]2[/code], [code]audio_playback_speed_scale[/code] [code]0.01[/code] to [code]4[/code], [code]low_processor_mode_sleep_usec[/code] [code]0[/code] to [code]1000000[/code].
+		The command-line options [code]--max-fps[/code] and [code]--time-scale[/code] win for the session: they become session overrides (see [method SettingsServer.set_session_override]), are pushed to the engine and are never saved.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			$MaxFps.value = EngineSettingsServer.get_max_fps()
+			$BatterySaver.button_pressed = EngineSettingsServer.is_low_processor_mode_enabled()
+			$GameSpeed.visible = EngineSettingsServer.is_value_supported(&amp;"time_scale")
+
+		func _on_max_fps_value_changed(value):
+			EngineSettingsServer.set_max_fps(int(value))
+
+		func _on_battery_saver_toggled(enabled):
+			EngineSettingsServer.set_low_processor_mode_enabled(enabled)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GetNode&lt;SpinBox&gt;("MaxFps").Value = EngineSettingsServer.GetMaxFps();
+		    GetNode&lt;CheckBox&gt;("BatterySaver").ButtonPressed = EngineSettingsServer.IsLowProcessorModeEnabled();
+		    // Methods of the base class are called through Singleton.
+		    GetNode&lt;Control&gt;("GameSpeed").Visible = EngineSettingsServer.Singleton.IsValueSupported("time_scale");
+		}
+
+		private void OnMaxFpsValueChanged(double value)
+		{
+		    EngineSettingsServer.SetMaxFps((int)value);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]EngineSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]EngineSettingsServer.Singleton[/code].
+		[b]Note:[/b] A game that changes [member Engine.time_scale] itself (slow motion, pause effects) overwrites the player's value until it is applied again; multiply with [method get_time_scale] instead of setting a fixed value.
+		[b]Note:[/b] In the Web export, [code]low_processor_mode_sleep_usec[/code] has no effect (the browser schedules the frames) and [method SettingsServer.is_value_supported] returns [code]false[/code] for it. The domain is never applied to the editor itself.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_audio_playback_speed_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending audio playback speed. See [member EngineSettings.audio_playback_speed_scale].
+			</description>
+		</method>
+		<method name="get_low_processor_mode_sleep_usec" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending sleep time between frames in low-processor mode, in microseconds.
+			</description>
+		</method>
+		<method name="get_max_fps" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending frame rate limit; [code]0[/code] means unlimited. A [code]--max-fps[/code] session override is not included; see [method SettingsServer.has_session_override].
+			</description>
+		</method>
+		<method name="get_max_physics_steps_per_frame" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending maximum number of physics steps per rendered frame.
+			</description>
+		</method>
+		<method name="get_physics_jitter_fix" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending physics jitter fix threshold.
+			</description>
+		</method>
+		<method name="get_physics_ticks_per_second" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending physics rate in ticks per second.
+			</description>
+		</method>
+		<method name="get_simulation_setting_names" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the simulation values: [code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code].
+			</description>
+		</method>
+		<method name="get_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending time scale. A [code]--time-scale[/code] session override is not included.
+			</description>
+		</method>
+		<method name="is_low_processor_mode_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the low-processor mode is enabled in the pending settings.
+			</description>
+		</method>
+		<method name="is_physics_interpolation_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if physics interpolation is enabled in the pending settings.
+			</description>
+		</method>
+		<method name="is_simulation_locked" qualifiers="static">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the simulation values stay at the project values, that is, if [member ProjectSettings.settings/engine/allow_simulation_values] is [code]false[/code].
+			</description>
+		</method>
+		<method name="is_simulation_setting" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param name] is one of the simulation values (see [method get_simulation_setting_names]).
+			</description>
+		</method>
+		<method name="set_audio_playback_speed_scale">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Sets the playback speed of all audio, clamped to [code]0.01[/code]–[code]4.0[/code]. Ignored with a warning while [method is_simulation_locked] is [code]true[/code].
+			</description>
+		</method>
+		<method name="set_low_processor_mode_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Enables or disables the low-processor mode (a battery saver): the engine only redraws when something changes.
+			</description>
+		</method>
+		<method name="set_low_processor_mode_sleep_usec">
+			<return type="void" />
+			<param index="0" name="usec" type="int" />
+			<description>
+				Sets the sleep time between frames in low-processor mode, in microseconds, clamped to [code]0[/code]–[code]1000000[/code].
+			</description>
+		</method>
+		<method name="set_max_fps">
+			<return type="void" />
+			<param index="0" name="max_fps" type="int" />
+			<description>
+				Sets the frame rate limit; [code]0[/code] means unlimited. Negative values become [code]0[/code]. Replaces a [code]--max-fps[/code] session override.
+			</description>
+		</method>
+		<method name="set_max_physics_steps_per_frame">
+			<return type="void" />
+			<param index="0" name="max_physics_steps" type="int" />
+			<description>
+				Sets the maximum number of physics steps per rendered frame, clamped to [code]1[/code]–[code]100[/code]. Ignored with a warning while [method is_simulation_locked] is [code]true[/code].
+			</description>
+		</method>
+		<method name="set_physics_interpolation_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Enables or disables physics interpolation of the [SceneTree].
+			</description>
+		</method>
+		<method name="set_physics_jitter_fix">
+			<return type="void" />
+			<param index="0" name="threshold" type="float" />
+			<description>
+				Sets the physics jitter fix threshold, clamped to [code]0.0[/code]–[code]2.0[/code]. Ignored with a warning while [method is_simulation_locked] is [code]true[/code].
+			</description>
+		</method>
+		<method name="set_physics_ticks_per_second">
+			<return type="void" />
+			<param index="0" name="ticks_per_second" type="int" />
+			<description>
+				Sets the physics rate, clamped to [code]1[/code]–[code]1000[/code]. Ignored with a warning while [method is_simulation_locked] is [code]true[/code]. Changing the physics rate changes how the game behaves; consider enabling physics interpolation for rates that are not a multiple of the display refresh rate.
+			</description>
+		</method>
+		<method name="set_time_scale">
+			<return type="void" />
+			<param index="0" name="time_scale" type="float" />
+			<description>
+				Sets the game speed, clamped to [code]0.01[/code]–[code]100.0[/code]. Ignored with a warning while [method is_simulation_locked] is [code]true[/code]. Replaces a [code]--time-scale[/code] session override.
+			</description>
+		</method>
+	</methods>
+</class>

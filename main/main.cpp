@@ -282,6 +282,8 @@ static bool debug_canvas_item_redraw = false;
 static bool debug_mute_audio = false;
 #endif
 static int max_fps = -1;
+static double cmdline_time_scale = 1.0; // `--time-scale`, for EngineSettingsServer.
+static bool cmdline_time_scale_set = false;
 static int frame_delay = 0;
 static int audio_output_latency = 0;
 static bool disable_render_loop = false;
@@ -1842,7 +1844,9 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		} else if (arg == "--time-scale") { // force time scale
 
 			if (N) {
-				Engine::get_singleton()->set_time_scale(N->get().to_float());
+				cmdline_time_scale = N->get().to_float();
+				cmdline_time_scale_set = true;
+				Engine::get_singleton()->set_time_scale(cmdline_time_scale);
 				N = N->next();
 			} else {
 				OS::get_singleton()->print("Missing time scale argument, aborting.\n");
@@ -4124,6 +4128,17 @@ Dictionary Main::get_command_line_window_options() {
 	}
 	if (init_embed_parent_window_id) {
 		options["embedded"] = true;
+	}
+	return options;
+}
+
+Dictionary Main::get_command_line_engine_options() {
+	Dictionary options;
+	if (max_fps >= 0) {
+		options["max_fps"] = max_fps;
+	}
+	if (cmdline_time_scale_set) {
+		options["time_scale"] = cmdline_time_scale;
 	}
 	return options;
 }
