@@ -213,7 +213,7 @@ TEST_CASE("[InputAction] Text form and events") {
 	Ref<InputAction> action;
 	action.instantiate();
 	action->set_action("jump");
-	const char *texts[] = { "KeyboardLabel:Ctrl+S", "Keyboard:W", "Mouse:Left", "Gamepad:A", "GamepadAxis:LeftX-" };
+	const char *texts[] = { "KeyboardLabel:Ctrl+S", "Keyboard:W", "Mouse:Left", "Gamepad:A", "GamepadAxis:LeftStickLeft" };
 	for (const char *text : texts) {
 		const Ref<InputEvent> event = InputAction::text_to_event(text);
 		REQUIRE(event.is_valid());

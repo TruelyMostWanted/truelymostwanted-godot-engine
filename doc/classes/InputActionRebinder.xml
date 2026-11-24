@@ -6,7 +6,7 @@
 	<description>
 		[InputActionRebinder] is the "press a key now" flow of a rebinding menu. [method begin] picks an action and an event index, the menu forwards its input events to [method update], and the first usable event is bound at once through [InputMapSettingsServer]. Mouse motion, released keys and buttons, echo events, weak stick moves and a modifier key pressed on its own are not used. The event is stored like the server stores it (a pressed key by its physical keycode, a stick by its axis and direction, for all devices), so it is exactly what a save and load of the settings gives back.
 		If another action already uses the event, [member conflict_mode] decides: ask the menu ([constant CONFLICT_ASK], the default), refuse and wait for another input, swap the two events, or allow both actions to use it. Conflicts are looked up in the merged [InputMap]: the built-in and the custom actions, with the pending events of the actions that [InputMapSettingsServer] stores. Only events of the device class of [member device_filter] are compared.
-		The signals of this class describe the flow ([signal started], [signal conflict], [signal completed], [signal canceled]). The new events themselves are announced by the server: [signal InputMapSettingsServer.action_events_changed] is emitted for every action that changed (both actions on a swap) before [signal completed]. There is no built-in cancel key, because Escape can be a binding; the menu calls [method cancel].
+		The signals of this class describe the flow ([signal started], [signal conflict], [signal completed], [signal canceled]). The new events themselves are announced by the server: [signal InputMapSettingsServer.action_events_changed] is emitted for every action that changed (both actions on a swap) after the change is applied to the [InputMap] and before [signal completed]. There is no built-in cancel key, because Escape can be a binding; the menu calls [method cancel].
 		Several rebinders can run at the same time, for example one per player in local co-op with [member device_filter] [constant DEVICE_GAMEPAD] and their own [member gamepad_device]. Use it from the main thread.
 		[codeblocks]
 		[gdscript]
@@ -115,14 +115,14 @@
 			<description>
 				Gives the rebinder an input event, usually from [method Node._input]. Returns [code]true[/code] if the event was used, so the caller can mark it as handled ([method Viewport.set_input_as_handled]).
 				Not used: events while no session is active or a conflict of [constant CONFLICT_ASK] is open, mouse motion and other events that can't be bound (touch, MIDI, actions), released keys and buttons, echo events, joypad motion weaker than [member axis_threshold], and events outside [member device_filter] or from another pad than [member gamepad_device].
-				A modifier key ([kbd]Shift[/kbd], [kbd]Ctrl[/kbd], [kbd]Alt[/kbd], [kbd]Meta[/kbd]) pressed on its own is used but not bound yet: if another key follows, the combination is bound ([code]PhysicalKey:Ctrl+S[/code]); if the modifier is released first, the modifier alone is bound.
+				A modifier key ([kbd]Shift[/kbd], [kbd]Ctrl[/kbd], [kbd]Alt[/kbd], [kbd]Meta[/kbd]) pressed on its own is used but not bound yet: if another key follows, the combination is bound ([code]Keyboard:Ctrl+S[/code]); if the modifier is released first, the modifier alone is bound.
 				A usable event without conflict is bound at once and [signal completed] is emitted. With a conflict, [member conflict_mode] decides.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="axis_threshold" type="float" setter="set_axis_threshold" getter="get_axis_threshold" default="0.5">
-			How far a stick or trigger must move (from [code]0.0[/code] to [code]1.0[/code]) before its motion is bound. The direction of the axis is part of the binding ([code]JoypadMotion:LeftY-[/code] is up).
+			How far a stick or trigger must move (from [code]0.0[/code] to [code]1.0[/code]) before its motion is bound. The direction of the axis is part of the binding ([code]GamepadAxis:LeftStickUp[/code]).
 		</member>
 		<member name="conflict_mode" type="int" setter="set_conflict_mode" getter="get_conflict_mode" enum="InputActionRebinder.ConflictMode" default="0">
 			What happens if another action already uses the captured event.

@@ -18,7 +18,7 @@
 		<member name="input_events" type="InputMapSettingsEvent[]" setter="set_input_events" getter="get_input_events" default="[]">
 			The events of the action, in the order of the action.
 		</member>
-		<member name="layer" type="int" setter="set_layer" getter="get_layer" enum="Layer" default="1">
+		<member name="layer" type="int" setter="set_layer" getter="get_layer" enum="InputMapSettingsAction.Layer" default="1">
 			The layer of the action in [InputMap]: [constant LAYER_BUILT_IN] for the [code]ui_*[/code] actions, [constant LAYER_CUSTOM] for the actions of the project. It is written for information; the project decides the layer when the file is loaded.
 		</member>
 	</members>

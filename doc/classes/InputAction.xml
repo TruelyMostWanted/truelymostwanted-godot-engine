@@ -6,17 +6,21 @@
 	<description>
 		An [InputAction] describes one action of the [InputMap] ([code]"jump"[/code], [code]"ui_accept"[/code], ...) with its [member action] name, its [member deadzone] and its [member events]. The layers of the [InputMap] are [InputActions] of [InputAction]s: [method InputMap.get_input_action] returns the action of the [InputMap] itself (changing it changes the [InputMap]), and [method InputMap.set_input_action] puts one into the [InputMap]. A set of actions is an [InputActions]. [InputMapSettingsServer] stores the player's bindings as [InputActions].
 		[member events] is a list of [InputEvent]s. It is stored like any other resource property: a [code].tres[/code] file holds the events as sub-resources, the same layout the editor writes, so an [InputAction] or an [InputActions] can be edited in the Inspector and saved again. [InputMapSettingsServer] stores the player's bindings in readable text instead (see [method InputMapSettingsServer.events_to_text]).
-		[method event_to_text] and [method text_to_event] convert one event to and from its text form [code]Type:Value[/code]. The older names ([code]PhysicalKey[/code], [code]Key[/code], [code]KeyLabel[/code], [code]MouseButton[/code], [code]JoypadButton[/code], [code]JoypadMotion[/code]) are still read. Only keys, mouse buttons, joypad buttons and joypad axes have one:
-		- [code]Keyboard:W[/code], [code]KeyboardLabel:Ctrl+S[/code] and [code]KeyboardPrinted:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.physical_keycode] (the key at the same place on every layout, the usual choice for games), [member InputEventKey.keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
-		- [code]Mouse:Left[/code], [code]Mouse:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
-		- [code]Gamepad:A[/code]: an [InputEventJoypadButton] with the names of [enum JoyButton] in PascalCase ([code]LeftShoulder[/code], [code]DPadUp[/code], ...) or the button index.
-		- [code]GamepadAxis:LeftX+[/code]: an [InputEventJoypadMotion] with the axis ([code]LeftX[/code], [code]LeftY[/code], [code]RightX[/code], [code]RightY[/code], [code]TriggerLeft[/code], [code]TriggerRight[/code] or the axis index) and the direction ([code]+[/code] or [code]-[/code]).
+		[method event_to_text] and [method text_to_event] convert one event to and from its text form The grammar is [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code]. Only keys, mouse buttons, gamepad buttons and gamepad axes have one. Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code].
+		- [code]Device&lt;N&gt;:[/code] (optional): only the gamepad with this device number ([member InputEvent.device]). Without it the event reacts to all devices; [code]Any:[/code] is read as well, and so is the [code]@N[/code] suffix of older texts. It is written only for gamepad events of one pad; keys and mouse buttons are always bound for all devices (the prefix is read, not kept).
+		- Type: [code]Keyboard[/code] (an [InputEventKey] matched by [member InputEventKey.physical_keycode], the key at the same place on every layout, the usual choice for games), [code]KeyboardLabel[/code] ([member InputEventKey.keycode]), [code]KeyboardPrinted[/code] ([member InputEventKey.key_label]), [code]Mouse[/code] ([InputEventMouseButton]), [code]Gamepad[/code] ([InputEventJoypadButton]) and [code]GamepadAxis[/code] ([InputEventJoypadMotion]). The older names [code]PhysicalKey[/code], [code]Key[/code], [code]KeyLabel[/code], [code]MouseButton[/code], [code]JoypadButton[/code] and [code]JoypadMotion[/code] are still read.
+		- Modifiers (only [code]Keyboard*[/code] and [code]Mouse[/code]): [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms), [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code] and [code]Meta[/code]. They are written in this order and read in any order. A modifier key alone is the input itself ([code]Keyboard:Shift[/code]).
+		- Input of a key: a name of [method OS.get_keycode_string], never a character ([code]Colon[/code], [code]Semicolon[/code], [code]Plus[/code], [code]Minus[/code], [code]At[/code], [code]Space[/code]), so [code]:[/code] and [code]+[/code] stay separators; unknown codes are written as [code]#[/code] and the number.
+		- Input of a mouse button: [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] or [code]Extra2[/code].
+		- Input of a gamepad button: [code]A[/code], [code]B[/code], [code]X[/code], [code]Y[/code] (positions, [code]A[/code] is the bottom one), [code]LeftShoulder[/code], [code]RightShoulder[/code], [code]DPadUp[/code], [code]DPadDown[/code], [code]DPadLeft[/code], [code]DPadRight[/code], [code]Back[/code], [code]Start[/code], [code]Guide[/code], [code]LeftStickPress[/code], [code]RightStickPress[/code], [code]Misc1[/code], [code]Paddle1[/code] to [code]Paddle4[/code], [code]Touchpad[/code], or the button index. [code]LeftStick[/code] and [code]RightStick[/code] are read as the stick clicks.
+		- Input of a gamepad axis, with the direction in the name: [code]LeftStickLeft[/code], [code]LeftStickRight[/code], [code]LeftStickUp[/code], [code]LeftStickDown[/code], the same for [code]RightStick[/code], [code]LeftTrigger[/code] and [code]RightTrigger[/code]. Other axes are written as the index with [code]+[/code] or [code]-[/code]. The older names with a sign ([code]LeftX-[/code], [code]LeftY+[/code], [code]TriggerRight+[/code]) are still read; [code]GamepadAxis:LeftStickX-[/code] is not valid.
+		Not valid are, for example, [code]Gamepad:Ctrl+A[/code] (a gamepad has no modifiers), [code]Device:Gamepad:A[/code], [code]DeviceX:Gamepad:A[/code], [code]Keyboard:[/code], [code]Keyboard:Ctrl+[/code], an unknown type and an unknown key.
 		[codeblocks]
 		[gdscript]
 		var action = InputAction.new()
 		action.action = &amp;"jump"
 		action.deadzone = 0.3
-		action.add_event(InputAction.text_to_event("Key:Space"))
+		action.add_event(InputAction.text_to_event("Keyboard:Space"))
 		action.add_event(InputAction.text_to_event("Gamepad:A"))
 		InputMap.set_input_action(action)
 		ResourceSaver.save(action, "user://jump.tres") # The events are sub-resources of the file.
@@ -25,7 +29,7 @@
 		var action = new InputAction();
 		action.Action = "jump";
 		action.Deadzone = 0.3f;
-		action.AddEvent(InputAction.TextToEvent("Key:Space"));
+		action.AddEvent(InputAction.TextToEvent("Keyboard:Space"));
 		action.AddEvent(InputAction.TextToEvent("Gamepad:A"));
 		InputMap.Singleton.SetInputAction(action);
 		ResourceSaver.Save(action, "user://jump.tres"); // The events are sub-resources of the file.
@@ -52,7 +56,7 @@
 			<return type="String" />
 			<param index="0" name="event" type="InputEvent" />
 			<description>
-				Returns the text form of [param event] (see the class description), or an empty [String] for event types that have none (touch, MIDI, ...). A key the player presses has all three codes; it is written as [code]PhysicalKey[/code], so the binding stays on the same key position on every keyboard layout. A modifier key on its own (such as [code]PhysicalKey:Shift[/code]) is written without modifiers. The device of the event is not part of the text.
+				Returns the text form [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code] of [param event] (see the class description), or an empty [String] for event types that have none (touch, MIDI, ...). Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code]. A key the player presses has all three codes; it is written as [code]Keyboard[/code], so the binding stays on the same key position on every keyboard layout. A modifier key on its own ([code]Keyboard:Shift[/code]) is written without modifiers. A gamepad event of one pad ([member InputEvent.device] [code]0[/code] or more) starts with [code]Device&lt;N&gt;:[/code].
 			</description>
 		</method>
 		<method name="get_device_events" qualifiers="const">
@@ -93,7 +97,7 @@
 			<return type="InputEvent" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Returns a new event of the text form [param text] (see the class description), or [code]null[/code] if the text is not valid. Its [member InputEvent.device] is [code]-1[/code] (all devices). [code]CmdOrCtrl[/code] is resolved here: the event uses [member InputEventWithModifiers.command_or_control_autoremap].
+				Returns a new event of the text form [param text] ([code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code], see the class description), or [code]null[/code] if the text is not valid. Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code]. Its [member InputEvent.device] is the number of the [code]Device&lt;N&gt;:[/code] prefix for a gamepad event, otherwise [code]-1[/code] (all devices). [code]CmdOrCtrl[/code] is resolved here: the event uses [member InputEventWithModifiers.command_or_control_autoremap].
 			</description>
 		</method>
 	</methods>

@@ -227,7 +227,6 @@ Ref<Resource> InputMapSettingsServer::_settings_to_storage_for_format(const Ref<
 			row->set_index(j);
 			row->set_device(event_record->get_device());
 			row->set_input(event_record->get_input());
-			row->set_direction(event_record->get_direction());
 			row->set_modifiers(event_record->get_modifiers());
 			row->set_key_mode(event_record->get_key_mode());
 			row->set_device_id(event_record->get_device_id());
@@ -311,7 +310,6 @@ Ref<Resource> InputMapSettingsServer::_settings_from_storage(const Ref<Resource>
 			event_record.instantiate();
 			event_record->set_device(row->get_device());
 			event_record->set_input(row->get_input());
-			event_record->set_direction(row->get_direction());
 			event_record->set_modifiers(row->get_modifiers());
 			event_record->set_key_mode(row->get_key_mode());
 			event_record->set_device_id(row->get_device_id());
@@ -369,7 +367,7 @@ Dictionary InputMapSettingsServer::_migrate_settings(int p_from_version, const D
 	const String list_property = get_list_property();
 	const Array old_rows = data.get(list_property, Array());
 	static const char *device_names[] = { "Keyboard", "Mouse", "Gamepad" };
-	static const char *key_mode_names[] = { "Physical", "Label" };
+	static const char *key_mode_names[] = { "Physical", "Label", "Printed" };
 	Array actions;
 	int skipped = 0;
 	for (int i = 0; i < old_rows.size(); i++) {
@@ -390,7 +388,6 @@ Dictionary InputMapSettingsServer::_migrate_settings(int p_from_version, const D
 			Dictionary event_dictionary;
 			event_dictionary["device"] = String(device_names[int(record->get_device())]);
 			event_dictionary["input"] = record->get_input();
-			event_dictionary["direction"] = record->get_direction();
 			event_dictionary["modifiers"] = record->get_modifiers();
 			event_dictionary["key_mode"] = String(key_mode_names[int(record->get_key_mode())]);
 			event_dictionary["device_id"] = record->get_device_id();
@@ -588,12 +585,14 @@ void InputMapSettingsServer::_merge_project_actions() {
 
 void InputMapSettingsServer::_validate_loaded_settings(const Ref<Resource> &p_settings) {
 	ListSettingsServer::_validate_loaded_settings(p_settings);
-	// Before `settings_changed`: the signal and `action_events_changed` see the merged actions.
+	// Before `settings_changed` and the apply: the signal and `action_events_changed` see the merged actions.
 	_merge_project_actions();
 }
 
-void InputMapSettingsServer::_on_settings_changed(const PackedStringArray &p_names) {
-	if (p_names.has(String(get_list_property()))) {
+void InputMapSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	ListSettingsServer::_notify_value_applied(p_name, p_value);
+	// After the events reached InputMap: a handler of `action_events_changed` sees the new bindings there.
+	if (p_name == get_list_property()) {
 		_emit_action_events_changed();
 	}
 }
@@ -701,7 +700,11 @@ Ref<InputEvent> InputMapSettingsServer::_normalized_event(const Ref<InputEvent> 
 	ERR_FAIL_COND_V_MSG(text.is_empty(), Ref<InputEvent>(), vformat("Input map settings: the event \"%s\" has no key, button or axis.", p_event->as_text()));
 	// The stored form: one code, no pressed state, for all devices (a pad's id changes when pads are reconnected).
 	r_error = OK;
-	return InputAction::text_to_event(text);
+	const Ref<InputEvent> event = InputAction::text_to_event(text);
+	if (event.is_valid()) {
+		event->set_device(-1);
+	}
+	return event;
 }
 
 TypedArray<InputEvent> InputMapSettingsServer::_get_merged_events(const StringName &p_action, bool &r_exists, bool &r_managed) const {
@@ -978,7 +981,6 @@ InputMapSettingsServer::InputMapSettingsServer() {
 		const int mode = project_settings->get_setting_with_override(SETTING_SAVE_MODE);
 		save_mode = mode == SAVE_MODE_ALL ? SAVE_MODE_ALL : SAVE_MODE_CUSTOM_ONLY;
 	}
-	connect(SNAME("settings_changed"), callable_mp(this, &InputMapSettingsServer::_on_settings_changed));
 }
 
 InputMapSettingsServer::~InputMapSettingsServer() {

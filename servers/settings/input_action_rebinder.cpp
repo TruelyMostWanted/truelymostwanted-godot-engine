@@ -293,6 +293,7 @@ void InputActionRebinder::_accept(const Ref<InputEvent> &p_pressed) {
 	// The stored form of the server (one code, all devices): what a save and load of the settings gives back.
 	const Ref<InputEvent> event = InputAction::text_to_event(InputAction::event_to_text(p_pressed));
 	ERR_FAIL_COND(event.is_null());
+	event->set_device(-1);
 	_find_conflicts(server, event, p_pressed);
 	conflict_event = event;
 	if (conflicts.is_empty()) {

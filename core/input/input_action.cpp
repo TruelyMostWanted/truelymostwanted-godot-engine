@@ -39,11 +39,33 @@
 static const char *_mouse_button_names[] = { "Left", "Right", "Middle", "WheelUp", "WheelDown", "WheelLeft", "WheelRight", "Extra1", "Extra2" };
 static constexpr int MOUSE_BUTTON_NAME_COUNT = 9; // MouseButton::LEFT (1) to MouseButton::MB_XBUTTON2 (9).
 
-static const char *_joy_button_names[] = { "A", "B", "X", "Y", "Back", "Guide", "Start", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Misc1", "Paddle1", "Paddle2", "Paddle3", "Paddle4", "Touchpad", "Misc2", "Misc3", "Misc4", "Misc5", "Misc6" };
+// The names of the text form (#193); Godot's JoyButton and JoyAxis enums keep their own names.
+static const char *_joy_button_names[] = { "A", "B", "X", "Y", "Back", "Guide", "Start", "LeftStickPress", "RightStickPress", "LeftShoulder", "RightShoulder", "DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Misc1", "Paddle1", "Paddle2", "Paddle3", "Paddle4", "Touchpad", "Misc2", "Misc3", "Misc4", "Misc5", "Misc6" };
 static constexpr int JOY_BUTTON_NAME_COUNT = int(JoyButton::SDL_MAX);
 
-static const char *_joy_axis_names[] = { "LeftX", "LeftY", "RightX", "RightY", "TriggerLeft", "TriggerRight" };
-static constexpr int JOY_AXIS_NAME_COUNT = int(JoyAxis::SDL_MAX);
+// An axis with its direction in the name (Godot's Y+ points down). Triggers only have the positive direction.
+struct JoyAxisName {
+	const char *name;
+	JoyAxis axis;
+	float value;
+};
+
+static const JoyAxisName _joy_axis_names[] = {
+	{ "LeftStickLeft", JoyAxis::LEFT_X, -1.0f },
+	{ "LeftStickRight", JoyAxis::LEFT_X, 1.0f },
+	{ "LeftStickUp", JoyAxis::LEFT_Y, -1.0f },
+	{ "LeftStickDown", JoyAxis::LEFT_Y, 1.0f },
+	{ "RightStickLeft", JoyAxis::RIGHT_X, -1.0f },
+	{ "RightStickRight", JoyAxis::RIGHT_X, 1.0f },
+	{ "RightStickUp", JoyAxis::RIGHT_Y, -1.0f },
+	{ "RightStickDown", JoyAxis::RIGHT_Y, 1.0f },
+	{ "LeftTrigger", JoyAxis::TRIGGER_LEFT, 1.0f },
+	{ "RightTrigger", JoyAxis::TRIGGER_RIGHT, 1.0f },
+};
+
+// Names before the final text form; still read, never written.
+static const char *_old_joy_axis_names[] = { "LeftX", "LeftY", "RightX", "RightY", "TriggerLeft", "TriggerRight" };
+static constexpr int OLD_JOY_AXIS_NAME_COUNT = int(JoyAxis::SDL_MAX);
 
 static bool _is_modifier_key(Key p_key) {
 	return p_key == Key::SHIFT || p_key == Key::CTRL || p_key == Key::ALT || p_key == Key::META;
@@ -176,29 +198,65 @@ String InputAction::event_to_text(const Ref<InputEvent> &p_event) {
 		const String button = (index >= 1 && index <= MOUSE_BUTTON_NAME_COUNT) ? String(_mouse_button_names[index - 1]) : itos(index);
 		return "Mouse:" + _modifiers_to_text(mouse_event.ptr()) + button;
 	}
+	// Only a gamepad event names its device: keys and mouse buttons have fixed device ids.
+	const String device = p_event.is_valid() && p_event->get_device() >= 0 ? vformat("Device%d:", p_event->get_device()) : String();
 	const Ref<InputEventJoypadButton> button_event = p_event;
 	if (button_event.is_valid()) {
 		if (button_event->get_button_index() == JoyButton::INVALID) {
 			return String();
 		}
-		return "Gamepad:" + _index_to_text(int(button_event->get_button_index()), _joy_button_names, JOY_BUTTON_NAME_COUNT);
+		return device + "Gamepad:" + _index_to_text(int(button_event->get_button_index()), _joy_button_names, JOY_BUTTON_NAME_COUNT);
 	}
 	const Ref<InputEventJoypadMotion> motion_event = p_event;
 	if (motion_event.is_valid()) {
 		if (motion_event->get_axis() == JoyAxis::INVALID) {
 			return String();
 		}
-		return "GamepadAxis:" + _index_to_text(int(motion_event->get_axis()), _joy_axis_names, JOY_AXIS_NAME_COUNT) + (motion_event->get_axis_value() < 0.0f ? "-" : "+");
+		const bool negative = motion_event->get_axis_value() < 0.0f;
+		for (const JoyAxisName &entry : _joy_axis_names) {
+			if (entry.axis == motion_event->get_axis() && (entry.value < 0.0f) == negative) {
+				return device + "GamepadAxis:" + entry.name;
+			}
+		}
+		// Axes without a name (and a trigger below zero): the number and the sign.
+		return device + "GamepadAxis:" + itos(int(motion_event->get_axis())) + (negative ? "-" : "+");
 	}
 	return String();
 }
 
 Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
-	const int colon = p_text.find_char(':');
+	String text = p_text.strip_edges();
+	// `@3` and `@Any` at the end: the device suffix of older texts.
+	int device = -1;
+	const int at = text.rfind_char('@');
+	if (at > 0) {
+		const String suffix = text.substr(at + 1).strip_edges();
+		if (suffix.nocasecmp_to("Any") == 0 || (suffix.is_valid_int() && suffix.to_int() >= 0)) {
+			device = suffix.is_valid_int() ? int(suffix.to_int()) : -1;
+			text = text.substr(0, at).strip_edges();
+		}
+	}
+	int colon = text.find_char(':');
 	if (colon <= 0) {
 		return Ref<InputEvent>();
 	}
-	String type = p_text.substr(0, colon).strip_edges();
+	// `[Device<N>:]<Type>:[<Modifiers>+]<Input>`: split at most twice at `:` from the left.
+	String type = text.substr(0, colon).strip_edges();
+	if (type.nocasecmp_to("Any") == 0 || type.begins_with("Device")) {
+		if (type.begins_with("Device")) {
+			const String number = type.substr(6);
+			if (!number.is_valid_int() || number.to_int() < 0) {
+				return Ref<InputEvent>();
+			}
+			device = int(number.to_int());
+		}
+		text = text.substr(colon + 1);
+		colon = text.find_char(':');
+		if (colon <= 0) {
+			return Ref<InputEvent>();
+		}
+		type = text.substr(0, colon).strip_edges();
+	}
 	// Names since #193 (Keyboard = physical key, KeyboardLabel = key code of the layout); the older names still load.
 	if (type == "Keyboard") {
 		type = "PhysicalKey";
@@ -213,13 +271,13 @@ Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 	} else if (type == "GamepadAxis") {
 		type = "JoypadMotion";
 	}
-	const String value = p_text.substr(colon + 1).strip_edges();
+	const String value = text.substr(colon + 1).strip_edges();
 	if (value.is_empty()) {
 		return Ref<InputEvent>();
 	}
 
 	if (type == "Key" || type == "PhysicalKey" || type == "KeyLabel") {
-		// The last part is the key; "Ctrl+Plus" has no "+" in the key name.
+		// The last part is the key; key names have no `+` (`Ctrl+Plus`).
 		const Vector<String> parts = value.split("+");
 		const Key code = _text_to_key(parts[parts.size() - 1].strip_edges());
 		if (code == Key::NONE) {
@@ -237,6 +295,7 @@ Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 		if (!_parse_modifiers(parts, key_event.ptr())) {
 			return Ref<InputEvent>();
 		}
+		// Keys are bound for all devices; a device prefix is read but not kept.
 		key_event->set_device(-1);
 		return key_event;
 	}
@@ -251,7 +310,7 @@ Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 			}
 		}
 		if (index < 0 && button.is_valid_int() && button.to_int() > 0 && button.to_int() <= 32) {
-			index = button.to_int();
+			index = int(button.to_int());
 		}
 		if (index < 0) {
 			return Ref<InputEvent>();
@@ -266,22 +325,33 @@ Ref<InputEvent> InputAction::text_to_event(const String &p_text) {
 		return mouse_event;
 	}
 	if (type == "JoypadButton") {
-		const int index = _text_to_index(value, _joy_button_names, JOY_BUTTON_NAME_COUNT, int(JoyButton::MAX));
+		int index = _text_to_index(value, _joy_button_names, JOY_BUTTON_NAME_COUNT, int(JoyButton::MAX));
+		if (index < 0 && value.nocasecmp_to("LeftStick") == 0) {
+			index = int(JoyButton::LEFT_STICK); // Old name of LeftStickPress.
+		} else if (index < 0 && value.nocasecmp_to("RightStick") == 0) {
+			index = int(JoyButton::RIGHT_STICK);
+		}
 		if (index < 0) {
 			return Ref<InputEvent>();
 		}
-		return InputEventJoypadButton::create_reference(JoyButton(index), -1);
+		return InputEventJoypadButton::create_reference(JoyButton(index), device);
 	}
 	if (type == "JoypadMotion") {
+		for (const JoyAxisName &entry : _joy_axis_names) {
+			if (value.nocasecmp_to(entry.name) == 0) {
+				return InputEventJoypadMotion::create_reference(entry.axis, entry.value, device);
+			}
+		}
+		// The older form: axis name or number with the sign (`LeftX-`, `TriggerRight+`, `6+`).
 		const char32_t sign = value[value.length() - 1];
 		if (sign != '+' && sign != '-') {
 			return Ref<InputEvent>();
 		}
-		const int index = _text_to_index(value.substr(0, value.length() - 1).strip_edges(), _joy_axis_names, JOY_AXIS_NAME_COUNT, int(JoyAxis::MAX));
+		const int index = _text_to_index(value.substr(0, value.length() - 1).strip_edges(), _old_joy_axis_names, OLD_JOY_AXIS_NAME_COUNT, int(JoyAxis::MAX));
 		if (index < 0) {
 			return Ref<InputEvent>();
 		}
-		return InputEventJoypadMotion::create_reference(JoyAxis(index), sign == '-' ? -1.0f : 1.0f, -1);
+		return InputEventJoypadMotion::create_reference(JoyAxis(index), sign == '-' ? -1.0f : 1.0f, device);
 	}
 	return Ref<InputEvent>();
 }

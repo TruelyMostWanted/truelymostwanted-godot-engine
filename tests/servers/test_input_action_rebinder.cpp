@@ -145,8 +145,19 @@ public:
 	void on_value_changed(const StringName &p_name, const Variant &) {
 		log.push_back(vformat("value_changed:%s", p_name));
 	}
+	// The events of the action in InputMap when the server announced the change.
+	HashMap<StringName, String> applied_events;
+
 	void on_action_events_changed(const StringName &p_action) {
 		log.push_back(vformat("changed:%s", p_action));
+		TypedArray<InputEvent> events;
+		const List<Ref<InputEvent>> *list = InputMap::get_singleton()->action_get_events(p_action);
+		if (list != nullptr) {
+			for (const Ref<InputEvent> &event : *list) {
+				events.push_back(event);
+			}
+		}
+		applied_events[p_action] = InputMapSettingsServer::events_to_text(events);
 	}
 	void on_started(const StringName &p_action, int p_index) {
 		log.push_back(vformat("started:%s:%d", p_action, p_index));
@@ -208,13 +219,13 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	ctrl->set_ctrl_pressed(true);
 	CHECK(rebinder->update(ctrl));
 	CHECK(rebinder->is_active());
-	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
 	Ref<InputEventKey> ctrl_s = make_key(Key::S);
 	ctrl_s->set_ctrl_pressed(true);
 	CHECK(rebinder->update(ctrl_s));
 	CHECK_FALSE(rebinder->is_active());
 	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Ctrl+S", JUMP));
-	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X");
 
 	// A modifier released before another key is bound alone (Shift to sprint).
 	CHECK(rebinder->begin(JUMP, 1) == OK);
@@ -225,7 +236,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	CHECK(rebinder->update(make_key(Key::SHIFT, false)));
 	CHECK_FALSE(rebinder->is_active());
 	CHECK(recorder->last() == vformat("completed:%s:1:Keyboard:Shift", JUMP));
-	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X@Any; Keyboard:Shift");
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; Gamepad:X; Keyboard:Shift");
 
 	// Gamepad: a weak stick move is ignored, a strong one keeps its direction; another pad is ignored.
 	rebinder->set_device_filter(InputActionRebinder::DEVICE_GAMEPAD);
@@ -235,9 +246,9 @@ TEST_CASE("[SceneTree][InputActionRebinder] Filtering: motion, release, echo, we
 	CHECK_FALSE(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.3f, 1)));
 	CHECK_FALSE(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.9f, 0)));
 	CHECK(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -0.9f, 1)));
-	CHECK(recorder->last() == vformat("completed:%s:0:GamepadAxis:LeftY-", JUMP));
+	CHECK(recorder->last() == vformat("completed:%s:0:GamepadAxis:LeftStickUp", JUMP));
 	// Stored for all pads, so the binding still works after the pad is reconnected with another id.
-	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; GamepadAxis:LeftY-; Keyboard:Shift");
+	CHECK(events_text(server, JUMP) == "Keyboard:Ctrl+S; GamepadAxis:LeftStickUp; Keyboard:Shift");
 	CHECK(is_action(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -1.0f, 3), JUMP));
 
 	// Errors of begin().
@@ -269,7 +280,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_REJECT emits conflict and w
 	CHECK_FALSE(rebinder->is_conflict_pending());
 	CHECK(InputAction::event_to_text(rebinder->get_conflict_event()) == "Keyboard:Space");
 	CHECK(events_text(server, FIRE) == "Mouse:Left");
-	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
 
 	CHECK(rebinder->update(make_key(Key::F)));
 	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:F", FIRE));
@@ -305,7 +316,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_SWAP exchanges both events 
 	recorder->log.clear();
 	CHECK(rebinder->update(make_key(Key::SPACE)));
 	CHECK(events_text(server, FIRE) == "Keyboard:Space");
-	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X");
 	CHECK(is_action(make_key(Key::SPACE), FIRE));
 	CHECK_FALSE(is_action(make_key(Key::SPACE), JUMP));
 	CHECK(is_action(make_mouse_button(MouseButton::LEFT), JUMP));
@@ -317,6 +328,9 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_SWAP exchanges both events 
 	CHECK(recorder->log.has(vformat("changed:%s", FIRE)));
 	CHECK(recorder->log.has(vformat("changed:%s", JUMP)));
 	CHECK(recorder->log[3] == vformat("completed:%s:0:Keyboard:Space", FIRE));
+	// `action_events_changed` comes after the apply: InputMap already has the new events.
+	CHECK(recorder->applied_events[FIRE] == "Keyboard:Space");
+	CHECK(recorder->applied_events[JUMP] == "Mouse:Left; Gamepad:X");
 
 	rebinder.unref();
 	memdelete(server);
@@ -336,7 +350,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ALLOW binds the event to bo
 	CHECK(rebinder->update(make_key(Key::SPACE)));
 	CHECK(recorder->last() == vformat("completed:%s:1:Keyboard:Space", FIRE));
 	CHECK(events_text(server, FIRE) == "Mouse:Left; Keyboard:Space");
-	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
 	CHECK(is_action(make_key(Key::SPACE), FIRE));
 	CHECK(is_action(make_key(Key::SPACE), JUMP));
 
@@ -364,7 +378,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	CHECK(rebinder->begin(JUMP, 0) == OK);
 	CHECK(rebinder->update(make_key(Key::SPACE)));
 	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Space", JUMP));
-	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X");
 
 	// Cancel: nothing changes.
 	CHECK(rebinder->begin(FIRE, 0) == OK);
@@ -378,7 +392,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	CHECK_FALSE(rebinder->is_active());
 	CHECK_FALSE(rebinder->is_conflict_pending());
 	CHECK(events_text(server, FIRE) == "Mouse:Left");
-	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X");
 
 	// Allow.
 	CHECK(rebinder->begin(FIRE, 0) == OK);
@@ -387,7 +401,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	CHECK_FALSE(rebinder->is_active());
 	CHECK(recorder->last() == vformat("completed:%s:0:Keyboard:Space", FIRE));
 	CHECK(events_text(server, FIRE) == "Keyboard:Space");
-	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Keyboard:Space; Gamepad:X");
 
 	// Swap: jump takes the old event of fire's slot; the server signals come before completed.
 	server->reset_action(FIRE);
@@ -398,7 +412,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] CONFLICT_ASK waits for swap, allow o
 	recorder->log.clear();
 	CHECK(rebinder->resolve_conflict_swap() == OK);
 	CHECK(events_text(server, FIRE) == "Keyboard:Space");
-	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "Mouse:Left; Gamepad:X");
 	REQUIRE(recorder->log.size() == 3);
 	CHECK(recorder->log[0].begins_with("changed:"));
 	CHECK(recorder->log[1].begins_with("changed:"));
@@ -431,7 +445,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Cancel without an event changes noth
 	recorder->log.clear();
 	keyboard->cancel(); // No session: no signal.
 	CHECK(recorder->log.is_empty());
-	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
 
 	// begin() during a session cancels it first.
 	CHECK(keyboard->begin(JUMP, 0) == OK);
@@ -451,7 +465,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Cancel without an event changes noth
 	CHECK_FALSE(pad->update(make_key(Key::W)));
 	CHECK(keyboard->update(make_key(Key::W)));
 	CHECK_FALSE(keyboard->is_active());
-	CHECK(events_text(server, JUMP) == "Keyboard:W; Gamepad:Y@Any");
+	CHECK(events_text(server, JUMP) == "Keyboard:W; Gamepad:Y");
 
 	keyboard.unref();
 	pad.unref();
@@ -495,7 +509,7 @@ TEST_CASE("[SceneTree][InputActionRebinder] Built-in actions count as conflicts;
 	}
 	CHECK(accept_conflict);
 	CHECK(rebinder->is_active()); // Handled like CONFLICT_REJECT.
-	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X@Any");
+	CHECK(events_text(server, JUMP) == "KeyboardLabel:Space; Gamepad:X");
 	rebinder->cancel();
 
 	rebinder.unref();
@@ -529,13 +543,13 @@ TEST_CASE("[SceneTree][InputActionRebinder] The committed event is the event a s
 		CHECK(rebinder->update(InputEventJoypadMotion::create_reference(JoyAxis::TRIGGER_RIGHT, 0.8f, 2)));
 		committed_text = recorder->last();
 		stored_text = events_text(server, JUMP);
-		CHECK(stored_text == "Keyboard:Ctrl+W; GamepadAxis:TriggerRight+");
+		CHECK(stored_text == "Keyboard:Ctrl+W; GamepadAxis:RightTrigger");
 		CHECK(server->save() == OK);
 		rebinder.unref();
 		memdelete(server);
 		memdelete(recorder);
 	}
-	CHECK(committed_text == vformat("completed:%s:1:GamepadAxis:TriggerRight+", JUMP));
+	CHECK(committed_text == vformat("completed:%s:1:GamepadAxis:RightTrigger", JUMP));
 
 	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 	server->set_file_path(path);

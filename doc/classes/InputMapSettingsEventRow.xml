@@ -4,7 +4,7 @@
 		One event as a row of the CSV file of [InputMapSettingsServer].
 	</brief_description>
 	<description>
-		The CSV form of one [InputMapSettingsEvent] with the name and deadzone of its action: the columns [code skip-lint]action[/code], [code skip-lint]index[/code], [code skip-lint]device[/code], [code skip-lint]input[/code], [code skip-lint]direction[/code], [code skip-lint]modifiers[/code], [code skip-lint]key_mode[/code], [code skip-lint]device_id[/code] and [code skip-lint]deadzone[/code]. [InputMapSettingsServer] converts between [InputActions] and these rows when it saves and loads; games do not need this class.
+		The CSV form of one [InputMapSettingsEvent] with the name and deadzone of its action: the columns [code skip-lint]action[/code], [code skip-lint]index[/code], [code skip-lint]device[/code], [code skip-lint]input[/code], [code skip-lint]modifiers[/code], [code skip-lint]key_mode[/code], [code skip-lint]device_id[/code] and [code skip-lint]deadzone[/code]. [InputMapSettingsServer] converts between [InputActions] and these rows when it saves and loads; games do not need this class.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -20,9 +20,6 @@
 		</member>
 		<member name="device_id" type="String" setter="set_device_id" getter="get_device_id" default="&quot;Any&quot;">
 			See [member InputMapSettingsEvent.device_id]. Column [code skip-lint]device_id[/code].
-		</member>
-		<member name="direction" type="String" setter="set_direction" getter="get_direction" default="&quot;&quot;">
-			See [member InputMapSettingsEvent.direction]. Column [code skip-lint]direction[/code].
 		</member>
 		<member name="index" type="int" setter="set_index" getter="get_index" default="0">
 			The position of the event in its action, [code]-1[/code] for an action without events. Column [code skip-lint]index[/code].

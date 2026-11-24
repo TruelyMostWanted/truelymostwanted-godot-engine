@@ -1209,8 +1209,16 @@ Error SettingsServer::load() {
 				version = int(tree[version_key]);
 				tree.erase(version_key);
 			}
+			String decode_type = type_name;
 			if (version < current_version) {
+				const String old_type = tree.get("$type", String());
 				tree = _migrate_settings(version, tree);
+				// A migration may convert the stored type (version 2 rows into version 3 records): the converted
+				// tree is read as the type the migration wrote, not as the type found in the old text.
+				const String new_type = tree.get("$type", String());
+				if (!new_type.is_empty() && new_type != old_type) {
+					decode_type = new_type;
+				}
 			} else if (version > current_version) {
 				WARN_PRINT(vformat("Settings domain \"%s\": \"%s\" was written with version %d; this game reads version %d.", domain, path, version, current_version));
 			}
@@ -1220,7 +1228,7 @@ Error SettingsServer::load() {
 					present.push_back(key);
 				}
 			}
-			err = ResourceTextSerializer::decode_resource(tree, type_name, loaded, error);
+			err = ResourceTextSerializer::decode_resource(tree, decode_type, loaded, error);
 		}
 	}
 	if (err == OK && loaded.is_valid()) {

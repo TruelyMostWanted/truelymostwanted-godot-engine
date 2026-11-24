@@ -4,7 +4,7 @@
 		One event as stored in the file of [InputMapSettingsServer].
 	</brief_description>
 	<description>
-		The file form of one bindable [InputEvent] (key, mouse button, gamepad button or gamepad axis) in the settings file of [InputMapSettingsServer]: named fields instead of a sub-resource, the same in JSON, INI, YAML, TOML and XML. [InputMapSettingsServer] converts between [InputEvent] and this record when it saves and loads; games do not need this class, but [method to_text] and [method from_text] give the text form of an event.
+		The file form of one bindable [InputEvent] (key, mouse button, gamepad button or gamepad axis) in the settings file of [InputMapSettingsServer]: named fields instead of a sub-resource, the same in JSON, INI, YAML, TOML and XML. [InputMapSettingsServer] converts between [InputEvent] and this record when it saves and loads; games do not need this class, but [method to_text] and [method from_text] give the text form [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code] of an event (see [method InputAction.event_to_text]). Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code]. The fields hold the same values: [code]Keyboard:Ctrl+Shift+S[/code] is [member device] [code]Keyboard[/code], [member modifiers] [code]Ctrl+Shift[/code], [member input] [code]S[/code]; [code]Device3:GamepadAxis:LeftStickLeft[/code] is [member device] [code]Gamepad[/code], [member input] [code]LeftStickLeft[/code], [member device_id] [code]3[/code].
 	</description>
 	<tutorials>
 	</tutorials>
@@ -13,44 +13,41 @@
 			<return type="InputMapSettingsEvent" />
 			<param index="0" name="event" type="InputEvent" />
 			<description>
-				Returns the record of [param event], or [code]null[/code] for event types that have none (touch, MIDI, ...). A key with a physical keycode is written with [constant KEY_MODE_PHYSICAL], other keys with [constant KEY_MODE_LABEL]. The [member device_id] is the number of the pad for a gamepad event of one pad, otherwise [code]Any[/code].
+				Returns the record of [param event], or [code]null[/code] for event types that have none (touch, MIDI, ...). A key with a physical keycode is written with [constant KEY_MODE_PHYSICAL], a key with a keycode with [constant KEY_MODE_LABEL], a key with only a key label with [constant KEY_MODE_PRINTED]. The [member device_id] is the number of the pad for a gamepad event of one pad, otherwise [code]Any[/code].
 			</description>
 		</method>
 		<method name="from_text" qualifiers="static">
 			<return type="InputMapSettingsEvent" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Returns the record of a text form such as [code]Keyboard:Ctrl+S[/code], [code]KeyboardLabel:E[/code], [code]Mouse:Left[/code], [code]Gamepad:A@Any[/code] or [code]GamepadAxis:LeftX-@1[/code], or [code]null[/code] if the text is not valid. The names of version 2 files ([code]Key:[/code], [code]PhysicalKey:[/code], [code]KeyLabel:[/code], [code]MouseButton:[/code], [code]JoypadButton:[/code], [code]JoypadMotion:[/code]) are read, too.
+				Returns the record of a text form [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code] such as [code]Keyboard:Ctrl+S[/code], [code]KeyboardLabel:E[/code], [code]Mouse:Left[/code], [code]Gamepad:A[/code] or [code]Device1:GamepadAxis:LeftStickLeft[/code], or [code]null[/code] if the text is not valid. Everything [method InputAction.text_to_event] reads is read: [code]Any:[/code], the [code]@N[/code] suffix and the older names ([code]Key:[/code], [code]PhysicalKey:[/code], [code]KeyLabel:[/code], [code]MouseButton:[/code], [code]JoypadButton:[/code], [code]JoypadMotion:[/code], [code]LeftX-[/code], [code]TriggerRight+[/code], [code]LeftStick[/code]).
 			</description>
 		</method>
 		<method name="to_event" qualifiers="const">
 			<return type="InputEvent" />
 			<description>
-				Returns a new event of this record, or [code]null[/code] if it is not valid (no [member input], an unknown name, a [member direction] that is not [code]+[/code] or [code]-[/code]). The event reacts to all devices ([member InputEvent.device] [code]-1[/code]), a gamepad event with a number in [member device_id] only to that pad.
+				Returns a new event of this record, or [code]null[/code] if it is not valid (no [member input], an unknown name, [member modifiers] on a gamepad). The event reacts to all devices ([member InputEvent.device] [code]-1[/code]), a gamepad event with a number in [member device_id] only to that pad. A gamepad [member input] is a button name or an axis name ([code]LeftStickLeft[/code]); the older axis form with a sign ([code]LeftX-[/code]) is read, too.
 			</description>
 		</method>
 		<method name="to_text" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the text form of this record: [code]Keyboard:Ctrl+S[/code], [code]KeyboardLabel:E[/code], [code]Mouse:Left[/code], [code]Gamepad:A@Any[/code] (a button always has [code]@Any[/code] or [code]@[/code] and the number of its pad) or [code]GamepadAxis:LeftX-[/code] ([code]@[/code] and the number only for one pad).
+				Returns the text form [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code] of this record, as [method InputAction.event_to_text] writes it: [code]Keyboard:Ctrl+S[/code], [code]KeyboardLabel:E[/code], [code]Mouse:Left[/code], [code]Gamepad:A[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device1:Gamepad:A[/code] (the prefix only for one pad).
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="device" type="int" setter="set_device" getter="get_device" enum="Device" default="0">
+		<member name="device" type="int" setter="set_device" getter="get_device" enum="InputMapSettingsEvent.Device" default="0">
 			The kind of event: [constant DEVICE_KEYBOARD], [constant DEVICE_MOUSE] or [constant DEVICE_GAMEPAD]. Written as [code]Keyboard[/code], [code]Mouse[/code] or [code]Gamepad[/code].
 		</member>
 		<member name="device_id" type="String" setter="set_device_id" getter="get_device_id" default="&quot;Any&quot;">
 			The pad of a gamepad event: [code]Any[/code] (all pads) or the number of one pad.
 		</member>
-		<member name="direction" type="String" setter="set_direction" getter="get_direction" default="&quot;&quot;">
-			The direction of a gamepad axis, [code]+[/code] or [code]-[/code]. Empty for all other events (a gamepad button has no direction).
-		</member>
 		<member name="input" type="String" setter="set_input" getter="get_input" default="&quot;&quot;">
-			The key, button or axis: a key name such as [code]W[/code], [code]Space[/code] or [code]Left[/code], a mouse button ([code]Left[/code], [code]WheelUp[/code], ...), a gamepad button ([code]A[/code], [code]LeftShoulder[/code], ...) or a gamepad axis ([code]LeftX[/code], [code]TriggerRight[/code], ...). The names are those of [method InputAction.text_to_event].
+			The key, button or axis: a key name of [method OS.get_keycode_string] such as [code]W[/code], [code]Space[/code], [code]Colon[/code] or [code]Plus[/code] (never a character), a mouse button ([code]Left[/code], [code]WheelUp[/code], ...), a gamepad button ([code]A[/code], [code]LeftShoulder[/code], [code]LeftStickPress[/code], ...) or a gamepad axis with its direction ([code]LeftStickLeft[/code], [code]LeftStickUp[/code], [code]RightTrigger[/code], ...). The names are those of [method InputAction.text_to_event].
 		</member>
-		<member name="key_mode" type="int" setter="set_key_mode" getter="get_key_mode" enum="KeyMode" default="0">
-			How a key is matched: [constant KEY_MODE_PHYSICAL] (the key position, [member InputEventKey.physical_keycode]) or [constant KEY_MODE_LABEL] (the key with this label on the current layout, [member InputEventKey.keycode]). Only for [constant DEVICE_KEYBOARD].
+		<member name="key_mode" type="int" setter="set_key_mode" getter="get_key_mode" enum="InputMapSettingsEvent.KeyMode" default="0">
+			How a key is matched: [constant KEY_MODE_PHYSICAL] (the key position, [member InputEventKey.physical_keycode], text type [code]Keyboard[/code]), [constant KEY_MODE_LABEL] (the key with this label on the current layout, [member InputEventKey.keycode], [code]KeyboardLabel[/code]) or [constant KEY_MODE_PRINTED] ([member InputEventKey.key_label], [code]KeyboardPrinted[/code]). Only for [constant DEVICE_KEYBOARD].
 		</member>
 		<member name="modifiers" type="String" setter="set_modifiers" getter="get_modifiers" default="&quot;&quot;">
 			The modifiers, joined by [code]+[/code], for example [code]Ctrl+Shift[/code]. The names are [code]CmdOrCtrl[/code], [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code] and [code]Meta[/code]. Only for keyboard and mouse events.
@@ -71,6 +68,9 @@
 		</constant>
 		<constant name="KEY_MODE_LABEL" value="1" enum="KeyMode">
 			The key with a label on the current layout.
+		</constant>
+		<constant name="KEY_MODE_PRINTED" value="2" enum="KeyMode">
+			The key that prints this character ([member InputEventKey.key_label]).
 		</constant>
 	</constants>
 </class>

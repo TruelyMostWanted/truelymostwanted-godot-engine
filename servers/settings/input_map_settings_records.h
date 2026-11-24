@@ -53,15 +53,17 @@ public:
 	enum KeyMode {
 		KEY_MODE_PHYSICAL,
 		KEY_MODE_LABEL,
+		KEY_MODE_PRINTED,
 	};
 
 private:
 	Device device = DEVICE_KEYBOARD;
-	String input; // `W`, `Space`, `Left`, `WheelUp`, `A`, `LeftX`.
-	String direction; // `+` or `-` for a joypad axis, empty otherwise.
+	String input; // `W`, `Space`, `Left`, `WheelUp`, `A`, `LeftStickLeft`: a gamepad axis has its direction in the name.
 	String modifiers; // `Ctrl+Shift` (keyboard and mouse), empty otherwise.
 	KeyMode key_mode = KEY_MODE_PHYSICAL;
 	String device_id = "Any"; // `Any` or the number of one joypad.
+
+	String _compose_text(const String &p_gamepad_type) const;
 
 protected:
 	static void _bind_methods();
@@ -69,8 +71,8 @@ protected:
 public:
 	// The record of an event; null for event types without a record (touch, MIDI, ...).
 	static Ref<InputMapSettingsEvent> from_event(const Ref<InputEvent> &p_event);
-	// The record of a text form (`Keyboard:Ctrl+S`, `Gamepad:A@0`, `GamepadAxis:LeftX-`; the names of version 2 files,
-	// `Key:`, `PhysicalKey:`, `KeyLabel:`, `MouseButton:`, `JoypadButton:`, `JoypadMotion:`, too); null if not valid.
+	// The record of a text form (`Keyboard:Ctrl+S`, `Device0:Gamepad:A`, `GamepadAxis:LeftStickLeft`; every form
+	// InputAction::text_to_event() reads, the names of version 2 files too); null if not valid.
 	static Ref<InputMapSettingsEvent> from_text(const String &p_text);
 
 	// The event; null if the record is not valid. The device of the event is -1 (all devices) unless a joypad is set.
@@ -83,8 +85,6 @@ public:
 	Device get_device() const;
 	void set_input(const String &p_input);
 	String get_input() const;
-	void set_direction(const String &p_direction);
-	String get_direction() const;
 	void set_modifiers(const String &p_modifiers);
 	String get_modifiers() const;
 	void set_key_mode(KeyMode p_key_mode);
@@ -150,7 +150,6 @@ class InputMapSettingsEventRow : public Resource {
 	int index = 0; // Position of the event in the action, -1 for an action without events.
 	InputMapSettingsEvent::Device device = InputMapSettingsEvent::DEVICE_KEYBOARD;
 	String input;
-	String direction;
 	String modifiers;
 	InputMapSettingsEvent::KeyMode key_mode = InputMapSettingsEvent::KEY_MODE_PHYSICAL;
 	String device_id = "Any";
@@ -168,8 +167,6 @@ public:
 	InputMapSettingsEvent::Device get_device() const;
 	void set_input(const String &p_input);
 	String get_input() const;
-	void set_direction(const String &p_direction);
-	String get_direction() const;
 	void set_modifiers(const String &p_modifiers);
 	String get_modifiers() const;
 	void set_key_mode(InputMapSettingsEvent::KeyMode p_key_mode);
