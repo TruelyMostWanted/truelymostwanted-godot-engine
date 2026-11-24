@@ -187,7 +187,7 @@ void LanguageSettingsServer::_push_pending_root_values() {
 	if (pending_root_values.is_empty() || _get_root() == nullptr) {
 		return;
 	}
-	const HashMap<StringName, Variant> values = pending_root_values;
+	const HashMap<StringName, Variant> values(pending_root_values);
 	for (const KeyValue<StringName, Variant> &kv : values) {
 		_push_root_value(kv.key, kv.value);
 	}
