@@ -412,7 +412,11 @@ TEST_CASE("[VideoEffectSettingsServer] Typed signals fire once per applied chang
 	server->reset_to_defaults();
 	SIGNAL_CHECK_FALSE("brightness_changed");
 	CHECK(server->apply() == OK);
-	const Array default_args = { { default_value } };
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
 	SIGNAL_CHECK("brightness_changed", default_args);
 
 	SIGNAL_UNWATCH(server, "brightness_changed");
