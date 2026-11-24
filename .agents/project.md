@@ -40,6 +40,7 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24 (ca. 01:30): Besitzer, **voll autonom ohne Rückfragen**: alle Issues (Konzept, Design, Code, Wiki, Tests, Merge) selbst abarbeiten. Vorgaben: (1) Namen von Features/APIs aussagekräftig machen, Parameter und Typen nutzen (Enums statt Strings, typisierte Options-Klassen statt Dictionary, z. B. `ResourceTextSerializer`); was im Inspector bearbeitbar sein soll → `Resource`, Rest Backend/Server. (2) **Wiki zuerst**: Guides kurz, direkt, verständlich; Home/Sidebar nach Themen gruppiert (Text-Serialisierung, Settings, File I/O, Laden & Speichern von Ressourcen, Packs, Audio, Performance …), Klassenreferenz alphabetisch. (3) Neu: `HttpRequestTarget`-Resource für `HTTPRequest`; Input-Settings (#19) einfach für Spiele; Laufzeit-Loader/-Saver für typische Assets (Bilder, Audio, Video …), **je Ressource ein eigenes Issue und Branch**. (4) Session-Limit: auf automatische Fortsetzung warten. Caveman, sparsam.
 - 2026-11-24: 5-Stunden-Limit bei 95 %: keine neuen Agenten; laufende mit WIP gestoppt.
 - 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
 - 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
@@ -123,6 +124,8 @@ Gemergt seit dem letzten Stand: #60, #9, #10, #36, #35, #50, #15, #53, #77, #68,
 
 **Gestoppt bei 95 % des 5-Stunden-Limits (2026-11-24):** #17 (`17-feature-language-settings`; Besitzer: `LanguageSettings.xml` fertigstellen lassen), #95 (`95-feature-scene-format-loaders`), #96 (`96-feature-font-format-loaders`) mit WIP-Commit und `scratch/issues/<N>/knowledge.md`; mit frischem Agenten fortsetzen.
 - #87 in Arbeit im Hauptbaum: Branch `03-feature-path-prefix-server` gebaut (0/0), Prefix-Tests 9/9, Volltests 1575/1575, Glue/Assemblies 0, doctool ohne Diff; offen: Checks (Testprojekt-Branch `03-feature-path-prefix-server` auf `-87` vorgespult), Kommentar, Merge.
+
+**Gestoppt am Limit (2026-11-24 ~01:40, WIP in Scratch/Branches):** #98 Wiki-Umbau (Clone `scratch/issues/98/wiki`, nicht gepusht, `rename-map.txt`), #99 API-Review (`scratch/issues/99/review.md`), #101 `101-feature-image-texture-loader`, #102–#104 Audio-Loader (`102-feature-wav-loader` …), #100 `100-feature-http-request-target`. #17: Wiki-Entwürfe + Checks fertig (Testprojekt-Commit 1919c31/454057f), Build fehlt. Neue Issues: #98–#105.
 
 **Danach:** #84 (nach #83, gleiche Dateien), #85/#86 (nach #83), #88 (nach #87), #90, #91; #75 (nach #74), #76; #79/#80 (nach #78); #93 SerializerOptions (Branch 05, alle Aufrufer); #73 Formatklassen; #71 (Branch 15); #18–#30 Settings-Domänen nach Muster #16; Fund #16: `AudioServer.set_bus_layout()` setzt Bus-Werte zurück (Issue anlegen, Branch 16).
 
