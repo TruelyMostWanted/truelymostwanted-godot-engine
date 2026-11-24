@@ -519,6 +519,8 @@ public:
 	static void get_resource_base_extensions(List<String> *p_extensions);
 	static void get_extensions_for_type(const StringName &p_class, List<String> *p_extensions);
 	static bool is_resource_extension(const StringName &p_extension);
+	// Lock-free counter that changes when resource extensions are added or cleared (ResourceLoader's extension index).
+	static uint32_t get_resource_base_extensions_version();
 
 	static void add_compatibility_class(const StringName &p_class, const StringName &p_fallback);
 	static StringName get_compatibility_class(const StringName &p_class);

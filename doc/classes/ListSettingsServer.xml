@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ListSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A [SettingsServer] whose settings are a list of entries, such as audio buses, key bindings or voices.
+	</brief_description>
+	<description>
+		A [ListSettingsServer] is a [SettingsServer] whose settings resource holds a list of entry resources in one typed [Array] property, for example the buses of an audio layout or the personas of a game. The entries are found by their index or by the value of a key property (see [method _get_entry_key]).
+		Every change of the list or of an entry emits [signal SettingsServer.value_changed] for the list property and, in [constant SettingsServer.APPLY_MODE_IMMEDIATE], applies the settings. The list property is the name that [method SettingsServer.get_dirty_values] and [signal SettingsServer.applied] report.
+		A list domain can be stored as CSV ([member ProjectSettings.settings/storage/format] [code]"csv"[/code]) if its settings resource has exactly one typed array of resources with simple properties (see [method ResourceTextSerializer.can_serialize] with [constant ResourceTextSerializer.FORMAT_CSV]). The file then has one row per entry. If the domain does not fit, INI is used and a warning is printed once.
+		[codeblocks]
+		[gdscript]
+		# voices_settings.gd, listed in settings/startup/custom_servers.
+		extends ListSettingsServer
+
+		func _get_domain() -&gt; StringName:
+			return &amp;"voices"
+
+		func _get_entry_key() -&gt; StringName:
+			return &amp;"voice_name"
+
+		func _create_settings() -&gt; Resource:
+			return VoiceList.new() # A Resource with "@export var entries: Array[VoiceEntry]".
+
+		# Anywhere in the game:
+		func add_voice():
+			var voices = SettingsServerManager.get_server(&amp;"voices")
+			var entry = VoiceEntry.new()
+			entry.voice_name = "guard"
+			voices.add_entry(entry)
+
+			var index = voices.find_entry("guard")
+			voices.set_entry_value(index, "pitch", 0.8)
+		[/gdscript]
+		[csharp]
+		// VoicesSettings.cs, listed in settings/startup/custom_servers.
+		public partial class VoicesSettings : ListSettingsServer
+		{
+		    public override StringName _GetDomain() =&gt; "voices";
+
+		    public override StringName _GetEntryKey() =&gt; "voice_name";
+
+		    public override Resource _CreateSettings() =&gt; new VoiceList();
+		}
+
+		// Anywhere in the game:
+		var voices = (ListSettingsServer)SettingsServerManager.GetServer("voices");
+		var entry = new VoiceEntry { VoiceName = "guard" };
+		voices.AddEntry(entry);
+
+		int index = voices.FindEntry("guard");
+		voices.SetEntryValue(index, "pitch", 0.8f);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="_get_entry_key" qualifiers="virtual const">
+			<return type="StringName" />
+			<description>
+				Returns the name of the property of an entry that identifies it in [method find_entry], for example [code]&amp;"bus_name"[/code]. The default is an empty [StringName]: entries can only be found by index.
+			</description>
+		</method>
+		<method name="_get_list_property" qualifiers="virtual const">
+			<return type="StringName" />
+			<description>
+				Returns the name of the [Array] property of the settings resource that holds the entries. If it returns an empty [StringName] (the default), the first [Array] property of the settings resource is used.
+			</description>
+		</method>
+		<method name="add_entry">
+			<return type="void" />
+			<param index="0" name="entry" type="Resource" />
+			<param index="1" name="at_index" type="int" default="-1" />
+			<description>
+				Inserts [param entry] at [param at_index]. If [param at_index] is negative or not smaller than the size of the list, the entry is added to the end. Reports an error if [param entry] is [code]null[/code]. Emits [signal SettingsServer.value_changed].
+			</description>
+		</method>
+		<method name="clear_entries">
+			<return type="void" />
+			<description>
+				Removes all entries. Does nothing if the list is empty.
+			</description>
+		</method>
+		<method name="find_entry" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="key" type="Variant" />
+			<description>
+				Returns the index of the first entry whose key property (see [method get_entry_key]) is equal to [param key], or [code]-1[/code] if there is none. Reports an error and returns [code]-1[/code] if the domain has no entry key.
+			</description>
+		</method>
+		<method name="get_entries" qualifiers="const">
+			<return type="Resource[]" />
+			<description>
+				Returns a copy of the list of entries. Changing the returned array does not change the settings; the entries in it are the same objects as in the settings.
+			</description>
+		</method>
+		<method name="get_entry" qualifiers="const">
+			<return type="Resource" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the entry at [param index]. Reports an error and returns [code]null[/code] if [param index] is out of range. Changes to the returned entry are not noticed by the server; use [method set_entry_value] instead.
+			</description>
+		</method>
+		<method name="get_entry_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of entries in the pending list.
+			</description>
+		</method>
+		<method name="get_entry_key" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Returns the name of the property that identifies an entry, from [method _get_entry_key]. Empty by default.
+			</description>
+		</method>
+		<method name="get_entry_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="name" type="StringName" />
+			<description>
+				Returns the value of the property [param name] of the entry at [param index]. Reports an error and returns [code]null[/code] if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_list_property" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Returns the name of the [Array] property of the settings resource that holds the entries, from [method _get_list_property]. By default this is the first [Array] property of the settings resource.
+			</description>
+		</method>
+		<method name="move_entry">
+			<return type="void" />
+			<param index="0" name="from" type="int" />
+			<param index="1" name="to" type="int" />
+			<description>
+				Moves the entry at index [param from] to index [param to]. Reports an error if an index is out of range. Does nothing if both are equal.
+			</description>
+		</method>
+		<method name="remove_entry">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the entry at [param index]. Reports an error if [param index] is out of range.
+			</description>
+		</method>
+		<method name="set_entry_value">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="name" type="StringName" />
+			<param index="2" name="value" type="Variant" />
+			<description>
+				Sets the property [param name] of the entry at [param index]. Does nothing if the value does not change. Reports an error if [param index] is out of range or the entry has no such property. Emits [signal SettingsServer.value_changed] for the list property.
+				[b]Note:[/b] The value is not validated by [method SettingsServer._validate_value].
+			</description>
+		</method>
+	</methods>
+</class>

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XMLWriter" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Writes XML text element by element.
+	</brief_description>
+	<description>
+		[XMLWriter] is the counterpart of [XMLParser]: it builds an XML document in memory, one element, attribute, text, CDATA section or comment at a time. Names are checked and text and attribute values are escaped ([code]&amp;[/code], [code]&lt;[/code], [code]&gt;[/code], quotes), so the output is always well-formed. Child elements are indented with [member indent]; an element that contains text keeps its content on one line. An element without content is written as [code]&lt;name/&gt;[/code].
+		[codeblocks]
+		[gdscript]
+		var writer = XMLWriter.new()
+		writer.write_declaration()
+		writer.begin_element("inventory")
+		writer.add_attribute("owner", "Ann &amp; Bob")
+		writer.begin_element("item")
+		writer.add_attribute("id", "sword")
+		writer.write_text("Sword of &lt;Light&gt;")
+		writer.end_element()
+		writer.write_element("gold", "250")
+		writer.end_element()
+		writer.save("user://inventory.xml")
+		# &lt;?xml version="1.0" encoding="UTF-8"?&gt;
+		# &lt;inventory owner="Ann &amp;amp; Bob"&gt;
+		#   &lt;item id="sword"&gt;Sword of &amp;lt;Light&amp;gt;&lt;/item&gt;
+		#   &lt;gold&gt;250&lt;/gold&gt;
+		# &lt;/inventory&gt;
+		[/gdscript]
+		[csharp]
+		var writer = new XmlWriter();
+		writer.WriteDeclaration();
+		writer.BeginElement("inventory");
+		writer.AddAttribute("owner", "Ann &amp; Bob");
+		writer.BeginElement("item");
+		writer.AddAttribute("id", "sword");
+		writer.WriteText("Sword of &lt;Light&gt;");
+		writer.EndElement();
+		writer.WriteElement("gold", "250");
+		writer.EndElement();
+		writer.Save("user://inventory.xml");
+		[/csharp]
+		[/codeblocks]
+		The methods return [constant OK] on success, or an error (and print it) if a call does not fit the document, for example [method add_attribute] after a child element, or a second root element.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_attribute">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="value" type="String" />
+			<description>
+				Adds the attribute [param name] with [param value] to the element started last. Must be called right after [method begin_element], before any content. Returns [constant ERR_UNCONFIGURED] if no start tag is open, [constant ERR_INVALID_PARAMETER] if [param name] is not a valid XML name and [constant ERR_ALREADY_EXISTS] if the attribute is already set.
+			</description>
+		</method>
+		<method name="begin_element">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Starts an element named [param name] inside the current element. Close it with [method end_element]. Returns [constant ERR_INVALID_PARAMETER] if [param name] is not a valid XML name (see [method is_valid_name]) and [constant ERR_ALREADY_EXISTS] if the root element is already closed.
+			</description>
+		</method>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Discards the output and all open elements, so the writer can start a new document.
+			</description>
+		</method>
+		<method name="end_all">
+			<return type="int" enum="Error" />
+			<description>
+				Ends all open elements.
+			</description>
+		</method>
+		<method name="end_element">
+			<return type="int" enum="Error" />
+			<description>
+				Ends the element started last. Returns [constant ERR_DOES_NOT_EXIST] if no element is open.
+			</description>
+		</method>
+		<method name="escape_attribute" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="value" type="String" />
+			<description>
+				Returns [param value] escaped for an attribute value in double quotes: [code]&amp;[/code], [code]&lt;[/code], [code]&gt;[/code], [code]"[/code], [code]'[/code], line breaks and tabs become entities.
+			</description>
+		</method>
+		<method name="escape_text" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns [param text] escaped for element content: [code]&amp;[/code], [code]&lt;[/code] and [code]&gt;[/code] become entities.
+			</description>
+		</method>
+		<method name="get_depth" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of open elements.
+			</description>
+		</method>
+		<method name="get_output" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the XML written so far.
+			</description>
+		</method>
+		<method name="get_output_buffer" qualifiers="const">
+			<return type="PackedByteArray" />
+			<description>
+				Returns the XML written so far as UTF-8 bytes, for example for [method XMLParser.open_buffer].
+			</description>
+		</method>
+		<method name="is_valid_name" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if [param name] can be used as an element or attribute name: it starts with a letter, [code]_[/code] or [code]:[/code], and contains only letters, digits, [code]-[/code], [code].[/code], [code]_[/code] and [code]:[/code]. Characters outside ASCII are allowed.
+			</description>
+		</method>
+		<method name="save" qualifiers="const">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Writes the output to the file at [param path]. Returns [constant ERR_UNCONFIGURED] if elements are still open (call [method end_all] first).
+			</description>
+		</method>
+		<method name="write_cdata">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Writes [param text] as a CDATA section into the current element, without escaping. A [code]]]&gt;[/code] inside [param text] is split over two sections.
+			</description>
+		</method>
+		<method name="write_comment">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Writes a comment. Returns [constant ERR_INVALID_PARAMETER] if [param text] contains [code]--[/code] or ends with [code]-[/code], which XML does not allow.
+			</description>
+		</method>
+		<method name="write_declaration">
+			<return type="int" enum="Error" />
+			<param index="0" name="version" type="String" default="&quot;1.0&quot;" />
+			<param index="1" name="encoding" type="String" default="&quot;UTF-8&quot;" />
+			<description>
+				Writes the XML declaration, for example [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Must be the first call; returns [constant ERR_ALREADY_EXISTS] otherwise. An empty [param encoding] is left out.
+			</description>
+		</method>
+		<method name="write_element">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="text" type="String" default="&quot;&quot;" />
+			<description>
+				Writes a complete element with [param text] as its content: the same as [method begin_element], [method write_text] and [method end_element]. With an empty [param text], writes [code]&lt;name/&gt;[/code].
+			</description>
+		</method>
+		<method name="write_text">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Writes [param text], escaped, into the current element. Returns [constant ERR_UNCONFIGURED] if no element is open.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="indent" type="String" setter="set_indent" getter="get_indent" default="&quot;  &quot;">
+			The text used for one level of indentation. With an empty string, the whole document is written on one line.
+		</member>
+	</members>
+</class>

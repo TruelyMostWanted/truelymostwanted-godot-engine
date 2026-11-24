@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TOML" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Reads and writes TOML, and any [Resource] as a TOML file.
+	</brief_description>
+	<description>
+		[TOML] reads and writes [url=https://toml.io/en/v1.0.0]TOML 1.0[/url] documents, a configuration format that is easy for people to read and edit. A document is read into a [Dictionary] whose keys keep the order of the file; tables become nested [Dictionary]s, arrays and arrays of tables become [Array]s.
+		The module also registers a loader and a saver for the file extension [code].toml[/code], so any [Resource] can be saved and loaded as TOML with [method ResourceSaver.save] and [method ResourceLoader.load]. It uses the same property mapping as the JSON format of [ResourceTextSerializer]: the root table has the keys [code]"$type"[/code] and [code]"$format_version"[/code], followed by one key per stored property. Nested resources are sub-tables ([code][main][/code]), arrays of resources are arrays of tables ([code][[entries]][/code]). The module also implements [constant ResourceTextSerializer.FORMAT_TOML], so [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_TOML)[/code] and [method ResourceTextSerializer.deserialize] work with TOML like with the built-in formats.
+		[codeblocks]
+		[gdscript]
+		var settings = AudioBusSettings.new() # A Resource with class_name AudioBusSettings.
+		settings.master_volume = 0.8
+		ResourceSaver.save(settings, "user://audio.toml")
+		var loaded = ResourceLoader.load("user://audio.toml") as AudioBusSettings
+		print(loaded.master_volume) # Prints 0.8
+
+		# Any TOML document as a Dictionary:
+		var toml = TOML.new()
+		if toml.parse("[window]\nwidth = 1280\n") == OK:
+			print(toml.get_data()["window"]["width"]) # Prints 1280
+		else:
+			print("Line %d: %s" % [toml.get_error_line(), toml.get_error_message()])
+		[/gdscript]
+		[csharp]
+		var settings = new AudioBusSettings(); // A [GlobalClass] Resource.
+		settings.MasterVolume = 0.8f;
+		ResourceSaver.Save(settings, "user://audio.toml");
+		var loaded = ResourceLoader.Load&lt;AudioBusSettings&gt;("user://audio.toml");
+		GD.Print(loaded.MasterVolume); // Prints 0.8
+
+		// Any TOML document as a Dictionary:
+		var toml = new Toml();
+		if (toml.Parse("[window]\nwidth = 1280\n") == Error.Ok)
+		{
+			GD.Print(toml.GetData()["window"].AsGodotDictionary()["width"]); // Prints 1280
+		}
+		else
+		{
+			GD.Print($"Line {toml.GetErrorLine()}: {toml.GetErrorMessage()}");
+		}
+		[/csharp]
+		[/codeblocks]
+		A resource file looks like this:
+		[codeblock lang=text]
+		"$type" = "AudioBusSettings"
+		"$format_version" = 1
+		master_volume = 0.8
+		mode = "Stereo"
+
+		[[buses]]
+		name = "Music"
+		volume = 0.5
+		[/codeblock]
+		[b]Reading:[/b] all of TOML 1.0 is supported: tables, dotted keys, arrays of tables, inline tables, basic, literal and multi-line strings, integers in decimal, hexadecimal ([code]0x[/code]), octal ([code]0o[/code]) and binary ([code]0b[/code]), floats including [code]inf[/code] and [code]nan[/code], booleans and comments. Dates and times have no [Variant] type and are returned as [String]s, as written in the file. Errors stop the parsing and are reported with line and column.
+		[b]Writing:[/b] keys keep their order. In each table the plain keys come first, then its sub-tables and arrays of tables, because TOML does not allow a key of a table after the header of one of its sub-tables. Strings with line breaks are written as multi-line strings. Arrays that contain tables together with other values are written with inline tables.
+		[b]Note:[/b] TOML has no [code]null[/code]. [code]null[/code] is written as an empty string [code]""[/code]; when a resource is loaded, an empty string sets an object property to [code]null[/code] and keeps the default value of a number or [bool] property.
+		[b]Note:[/b] The static methods can be called from any thread. A [TOML] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+		<link title="TOML 1.0 specification">https://toml.io/en/v1.0.0</link>
+	</tutorials>
+	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a resource from TOML [param text]. The class comes from the key [code]"$type"[/code] of the root table, or from [param type_hint]. Missing keys keep the default value of the class; unknown keys are skipped with a warning. Returns [code]null[/code] and prints an error if the text can't be read. [param options] is accepted for symmetry with [method ResourceTextSerializer.deserialize]; reading TOML has no options yet. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_TOML, type_hint, options)[/code].
+			</description>
+		</method>
+		<method name="get_data" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the document read by the last successful call to [method parse], or an empty [Dictionary].
+			</description>
+		</method>
+		<method name="get_error_column" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the column (starting at 1) of the error of the last call to [method parse], or [code]0[/code] if there was no error.
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the line (starting at 1) of the error of the last call to [method parse], or [code]0[/code] if there was no error.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last call to [method parse], or an empty string if there was no error.
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Reads the TOML document [param text]. Returns [constant OK] on success; the result is then available with [method get_data]. Returns [constant ERR_PARSE_ERROR] if the text is not valid TOML; [method get_error_message], [method get_error_line] and [method get_error_column] describe the problem.
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Reads the TOML document [param text] and returns it as a [Dictionary]. Returns an empty [Dictionary] and prints an error with line and column if the text is not valid TOML.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as TOML text, with the same property mapping as the JSON format of [ResourceTextSerializer]. Of [param options], [member SerializerOptions.enums_as_names], [member SerializerOptions.defaults], [member SerializerOptions.include_type_marker], [member SerializerOptions.sort_keys] and [member SerializerOptions.full_precision_floats] apply; TOML ignores [member SerializerOptions.indent]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code]. Returns an empty string and prints an error if the resource can't be written, for example if it contains itself. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_TOML, options)[/code].
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Dictionary" />
+			<description>
+				Returns [param data] as a TOML document. Values can be [bool], [int], [float], [String], [StringName], [NodePath], [Array], packed arrays and [Dictionary]; [code]null[/code] is written as [code]""[/code]. Returns an empty string and prints an error for other types (for example [Vector2] or [Object]) and for containers that contain themselves.
+				[codeblocks]
+				[gdscript]
+				var text = TOML.stringify({ "name": "Game", "window": { "width": 1280 } })
+				# name = "Game"
+				#
+				# [window]
+				# width = 1280
+				[/gdscript]
+				[csharp]
+				string text = Toml.Stringify(new Godot.Collections.Dictionary { { "name", "Game" }, { "window", new Godot.Collections.Dictionary { { "width", 1280 } } } });
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+	</methods>
+</class>

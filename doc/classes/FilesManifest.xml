@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FilesManifest" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A resource that describes a set of files to load together.
+	</brief_description>
+	<description>
+		A [FilesManifest] describes a set of files as data instead of code: folders (optionally with their subfolders), the extensions and the type of the files to take from them, and single files. Create it in the Inspector or in code, save it as a resource, and load everything it describes with [method ResourceLoader.load_manifest] or [method ResourceLoader.load_threaded_request_manifest]. [method ResourceLoader.get_manifest_paths] returns the paths without loading them.
+		Paths may use any prefix of [PathPrefixServer], for example [code]res://[/code], [code]user://[/code], [code]exec://[/code] or [code]appdata://[/code]. Relative paths are relative to [code]res://[/code].
+		[codeblocks]
+		[gdscript]
+		var manifest := FilesManifest.new()
+		manifest.type_hint = &amp;"Texture2D"
+		manifest.extensions = PackedStringArray(["png", "webp"])
+		manifest.folder_paths = PackedStringArray(["res://art/icons", "res://art/portraits"])
+		var textures := ResourceLoader.load_manifest(manifest)
+		print(textures.size(), " textures loaded")
+		[/gdscript]
+		[csharp]
+		var manifest = new FilesManifest
+		{
+		    TypeHint = "Texture2D",
+		    Extensions = ["png", "webp"],
+		    FolderPaths = ["res://art/icons", "res://art/portraits"],
+		};
+		Godot.Collections.Dictionary textures = ResourceLoader.LoadManifest(manifest);
+		GD.Print(textures.Count, " textures loaded");
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] Folders are listed with [method ResourceLoader.list_directory], so imported files are found by their original names in the editor and in exported projects (files inside the PCK).
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="matches_extension" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if the file name of [param path] ends with one of the [member extensions] (case-insensitive), or if [member extensions] is empty.
+			</description>
+		</method>
+		<method name="normalize_extension" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Returns [param extension] in the form used by [member extensions]: lowercase with a leading dot. [code]"png"[/code], [code]"*.PNG"[/code] and [code]".png"[/code] all become [code]".png"[/code]. Returns an empty string for an empty extension.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="create_non_existing_folders" type="bool" setter="set_create_non_existing_folders" getter="is_create_non_existing_folders" default="false">
+			If [code]true[/code], folders of [member folder_paths] that do not exist are created (with their parent folders) instead of reporting an error. Folders on read-only paths, such as [code]res://[/code] in an exported project, cannot be created and still report an error.
+		</member>
+		<member name="extensions" type="PackedStringArray" setter="set_extensions" getter="get_extensions" default="PackedStringArray()">
+			The extensions of the files to take from [member folder_paths]. They are normalized with [method normalize_extension] and duplicates are removed. Multi-part extensions such as [code].tres.json[/code] are supported. If empty, all files that a resource loader recognizes are taken.
+		</member>
+		<member name="file_paths" type="PackedStringArray" setter="set_file_paths" getter="get_file_paths" default="PackedStringArray()">
+			Single files that belong to the manifest. They are always included, regardless of [member extensions] and [member type_hint]. Files that do not exist report an error and are skipped.
+		</member>
+		<member name="folder_paths" type="PackedStringArray" setter="set_folder_paths" getter="get_folder_paths" default="PackedStringArray()">
+			The folders to take files from. Folders that do not exist report an error, unless [member create_non_existing_folders] is [code]true[/code].
+		</member>
+		<member name="recursive" type="bool" setter="set_recursive" getter="is_recursive" default="true">
+			If [code]true[/code], the subfolders of [member folder_paths] are searched too. Hidden folders are skipped.
+		</member>
+		<member name="type_hint" type="StringName" setter="set_type_hint" getter="get_type_hint" default="&amp;&quot;&quot;">
+			The class of the resources, for example [Texture2D]. If it is a built-in class, files in [member folder_paths] whose resource type is known and does not inherit from it are skipped, and the hint is passed to the loaders. Class names of scripts do not filter and are not passed to the loaders. If empty, files of all types are taken.
+		</member>
+	</members>
+</class>

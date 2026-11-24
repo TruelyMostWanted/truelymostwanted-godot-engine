@@ -6,6 +6,7 @@
 	<description>
 		A singleton for saving resource types to the filesystem.
 		It uses the many [ResourceFormatSaver] classes registered in the engine (either built-in or from a plugin) to save resource data to text-based (e.g. [code].tres[/code] or [code].tscn[/code]) or binary files (e.g. [code].res[/code] or [code].scn[/code]).
+		A [PackedScene] can also be saved as [code].gltf[/code] (JSON with an external [code].bin[/code] buffer and image files) or [code].glb[/code] (one binary file), for example to [code]user://[/code]. In the editor these extensions are not offered in [method get_recognized_extensions].
 	</description>
 	<tutorials>
 	</tutorials>
@@ -34,6 +35,59 @@
 				Returns the resource ID for the given path. If [param generate] is [code]true[/code], a new resource ID will be generated if one for the path is not found. If [param generate] is [code]false[/code] and the path is not found, [constant ResourceUID.INVALID_ID] is returned.
 			</description>
 		</method>
+		<method name="is_extension_registered">
+			<return type="bool" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Returns [code]true[/code] if a save [Callable] is registered for [param extension] with [method register_extension]. The extension is compared without the leading dot and case-insensitively.
+			</description>
+		</method>
+		<method name="register_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="extension" type="String" />
+			<param index="1" name="save" type="Callable" />
+			<param index="2" name="type" type="StringName" default="&amp;&quot;Resource&quot;" />
+			<param index="3" name="at_front" type="bool" default="false" />
+			<description>
+				Registers a simple resource format with one call: resources saved to a path ending with [param extension] are written by calling [param save], without writing a [ResourceFormatSaver]. Use [method ResourceLoader.register_extension] to load files of the same format.
+				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param save] receives the resource and the path ([code]func(resource: Resource, path: String)[/code]) and returns an [enum Error] code; a function without a return value counts as [constant OK].
+				[param type] is the class of the resources this format saves: a [Resource] class or a global script class ([code]class_name[/code]) that extends [Resource]. Only resources of that class or of a class that inherits it are saved with this format. If [param at_front] is [code]true[/code], the format is asked before all other registered savers.
+				Registering an extension again replaces the previous [Callable]. Returns [constant OK], or [constant ERR_INVALID_PARAMETER] if the extension, the callable or the type is not valid.
+				[codeblocks]
+				[gdscript]
+				func _ready():
+					ResourceSaver.register_extension("quiz", _save_quiz, &amp;"QuizSet")
+					ResourceSaver.save(my_quiz, "user://questions.quiz")
+
+				static func _save_quiz(quiz: QuizSet, path: String) -&gt; Error:
+					var file := FileAccess.open(path, FileAccess.WRITE)
+					if file == null:
+						return FileAccess.get_open_error()
+					file.store_string("\n".join(quiz.questions))
+					return OK
+				[/gdscript]
+				[csharp]
+				public override void _Ready()
+				{
+					ResourceSaver.RegisterExtension("quiz", Callable.From&lt;Resource, string, int&gt;(SaveQuiz), "QuizSet");
+					ResourceSaver.Save(_myQuiz, "user://questions.quiz");
+				}
+
+				private static int SaveQuiz(Resource resource, string path)
+				{
+					using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
+					if (file == null)
+					{
+						return (int)FileAccess.GetOpenError();
+					}
+					file.StoreString(string.Join('\n', ((QuizSet)resource).Questions));
+					return (int)Error.Ok;
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] [param save] is called on the thread that calls [method save], with no engine lock held. If the object that [param save] is bound to is freed, saving fails with an error. All registrations are removed when the engine shuts down.
+			</description>
+		</method>
 		<method name="remove_resource_format_saver">
 			<return type="void" />
 			<param index="0" name="format_saver" type="ResourceFormatSaver" />
@@ -49,8 +103,32 @@
 			<description>
 				Saves a resource to disk to the given path, using a [ResourceFormatSaver] that recognizes the resource object. If [param path] is empty, [ResourceSaver] will try to use [member Resource.resource_path].
 				The [param flags] bitmask can be specified to customize the save behavior.
-				Returns [constant OK] on success.
+				Returns [constant OK] on success. Use [method save_result] to get the saver's message as well.
 				[b]Note:[/b] When the project is running, any generated UID associated with the resource will not be saved as the required code is only executed in editor mode.
+			</description>
+		</method>
+		<method name="save_result">
+			<return type="ResourceSaveResult" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="path" type="String" default="&quot;&quot;" />
+			<param index="2" name="flags" type="int" enum="ResourceSaver.SaverFlags" is_bitfield="true" default="0" />
+			<description>
+				Saves a resource like [method save] and reports why it failed: the returned [ResourceSaveResult] holds the [enum Error] code and the message the saver printed (or, if nothing was printed, the name of the error code and the path). [member ResourceSaveResult.path] is [param path], or [member Resource.resource_path] if [param path] is empty. A [code]null[/code] [param resource] gives [constant ERR_INVALID_PARAMETER]. The errors are still printed as with [method save].
+				[codeblocks]
+				[gdscript]
+				var result := ResourceSaver.save_result(settings, "user://settings.tres")
+				if not result.ok:
+					push_error(result.error_message)
+				[/gdscript]
+				[csharp]
+				ResourceSaveResult result = ResourceSaver.SaveResult(settings, "user://settings.tres");
+				if (!result.Ok)
+				{
+				    GD.PushError(result.ErrorMessage);
+				}
+				// Or: ResourceSaver.TrySave(settings, "user://settings.tres", out Error error).
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="set_uid">
@@ -60,6 +138,13 @@
 			<description>
 				Sets the UID of the given [param resource] path to [param uid]. You can generate a new UID using [method ResourceUID.create_id].
 				Since resources will normally get a UID automatically, this method is only useful in very specific cases.
+			</description>
+		</method>
+		<method name="unregister_extension">
+			<return type="int" enum="Error" />
+			<param index="0" name="extension" type="String" />
+			<description>
+				Removes the format registered for [param extension] with [method register_extension]. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no save [Callable] is registered for [param extension].
 			</description>
 		</method>
 	</methods>

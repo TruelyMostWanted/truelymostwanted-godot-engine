@@ -79,6 +79,16 @@ public:
 		String salt;
 	};
 
+	// One pack added with `add_pack()`. The list is kept in mount order so that `remove_pack()`
+	// can rebuild the merged file tree from the remaining packs.
+	struct PackInfo {
+		String path;
+		bool replace_files = false;
+		uint64_t offset = 0;
+		Vector<uint8_t> decryption_key;
+		bool main_pack = false;
+	};
+
 private:
 	struct PackedDir {
 		PackedDir *parent = nullptr;
@@ -111,8 +121,12 @@ private:
 	HashMap<PathMD5, Vector<PackedFile>, PathMD5> delta_patches;
 
 	Vector<PackSource *> sources;
+	Vector<PackInfo> packs;
 
 	PackedDir *root = nullptr;
+	// Directory trees replaced by `remove_pack()`. Open `DirAccessPack` instances may still point into them,
+	// so they are freed with PackedData.
+	Vector<PackedDir *> retired_roots;
 
 	static inline PackedData *singleton = nullptr;
 	bool disabled = false;
@@ -143,6 +157,13 @@ public:
 
 	static PackedData *get_singleton() { return singleton; }
 	Error add_pack(const String &p_path, bool p_replace_files, uint64_t p_offset, const Vector<uint8_t> &p_decryption_key = Vector<uint8_t>());
+	// Removes every pack added with `p_path` and rebuilds the file tree from the remaining packs in mount order.
+	// Not thread-safe, like `add_pack()`: call it while no other thread looks up pack files.
+	Error remove_pack(const String &p_path);
+	void mark_main_pack(const String &p_path);
+	const Vector<PackInfo> &get_packs() const { return packs; }
+	// The pack that provides `p_path` (as given to `add_pack()`), or an empty string.
+	String get_pack_of(const String &p_path);
 
 	void clear();
 
