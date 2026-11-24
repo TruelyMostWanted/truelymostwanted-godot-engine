@@ -6,7 +6,7 @@
 	<description>
 		[TTSServer] speaks text with a [TTSPersona], keeps a list of named personas and emits one signal per utterance event. The speech itself is done by the platform through [DisplayServer] ([method DisplayServer.tts_speak] and the other [code]tts_*[/code] methods), which stay available as before.
 		If the voice of a persona does not exist on the current machine, [TTSServer] picks a voice for the persona's language instead (see [method resolve_voice_id]), so a saved persona works on every platform.
-The personas have two layers: the personas of the game ([method add_persona], [method set_default_persona]) and the player's overrides ([method set_persona_override], [method set_default_persona_override]), which [code]TTSPersonaSettingsServer[/code] stores and applies. [method get_persona], [method get_personas], [method get_default_persona] and [method speak_with_persona] see the player's override first, so the game can add its personas at any time without hiding the player's choice.
+The personas have two layers: the personas of the game ([method add_persona], [method set_default_persona]) and the player's overrides ([method set_persona_override], [method set_default_persona_override]), which [TTSPersonaSettingsServer] stores and applies. [method get_persona], [method get_personas], [method get_default_persona] and [method speak_with_persona] see the player's override first, so the game can add its personas at any time without hiding the player's choice.
 		[codeblocks]
 		[gdscript]
 		func _ready():
@@ -229,7 +229,7 @@ The personas have two layers: the personas of the game ([method add_persona], [m
 			<param index="0" name="name" type="StringName" />
 			<description>
 				Sets the player's default persona. It comes before the default persona of the game as long as a persona with this name exists; the name is not checked, so it may name a persona the game adds later. An empty [param name] removes the player's choice.
-				[b]Note:[/b] [code]TTSPersonaSettingsServer[/code] calls this method; games usually change [code]TTSPersonaSettingsServer.set_default_persona()[/code] instead, which is saved.
+				[b]Note:[/b] [TTSPersonaSettingsServer] calls this method; games usually change [method TTSPersonaSettingsServer.set_default_persona] instead, which is saved.
 			</description>
 		</method>
 		<method name="set_persona_override">
@@ -237,7 +237,7 @@ The personas have two layers: the personas of the game ([method add_persona], [m
 			<param index="0" name="persona" type="TTSPersona" />
 			<description>
 				Sets the player's version of the persona called [member TTSPersona.persona_name]. It replaces the persona of the game with the same name for [method get_persona], [method speak_with_persona] and the default persona, without removing it (see [method get_base_persona]). A persona only the player has is added this way too. An override with the same name is replaced. Reports an error if [param persona] is [code]null[/code] or has no name.
-				[b]Note:[/b] [code]TTSPersonaSettingsServer[/code] calls this method; games usually change [code]TTSPersonaSettingsServer[/code] instead, which is saved.
+				[b]Note:[/b] [TTSPersonaSettingsServer] calls this method; games usually change [TTSPersonaSettingsServer] instead, which is saved.
 			</description>
 		</method>
 		<method name="speak">

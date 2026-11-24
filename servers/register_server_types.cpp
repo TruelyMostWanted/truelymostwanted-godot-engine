@@ -97,6 +97,8 @@
 #include "servers/settings/list_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/tts_persona_settings.h"
+#include "servers/settings/tts_persona_settings_server.h"
 #include "servers/settings/video_effect_settings.h"
 #include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_quality_settings.h"
@@ -198,6 +200,7 @@ static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
 static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
+static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
 #endif
@@ -294,6 +297,12 @@ void register_server_types() {
 	accessibility_settings_server = memnew(AccessibilitySettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AccessibilitySettingsServer", AccessibilitySettingsServer::get_singleton(), "AccessibilitySettingsServer"));
 	settings_server_manager->register_server(accessibility_settings_server);
+	GDREGISTER_CLASS(TTSPersonaSettings);
+	GDREGISTER_CLASS(TTSPersonaListSettings);
+	GDREGISTER_ABSTRACT_CLASS(TTSPersonaSettingsServer);
+	tts_persona_settings_server = memnew(TTSPersonaSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSPersonaSettingsServer", TTSPersonaSettingsServer::get_singleton(), "TTSPersonaSettingsServer"));
+	settings_server_manager->register_server(tts_persona_settings_server);
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	// Only with the texture_streaming module (#22); otherwise the domain is missing.
 	GDREGISTER_CLASS(VideoTextureStreamingSettings);
@@ -556,6 +565,8 @@ void unregister_server_types() {
 #endif
 	memdelete(video_effect_settings_server);
 	video_effect_settings_server = nullptr;
+	memdelete(tts_persona_settings_server);
+	tts_persona_settings_server = nullptr;
 	memdelete(accessibility_settings_server);
 	accessibility_settings_server = nullptr;
 	memdelete(video_texture_settings_server);
