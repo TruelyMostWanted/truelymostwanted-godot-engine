@@ -99,7 +99,9 @@ bool is_encoder_available(const String &p_extension) {
 bool is_handled_by_importer(const String &p_path) {
 	const String import_path = p_path + ".import";
 	if (!FileAccess::exists(import_path)) {
-		return false;
+		// In the editor, a `res://` file without `.import` is about to be imported (or is a dependency
+		// that an importer reads itself, e.g. glTF textures): leave it to the import system.
+		return p_path.begins_with("res://") && Engine::get_singleton()->is_editor_hint();
 	}
 	Ref<ConfigFile> config;
 	config.instantiate();
