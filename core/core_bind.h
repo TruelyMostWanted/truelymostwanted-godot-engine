@@ -99,9 +99,9 @@ public:
 	Dictionary load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Error load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads = false, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 
-	Error register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type = "Resource", bool p_at_front = false);
-	Error unregister_extension(const String &p_extension);
-	bool is_extension_registered(const String &p_extension);
+	Error register_extension_loader(const String &p_extension, const Callable &p_loader, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension_loader(const String &p_extension);
+	bool has_extension_loader(const String &p_extension);
 
 	Ref<ResourceLoadResult> load_result(const String &p_path, const String &p_type_hint = "", CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Ref<ResourceLoadResult> load_threaded_get_result(const String &p_path);
@@ -138,9 +138,9 @@ public:
 
 	ResourceUID::ID get_resource_id_for_path(const String &p_path, bool p_generate = false);
 
-	Error register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type = "Resource", bool p_at_front = false);
-	Error unregister_extension(const String &p_extension);
-	bool is_extension_registered(const String &p_extension);
+	Error register_extension_saver(const String &p_extension, const Callable &p_saver, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension_saver(const String &p_extension);
+	bool has_extension_saver(const String &p_extension);
 
 	Ref<ResourceSaveResult> save_result(const Ref<Resource> &p_resource, const String &p_path, BitField<SaverFlags> p_flags);
 
