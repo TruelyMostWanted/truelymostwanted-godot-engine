@@ -33,6 +33,7 @@
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/object/class_db.h"
 
 // Guards against deep or cyclic folder structures (links are skipped, but junctions may not be detected).
 static constexpr int STREAMING_ASSETS_MAX_FOLDER_DEPTH = 64;
