@@ -56,6 +56,7 @@
 		}
 		[/csharp]
 		[/codeblocks]
+		Channels can also be controlled by data: an [AudioCommand] describes one action (play, stop, toggle, fade, enqueue, ...), an [AudioCommandList] holds many and saves as [code].tres[/code], JSON, INI or CSV. [method execute] runs a command; [method register_commands] makes the commands of a list callable by name ([method execute_named]) and by group ([method execute_group]). The project setting [code]audio/mixer/default_commands[/code] registers a list at startup.
 		[b]Note:[/b] All methods must be called on the main thread, like the playback API of [AudioServer] that the mixer uses. Signals are emitted on the main thread.
 		[b]Note:[/b] The mixer updates fades, detects the end of streams and advances queues once per frame, when the [AudioServer] updates on the main thread (also while the [SceneTree] is paused). The next queue entry therefore starts up to one frame after the previous one ended. For gapless sequences, put an [AudioStreamPlaylist] into one queue entry.
 		[b]Note:[/b] On the Web, streams play as samples by default (project setting [code]audio/general/default_playback_type.web[/code]). Fades work for samples too; browsers start audio only after the first user input.
@@ -113,6 +114,50 @@
 				Adds [param stream] (an [AudioStream] or a path) to the queue of [param channel], at position [param at] or at the end if [param at] is negative or past the end. A path is not loaded until the entry plays.
 			</description>
 		</method>
+		<method name="execute">
+			<return type="int" enum="Error" />
+			<param index="0" name="command" type="AudioCommand" />
+			<description>
+				Runs [param command] on its channel and returns [constant OK], then emits [signal command_executed]. [method execute] calls the same methods as code does ([method play], [method stop], [method enqueue], [method cross_fade], ...); see [enum AudioCommand.Command] for which properties each command uses.
+				A command that cannot run changes nothing, prints one error that names the command, and returns an error code: [constant ERR_INVALID_PARAMETER] (no channel, missing [member AudioCommand.stream_path] or [member AudioCommand.clip_name], pitch scale not above [code]0[/code]), [constant ERR_DOES_NOT_EXIST] (unknown channel, nothing to play), [constant ERR_FILE_NOT_FOUND] (the stream file does not exist), [constant ERR_FILE_UNRECOGNIZED] (the file is not an [AudioStream]), [constant ERR_PARAMETER_RANGE_ERROR] (no queue entry at [member AudioCommand.queue_index]) or [constant ERR_UNAVAILABLE] (the channel is not playing, or its stream is not an [AudioStreamInteractive]). Other channels are not affected.
+				A stream is loaded on first use through the resource cache: it stays in memory while it plays (or while an [AudioCommandList] keeps it with [method AudioCommandList.preload_streams]) and is freed afterwards.
+			</description>
+		</method>
+		<method name="execute_group">
+			<return type="int" enum="Error" />
+			<param index="0" name="group" type="StringName" />
+			<description>
+				Runs all registered commands whose [member AudioCommand.group] is [param group], in the order they were registered, for example all ambience commands of a forest. Every command runs even if one fails; returns the first error, or [constant ERR_DOES_NOT_EXIST] if no registered command has that group.
+			</description>
+		</method>
+		<method name="execute_list">
+			<return type="int" enum="Error" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Runs all commands of [param list] in order, without registering them. Every command runs even if one fails; returns the first error.
+			</description>
+		</method>
+		<method name="execute_named">
+			<return type="int" enum="Error" />
+			<param index="0" name="command_name" type="StringName" />
+			<description>
+				Runs the registered command named [param command_name] (see [method register_commands]). Returns [constant ERR_DOES_NOT_EXIST] and prints an error if no command has that name.
+				[codeblocks]
+				[gdscript]
+				# A soundboard button: one TOGGLE command per button.
+				func _on_pad_pressed(pad_name):
+					AudioMixerServer.execute_named(pad_name)
+				[/gdscript]
+				[csharp]
+				// A soundboard button: one Toggle command per button.
+				private void OnPadPressed(StringName padName)
+				{
+					AudioMixerServer.ExecuteNamed(padName);
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="fade_in">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -165,6 +210,12 @@
 				Returns the current volume of [param channel] in decibels, including the progress of a volume fade started with [method set_channel_volume_db].
 			</description>
 		</method>
+		<method name="get_command_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all registered commands, in the order they were registered. Commands without a name are registered too (for [method execute_group]) but are not listed.
+			</description>
+		</method>
 		<method name="get_fade_gain" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="channel" type="StringName" />
@@ -205,6 +256,13 @@
 			<param index="0" name="channel" type="StringName" />
 			<description>
 				Returns [code]true[/code] if a channel named [param channel] exists.
+			</description>
+		</method>
+		<method name="has_command" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="command_name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a command named [param command_name] is registered.
 			</description>
 		</method>
 		<method name="is_fading" qualifiers="const">
@@ -277,6 +335,24 @@
 				Moves to the previous queue entry of [param channel] like [method change_index]. At the first entry, it moves to the last one, except in [constant AudioMixerChannel.QUEUE_MODE_STOP], where it does nothing.
 			</description>
 		</method>
+		<method name="register_commands">
+			<return type="int" enum="Error" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Registers the commands of [param list], so they can run by name with [method execute_named] and by group with [method execute_group]. The commands are kept by reference: later changes to a command take effect, but a changed [member AudioCommand.command_name] needs a new registration. If a name is already registered by another command, the new command replaces it and a warning is printed (so a later list, for example a mod, can override a command on purpose).
+				A CSV file has no type of its own, so load it with the type hint [code]"AudioCommandList"[/code]:
+				[codeblocks]
+				[gdscript]
+				var board = ResourceLoader.load("user://soundboard.csv", "AudioCommandList")
+				AudioMixerServer.register_commands(board)
+				[/gdscript]
+				[csharp]
+				var board = ResourceLoader.Load&lt;AudioCommandList&gt;("user://soundboard.csv", "AudioCommandList");
+				AudioMixerServer.RegisterCommands(board);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="remove_channel">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -339,6 +415,13 @@
 				Switches the current voice of [param channel] to the clip named [param clip], if the voice plays an [AudioStreamInteractive] (module [code]interactive_music[/code]). Prints an error for other streams.
 			</description>
 		</method>
+		<method name="unregister_commands">
+			<return type="void" />
+			<param index="0" name="list" type="AudioCommandList" />
+			<description>
+				Removes the commands of [param list] from the registered commands. A name that another list registered later stays registered; a name that this list had replaced is not restored.
+			</description>
+		</method>
 	</methods>
 	<signals>
 		<signal name="channel_finished">
@@ -354,6 +437,13 @@
 			<param index="2" name="stream_path" type="String" />
 			<description>
 				Emitted when a new current voice starts on [param channel], by a call or by the queue. [param index] is the queue index, or [code]-1[/code] if the stream was played directly. [param stream_path] is empty for streams without a path.
+			</description>
+		</signal>
+		<signal name="command_executed">
+			<param index="0" name="command_name" type="StringName" />
+			<param index="1" name="command" type="AudioCommand" />
+			<description>
+				Emitted after [param command] ran successfully through [method execute], [method execute_list], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
 			</description>
 		</signal>
 		<signal name="fade_finished">
