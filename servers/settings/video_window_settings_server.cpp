@@ -57,6 +57,55 @@ static Variant video_window_project_setting(const String &p_key, const Variant &
 	return project_settings->get_setting_with_override(p_key);
 }
 
+// A vector of a stored window state. The INI and JSON files keep the states as an untyped dictionary, so
+// after loading a vector arrives as an array of two numbers.
+static bool video_window_state_vector(const Variant &p_value, Vector2i &r_vector) {
+	switch (p_value.get_type()) {
+		case Variant::VECTOR2I: {
+			r_vector = p_value;
+			return true;
+		}
+		case Variant::VECTOR2: {
+			r_vector = Vector2i(Vector2(p_value).round());
+			return true;
+		}
+		case Variant::ARRAY:
+		case Variant::PACKED_INT32_ARRAY:
+		case Variant::PACKED_INT64_ARRAY:
+		case Variant::PACKED_FLOAT32_ARRAY:
+		case Variant::PACKED_FLOAT64_ARRAY: {
+			const Array values = p_value;
+			if (values.size() != 2 || !values[0].is_num() || !values[1].is_num()) {
+				return false;
+			}
+			r_vector = Vector2i(Math::round(double(values[0])), Math::round(double(values[1])));
+			return true;
+		}
+		default: {
+			return false;
+		}
+	}
+}
+
+// A stored window state with typed values: vectors as Vector2i, mode and screen as int. Unknown entries are dropped.
+static Dictionary video_window_normalize_state(const Dictionary &p_state) {
+	Dictionary state;
+	Vector2i vector;
+	if (p_state.has("mode") && p_state["mode"].is_num()) {
+		state["mode"] = int(p_state["mode"]);
+	}
+	if (video_window_state_vector(p_state.get("size", Variant()), vector)) {
+		state["size"] = vector;
+	}
+	if (video_window_state_vector(p_state.get("position", Variant()), vector)) {
+		state["position"] = vector;
+	}
+	if (p_state.has("screen") && p_state["screen"].is_num()) {
+		state["screen"] = int(p_state["screen"]);
+	}
+	return state;
+}
+
 // The window flag a setting controls, or -1.
 static int video_window_flag(const StringName &p_name) {
 	if (p_name == SNAME("borderless")) {
@@ -648,8 +697,19 @@ Variant VideoWindowSettingsServer::_validate_setting(const StringName &p_name, c
 	} else if (p_name == SNAME("hdr_reference_luminance") || p_name == SNAME("hdr_max_luminance")) {
 		const float luminance = value;
 		return luminance < 0.0f ? -1.0f : luminance; // Negative: automatic.
-	} else if (p_name == SNAME("window_states") && value.get_type() != Variant::DICTIONARY) {
-		return Dictionary();
+	} else if (p_name == SNAME("window_states")) {
+		if (value.get_type() != Variant::DICTIONARY) {
+			return Dictionary();
+		}
+		// Loaded states hold arrays instead of vectors: give them their types back.
+		const Dictionary states = value;
+		Dictionary normalized;
+		for (const KeyValue<Variant, Variant> &kv : states) {
+			if (kv.value.get_type() == Variant::DICTIONARY) {
+				normalized[kv.key] = video_window_normalize_state(kv.value);
+			}
+		}
+		return normalized;
 	}
 	return value;
 }

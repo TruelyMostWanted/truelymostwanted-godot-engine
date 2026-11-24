@@ -214,7 +214,7 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 	memdelete(server);
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Window states are saved by key and restored") {
+TEST_CASE("[SceneTree][VideoWindowSettingsServer] Window states are saved by key and restored") {
 	TestSetup setup;
 	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
 	server->set_file_path(temp_file("states.ini"));
@@ -240,6 +240,18 @@ TEST_CASE("[VideoWindowSettingsServer] Window states are saved by key and restor
 	CHECK(restored->get_position() == Point2i(120, 80));
 	CHECK(restored->get_initial_position() == Window::WINDOW_INITIAL_POSITION_ABSOLUTE);
 	CHECK_FALSE(server->restore_window_state(restored, "missing"));
+
+	// The file keeps the states as an untyped dictionary: after loading, the vectors are typed again.
+	CHECK(server->save() == OK);
+	CHECK(server->load() == OK);
+	const Dictionary loaded = Dictionary(server->get_value("window_states"))["inventory"];
+	CHECK(loaded["size"].get_type() == Variant::VECTOR2I);
+	CHECK(loaded["size"] == Variant(Vector2i(640, 480)));
+	CHECK(loaded["position"] == Variant(Vector2i(120, 80)));
+	CHECK(int(loaded["mode"]) == int(Window::MODE_WINDOWED));
+	restored->set_size(Size2i(10, 10));
+	CHECK(server->restore_window_state(restored, "inventory"));
+	CHECK(restored->get_size() == Size2i(640, 480));
 
 	server->clear_window_state("inventory");
 	CHECK_FALSE(server->has_window_state("inventory"));
