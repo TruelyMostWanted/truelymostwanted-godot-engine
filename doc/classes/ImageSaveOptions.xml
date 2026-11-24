@@ -65,7 +65,7 @@
 	</methods>
 	<members>
 		<member name="exr_grayscale" type="bool" setter="set_exr_grayscale" getter="is_exr_grayscale" default="false">
-			If [code]true[/code], OpenEXR files are written with a single grayscale channel. See [method Image.save_exr].
+			If [code]true[/code], single-channel images ([constant Image.FORMAT_R8], [constant Image.FORMAT_RH], [constant Image.FORMAT_RF]) are written to OpenEXR files as a grayscale channel instead of a red channel. Ignored for images with more than one channel. See [method Image.save_exr].
 		</member>
 		<member name="jpg_quality" type="float" setter="set_jpg_quality" getter="get_jpg_quality" default="0.75">
 			Quality of JPEG files, between [code]0.0[/code] (smallest file) and [code]1.0[/code] (best quality). See [method Image.save_jpg].

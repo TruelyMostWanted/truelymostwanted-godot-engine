@@ -169,7 +169,10 @@ Error save_image(const Ref<Image> &p_image, const String &p_path, const Ref<Imag
 		return image->save_webp(p_path, options->is_webp_lossy(), options->get_webp_quality());
 	}
 	if (extension == "exr") {
-		return image->save_exr(p_path, options->is_exr_grayscale());
+		// The EXR encoder accepts grayscale only for single-channel images.
+		const Image::Format format = image->get_format();
+		const bool single_channel = format == Image::FORMAT_R8 || format == Image::FORMAT_RH || format == Image::FORMAT_RF;
+		return image->save_exr(p_path, options->is_exr_grayscale() && single_channel);
 	}
 	return image->save_dds(p_path);
 }
