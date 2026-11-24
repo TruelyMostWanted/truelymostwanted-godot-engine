@@ -31,6 +31,7 @@
 #include "register_types.h"
 
 #include "audio_stream_ogg_vorbis.h"
+#include "audio_stream_ogg_vorbis_resource_format.h"
 
 #include "core/io/resource_importer.h"
 #include "core/object/class_db.h"
@@ -54,10 +55,16 @@ static void _editor_init() {
 }
 #endif
 
+static Ref<ResourceFormatLoaderAudioStreamOggVorbis> resource_loader_ogg_vorbis;
+
 void initialize_vorbis_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
 		GDREGISTER_CLASS(AudioStreamOggVorbis);
 		GDREGISTER_CLASS(AudioStreamPlaybackOggVorbis);
+
+		// Not at the front: ResourceFormatImporter keeps precedence for imported Ogg Vorbis files.
+		resource_loader_ogg_vorbis.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_ogg_vorbis);
 	}
 
 #ifdef TOOLS_ENABLED
@@ -70,4 +77,8 @@ void initialize_vorbis_module(ModuleInitializationLevel p_level) {
 }
 
 void uninitialize_vorbis_module(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && resource_loader_ogg_vorbis.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_ogg_vorbis);
+		resource_loader_ogg_vorbis.unref();
+	}
 }

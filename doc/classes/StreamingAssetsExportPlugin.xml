@@ -41,7 +41,7 @@
 			<param index="0" name="template" type="String" />
 			<param index="1" name="exe_name" type="String" />
 			<description>
-				Replaces every [code]{exe_name}[/code] in [param template] with [param exe_name] and returns the result. Other placeholders are left unchanged. The plugin passes the base name of the export file without its extension, for example [code]"MyGame"[/code] for [code]MyGame.exe[/code].
+				Expands the placeholders in [param template] with [method StreamingAssetsServer.expand_template], the same helper the runtime uses to find the folder: [code]{exe_name}[/code], [code]{app_name}[/code] and [code]{version}[/code]. Other placeholders are left unchanged. The plugin passes the base name of the export file without its extension, for example [code]"MyGame"[/code] for [code]MyGame.exe[/code].
 			</description>
 		</method>
 		<method name="is_file_excluded" qualifiers="static">
