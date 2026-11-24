@@ -93,7 +93,7 @@ TEST_CASE("[Camera3DSettingsServer] The domain is an engine singleton registered
 	CHECK(SettingsServerManager::get_singleton()->get_server("camera_3d") == server);
 	CHECK(server->get_domain() == StringName("camera_3d"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(server->get_file_path() == "user://settings/camera.ini");
+	CHECK(server->get_file_path() == "user://settings/camera_3d.ini");
 	CHECK(Object::cast_to<Camera3DSettings>(server->get_settings().ptr()) != nullptr);
 	CHECK(Camera3DSettingsServer::get_camera_group() == StringName("camera_3d_settings"));
 
