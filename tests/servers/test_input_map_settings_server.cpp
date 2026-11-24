@@ -40,6 +40,7 @@ TEST_FORCE_LINK(test_input_map_settings_server)
 #include "core/input/input_map.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/resource_text_serializer.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/test_utils.h"
@@ -226,6 +227,75 @@ TEST_CASE("[InputMapSettingsServer] Text form of key, mouse button, joypad butto
 	CHECK(label_server->get_event_label(InputAction::text_to_event("PhysicalKey:W")) == "W");
 }
 
+TEST_CASE("[InputMapSettingsServer] Text form of the events of an action") {
+	TypedArray<InputEvent> events;
+	events.push_back(InputAction::text_to_event("Key:Ctrl+S"));
+	events.push_back(InputAction::text_to_event("PhysicalKey:W"));
+	events.push_back(InputAction::text_to_event("MouseButton:Left"));
+	events.push_back(InputEventJoypadButton::create_reference(JoyButton::A, 1));
+	events.push_back(InputAction::text_to_event("JoypadMotion:LeftX-"));
+	Ref<InputEventScreenTouch> touch;
+	touch.instantiate();
+	events.push_back(touch); // No text form: skipped.
+	const String text = InputMapSettingsServer::events_to_text(events);
+	CHECK(text == "Key:Ctrl+S; PhysicalKey:W; MouseButton:Left; JoypadButton:A@1; JoypadMotion:LeftX-");
+
+	const TypedArray<InputEvent> read = InputMapSettingsServer::text_to_events(text);
+	REQUIRE(read.size() == 5);
+	const Ref<InputEventJoypadButton> pad = read[3];
+	REQUIRE(pad.is_valid());
+	CHECK(pad->get_device() == 1);
+	CHECK(InputMapSettingsServer::events_to_text(read) == text);
+
+	// Invalid items are skipped.
+	CHECK(InputMapSettingsServer::text_to_events("Key:Ctrl+S; NotAType:X; ;").size() == 1);
+	CHECK(InputMapSettingsServer::text_to_events("").is_empty());
+}
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] The file holds one text row per action; version 1 files still load") {
+	TestSetup setup;
+	{
+		// JSON: the storage type and its rows, not InputActions with InputEvent sub-resources.
+		const String path = temp_file("input_map_rows.json");
+		InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+		server->set_file_path(path);
+		CHECK(server->rebind(JUMP, InputAction::text_to_event("Key:Ctrl+J")) == OK);
+		CHECK(server->save() == OK);
+		memdelete(server);
+		const String text = FileAccess::get_file_as_string(path);
+		CHECK(text.contains("InputMapSettingsRows"));
+		CHECK(text.contains("\"bindings\""));
+		CHECK(text.contains("Key:Ctrl+J; JoypadButton:A"));
+		CHECK_FALSE(text.contains("\"events\""));
+	}
+	for (const String &extension : { String("json"), String("csv") }) {
+		// A file of the first layout (InputActions with InputAction.bindings, version 1).
+		const String path = temp_file("input_map_v1." + extension);
+		String text;
+		if (extension == "json") {
+			text = vformat("{\"$type\": \"InputActions\", \"$format_version\": 1, \"metadata/settings_version\": 1, \"actions\": [{\"action\": \"%s\", \"deadzone\": 0.4, \"bindings\": \"Key:K; JoypadButton:B@2\"}, {\"action\": \"%s\", \"deadzone\": 0.2, \"bindings\": \"MouseButton:Right\"}]}", JUMP, FIRE);
+		} else {
+			text = vformat("action,deadzone,bindings\n%s,0.4,Key:K; JoypadButton:B@2\n%s,0.2,MouseButton:Right\n", JUMP, FIRE);
+		}
+		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string(text);
+		file.unref();
+
+		load_project_actions();
+		InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+		server->set_file_path(path);
+		CHECK_MESSAGE(server->load() == OK, extension);
+		server->apply();
+		CHECK_MESSAGE(server->get_action_deadzone(JUMP) == doctest::Approx(0.4), extension);
+		CHECK_MESSAGE(InputMapSettingsServer::events_to_text(server->get_events(JUMP)) == "Key:K; JoypadButton:B@2", extension);
+		CHECK_MESSAGE(is_action(make_pressed_key(Key::K), JUMP), extension);
+		CHECK_FALSE_MESSAGE(is_action(make_pressed_key(Key::SPACE), JUMP), extension);
+		CHECK_MESSAGE(is_action(make_mouse_button(MouseButton::RIGHT), FIRE), extension);
+		memdelete(server);
+	}
+}
+
 TEST_CASE("[SceneTree][InputMapSettingsServer] Defaults come from InputMap; custom actions only by default") {
 	TestSetup setup;
 	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
@@ -252,8 +322,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Defaults come from InputMap; cust
 	CHECK(copy->get_action() == StringName(JUMP));
 	CHECK(copy->get_deadzone() == doctest::Approx(0.3));
 	CHECK(copy->get_event_count() == 2);
-	CHECK(copy->get_bindings().contains("Key:Space"));
-	CHECK(copy->get_bindings().contains("JoypadButton:A"));
+	CHECK(InputMapSettingsServer::events_to_text(copy->get_events()) == "Key:Space; JoypadButton:A");
 	copy->clear_events();
 	CHECK(server->get_events(JUMP).size() == 2);
 	memdelete(server);
@@ -433,9 +502,12 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Conflicts and reset to the projec
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (INI, JSON, CSV)") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (every text format)") {
 	TestSetup setup;
-	for (const String &extension : { String("ini"), String("json"), String("csv") }) {
+	for (const String &extension : { String("ini"), String("json"), String("csv"), String("xml"), String("toml"), String("yaml") }) {
+		if (!ResourceTextSerializer::has_format_implementation(ResourceTextSerializer::get_format_for_extension(extension))) {
+			continue; // The module of the format is disabled in this build.
+		}
 		const String path = temp_file("input_map." + extension);
 		load_project_actions();
 		{
@@ -453,6 +525,8 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the ne
 		CHECK_MESSAGE(text.contains("PhysicalKey:W"), extension);
 		CHECK_MESSAGE(text.contains("JoypadMotion:LeftY-"), extension);
 		CHECK_MESSAGE(text.contains("MouseButton:Ctrl+Right"), extension);
+		// The events are one text value per action, never sub-resources.
+		CHECK_FALSE_MESSAGE(text.contains("InputEvent"), extension);
 		if (extension == "csv") {
 			// One row per action with the bindings of the action in one cell.
 			int jump_rows = 0;
@@ -533,7 +607,7 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] A saved action that no longer exi
 		Ref<InputAction> gone;
 		gone.instantiate();
 		gone->set_action("kb_test_removed");
-		gone->set_bindings("Key:G");
+		gone->add_event(InputAction::text_to_event("Key:G"));
 		ERR_PRINT_OFF; // Applying warns once that the project has no such action.
 		server->add_entry(gone);
 		ERR_PRINT_ON;

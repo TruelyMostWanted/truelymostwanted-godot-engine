@@ -161,6 +161,11 @@ protected:
 	// Text format of the file when no file path is set: the project setting `settings/storage/format`, or INI if
 	// the domain can't use it (CSV is only for ListSettingsServer, a format whose module is missing).
 	virtual ResourceTextSerializer::Format _get_file_format();
+	// Storage form (#172): the resource that is written to the settings file and read back from it. By default the
+	// settings resource itself. A domain whose settings hold values without a readable text form (sub-resources such
+	// as input events) returns a resource with the same value names and plain values, and converts it back.
+	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const { return p_settings; }
+	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const { return p_storage; }
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)

@@ -50,20 +50,32 @@ int InputActions::_find(const StringName &p_action) const {
 	return index != nullptr ? int(*index) : -1;
 }
 
+Callable InputActions::_get_changed_callable(const Ref<InputAction> &p_action) {
+	// Bound to the action (by ID, a Ref would keep it alive), so a change can be checked in O(1).
+	return callable_mp(this, &InputActions::_action_changed).bind(uint64_t(p_action->get_instance_id()));
+}
+
 void InputActions::_attach(const Ref<InputAction> &p_action) {
-	p_action->connect(CoreStringName(changed), callable_mp(this, &InputActions::_action_changed), CONNECT_REFERENCE_COUNTED);
+	p_action->connect(CoreStringName(changed), _get_changed_callable(p_action), CONNECT_REFERENCE_COUNTED);
 }
 
 void InputActions::_detach(const Ref<InputAction> &p_action) {
-	const Callable callable = callable_mp(this, &InputActions::_action_changed);
+	const Callable callable = _get_changed_callable(p_action);
 	if (p_action->is_connected(CoreStringName(changed), callable)) {
 		p_action->disconnect(CoreStringName(changed), callable);
 	}
 }
 
-void InputActions::_action_changed() {
-	// The name may have changed; the lookup is rebuilt on the next access.
-	lookup_dirty = true;
+void InputActions::_action_changed(uint64_t p_action_id) {
+	// Only a rename changes the lookup: then the action is no longer found under its name, and the
+	// lookup is rebuilt on the next access. Other changes (events, deadzone) keep it.
+	if (!lookup_dirty) {
+		const InputAction *action = ObjectDB::get_instance<InputAction>(ObjectID(p_action_id));
+		const uint32_t *index = action != nullptr ? lookup.getptr(action->get_action()) : nullptr;
+		if (index == nullptr || *index >= actions.size() || actions[*index].ptr() != action) {
+			lookup_dirty = true;
+		}
+	}
 	emit_changed();
 }
 

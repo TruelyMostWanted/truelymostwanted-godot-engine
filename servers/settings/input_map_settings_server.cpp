@@ -40,7 +40,7 @@
 static constexpr const char *SETTING_SAVE_MODE = "settings/input_map/save_mode";
 
 /////////////////////////////////////////////////////////////////////////////
-// Labels for the UI (English); the stored text form is InputAction::event_to_text().
+// Labels for the UI (English); the stored text form is events_to_text().
 
 static constexpr int MOUSE_BUTTON_NAME_COUNT = 9; // MouseButton::LEFT (1) to MouseButton::MB_XBUTTON2 (9).
 static constexpr int JOY_BUTTON_NAME_COUNT = int(JoyButton::SDL_MAX);
@@ -122,6 +122,203 @@ static String _event_to_label(const Ref<InputEvent> &p_event) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// Storage form.
+
+void InputMapSettingsRow::set_action(const StringName &p_action) {
+	action = p_action;
+}
+
+StringName InputMapSettingsRow::get_action() const {
+	return action;
+}
+
+void InputMapSettingsRow::set_deadzone(float p_deadzone) {
+	deadzone = p_deadzone;
+}
+
+float InputMapSettingsRow::get_deadzone() const {
+	return deadzone;
+}
+
+void InputMapSettingsRow::set_bindings(const String &p_bindings) {
+	bindings = p_bindings;
+}
+
+String InputMapSettingsRow::get_bindings() const {
+	return bindings;
+}
+
+void InputMapSettingsRow::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_action", "action"), &InputMapSettingsRow::set_action);
+	ClassDB::bind_method(D_METHOD("get_action"), &InputMapSettingsRow::get_action);
+	ClassDB::bind_method(D_METHOD("set_deadzone", "deadzone"), &InputMapSettingsRow::set_deadzone);
+	ClassDB::bind_method(D_METHOD("get_deadzone"), &InputMapSettingsRow::get_deadzone);
+	ClassDB::bind_method(D_METHOD("set_bindings", "bindings"), &InputMapSettingsRow::set_bindings);
+	ClassDB::bind_method(D_METHOD("get_bindings"), &InputMapSettingsRow::get_bindings);
+
+	// The column names of the CSV file.
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "action"), "set_action", "get_action");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "deadzone", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_deadzone", "get_deadzone");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "bindings"), "set_bindings", "get_bindings");
+}
+
+void InputMapSettingsRows::set_actions(const TypedArray<InputMapSettingsRow> &p_actions) {
+	actions = p_actions;
+}
+
+TypedArray<InputMapSettingsRow> InputMapSettingsRows::get_actions() const {
+	return actions;
+}
+
+void InputMapSettingsRows::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_actions", "actions"), &InputMapSettingsRows::set_actions);
+	ClassDB::bind_method(D_METHOD("get_actions"), &InputMapSettingsRows::get_actions);
+
+	// The name of InputActions.actions, the list property of the settings.
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "actions", PROPERTY_HINT_ARRAY_TYPE, "InputMapSettingsRow"), "set_actions", "get_actions");
+}
+
+String InputMapSettingsServer::events_to_text(const TypedArray<InputEvent> &p_events) {
+	String result;
+	for (int i = 0; i < p_events.size(); i++) {
+		const Ref<InputEvent> event = p_events[i];
+		if (event.is_null()) {
+			continue;
+		}
+		String text = InputAction::event_to_text(event);
+		if (text.is_empty()) {
+			continue;
+		}
+		// A joypad binding for one pad ends with "@<device id>".
+		if (InputAction::get_event_device(event) == InputAction::INPUT_DEVICE_GAMEPAD && event->get_device() >= 0) {
+			text += "@" + itos(event->get_device());
+		}
+		if (!result.is_empty()) {
+			result += "; ";
+		}
+		result += text;
+	}
+	return result;
+}
+
+TypedArray<InputEvent> InputMapSettingsServer::_parse_events(const String &p_text, PackedStringArray &r_invalid) {
+	TypedArray<InputEvent> result;
+	const Vector<String> items = p_text.split(";", false);
+	for (const String &raw_item : items) {
+		String item = raw_item.strip_edges();
+		if (item.is_empty()) {
+			continue;
+		}
+		int device_id = -1;
+		const int at = item.rfind_char('@');
+		if (at > 0 && item.substr(at + 1).is_valid_int()) {
+			device_id = item.substr(at + 1).to_int();
+			item = item.substr(0, at).strip_edges();
+		}
+		const Ref<InputEvent> event = InputAction::text_to_event(item);
+		if (event.is_null()) {
+			r_invalid.push_back(item);
+			continue;
+		}
+		if (device_id >= 0) {
+			event->set_device(device_id);
+		}
+		result.push_back(event);
+	}
+	return result;
+}
+
+TypedArray<InputEvent> InputMapSettingsServer::text_to_events(const String &p_text) {
+	PackedStringArray invalid;
+	return _parse_events(p_text, invalid);
+}
+
+TypedArray<InputEvent> InputMapSettingsServer::_canonical_events(const TypedArray<InputEvent> &p_events) {
+	PackedStringArray invalid;
+	return _parse_events(events_to_text(p_events), invalid);
+}
+
+Ref<Resource> InputMapSettingsServer::_settings_to_storage(const Ref<Resource> &p_settings) const {
+	const Ref<InputActions> source = p_settings;
+	ERR_FAIL_COND_V(source.is_null(), Ref<Resource>());
+	TypedArray<InputMapSettingsRow> rows;
+	for (const Ref<InputAction> &action : source->get_action_list()) {
+		Ref<InputMapSettingsRow> row;
+		row.instantiate();
+		row->set_action(action->get_action());
+		row->set_deadzone(action->get_deadzone());
+		row->set_bindings(events_to_text(action->get_events()));
+		rows.push_back(row);
+	}
+	Ref<InputMapSettingsRows> storage;
+	storage.instantiate();
+	storage->set_actions(rows);
+	return storage;
+}
+
+Ref<Resource> InputMapSettingsServer::_settings_from_storage(const Ref<Resource> &p_storage) const {
+	const Ref<InputMapSettingsRows> storage = p_storage;
+	ERR_FAIL_COND_V(storage.is_null(), Ref<Resource>());
+	TypedArray<InputAction> list;
+	PackedStringArray invalid;
+	const TypedArray<InputMapSettingsRow> rows = storage->get_actions();
+	for (int i = 0; i < rows.size(); i++) {
+		const Ref<InputMapSettingsRow> row = rows[i];
+		if (row.is_null()) {
+			continue;
+		}
+		PackedStringArray row_invalid;
+		Ref<InputAction> action;
+		action.instantiate(row->get_action(), row->get_deadzone());
+		action->set_events(_parse_events(row->get_bindings(), row_invalid));
+		for (const String &item : row_invalid) {
+			invalid.push_back(vformat("\"%s\" of %s", item, row->get_action()));
+		}
+		list.push_back(action);
+	}
+	if (!invalid.is_empty()) {
+		WARN_PRINT(vformat("Input map settings: can't read the binding %s; it is skipped.", String(", ").join(invalid)));
+	}
+	Ref<InputActions> result;
+	result.instantiate();
+	result->set_actions(list);
+	return result;
+}
+
+int InputMapSettingsServer::get_format_version() const {
+	// 2: the file holds InputMapSettingsRows (version 1: InputActions with the property InputAction.bindings, #172).
+	return 2;
+}
+
+Dictionary InputMapSettingsServer::_migrate_settings(int p_from_version, const Dictionary &p_data) {
+	Dictionary data = SettingsServer::_migrate_settings(p_from_version, p_data);
+	if (p_from_version >= 2 || String(data.get("$type", String())) != "InputActions") {
+		return data;
+	}
+	// Version 1 had the same keys under the type InputActions. JSON and INI kept `bindings`; XML, TOML and YAML
+	// files were read through InputActions, which no longer has it: those actions keep their project events.
+	data = data.duplicate();
+	data["$type"] = String(InputMapSettingsRows::get_class_static());
+	const String list_property = get_list_property();
+	const Array old_rows = data.get(list_property, Array());
+	Array rows;
+	int skipped = 0;
+	for (int i = 0; i < old_rows.size(); i++) {
+		const Dictionary row = old_rows[i];
+		if (row.has("bindings")) {
+			rows.push_back(row);
+		} else {
+			skipped++;
+		}
+	}
+	data[list_property] = rows;
+	if (skipped > 0) {
+		WARN_PRINT(vformat("Input map settings: the bindings of %d actions in the old settings file can't be read; they use the project events until the next save.", skipped));
+	}
+	return data;
+}
+
+/////////////////////////////////////////////////////////////////////////////
 // Domain.
 
 InputMapSettingsServer *InputMapSettingsServer::singleton = nullptr;
@@ -184,12 +381,14 @@ Ref<InputAction> InputMapSettingsServer::_make_action(const StringName &p_action
 	action.instantiate(p_action, input_map->action_get_deadzone(p_action));
 	const List<Ref<InputEvent>> *events = input_map->action_get_events(p_action);
 	if (events != nullptr) {
+		TypedArray<InputEvent> managed;
 		for (const Ref<InputEvent> &event : *events) {
 			if (_is_managed_event(event)) {
-				const Ref<InputEvent> copy = event->duplicate();
-				action->add_event(copy);
+				managed.push_back(event);
 			}
 		}
+		// In the text form, like the events read back from the file: an unchanged action equals its saved copy.
+		action->set_events(_canonical_events(managed));
 	}
 	return action;
 }
@@ -520,7 +719,7 @@ void InputMapSettingsServer::reset_action(const StringName &p_action) {
 	const Ref<InputActions> default_actions = get_default_settings();
 	const Ref<InputAction> project_action = default_actions.is_valid() ? default_actions->get_action(p_action) : Ref<InputAction>();
 	ERR_FAIL_COND_MSG(project_action.is_null(), vformat("Input map settings: the project has no action \"%s\".", p_action));
-	if (action->get_deadzone() == project_action->get_deadzone() && action->get_bindings() == project_action->get_bindings()) {
+	if (values_equal(action, project_action)) {
 		return;
 	}
 	// Replaces the entry in place, so the order of the list stays.
@@ -557,6 +756,8 @@ void InputMapSettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("reset_action", "action"), &InputMapSettingsServer::reset_action);
 	ClassDB::bind_method(D_METHOD("reset_all"), &InputMapSettingsServer::reset_all);
 	ClassDB::bind_method(D_METHOD("get_event_label", "event"), &InputMapSettingsServer::get_event_label);
+	ClassDB::bind_static_method("InputMapSettingsServer", D_METHOD("events_to_text", "events"), &InputMapSettingsServer::events_to_text);
+	ClassDB::bind_static_method("InputMapSettingsServer", D_METHOD("text_to_events", "text"), &InputMapSettingsServer::text_to_events);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "save_mode", PROPERTY_HINT_ENUM, "Custom Only,All"), "set_save_mode", "get_save_mode");
 

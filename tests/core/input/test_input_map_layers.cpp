@@ -37,8 +37,13 @@ TEST_FORCE_LINK(test_input_map_layers)
 #include "core/input/input_action.h"
 #include "core/input/input_actions.h"
 #include "core/input/input_map.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
+#include "core/io/resource_loader.h"
+#include "core/io/resource_saver.h"
 #include "core/os/os.h"
 #include "core/variant/typed_array.h"
+#include "tests/test_utils.h"
 
 namespace TestInputMapLayers {
 
@@ -204,16 +209,19 @@ static void check_index_equals_full_scan() {
 	}
 }
 
-TEST_CASE("[InputAction] Text form, bindings and events") {
+TEST_CASE("[InputAction] Text form and events") {
 	Ref<InputAction> action;
 	action.instantiate();
 	action->set_action("jump");
-	action->set_bindings("Key:Ctrl+S; PhysicalKey:W; MouseButton:Left; JoypadButton:A@1; JoypadMotion:LeftX-");
+	const char *texts[] = { "Key:Ctrl+S", "PhysicalKey:W", "MouseButton:Left", "JoypadButton:A", "JoypadMotion:LeftX-" };
+	for (const char *text : texts) {
+		const Ref<InputEvent> event = InputAction::text_to_event(text);
+		REQUIRE(event.is_valid());
+		CHECK(InputAction::event_to_text(event) == text);
+		CHECK(event->get_device() == -1);
+		action->add_event(event);
+	}
 	CHECK(action->get_event_count() == 5);
-	CHECK(action->get_bindings() == "Key:Ctrl+S; PhysicalKey:W; MouseButton:Left; JoypadButton:A@1; JoypadMotion:LeftX-");
-	const Ref<InputEventJoypadButton> pad = action->get_event_list()[3];
-	REQUIRE(pad.is_valid());
-	CHECK(pad->get_device() == 1);
 	CHECK(action->get_device_events(InputAction::INPUT_DEVICE_GAMEPAD).size() == 2);
 	CHECK(action->get_device_events(InputAction::INPUT_DEVICE_KEYBOARD).size() == 2);
 
@@ -231,10 +239,91 @@ TEST_CASE("[InputAction] Text form, bindings and events") {
 	CHECK(InputAction::event_to_text(touch).is_empty());
 	CHECK(InputAction::text_to_event("Nonsense").is_null());
 
-	ERR_PRINT_OFF;
-	action->set_bindings("Key:Ctrl+S; NotAType:X");
-	ERR_PRINT_ON;
-	CHECK(action->get_event_count() == 1);
+	// `events` is a stored property (sub-resources in `.tres`); there is no text property.
+	bool found_events = false;
+	List<PropertyInfo> properties;
+	action->get_property_list(&properties);
+	for (const PropertyInfo &info : properties) {
+		CHECK(info.name != "bindings");
+		if (info.name == "events") {
+			found_events = true;
+			CHECK((info.usage & PROPERTY_USAGE_STORAGE) != 0);
+			CHECK((info.usage & PROPERTY_USAGE_EDITOR) != 0);
+		}
+	}
+	CHECK(found_events);
+}
+
+// The text resource format and the binary format keep the events of every action as sub-resources.
+static void check_input_actions_round_trip(const String &p_path) {
+	Ref<InputActions> actions;
+	actions.instantiate();
+	Ref<InputAction> jump = Ref<InputAction>(memnew(InputAction("jump", 0.5f)));
+	jump->add_event(InputEventKey::create_reference(Key::SPACE));
+	Ref<InputEventKey> physical;
+	physical.instantiate();
+	physical->set_physical_keycode(Key::W);
+	physical->set_ctrl_pressed(true);
+	jump->add_event(physical);
+	jump->add_event(InputEventJoypadButton::create_reference(JoyButton::A, 1));
+	jump->add_event(InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -1.0f, -1));
+	Ref<InputEventMouseButton> mouse;
+	mouse.instantiate();
+	mouse->set_button_index(MouseButton::RIGHT);
+	jump->add_event(mouse);
+	Ref<InputEventScreenTouch> touch;
+	touch.instantiate();
+	touch->set_index(2);
+	jump->add_event(touch); // No text form, but stored as a sub-resource too.
+	actions->add_action(jump);
+	actions->add_action(Ref<InputAction>(memnew(InputAction("empty"))));
+
+	REQUIRE(ResourceSaver::save(actions, p_path) == OK);
+	const Ref<InputActions> loaded = ResourceLoader::load(p_path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded != actions);
+	REQUIRE(loaded->get_action_count() == 2);
+	const Ref<InputAction> loaded_jump = loaded->get_action("jump");
+	REQUIRE(loaded_jump.is_valid());
+	CHECK(loaded_jump->get_deadzone() == doctest::Approx(0.5f));
+	REQUIRE(loaded_jump->get_event_count() == 6);
+	for (int i = 0; i < 6; i++) {
+		const Ref<InputEvent> saved = jump->get_event_list()[i];
+		const Ref<InputEvent> read = loaded_jump->get_event_list()[i];
+		CHECK(read->get_class() == saved->get_class());
+		CHECK(read->get_device() == saved->get_device());
+		if (i < 5) {
+			CHECK(read->is_match(saved, true));
+		}
+	}
+	const Ref<InputEventScreenTouch> loaded_touch = loaded_jump->get_event_list()[5];
+	REQUIRE(loaded_touch.is_valid());
+	CHECK(loaded_touch->get_index() == 2);
+	CHECK(loaded->get_action("empty")->get_event_count() == 0);
+	CHECK(loaded->get_action("empty")->get_deadzone() == doctest::Approx(InputAction::DEFAULT_DEADZONE));
+}
+
+TEST_CASE("[InputActions] Round trip through ResourceSaver and ResourceLoader") {
+	const String folder = TestUtils::get_temp_path("input_actions_round_trip");
+	REQUIRE(DirAccess::make_dir_recursive_absolute(folder) == OK);
+
+	SUBCASE("Text resource (.tres)") {
+		const String path = folder.path_join("actions.tres");
+		check_input_actions_round_trip(path);
+		// The layout of the editor: events as sub-resources, the deadzone only when it is not the default.
+		const String text = FileAccess::get_file_as_string(path);
+		CHECK(text.begins_with("[gd_resource type=\"InputActions\" format=3"));
+		CHECK(text.contains("[sub_resource type=\"InputEventKey\""));
+		CHECK(text.contains("action = &\"jump\"\ndeadzone = 0.5\nevents = Array[InputEvent]([SubResource(\""));
+		CHECK(text.contains("[sub_resource type=\"InputAction\" id=\"InputAction_"));
+		CHECK(text.contains("action = &\"empty\"\n\n"));
+		CHECK_FALSE(text.contains("bindings"));
+		CHECK(text.contains("actions = Array[InputAction]([SubResource(\""));
+	}
+
+	SUBCASE("Binary resource (.res)") {
+		check_input_actions_round_trip(folder.path_join("actions.res"));
+	}
 }
 
 TEST_CASE("[InputActions] Lookup by name, replace, rename and remove") {
@@ -282,7 +371,7 @@ TEST_CASE("[SceneTree][InputMap] Built-in actions come from the generated data")
 	int event_count = 0;
 	for (const KeyValue<String, List<Ref<InputEvent>>> &E : builtins) {
 		event_count += E.value.size();
-		CHECK(input_map->is_builtin_input_action(E.key));
+		CHECK(input_map->is_builtin_action_name(E.key));
 	}
 	CHECK(event_count == 128);
 	CHECK(builtins.begin()->key == "ui_accept");
@@ -326,7 +415,9 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	input_map->action_add_event("layers_keycode", InputEventKey::create_reference(Key::W));
 
 	CHECK(input_map->is_builtin_input_action("ui_accept"));
-	CHECK(input_map->is_builtin_input_action("ui_text_backspace_word.macos"));
+	// A lookup in the built-in layer: a platform variant is a built-in name, but not an action of the map.
+	CHECK(input_map->is_builtin_action_name("ui_text_backspace_word.macos"));
+	CHECK_FALSE(input_map->is_builtin_input_action("ui_text_backspace_word.macos"));
 	CHECK_FALSE(input_map->is_custom_input_action("ui_accept"));
 	CHECK(input_map->is_custom_input_action("layers_keycode"));
 	CHECK_FALSE(input_map->is_builtin_input_action("layers_keycode"));
@@ -342,18 +433,57 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	CHECK_FALSE(custom_layer->has_action("ui_accept"));
 	CHECK(builtin_layer->get_action_count() + custom_layer->get_action_count() == input_map->get_actions().size());
 
-	// get_input_action() is a copy; set_input_action() writes it back.
-	Ref<InputAction> copy = input_map->get_input_action("layers_keycode");
-	REQUIRE(copy.is_valid());
-	CHECK(copy->get_deadzone() == doctest::Approx(0.4f));
-	CHECK(copy->get_bindings() == "Key:W");
-	copy->clear_events();
-	copy->add_event(InputEventKey::create_reference(Key::E));
-	CHECK(input_map->action_get_events("layers_keycode")->size() == 1);
+	// InputMap references the layers: get_input_actions() returns the same objects every time.
+	CHECK(input_map->get_input_actions(InputMap::INPUT_ACTION_LAYER_BUILTIN) == builtin_layer);
+	CHECK(input_map->get_input_actions(InputMap::INPUT_ACTION_LAYER_CUSTOM) == custom_layer);
+
+	// get_input_action() is the action of the layer: changing it changes the action map.
+	Ref<InputAction> action = input_map->get_input_action("layers_keycode");
+	REQUIRE(action.is_valid());
+	CHECK(action == custom_layer->get_action("layers_keycode"));
+	CHECK(action->get_deadzone() == doctest::Approx(0.4f));
+	REQUIRE(action->get_event_count() == 1);
+	CHECK(InputAction::event_to_text(action->get_event_list()[0]) == "Key:W");
 	CHECK(input_map->event_is_action(make_key(Key::W, Key::W, Key::W), "layers_keycode"));
-	input_map->set_input_action(copy);
+	action->clear_events();
+	action->add_event(InputEventKey::create_reference(Key::E));
+	action->set_deadzone(0.45f);
+	CHECK(input_map->action_get_events("layers_keycode")->size() == 1);
+	CHECK(input_map->get_action_map()["layers_keycode"].deadzone == doctest::Approx(0.45f));
 	CHECK_FALSE(input_map->event_is_action(make_key(Key::W, Key::W, Key::W), "layers_keycode"));
 	CHECK(input_map->event_is_action(make_key(Key::E, Key::E, Key::E), "layers_keycode"));
+
+	// set_input_action() puts the resource itself into the layer, in the place of the old one.
+	Ref<InputAction> replacement = Ref<InputAction>(memnew(InputAction("layers_keycode", 0.6f)));
+	replacement->add_event(InputEventKey::create_reference(Key::R));
+	input_map->set_input_action(replacement);
+	CHECK(input_map->get_input_action("layers_keycode") == replacement);
+	CHECK(custom_layer->get_action("layers_keycode") == replacement);
+	CHECK(input_map->action_get_deadzone("layers_keycode") == doctest::Approx(0.6f));
+	CHECK_FALSE(input_map->event_is_action(make_key(Key::E, Key::E, Key::E), "layers_keycode"));
+	CHECK(input_map->event_is_action(make_key(Key::R, Key::R, Key::R), "layers_keycode"));
+
+	// The InputMap API writes into the layer of the action.
+	input_map->action_add_event("layers_keycode", InputEventKey::create_reference(Key::T));
+	CHECK(replacement->get_event_count() == 2);
+	input_map->action_erase_event("layers_keycode", InputEventKey::create_reference(Key::R));
+	REQUIRE(replacement->get_event_count() == 1);
+	CHECK(InputAction::event_to_text(replacement->get_event_list()[0]) == "Key:T");
+	input_map->action_set_deadzone("layers_keycode", 0.7f);
+	CHECK(replacement->get_deadzone() == doctest::Approx(0.7f));
+	CHECK(builtin_layer->has_action("ui_accept"));
+
+	// Direct edits of a layer: the action map follows on the next access.
+	Ref<InputAction> direct = Ref<InputAction>(memnew(InputAction("layers_label")));
+	direct->add_event(InputEventKey::create_reference(Key::Y));
+	custom_layer->add_action(direct);
+	CHECK(input_map->has_action("layers_label"));
+	CHECK(input_map->is_custom_input_action("layers_label"));
+	CHECK(input_map->get_action_map().has("layers_label"));
+	CHECK(input_map->event_is_action(make_key(Key::Y, Key::Y, Key::Y), "layers_label"));
+	custom_layer->remove_action("layers_label");
+	CHECK_FALSE(input_map->has_action("layers_label"));
+	CHECK_FALSE(input_map->get_action_map().has("layers_label"));
 
 	// set_input_actions() adds missing actions.
 	Ref<InputActions> added;

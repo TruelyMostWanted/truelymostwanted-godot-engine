@@ -4,14 +4,14 @@
 		A collection of [InputAction]s with lookup by action name.
 	</brief_description>
 	<description>
-		An [InputActions] resource holds a list of [InputAction]s whose names are unique. It is one layer of the [InputMap] ([method InputMap.get_input_actions]) and the settings resource of [InputMapSettingsServer]. Adding an action with a name that is already in the list replaces the old one in its place. Looking up an action by name is fast, also for hundreds of actions.
-		The list is the typed array [member actions], so it can be edited in the Inspector and saved as [code].tres[/code], JSON, INI or CSV (one row per action).
+		An [InputActions] resource holds a list of [InputAction]s whose names are unique. The [InputMap] references two of them as its layers ([method InputMap.get_input_actions]), and it is the settings resource of [InputMapSettingsServer]. It emits [signal Resource.changed] when its list or one of its actions changes. Adding an action with a name that is already in the list replaces the old one in its place. Looking up an action by name is fast, also for hundreds of actions.
+		The list is the typed array [member actions], so it can be edited in the Inspector and saved as [code].tres[/code] or [code].res[/code] with the events as sub-resources. [InputMapSettingsServer] writes it to its settings file as text, one row per action.
 		[codeblocks]
 		[gdscript]
 		var actions = InputActions.new()
 		var jump = InputAction.new()
 		jump.action = &amp;"jump"
-		jump.bindings = "Key:Space; JoypadButton:A"
+		jump.events = InputMapSettingsServer.text_to_events("Key:Space; JoypadButton:A")
 		actions.add_action(jump)
 		InputMap.set_input_actions(actions)
 		print(actions.has_action(&amp;"jump")) # Prints true
@@ -20,7 +20,7 @@
 		var actions = new InputActions();
 		var jump = new InputAction();
 		jump.Action = "jump";
-		jump.Bindings = "Key:Space; JoypadButton:A";
+		jump.Events = InputMapSettingsServer.TextToEvents("Key:Space; JoypadButton:A");
 		actions.AddAction(jump);
 		InputMap.Singleton.SetInputActions(actions);
 		GD.Print(actions.HasAction("jump")); // Prints True
