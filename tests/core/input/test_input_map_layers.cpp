@@ -273,7 +273,7 @@ TEST_CASE("[InputActions] Lookup by name, replace, rename and remove") {
 	CHECK(actions->get_action("a")->get_deadzone() == doctest::Approx(0.9f));
 }
 
-TEST_CASE("[InputMap] Built-in actions come from the generated data") {
+TEST_CASE("[SceneTree][InputMap] Built-in actions come from the generated data") {
 	InputMap *input_map = InputMap::get_singleton();
 	const HashMap<String, List<Ref<InputEvent>>> &builtins = input_map->get_builtins();
 
