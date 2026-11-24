@@ -398,7 +398,8 @@ Error InputMapSettingsServer::add_event(const StringName &p_action, const Ref<In
 	if (error != OK) {
 		return error;
 	}
-	if (action->has_event(event)) {
+	// A pressed key has all codes; a stored binding matches it when one of them is the same.
+	if (action->has_event(p_event) || action->has_event(event)) {
 		return OK;
 	}
 	action->add_event(event);
@@ -414,7 +415,8 @@ Error InputMapSettingsServer::remove_event(const StringName &p_action, const Ref
 	if (error != OK) {
 		return error;
 	}
-	if (!action->remove_event(event)) {
+	// The stored binding that matches the pressed event (`Key:W` matches a pressed W), else the same text form.
+	if (!action->remove_event(p_event) && !action->remove_event(event)) {
 		return ERR_DOES_NOT_EXIST;
 	}
 	notify_value_changed(get_list_property());
