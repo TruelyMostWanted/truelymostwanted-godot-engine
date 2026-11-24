@@ -47,7 +47,7 @@ public:
 	virtual void get_options(const OptionsData &p_data) override;
 };
 
-// An "Extract…" button in the Inspector of a `PckPackage` opened from a `.pck` file.
+// An "Extract…" button in the Inspector of a `PCKPackage` opened from a `.pck` file.
 class EditorInspectorPluginPckExtract : public EditorInspectorPlugin {
 	GDCLASS(EditorInspectorPluginPckExtract, EditorInspectorPlugin);
 

@@ -1648,11 +1648,11 @@
 		<member name="OS" type="OS" setter="" getter="">
 			The [OS] singleton.
 		</member>
+		<member name="PCKPackageServer" type="PCKPackageServer" setter="" getter="">
+			The [PCKPackageServer] singleton.
+		</member>
 		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
 			The [PathPrefixServer] singleton.
-		</member>
-		<member name="PckPackageServer" type="PckPackageServer" setter="" getter="">
-			The [PckPackageServer] singleton.
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.

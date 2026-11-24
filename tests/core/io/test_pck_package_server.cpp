@@ -42,7 +42,7 @@ TEST_FORCE_LINK(test_pck_package_server)
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
-namespace TestPckPackageServer {
+namespace TestPCKPackageServer {
 
 static const String KEY_A = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 static const String KEY_B = "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100";
@@ -66,8 +66,8 @@ static void _write_pack(const String &p_path, const Dictionary &p_files, const S
 	REQUIRE(packer.flush() == OK);
 }
 
-TEST_CASE("[PckPackageServer] Open, list, read and verify without mounting") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Open, list, read and verify without mounting") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	REQUIRE(server);
 	const String pack_path = TestUtils::get_temp_path("pck_package_open.pck");
 	Dictionary files;
@@ -75,7 +75,7 @@ TEST_CASE("[PckPackageServer] Open, list, read and verify without mounting") {
 	files["sub/b.txt"] = "Beta";
 	_write_pack(pack_path, files);
 
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 	CHECK(package->get_pack_path() == pack_path);
 	CHECK(package->get_format_version() == PACK_FORMAT_VERSION);
@@ -83,18 +83,20 @@ TEST_CASE("[PckPackageServer] Open, list, read and verify without mounting") {
 	CHECK(package->get_alignment() >= 32);
 	CHECK_FALSE(package->is_encrypted_directory());
 	CHECK(package->get_file_count() == 2);
-	CHECK(package->get_paths() == PackedStringArray({ "res://a.txt", "res://sub/b.txt" }));
+	CHECK(package->get_file_paths() == PackedStringArray({ "res://a.txt", "res://sub/b.txt" }));
 	CHECK(package->has_file("res://sub/b.txt"));
 	CHECK(package->has_file("sub/b.txt"));
 
-	const TypedArray<Dictionary> entries = package->get_entries();
+	const TypedArray<PCKPackageEntry> entries = package->get_entries();
 	REQUIRE(entries.size() == 2);
-	const Dictionary first = entries[0];
-	CHECK(String(first["path"]) == "res://a.txt");
-	CHECK(int64_t(first["size"]) == 5);
-	CHECK(String(first["md5"]) == String("Alpha").md5_text());
-	CHECK_FALSE(bool(first["encrypted"]));
-	CHECK_FALSE(bool(first["pending"]));
+	const Ref<PCKPackageEntry> first = entries[0];
+	REQUIRE(first.is_valid());
+	CHECK(first->get_path() == "res://a.txt");
+	CHECK(first->get_size() == 5);
+	CHECK(first->get_md5() == String("Alpha").md5_text());
+	CHECK_FALSE(first->is_encrypted());
+	CHECK_FALSE(first->is_pending());
+	CHECK(first->get_source_type() == PCKPackage::SOURCE_PACK);
 
 	CHECK(_text(server->read_file(package, "res://a.txt")) == "Alpha");
 	CHECK(_text(server->read_file(package, "sub/b.txt")) == "Beta");
@@ -108,8 +110,8 @@ TEST_CASE("[PckPackageServer] Open, list, read and verify without mounting") {
 	ERR_PRINT_ON;
 }
 
-TEST_CASE("[PckPackageServer] Edit in memory and build") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Edit in memory and build") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const String pack_path = TestUtils::get_temp_path("pck_package_edit.pck");
 	const String built_path = TestUtils::get_temp_path("pck_package_edit_built.pck");
 	Dictionary files;
@@ -117,23 +119,23 @@ TEST_CASE("[PckPackageServer] Edit in memory and build") {
 	files["sub/b.txt"] = "Beta";
 	_write_pack(pack_path, files);
 
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 	CHECK(package->add_file_from_buffer("res://c.txt", _bytes("Gamma")) == OK);
 	CHECK(package->remove_file("res://a.txt") == OK);
 	CHECK(package->rename_file("res://sub/b.txt", "res://sub/b2.txt") == OK);
-	CHECK(package->mark_removal("res://old.txt") == OK);
+	CHECK(package->add_removal("res://old.txt") == OK);
 	ERR_PRINT_OFF;
 	CHECK(package->remove_file("res://a.txt") == ERR_DOES_NOT_EXIST);
 	CHECK(package->rename_file("res://c.txt", "res://sub/b2.txt") == ERR_ALREADY_EXISTS);
 	ERR_PRINT_ON;
 	CHECK(_text(server->read_file(package, "res://c.txt")) == "Gamma");
-	CHECK(package->get_paths() == PackedStringArray({ "res://c.txt", "res://sub/b2.txt" }));
+	CHECK(package->get_file_paths() == PackedStringArray({ "res://c.txt", "res://sub/b2.txt" }));
 
 	CHECK(server->build(package, built_path) == OK);
-	Ref<PckPackage> built = server->open(built_path);
+	Ref<PCKPackage> built = server->open(built_path);
 	REQUIRE(built.is_valid());
-	CHECK(built->get_paths() == PackedStringArray({ "res://c.txt", "res://sub/b2.txt" }));
+	CHECK(built->get_file_paths() == PackedStringArray({ "res://c.txt", "res://sub/b2.txt" }));
 	CHECK(built->get_file_count() == 3); // Including the removal entry.
 	CHECK(_text(server->read_file(built, "res://sub/b2.txt")) == "Beta");
 	CHECK(_text(server->read_file(built, "res://c.txt")) == "Gamma");
@@ -143,13 +145,14 @@ TEST_CASE("[PckPackageServer] Edit in memory and build") {
 	CHECK(built->add_file_from_buffer("res://d.txt", _bytes("Delta")) == OK);
 	CHECK(server->build(built, built_path) == OK);
 	CHECK(built->get_pack_path() == built_path);
-	const Dictionary rebuilt_first = built->get_entries()[0];
-	CHECK_FALSE(bool(rebuilt_first["pending"]));
+	const Ref<PCKPackageEntry> rebuilt_first = built->get_entries()[0];
+	REQUIRE(rebuilt_first.is_valid());
+	CHECK_FALSE(rebuilt_first->is_pending());
 	CHECK(_text(server->read_file(built, "res://d.txt")) == "Delta");
 	CHECK(_text(server->read_file(built, "res://c.txt")) == "Gamma");
 
 	// A new package is an empty pack.
-	Ref<PckPackage> empty;
+	Ref<PCKPackage> empty;
 	empty.instantiate();
 	CHECK(empty->get_file_count() == 0);
 	CHECK(empty->add_file_from_buffer("x.txt", _bytes("X")) == OK);
@@ -157,18 +160,19 @@ TEST_CASE("[PckPackageServer] Edit in memory and build") {
 	CHECK(server->open(TestUtils::get_temp_path("pck_package_new.pck"))->get_file_count() == 1);
 }
 
-TEST_CASE("[PckPackageServer] Encrypted packs") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Encrypted packs") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const String pack_path = TestUtils::get_temp_path("pck_package_encrypted.pck");
 	Dictionary files;
 	files["secret.txt"] = "Hidden";
 	_write_pack(pack_path, files, KEY_A, true);
 
-	Ref<PckPackage> package = server->open(pack_path, KEY_A);
+	Ref<PCKPackage> package = server->open(pack_path, KEY_A);
 	REQUIRE(package.is_valid());
 	CHECK(package->is_encrypted_directory());
-	const Dictionary secret_entry = package->get_entries()[0];
-	CHECK(bool(secret_entry["encrypted"]));
+	const Ref<PCKPackageEntry> secret_entry = package->get_entries()[0];
+	REQUIRE(secret_entry.is_valid());
+	CHECK(secret_entry->is_encrypted());
 	CHECK(_text(server->read_file(package, "res://secret.txt")) == "Hidden");
 	CHECK(server->verify(package) == OK);
 
@@ -180,7 +184,7 @@ TEST_CASE("[PckPackageServer] Encrypted packs") {
 	// Rebuild with another key: the files stay encrypted.
 	const String rekeyed_path = TestUtils::get_temp_path("pck_package_rekeyed.pck");
 	CHECK(server->build(package, rekeyed_path, KEY_B) == OK);
-	Ref<PckPackage> rekeyed = server->open(rekeyed_path, KEY_B);
+	Ref<PCKPackage> rekeyed = server->open(rekeyed_path, KEY_B);
 	REQUIRE(rekeyed.is_valid());
 	CHECK(_text(server->read_file(rekeyed, "res://secret.txt")) == "Hidden");
 
@@ -190,7 +194,7 @@ TEST_CASE("[PckPackageServer] Encrypted packs") {
 	REQUIRE(packer.pck_start(files_only_path, 32, KEY_A, false) == OK);
 	REQUIRE(packer.add_file_from_buffer("secret.txt", _bytes("Hidden"), true) == OK);
 	REQUIRE(packer.flush() == OK);
-	Ref<PckPackage> wrong = server->open(files_only_path, KEY_B);
+	Ref<PCKPackage> wrong = server->open(files_only_path, KEY_B);
 	REQUIRE(wrong.is_valid());
 	ERR_PRINT_OFF;
 	CHECK(server->read_file(wrong, "res://secret.txt").is_empty());
@@ -209,8 +213,8 @@ static String _clean_dir(const String &p_name) {
 	return dir;
 }
 
-TEST_CASE("[PckPackageServer] Extract skips engine files and reports not editable files") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Extract skips engine files and reports not editable files") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const String pack_path = TestUtils::get_temp_path("pck_extract_engine.pck");
 	const String out = _clean_dir("pck_extract_engine_out");
 	Dictionary files;
@@ -223,10 +227,10 @@ TEST_CASE("[PckPackageServer] Extract skips engine files and reports not editabl
 	files["level.tscn.remap"] = "[remap]\npath=\"res://.godot/exported/level.scn\"\n";
 	files["project.binary"] = "BIN";
 	_write_pack(pack_path, files);
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 
-	Ref<PckExtractResult> result = server->extract(package, out);
+	Ref<PCKExtractResult> result = server->extract(package, out);
 	REQUIRE(result.is_valid());
 	CHECK(result->is_ok());
 	CHECK(result->get_errors().is_empty());
@@ -240,27 +244,27 @@ TEST_CASE("[PckPackageServer] Extract skips engine files and reports not editabl
 
 	// Without the engine file rules, everything is written as it is.
 	const String raw_out = _clean_dir("pck_extract_engine_raw_out");
-	Ref<PckExtractResult> raw = server->extract(package, raw_out, PackedStringArray(), PckPackageServer::EXTRACT_SKIP, false);
+	Ref<PCKExtractResult> raw = server->extract(package, raw_out, PackedStringArray(), PCKPackageServer::EXTRACT_SKIP, false);
 	CHECK(raw->is_ok());
 	CHECK(raw->get_written().size() == 8);
 	CHECK(FileAccess::get_file_as_string(raw_out.path_join(".godot/imported/icon.png-123.ctex")) == "CTEX");
 
 	ERR_PRINT_OFF;
-	Ref<PckPackage> null_package;
+	Ref<PCKPackage> null_package;
 	CHECK(server->extract(null_package, out)->get_error() == ERR_INVALID_PARAMETER);
 	CHECK(server->extract(package, "")->get_error() == ERR_INVALID_PARAMETER);
 	ERR_PRINT_ON;
 }
 
-TEST_CASE("[PckPackageServer] Extract progress signal") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Extract progress signal") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const String pack_path = TestUtils::get_temp_path("pck_extract_progress.pck");
 	const String out = _clean_dir("pck_extract_progress_out");
 	Dictionary files;
 	files["a.txt"] = "Alpha";
 	files["b.txt"] = "Beta";
 	_write_pack(pack_path, files);
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 
 	SIGNAL_WATCH(server, "extract_progress");
@@ -269,8 +273,8 @@ TEST_CASE("[PckPackageServer] Extract progress signal") {
 	SIGNAL_UNWATCH(server, "extract_progress");
 }
 
-TEST_CASE("[PckPackageServer] Extract filters and conflict policies") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Extract filters and conflict policies") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const String pack_path = TestUtils::get_temp_path("pck_extract_policy.pck");
 	const String out = _clean_dir("pck_extract_policy_out");
 	Dictionary files;
@@ -280,12 +284,12 @@ TEST_CASE("[PckPackageServer] Extract filters and conflict policies") {
 	files["img.png"] = "PNG";
 	files["img.png.import"] = "[remap]\n";
 	_write_pack(pack_path, files);
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 
 	// Filters: folders, patterns and paths with or without `res://`.
 	CHECK(server->extract(package, out, PackedStringArray({ "res://sub/" }))->get_written() == PackedStringArray({ out.path_join("sub/b.txt"), out.path_join("sub/c.json") }));
-	CHECK(server->extract(package, out, PackedStringArray({ "*.txt" }), PckPackageServer::EXTRACT_OVERWRITE)->get_written() == PackedStringArray({ out.path_join("a.txt"), out.path_join("sub/b.txt") }));
+	CHECK(server->extract(package, out, PackedStringArray({ "*.txt" }), PCKPackageServer::EXTRACT_OVERWRITE)->get_written() == PackedStringArray({ out.path_join("a.txt"), out.path_join("sub/b.txt") }));
 	CHECK(server->extract(package, out, PackedStringArray({ "img.png" }))->get_written() == PackedStringArray({ out.path_join("img.png"), out.path_join("img.png.import") }));
 
 	// Skip: existing files stay, and sidecars follow their source.
@@ -294,19 +298,19 @@ TEST_CASE("[PckPackageServer] Extract filters and conflict policies") {
 		REQUIRE(f.is_valid());
 		f->store_string("Edited");
 	}
-	Ref<PckExtractResult> skipped = server->extract(package, out);
+	Ref<PCKExtractResult> skipped = server->extract(package, out);
 	CHECK(skipped->is_ok());
 	CHECK(skipped->get_written().is_empty());
 	CHECK(skipped->get_skipped().size() == 5);
 	CHECK(FileAccess::get_file_as_string(out.path_join("a.txt")) == "Edited");
 
 	// Overwrite.
-	Ref<PckExtractResult> overwritten = server->extract(package, out, PackedStringArray({ "a.txt" }), PckPackageServer::EXTRACT_OVERWRITE);
+	Ref<PCKExtractResult> overwritten = server->extract(package, out, PackedStringArray({ "a.txt" }), PCKPackageServer::EXTRACT_OVERWRITE);
 	CHECK(overwritten->get_written() == PackedStringArray({ out.path_join("a.txt") }));
 	CHECK(FileAccess::get_file_as_string(out.path_join("a.txt")) == "Alpha");
 
 	// Rename: the sidecar gets the new name of its source.
-	Ref<PckExtractResult> renamed = server->extract(package, out, PackedStringArray({ "a.txt", "img.png" }), PckPackageServer::EXTRACT_RENAME);
+	Ref<PCKExtractResult> renamed = server->extract(package, out, PackedStringArray({ "a.txt", "img.png" }), PCKPackageServer::EXTRACT_RENAME);
 	CHECK(renamed->is_ok());
 	CHECK(renamed->get_written() == PackedStringArray({ out.path_join("a_2.txt"), out.path_join("img_2.png"), out.path_join("img_2.png.import") }));
 	const Dictionary renamed_map = renamed->get_renamed();
@@ -315,11 +319,11 @@ TEST_CASE("[PckPackageServer] Extract filters and conflict policies") {
 	CHECK(FileAccess::get_file_as_string(out.path_join("a_2.txt")) == "Alpha");
 
 	// A second rename picks the next free name.
-	CHECK(server->extract(package, out, PackedStringArray({ "a.txt" }), PckPackageServer::EXTRACT_RENAME)->get_written() == PackedStringArray({ out.path_join("a_3.txt") }));
+	CHECK(server->extract(package, out, PackedStringArray({ "a.txt" }), PCKPackageServer::EXTRACT_RENAME)->get_written() == PackedStringArray({ out.path_join("a_3.txt") }));
 }
 
-TEST_CASE("[PckPackageServer] Extract keeps free UIDs and drops colliding ones") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Extract keeps free UIDs and drops colliding ones") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	ResourceUID *uids = ResourceUID::get_singleton();
 	REQUIRE(uids);
 	const String pack_path = TestUtils::get_temp_path("pck_extract_uid.pck");
@@ -341,10 +345,10 @@ TEST_CASE("[PckPackageServer] Extract keeps free UIDs and drops colliding ones")
 	files["free.gd.uid"] = free_script_text + "\n";
 	files["data.tres"] = "[gd_resource type=\"Resource\" format=3 uid=\"" + taken_resource_text + "\"]\n\n[resource]\n";
 	_write_pack(pack_path, files);
-	Ref<PckPackage> package = server->open(pack_path);
+	Ref<PCKPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
 
-	Ref<PckExtractResult> result = server->extract(package, out);
+	Ref<PCKExtractResult> result = server->extract(package, out);
 	CHECK(result->is_ok());
 	CHECK(result->get_dropped_uids() == PackedStringArray({ taken_script_text, taken_resource_text }));
 	CHECK(FileAccess::exists(out.path_join("taken.gd")));
@@ -358,7 +362,7 @@ TEST_CASE("[PckPackageServer] Extract keeps free UIDs and drops colliding ones")
 	CHECK(uids->get_id_path(free_script) == ProjectSettings::get_singleton()->localize_path(out.path_join("free.gd")));
 
 	// Extracting again to the same place keeps the UID: it already belongs to that file.
-	Ref<PckExtractResult> again = server->extract(package, out, PackedStringArray({ "free.gd" }), PckPackageServer::EXTRACT_OVERWRITE);
+	Ref<PCKExtractResult> again = server->extract(package, out, PackedStringArray({ "free.gd" }), PCKPackageServer::EXTRACT_OVERWRITE);
 	CHECK(again->get_dropped_uids().is_empty());
 	CHECK(again->get_written().has(out.path_join("free.gd.uid")));
 
@@ -367,8 +371,8 @@ TEST_CASE("[PckPackageServer] Extract keeps free UIDs and drops colliding ones")
 	uids->remove_id(free_script);
 }
 
-TEST_CASE("[PckPackageServer] Mount, pack of a file, unmount") {
-	PckPackageServer *server = PckPackageServer::get_singleton();
+TEST_CASE("[PCKPackageServer] Mount, pack of a file, unmount") {
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	PackedData *packed_data = PackedData::get_singleton();
 	REQUIRE(packed_data);
 	const String first_path = TestUtils::get_temp_path("pck_package_first.pck");
@@ -389,15 +393,15 @@ TEST_CASE("[PckPackageServer] Mount, pack of a file, unmount") {
 	CHECK(server->is_mounted(first_path));
 	CHECK(server->is_mounted(second_path));
 	CHECK_FALSE(server->is_main_pack(second_path));
-	CHECK(server->get_mounted().has(first_path));
-	CHECK(server->get_mounted().has(second_path));
-	CHECK(server->get_pack_of("res://pck_package_test/shared.txt") == second_path);
-	CHECK(server->get_pack_of("res://pck_package_test/only_first.txt") == first_path);
-	CHECK(server->get_pack_of("res://pck_package_test/missing.txt").is_empty());
+	CHECK(server->get_mounted_packs().has(first_path));
+	CHECK(server->get_mounted_packs().has(second_path));
+	CHECK(server->get_providing_pack("res://pck_package_test/shared.txt") == second_path);
+	CHECK(server->get_providing_pack("res://pck_package_test/only_first.txt") == first_path);
+	CHECK(server->get_providing_pack("res://pck_package_test/missing.txt").is_empty());
 	CHECK(FileAccess::get_file_as_string("res://pck_package_test/shared.txt") == "Second");
 
 	// A mounted pack can't be overwritten.
-	Ref<PckPackage> package = server->open(second_path);
+	Ref<PCKPackage> package = server->open(second_path);
 	REQUIRE(package.is_valid());
 	ERR_PRINT_OFF;
 	CHECK(server->build(package, second_path) == ERR_BUSY);
@@ -412,7 +416,7 @@ TEST_CASE("[PckPackageServer] Mount, pack of a file, unmount") {
 	CHECK(server->is_mounted(first_path));
 	CHECK_FALSE(FileAccess::exists("res://pck_package_test/only_second.txt"));
 	CHECK(FileAccess::exists("res://pck_package_test/only_first.txt"));
-	CHECK(server->get_pack_of("res://pck_package_test/shared.txt") == first_path);
+	CHECK(server->get_providing_pack("res://pck_package_test/shared.txt") == first_path);
 	CHECK(FileAccess::get_file_as_string("res://pck_package_test/shared.txt") == "First");
 
 	ERR_PRINT_OFF;
@@ -432,4 +436,4 @@ TEST_CASE("[PckPackageServer] Mount, pack of a file, unmount") {
 	CHECK_FALSE(FileAccess::exists("res://pck_package_test/only_first.txt"));
 }
 
-} // namespace TestPckPackageServer
+} // namespace TestPCKPackageServer
