@@ -308,10 +308,17 @@ Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package
 	const HashMap<String, PckPackage::Entry> &entries = p_package->get_entry_map();
 
 	// 1. Select and classify. Main files first decide where they go; sidecars follow them in step 2.
+	HashSet<String> matched;
+	for (const KeyValue<String, PckPackage::Entry> &kv : entries) {
+		if (_extract_filter_matches(kv.key, filters)) {
+			matched.insert(kv.key);
+		}
+	}
+	// A selected file brings its `.import` and `.uid` files along.
 	Vector<String> selected;
 	HashSet<String> selected_set;
 	for (const KeyValue<String, PckPackage::Entry> &kv : entries) {
-		if (_extract_filter_matches(kv.key, filters)) {
+		if (matched.has(kv.key) || matched.has(_extract_sidecar_source(kv.key))) {
 			selected.push_back(kv.key);
 			selected_set.insert(kv.key);
 		}

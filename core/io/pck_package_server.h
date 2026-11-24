@@ -64,7 +64,7 @@ public:
 	Error verify(const Ref<PckPackage> &p_package);
 	Error build(const Ref<PckPackage> &p_package, const String &p_target_path, const String &p_key = String());
 	// Writes the files of `p_package` below `p_target_dir`. `p_paths` filters (files, folders or `*`/`?` patterns;
-	// empty: all files). Sidecars (`.import`, `.uid`) follow the decision for their source file.
+	// empty: all files). Sidecars (`.import`, `.uid`) are selected with their source file and follow its decision.
 	Ref<PckExtractResult> extract(const Ref<PckPackage> &p_package, const String &p_target_dir, const PackedStringArray &p_paths = PackedStringArray(), ExtractPolicy p_policy = EXTRACT_SKIP, bool p_skip_engine_files = true);
 
 	Error mount(const String &p_path, bool p_replace_files = true, uint64_t p_offset = 0);
