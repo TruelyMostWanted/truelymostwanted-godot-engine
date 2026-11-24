@@ -1581,6 +1581,9 @@
 		<member name="EngineDebugger" type="EngineDebugger" setter="" getter="">
 			The [EngineDebugger] singleton.
 		</member>
+		<member name="EngineSettingsServer" type="EngineSettingsServer" setter="" getter="">
+			The [EngineSettingsServer] singleton.
+		</member>
 		<member name="FilesManifestServer" type="FilesManifestServer" setter="" getter="">
 			The [FilesManifestServer] singleton.
 		</member>
