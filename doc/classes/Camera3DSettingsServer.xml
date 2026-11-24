@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Camera3DSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the player camera: field of view, clip planes and motion values.
+	</brief_description>
+	<description>
+		[Camera3DSettingsServer] is the settings domain [code]"camera_3d"[/code]: it stores the field of view, whether it is vertical or horizontal, the near and far clip plane, and the game-side motion values (camera shake, head bob, motion blur) for the player. The settings resource is a [Camera3DSettings]; the file is [code]user://settings/camera.ini[/code] by default, in the format of [member ProjectSettings.settings/storage/format].
+		[b]Which cameras:[/b] every [Camera3D] in the group [code]"camera_3d_settings"[/code] ([method get_camera_group]) gets the values when it enters the scene tree, also after a scene change, and every later change at once. Cameras can also be passed to [method add_camera]. Cameras outside the group, such as cutscene cameras, are never changed, also when they are current. In the editor, the cameras of the edited scene are not changed.
+		[b]Authored values:[/b] the first time a camera gets the settings, its own [member Camera3D.fov], [member Camera3D.keep_aspect], [member Camera3D.near] and [member Camera3D.far] are remembered. [method remove_camera] and [member Camera3DSettings.enabled] = [code]false[/code] give them back.
+		The defaults are the project settings [member ProjectSettings.settings/camera_3d/field_of_view], [member ProjectSettings.settings/camera_3d/keep_aspect], [member ProjectSettings.settings/camera_3d/near] and [member ProjectSettings.settings/camera_3d/far]. The domain is applied in [constant SettingsServer.APPLY_PHASE_SCENE], before the main scene is loaded. Values out of range are clamped with a warning.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			var camera_3d_settings = Engine.get_singleton("Camera3DSettingsServer")
+			$Menu/FieldOfView.value = camera_3d_settings.get_field_of_view()
+			# The player camera of every level gets the values.
+			$Player/Camera3D.add_to_group(Camera3DSettingsServer.get_camera_group())
+
+		func _on_field_of_view_value_changed(value):
+			Engine.get_singleton("Camera3DSettingsServer").set_field_of_view(value)
+
+		func shake(strength):
+			var intensity = Engine.get_singleton("Camera3DSettingsServer").get_shake_intensity()
+			$ShakeEffect.start(strength * intensity)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GetNode&lt;HSlider&gt;("Menu/FieldOfView").Value = Camera3DSettingsServer.GetFieldOfView();
+		    // The player camera of every level gets the values.
+		    GetNode&lt;Camera3D&gt;("Player/Camera3D").AddToGroup(Camera3DSettingsServer.GetCameraGroup());
+		}
+
+		private void OnFieldOfViewValueChanged(double value)
+		{
+		    Camera3DSettingsServer.SetFieldOfView((float)value);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] This class does not exist when the engine is built with [code]disable_3d=yes[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_camera">
+			<return type="void" />
+			<param index="0" name="camera" type="Camera3D" />
+			<description>
+				Gives the settings to [param camera] now and on every later change, for example a camera created in code or one that is not in the group. Its authored values are remembered the first time. Calling it again does nothing more.
+			</description>
+		</method>
+		<method name="apply_to_cameras">
+			<return type="void" />
+			<description>
+				Gives the settings to every camera in the group [method get_camera_group] that has not got them yet. Use it after adding a camera to the group while it is already in the scene tree; cameras that enter the tree in the group get the values without it.
+			</description>
+		</method>
+		<method name="get_camera_group" qualifiers="static">
+			<return type="StringName" />
+			<description>
+				Returns the group of the cameras that get the settings when they enter the scene tree: [code]"camera_3d_settings"[/code].
+			</description>
+		</method>
+		<method name="get_far" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending far clip plane distance. See [member Camera3DSettings.far].
+			</description>
+		</method>
+		<method name="get_field_of_view" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending field of view in degrees. See [member Camera3DSettings.field_of_view].
+			</description>
+		</method>
+		<method name="get_head_bob_intensity" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending head bob intensity. See [member Camera3DSettings.head_bob_intensity].
+			</description>
+		</method>
+		<method name="get_keep_aspect" qualifiers="const">
+			<return type="int" enum="Camera3D.KeepAspect" />
+			<description>
+				Returns the pending FOV axis. See [member Camera3DSettings.keep_aspect].
+			</description>
+		</method>
+		<method name="get_managed_cameras" qualifiers="const">
+			<return type="Camera3D[]" />
+			<description>
+				Returns the cameras that have the settings now: the cameras in the group that entered the tree and the cameras passed to [method add_camera], without those freed or passed to [method remove_camera].
+			</description>
+		</method>
+		<method name="get_motion_blur_intensity" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending motion blur intensity. See [member Camera3DSettings.motion_blur_intensity].
+			</description>
+		</method>
+		<method name="get_near" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending near clip plane distance. See [member Camera3DSettings.near].
+			</description>
+		</method>
+		<method name="get_shake_intensity" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending camera shake intensity. See [member Camera3DSettings.shake_intensity].
+			</description>
+		</method>
+		<method name="has_camera" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="camera" type="Camera3D" />
+			<description>
+				Returns [code]true[/code] if [param camera] has the settings (see [method get_managed_cameras]).
+			</description>
+		</method>
+		<method name="is_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the managed cameras use the settings. See [member Camera3DSettings.enabled].
+			</description>
+		</method>
+		<method name="remove_camera">
+			<return type="void" />
+			<param index="0" name="camera" type="Camera3D" />
+			<description>
+				Gives [param camera] its authored values back and stops changing it. A camera still in the group gets the settings again when it enters the tree the next time; remove it from the group first if it should keep its own values.
+			</description>
+		</method>
+		<method name="set_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Turns the settings on or off for the managed cameras. See [member Camera3DSettings.enabled].
+			</description>
+		</method>
+		<method name="set_far">
+			<return type="void" />
+			<param index="0" name="far" type="float" />
+			<description>
+				Sets the far clip plane distance in meters. See [member Camera3DSettings.far].
+			</description>
+		</method>
+		<method name="set_field_of_view">
+			<return type="void" />
+			<param index="0" name="degrees" type="float" />
+			<description>
+				Sets the field of view in degrees. See [member Camera3DSettings.field_of_view].
+			</description>
+		</method>
+		<method name="set_head_bob_intensity">
+			<return type="void" />
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Sets the head bob intensity ([code]0[/code] to [code]1[/code]). See [member Camera3DSettings.head_bob_intensity].
+			</description>
+		</method>
+		<method name="set_keep_aspect">
+			<return type="void" />
+			<param index="0" name="keep_aspect" type="int" enum="Camera3D.KeepAspect" />
+			<description>
+				Sets the axis the field of view is measured on. See [member Camera3DSettings.keep_aspect].
+			</description>
+		</method>
+		<method name="set_motion_blur_intensity">
+			<return type="void" />
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Sets the motion blur intensity ([code]0[/code] to [code]1[/code]). See [member Camera3DSettings.motion_blur_intensity].
+			</description>
+		</method>
+		<method name="set_near">
+			<return type="void" />
+			<param index="0" name="near" type="float" />
+			<description>
+				Sets the near clip plane distance in meters. See [member Camera3DSettings.near].
+			</description>
+		</method>
+		<method name="set_shake_intensity">
+			<return type="void" />
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Sets the camera shake intensity ([code]0[/code] to [code]1[/code]). See [member Camera3DSettings.shake_intensity].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="far_changed">
+			<param index="0" name="far" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.far] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to adapt fog or level of detail to the view distance.
+			</description>
+		</signal>
+		<signal name="field_of_view_changed">
+			<param index="0" name="fov" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.field_of_view] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for cameras that the domain does not manage, for example a weapon camera.
+			</description>
+		</signal>
+		<signal name="head_bob_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.head_bob_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the head bob of the game by it.
+			</description>
+		</signal>
+		<signal name="keep_aspect_changed">
+			<param index="0" name="keep_aspect" type="int" enum="Camera3D.KeepAspect" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.keep_aspect] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="motion_blur_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.motion_blur_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the motion blur effect of the game by it.
+			</description>
+		</signal>
+		<signal name="near_changed">
+			<param index="0" name="near" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.near] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="shake_intensity_changed">
+			<param index="0" name="intensity" type="float" />
+			<description>
+				Emitted once when a changed [member Camera3DSettings.shake_intensity] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Scale the camera shake of the game by it.
+			</description>
+		</signal>
+	</signals>
+</class>

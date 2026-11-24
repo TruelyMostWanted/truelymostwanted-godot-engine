@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  camera_settings.h                                                     */
+/*  camera_3d_settings.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -37,9 +37,9 @@
 
 // Data of the `camera` settings domain (#28): field of view (and whether it is vertical or horizontal), near and far
 // clip plane, and the game-side motion values (camera shake, head bob, motion blur).
-// CameraSettingsServer pushes the camera values to the Camera3D nodes in its group and to the cameras added to it.
-class CameraSettings : public Resource {
-	GDCLASS(CameraSettings, Resource);
+// Camera3DSettingsServer pushes the camera values to the Camera3D nodes in its group and to the cameras added to it.
+class Camera3DSettings : public Resource {
+	GDCLASS(Camera3DSettings, Resource);
 
 	bool enabled = true;
 	float field_of_view = 75.0;
