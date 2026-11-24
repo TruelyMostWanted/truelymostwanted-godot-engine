@@ -539,3 +539,4 @@
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
 /servers/settings/                            @TruelyMostWanted
 /servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
+/modules/mono/tests/                          @TruelyMostWanted @godotengine/dotnet @godotengine/tests
