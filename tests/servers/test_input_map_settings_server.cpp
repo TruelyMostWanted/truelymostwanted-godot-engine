@@ -206,7 +206,7 @@ TEST_CASE("[InputMapSettingsServer] Text form of key, mouse button, joypad butto
 	CHECK(InputAction::event_to_text(shift) == "Keyboard:Shift");
 
 	// Invalid texts and event types that can't be bound.
-	for (const String &text : { String(""), String("Key"), String("KeyboardLabel:"), String("KeyboardLabel:NoSuchKey"), String("KeyboardLabel:Hyper+S"), String("Mouse:Left"),
+	for (const String &text : { String(""), String("Key"), String("KeyboardLabel:"), String("KeyboardLabel:NoSuchKey"), String("KeyboardLabel:Hyper+S"), String("MouseMotion:Left"),
 				 String("Mouse:Sideways"), String("Gamepad:Z"), String("GamepadAxis:LeftX"), String("GamepadAxis:Nowhere+") }) {
 		CHECK_MESSAGE(InputAction::text_to_event(text).is_null(), text);
 	}
