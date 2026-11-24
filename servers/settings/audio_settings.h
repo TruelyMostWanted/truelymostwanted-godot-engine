@@ -35,9 +35,9 @@
 
 // Data of the audio settings domains (#16). No engine dependency: the servers push the values to AudioServer.
 
-// Settings of the `audio` domain (AudioSettingsServer): the output and the input device.
-class AudioSettings : public Resource {
-	GDCLASS(AudioSettings, Resource);
+// Settings of the `audio` domain (AudioDeviceSettingsServer): the output and the input device.
+class AudioDeviceSettings : public Resource {
+	GDCLASS(AudioDeviceSettings, Resource);
 
 	String output_device = "Default";
 	String input_device = "Default";

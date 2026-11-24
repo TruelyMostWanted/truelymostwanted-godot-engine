@@ -43,6 +43,12 @@ TEST_FORCE_LINK(test_resource_text_serializer_xml)
 #include "core/variant/typed_dictionary.h"
 #include "tests/test_utils.h"
 
+#include "modules/modules_enabled.gen.h" // For yaml.
+
+#ifdef MODULE_YAML_ENABLED
+#include "modules/yaml/yaml.h"
+#endif
+
 namespace TestResourceTextSerializerXML {
 
 class XMLTestEntry : public Resource {
@@ -429,10 +435,14 @@ TEST_CASE("[ResourceTextSerializer] serialize() and deserialize() for all format
 	CHECK(formats.has(ResourceTextSerializer::FORMAT_INI));
 	CHECK(formats.has(ResourceTextSerializer::FORMAT_CSV));
 	CHECK(formats.has(ResourceTextSerializer::FORMAT_XML));
+#ifndef MODULE_YAML_ENABLED
 	CHECK_FALSE(formats.has(ResourceTextSerializer::FORMAT_YAML));
+#endif
 	CHECK(formats.find(ResourceTextSerializer::FORMAT_JSON) < formats.find(ResourceTextSerializer::FORMAT_XML));
 	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_XML));
+#ifndef MODULE_YAML_ENABLED
 	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
 	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_MAX));
 
 	// Extensions.
@@ -459,10 +469,12 @@ TEST_CASE("[ResourceTextSerializer] serialize() and deserialize() for all format
 	CHECK(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_JSON), ResourceTextSerializer::FORMAT_JSON).is_valid());
 	CHECK(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI), ResourceTextSerializer::FORMAT_INI).is_valid());
 
+#ifndef MODULE_YAML_ENABLED
 	ERR_PRINT_OFF;
 	CHECK(serializer->serialize(settings, ResourceTextSerializer::FORMAT_YAML).is_empty());
 	CHECK(serializer->deserialize("a: 1", ResourceTextSerializer::FORMAT_YAML).is_null());
 	ERR_PRINT_ON;
+#endif
 }
 
 static Error _write_test_format(const Ref<Resource> &p_resource, const ResourceTextSerializer::Options &p_options, String &r_text, String &r_error) {
@@ -479,8 +491,11 @@ TEST_CASE("[ResourceTextSerializer] register_format() adds a format") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	const Ref<XMLTestEntry> entry = make_xml_entry("Ann", 3);
 
-	// YAML has no implementation in core, so its slot is free for the test.
+	// YAML has no implementation in core, so its slot is free for the test; with the YAML module, the module's
+	// functions are registered again at the end.
+#ifndef MODULE_YAML_ENABLED
 	REQUIRE_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
 	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_YAML, &_write_test_format, &_parse_test_format);
 	CHECK(serializer->get_available_formats().has(ResourceTextSerializer::FORMAT_YAML));
 	CHECK(serializer->serialize(entry, ResourceTextSerializer::FORMAT_YAML) == "test:XMLTestEntry");
@@ -490,6 +505,11 @@ TEST_CASE("[ResourceTextSerializer] register_format() adds a format") {
 	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_YAML);
 	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
 	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_JSON));
+
+#ifdef MODULE_YAML_ENABLED
+	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_YAML, &YAML::write_resource, &YAML::parse_format);
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
 }
 
 } // namespace TestResourceTextSerializerXML

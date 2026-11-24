@@ -96,7 +96,7 @@ void AudioMixerServer::_ensure_default_layout() {
 	}
 	Ref<AudioMixerLayout> layout = ResourceLoader::load(path);
 	ERR_FAIL_COND_MSG(layout.is_null(), vformat("Cannot load the audio mixer layout \"%s\" (project setting \"audio/mixer/default_layout\").", path));
-	load_layout(layout);
+	apply_layout(layout);
 }
 
 // Helpers.
@@ -201,7 +201,7 @@ static Vector<AudioFrame> _mixer_volume_vector(float p_linear) {
 }
 
 float AudioMixerServer::_voice_volume_linear(const Channel &p_channel, const Voice &p_voice) const {
-	return Math::db_to_linear(p_channel.volume_db) * p_voice.gain * Math::db_to_linear(p_voice.volume_db);
+	return Math::db_to_linear(p_channel.volume_db + p_channel.duck_db) * p_voice.gain * Math::db_to_linear(p_voice.volume_db);
 }
 
 void AudioMixerServer::_apply_voice_volume(const Channel &p_channel, const Voice &p_voice) const {
@@ -339,7 +339,7 @@ void AudioMixerServer::_limit_voices(Channel &p_channel) {
 		}
 	}
 	// One-shots: the oldest voice is stolen.
-	while ((int)p_channel.one_shots.size() > p_channel.config->get_polyphony()) {
+	while ((int)p_channel.one_shots.size() > p_channel.config->get_max_polyphony()) {
 		_stop_voice(p_channel.one_shots[0]);
 		p_channel.one_shots.remove_at(0);
 	}
@@ -513,12 +513,23 @@ void AudioMixerServer::_process_channel(const StringName &p_name, Channel &p_cha
 		}
 	}
 
+	// Ducking follows speech also while the channel is paused.
+	const bool duck_changed = _process_duck(p_name, p_channel, p_delta);
+
 	if (p_channel.paused || p_channel.tree_paused) {
+		if (duck_changed) {
+			for (const Voice &voice : p_channel.voices) {
+				_apply_voice_volume(p_channel, voice);
+			}
+			for (const Voice &voice : p_channel.one_shots) {
+				_apply_voice_volume(p_channel, voice);
+			}
+		}
 		return; // Fades and end detection wait while the channel is paused.
 	}
 
 	bool fade_finished = false;
-	bool volume_changed = false;
+	bool volume_changed = duck_changed;
 	if (p_channel.volume_fade.active) {
 		p_channel.volume_fade.elapsed += p_delta;
 		p_channel.volume_db = _apply_curve(p_channel.volume_fade);
@@ -591,7 +602,7 @@ void AudioMixerServer::_process_channel(const StringName &p_name, Channel &p_cha
 	// The current entry reached its end: loop it, advance the queue or finish.
 	if (ended && _current_voice_index(p_channel) < 0) {
 		_queue_signal(SIGNAL_CHANNEL_FINISHED, p_name, ended_index);
-		if (p_channel.config->is_loop_entry()) {
+		if (p_channel.config->is_loop_current_entry()) {
 			if (ended_index >= 0) {
 				_play_entry(p_name, p_channel, ended_index, 0.0f, 0.0f, FADE_CURVE_LINEAR);
 			} else {
@@ -639,6 +650,9 @@ void AudioMixerServer::_flush_signals() {
 				case SIGNAL_FADE_FINISHED: {
 					emit_signal(SNAME("fade_finished"), pending.channel);
 				} break;
+				case SIGNAL_DUCKING_CHANGED: {
+					emit_signal(SNAME("ducking_changed"), pending.channel, pending.index != 0);
+				} break;
 			}
 		}
 	}
@@ -646,7 +660,7 @@ void AudioMixerServer::_flush_signals() {
 
 // Channels.
 
-void AudioMixerServer::load_layout(const Ref<AudioMixerLayout> &p_layout) {
+void AudioMixerServer::apply_layout(const Ref<AudioMixerLayout> &p_layout) {
 	MIXER_THREAD_GUARD();
 	ERR_FAIL_COND_MSG(p_layout.is_null(), "The audio mixer layout is null.");
 	_ensure_default_layout();
@@ -678,6 +692,8 @@ void AudioMixerServer::add_channel(const Ref<AudioMixerChannel> &p_channel) {
 		_apply_voice_pitch(channel, voice);
 	}
 	_limit_voices(channel);
+	_update_duck(p_channel->get_channel_name(), channel, p_channel->get_duck_fade_time());
+	_flush_signals();
 }
 
 void AudioMixerServer::remove_channel(const StringName &p_channel) {
@@ -894,7 +910,7 @@ void AudioMixerServer::dequeue(const StringName &p_channel, int p_index) {
 	const int index = p_index < 0 ? size - 1 : p_index;
 	ERR_FAIL_INDEX_MSG(index, size, vformat("The queue of the audio mixer channel \"%s\" has no entry %d.", p_channel, index));
 	channel->queue.remove_at(index);
-	// The cursor stays on the entry before, so next() plays the entry that followed the removed one.
+	// The cursor stays on the entry before, so play_next() plays the entry that followed the removed one.
 	if (index <= channel->index) {
 		channel->index--;
 	}
@@ -936,7 +952,7 @@ PackedStringArray AudioMixerServer::get_queue(const StringName &p_channel) const
 	return paths;
 }
 
-void AudioMixerServer::change_index(const StringName &p_channel, int p_index, float p_fade_time) {
+void AudioMixerServer::set_queue_index(const StringName &p_channel, int p_index, float p_fade_time) {
 	MIXER_THREAD_GUARD();
 	Channel *channel = _get_channel(p_channel);
 	if (channel == nullptr) {
@@ -946,7 +962,7 @@ void AudioMixerServer::change_index(const StringName &p_channel, int p_index, fl
 	_switch_to(p_channel, *channel, p_index, p_fade_time);
 }
 
-void AudioMixerServer::next(const StringName &p_channel, float p_fade_time) {
+void AudioMixerServer::play_next(const StringName &p_channel, float p_fade_time) {
 	MIXER_THREAD_GUARD();
 	Channel *channel = _get_channel(p_channel);
 	if (channel == nullptr) {
@@ -955,7 +971,7 @@ void AudioMixerServer::next(const StringName &p_channel, float p_fade_time) {
 	_switch_to(p_channel, *channel, _next_index(*channel), p_fade_time);
 }
 
-void AudioMixerServer::previous(const StringName &p_channel, float p_fade_time) {
+void AudioMixerServer::play_previous(const StringName &p_channel, float p_fade_time) {
 	MIXER_THREAD_GUARD();
 	Channel *channel = _get_channel(p_channel);
 	if (channel == nullptr) {
@@ -964,7 +980,7 @@ void AudioMixerServer::previous(const StringName &p_channel, float p_fade_time) 
 	_switch_to(p_channel, *channel, _previous_index(*channel), p_fade_time);
 }
 
-int AudioMixerServer::get_index(const StringName &p_channel) const {
+int AudioMixerServer::get_queue_index(const StringName &p_channel) const {
 	MIXER_THREAD_GUARD_V(-1);
 	const Channel *channel = _get_channel(p_channel);
 	return channel ? channel->index : -1;
@@ -1110,7 +1126,7 @@ float AudioMixerServer::get_channel_pitch_scale(const StringName &p_channel) con
 	return channel ? channel->pitch_scale : 1.0f;
 }
 
-void AudioMixerServer::switch_clip(const StringName &p_channel, const StringName &p_clip) {
+void AudioMixerServer::switch_to_clip(const StringName &p_channel, const StringName &p_clip) {
 	MIXER_THREAD_GUARD();
 	Channel *channel = _get_channel(p_channel);
 	if (channel == nullptr) {
@@ -1189,6 +1205,7 @@ void AudioMixerServer::process(double p_delta) {
 	for (KeyValue<StringName, Channel> &E : channels) {
 		_process_channel(E.key, E.value, MAX(0.0, p_delta), scene_id, tree_paused);
 	}
+	_process_utterance_safeguard(MAX(0.0, p_delta));
 	_flush_signals();
 }
 
@@ -1200,11 +1217,15 @@ void AudioMixerServer::reset() {
 	channels.clear();
 	pending_signals.clear();
 	command_registry->clear();
+	active_utterances.clear();
+	ducking_enabled = true;
+	tts_poll_elapsed = 0.0;
+	tts_silent_time = 0.0;
 	_remove_callback();
 }
 
 void AudioMixerServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("load_layout", "layout"), &AudioMixerServer::load_layout);
+	ClassDB::bind_method(D_METHOD("apply_layout", "layout"), &AudioMixerServer::apply_layout);
 	ClassDB::bind_method(D_METHOD("add_channel", "channel"), &AudioMixerServer::add_channel);
 	ClassDB::bind_method(D_METHOD("remove_channel", "channel"), &AudioMixerServer::remove_channel);
 	ClassDB::bind_method(D_METHOD("has_channel", "channel"), &AudioMixerServer::has_channel);
@@ -1227,10 +1248,10 @@ void AudioMixerServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("dequeue", "channel", "index"), &AudioMixerServer::dequeue, DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("clear_queue", "channel"), &AudioMixerServer::clear_queue);
 	ClassDB::bind_method(D_METHOD("get_queue", "channel"), &AudioMixerServer::get_queue);
-	ClassDB::bind_method(D_METHOD("change_index", "channel", "index", "fade_time"), &AudioMixerServer::change_index, DEFVAL(-1.0));
-	ClassDB::bind_method(D_METHOD("next", "channel", "fade_time"), &AudioMixerServer::next, DEFVAL(-1.0));
-	ClassDB::bind_method(D_METHOD("previous", "channel", "fade_time"), &AudioMixerServer::previous, DEFVAL(-1.0));
-	ClassDB::bind_method(D_METHOD("get_index", "channel"), &AudioMixerServer::get_index);
+	ClassDB::bind_method(D_METHOD("set_queue_index", "channel", "index", "fade_time"), &AudioMixerServer::set_queue_index, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("play_next", "channel", "fade_time"), &AudioMixerServer::play_next, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("play_previous", "channel", "fade_time"), &AudioMixerServer::play_previous, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("get_queue_index", "channel"), &AudioMixerServer::get_queue_index);
 
 	ClassDB::bind_method(D_METHOD("fade_in", "channel", "time", "curve"), &AudioMixerServer::fade_in, DEFVAL(FADE_CURVE_LINEAR));
 	ClassDB::bind_method(D_METHOD("fade_out", "channel", "time", "curve"), &AudioMixerServer::fade_out, DEFVAL(FADE_CURVE_LINEAR));
@@ -1241,8 +1262,16 @@ void AudioMixerServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_channel_volume_db", "channel"), &AudioMixerServer::get_channel_volume_db);
 	ClassDB::bind_method(D_METHOD("set_channel_pitch_scale", "channel", "pitch_scale"), &AudioMixerServer::set_channel_pitch_scale);
 	ClassDB::bind_method(D_METHOD("get_channel_pitch_scale", "channel"), &AudioMixerServer::get_channel_pitch_scale);
-	ClassDB::bind_method(D_METHOD("switch_clip", "channel", "clip"), &AudioMixerServer::switch_clip);
+	ClassDB::bind_method(D_METHOD("switch_to_clip", "channel", "clip"), &AudioMixerServer::switch_to_clip);
 	ClassDB::bind_method(D_METHOD("get_channel_playback", "channel"), &AudioMixerServer::get_channel_playback);
+
+	ClassDB::bind_method(D_METHOD("set_ducking_enabled", "enabled"), &AudioMixerServer::set_ducking_enabled);
+	ClassDB::bind_method(D_METHOD("is_ducking_enabled"), &AudioMixerServer::is_ducking_enabled);
+	ClassDB::bind_method(D_METHOD("duck", "channel", "volume_db", "fade_time"), &AudioMixerServer::duck, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("unduck", "channel", "fade_time"), &AudioMixerServer::unduck, DEFVAL(-1.0));
+	ClassDB::bind_method(D_METHOD("is_ducked", "channel"), &AudioMixerServer::is_ducked);
+	ClassDB::bind_method(D_METHOD("get_duck_volume_db", "channel"), &AudioMixerServer::get_duck_volume_db);
+	ClassDB::bind_method(D_METHOD("get_active_utterance_count"), &AudioMixerServer::get_active_utterance_count);
 
 	ClassDB::bind_method(D_METHOD("execute", "command"), &AudioMixerServer::execute);
 	ClassDB::bind_method(D_METHOD("execute_list", "list"), &AudioMixerServer::execute_list);
@@ -1257,6 +1286,7 @@ void AudioMixerServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("channel_finished", PropertyInfo(Variant::STRING_NAME, "channel"), PropertyInfo(Variant::INT, "index")));
 	ADD_SIGNAL(MethodInfo("queue_finished", PropertyInfo(Variant::STRING_NAME, "channel")));
 	ADD_SIGNAL(MethodInfo("fade_finished", PropertyInfo(Variant::STRING_NAME, "channel")));
+	ADD_SIGNAL(MethodInfo("ducking_changed", PropertyInfo(Variant::STRING_NAME, "channel"), PropertyInfo(Variant::BOOL, "ducked")));
 	ADD_SIGNAL(MethodInfo("command_executed", PropertyInfo(Variant::STRING_NAME, "command_name"), PropertyInfo(Variant::OBJECT, "command", PROPERTY_HINT_RESOURCE_TYPE, "AudioCommand")));
 
 	BIND_ENUM_CONSTANT(FADE_CURVE_LINEAR);
@@ -1270,9 +1300,11 @@ AudioMixerServer::AudioMixerServer() {
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "audio/mixer/default_layout", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "audio/mixer/default_commands", PROPERTY_HINT_FILE, "*.tres,*.res,*.json,*.ini,*.csv"), "");
 	command_registry = memnew(AudioCommandRegistry(this));
+	_connect_tts();
 }
 
 AudioMixerServer::~AudioMixerServer() {
+	_disconnect_tts();
 	for (KeyValue<StringName, Channel> &E : channels) {
 		_stop_channel(E.value, 0.0f, FADE_CURVE_LINEAR);
 	}

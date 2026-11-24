@@ -114,7 +114,10 @@ UPDATED='2026-11-24'
 
 Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
 
-**Laufende Agenten:** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
+**Stand (2026-11-24, Mittag):** Gemergt seit #99: #10/#15–#20-Umbenennungen, #90, #26 (+Testfix), #73, #155 YAML, #85, #122, #86 (+PCKBuildPlan typisiert, im Core registriert), #21, #79, #71, #89/#91 Pack-Modus, #22. Wiki aktuell bis #91 (Batch #22 läuft).
+**Fallen neu:** Glue-Generator löscht alte generierte Dateien nicht (Klasse zwischen Core/Editor verschoben → alte Datei in `modules/mono/glue/GodotSharp/*/Generated` löschen, Quelle `touch`en, Assemblies neu, im Test-Worktree `.godot/mono/temp` löschen). Datenklassen, die C# zur Laufzeit braucht, im Core registrieren. `integrate.sh` bricht bei roten Unit-Tests ab (ein Merge von #26 ging vorher mit roten Tests durch, korrigiert).
+**Laufende Agenten:** #23, #24, #27, #28, Wiki #22. Danach: #25 (Presets, nach #21–#24), #29, #30, #76, #80, #121.
+**Alt (überholt):** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
 
 **Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
 

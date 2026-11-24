@@ -33,8 +33,8 @@
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 
-// Makes `.pck` files resources of the type `PckPackage`. Loading opens the pack (header and directory only)
-// with the key compiled into the engine and never mounts it; mounting stays `PckPackageServer.mount()`.
+// Makes `.pck` files resources of the type `PCKPackage`. Loading opens the pack (header and directory only)
+// with the key compiled into the engine and never mounts it; mounting stays `PCKPackageServer.mount()`.
 class ResourceFormatLoaderPck : public ResourceFormatLoader {
 	GDSOFTCLASS(ResourceFormatLoaderPck, ResourceFormatLoader);
 
@@ -45,7 +45,7 @@ public:
 	virtual String get_resource_type(const String &p_path) const override;
 };
 
-// Saving a `PckPackage` to a `.pck` path builds the pack with `PckPackageServer.build()`.
+// Saving a `PCKPackage` to a `.pck` path builds the pack with `PCKPackageServer.build()`.
 class ResourceFormatSaverPck : public ResourceFormatSaver {
 	GDSOFTCLASS(ResourceFormatSaverPck, ResourceFormatSaver);
 

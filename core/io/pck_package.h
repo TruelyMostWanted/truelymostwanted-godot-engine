@@ -34,12 +34,14 @@
 #include "core/templates/hash_map.h"
 #include "core/variant/typed_array.h"
 
-// A `.pck` file as a resource. Opened from a `.pck` (`PckPackageServer::open()`, `load("x.pck")`), it holds
-// the directory of that pack plus edits in memory. Created with `PckPackage.new()` or loaded from a
-// `.tres`/`.res`, it is a pack description: target paths mapped to sources, built with `PckPackageServer::build()`.
+class PCKPackageEntry;
+
+// A `.pck` file as a resource. Opened from a `.pck` (`PCKPackageServer::open()`, `load("x.pck")`), it holds
+// the directory of that pack plus edits in memory. Created with `PCKPackage.new()` or loaded from a
+// `.tres`/`.res`, it is a pack description: target paths mapped to sources, built with `PCKPackageServer::build()`.
 // The key is a runtime member only and is never stored. Not thread-safe: use one package from one thread at a time.
-class PckPackage : public Resource {
-	GDCLASS(PckPackage, Resource);
+class PCKPackage : public Resource {
+	GDCLASS(PCKPackage, Resource);
 
 public:
 	enum SourceType {
@@ -84,11 +86,11 @@ private:
 	// Insertion order is kept, so entries are listed and built in pack order.
 	HashMap<String, Entry> entries;
 	// The opened directory of `base_pack`, for SOURCE_PACK entries of a description.
-	mutable Ref<PckPackage> base_cache;
+	mutable Ref<PCKPackage> base_cache;
 
 	static String _key_path(const String &p_path);
 	Error _open_pack(const String &p_path, const Vector<uint8_t> &p_key, uint64_t p_offset);
-	void _copy_state(const PckPackage &p_from, bool p_copy_key);
+	void _copy_state(const PCKPackage &p_from, bool p_copy_key);
 	Array _get_files() const;
 	void _set_files(const Array &p_files);
 	PackedStringArray _get_removals() const;
@@ -130,8 +132,8 @@ public:
 	void set_encrypted_directory(bool p_encrypted);
 	bool is_encrypted_directory() const { return encrypted_directory; }
 
-	TypedArray<Dictionary> get_entries() const;
-	PackedStringArray get_paths() const;
+	TypedArray<PCKPackageEntry> get_entries() const;
+	PackedStringArray get_file_paths() const;
 	int get_file_count() const;
 	bool has_file(const String &p_path) const;
 
@@ -139,10 +141,44 @@ public:
 	Error add_file_from_buffer(const String &p_target_path, const Vector<uint8_t> &p_data, bool p_encrypt = false);
 	Error remove_file(const String &p_path);
 	Error rename_file(const String &p_from, const String &p_to);
-	Error mark_removal(const String &p_path);
+	Error add_removal(const String &p_path);
 
 	virtual Error copy_from(const Ref<Resource> &p_resource) override;
 	virtual void reload_from_file() override;
 };
 
-VARIANT_ENUM_CAST(PckPackage::SourceType);
+VARIANT_ENUM_CAST(PCKPackage::SourceType);
+
+// One entry of a `PCKPackage`, as listed by `PCKPackage::get_entries()`. A read-only snapshot: changing the
+// package afterwards does not change it.
+class PCKPackageEntry : public RefCounted {
+	GDCLASS(PCKPackageEntry, RefCounted);
+
+	friend class PCKPackage;
+
+	String path;
+	int64_t size = 0;
+	int64_t offset = 0;
+	String md5;
+	bool encrypted = false;
+	bool removal = false;
+	bool delta = false;
+	bool pending = false;
+	PCKPackage::SourceType source_type = PCKPackage::SOURCE_PACK;
+	String source;
+
+protected:
+	static void _bind_methods();
+
+public:
+	String get_path() const { return path; }
+	int64_t get_size() const { return size; }
+	int64_t get_offset() const { return offset; }
+	String get_md5() const { return md5; }
+	bool is_encrypted() const { return encrypted; }
+	bool is_removal() const { return removal; }
+	bool is_delta() const { return delta; }
+	bool is_pending() const { return pending; }
+	PCKPackage::SourceType get_source_type() const { return source_type; }
+	String get_source() const { return source; }
+};

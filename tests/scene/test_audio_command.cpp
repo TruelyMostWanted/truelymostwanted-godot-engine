@@ -124,11 +124,11 @@ static Ref<AudioCommandList> make_mixed_list() {
 	volume->set_volume_db(-12.5f);
 	volume->set_fade_time(0.0f);
 	list->add_command(volume);
-	Ref<AudioCommand> jump = make_command("track_3", AudioCommand::COMMAND_CHANGE_INDEX, "music");
+	Ref<AudioCommand> jump = make_command("track_3", AudioCommand::COMMAND_SET_QUEUE_INDEX, "music");
 	jump->set_queue_index(3);
 	jump->set_loop_mode(AudioCommand::LOOP_MODE_OFF);
 	list->add_command(jump);
-	Ref<AudioCommand> clip = make_command("battle", AudioCommand::COMMAND_SWITCH_CLIP, "music");
+	Ref<AudioCommand> clip = make_command("battle", AudioCommand::COMMAND_SWITCH_TO_CLIP, "music");
 	clip->set_clip_name("Battle");
 	clip->set_position(1.25f);
 	clip->set_pitch_scale(1.5f);
@@ -235,7 +235,7 @@ TEST_CASE("[AudioCommand] Registering, collisions and unregistering") {
 	base.instantiate();
 	Ref<AudioCommand> base_stop = make_command("stop_music", AudioCommand::COMMAND_STOP, "music");
 	base->add_command(base_stop);
-	base->add_command(make_command("next_track", AudioCommand::COMMAND_NEXT, "music"));
+	base->add_command(make_command("next_track", AudioCommand::COMMAND_PLAY_NEXT, "music"));
 	base->add_command(make_command(StringName(), AudioCommand::COMMAND_STOP, "ambience"));
 	CHECK(mixer->register_commands(base) == OK);
 	CHECK(mixer->has_command("stop_music"));
@@ -308,7 +308,7 @@ TEST_CASE("[Audio][AudioCommand] Queue commands without playback") {
 	CHECK(mixer->execute(make_command("clear", AudioCommand::COMMAND_CLEAR, "music")) == OK);
 	CHECK(mixer->get_queue("music").is_empty());
 	ERR_PRINT_OFF;
-	CHECK(mixer->execute(make_command("next", AudioCommand::COMMAND_NEXT, "music")) == ERR_DOES_NOT_EXIST);
+	CHECK(mixer->execute(make_command("next", AudioCommand::COMMAND_PLAY_NEXT, "music")) == ERR_DOES_NOT_EXIST);
 	ERR_PRINT_ON;
 
 	DirAccess::remove_absolute(track_a);
@@ -393,7 +393,7 @@ TEST_CASE("[Audio][AudioCommand] A group starts all ambience commands") {
 	CHECK(mixer->is_playing("wind"));
 	CHECK(mixer->is_playing("river"));
 	CHECK_FALSE(mixer->is_playing("traffic"));
-	CHECK(mixer->get_channel("birds")->is_loop_entry());
+	CHECK(mixer->get_channel("birds")->is_loop_current_entry());
 
 	// The whole list at once.
 	Ref<AudioCommandList> stop_all;
@@ -424,8 +424,8 @@ TEST_CASE("[Audio][AudioCommand] An invalid command fails alone") {
 	CHECK(mixer->execute(make_command("no_channel", AudioCommand::COMMAND_STOP, StringName())) == ERR_INVALID_PARAMETER);
 	CHECK(mixer->execute(make_command("one_shot", AudioCommand::COMMAND_PLAY_ONE_SHOT, "sfx")) == ERR_INVALID_PARAMETER);
 	CHECK(mixer->execute(make_command("seek", AudioCommand::COMMAND_SEEK, "sfx")) == ERR_UNAVAILABLE);
-	CHECK(mixer->execute(make_command("clip", AudioCommand::COMMAND_SWITCH_CLIP, "music")) == ERR_INVALID_PARAMETER);
-	Ref<AudioCommand> clip = make_command("clip", AudioCommand::COMMAND_SWITCH_CLIP, "music");
+	CHECK(mixer->execute(make_command("clip", AudioCommand::COMMAND_SWITCH_TO_CLIP, "music")) == ERR_INVALID_PARAMETER);
+	Ref<AudioCommand> clip = make_command("clip", AudioCommand::COMMAND_SWITCH_TO_CLIP, "music");
 	clip->set_clip_name("Battle");
 	CHECK(mixer->execute(clip) == ERR_UNAVAILABLE); // A WAV is not an AudioStreamInteractive.
 	Ref<AudioCommand> pitch = make_command("pitch", AudioCommand::COMMAND_SET_PITCH, "music");

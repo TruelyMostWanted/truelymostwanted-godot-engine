@@ -91,8 +91,10 @@ void AudioBusSettingsServer::_apply_settings(const Ref<Resource> &p_settings, co
 	if (audio_server == nullptr || !p_names.has(String(property))) {
 		return;
 	}
+	_connect_audio_server();
 	const Array buses = p_settings->get(property);
 	PackedStringArray missing;
+	pushing_buses = true;
 	for (int i = 0; i < buses.size(); i++) {
 		const Ref<Resource> entry = buses[i];
 		if (entry.is_null()) {
@@ -120,16 +122,18 @@ void AudioBusSettingsServer::_apply_settings(const Ref<Resource> &p_settings, co
 		audio_server->set_bus_mute(bus, entry->get(SNAME("mute")));
 		audio_server->set_bus_solo(bus, entry->get(SNAME("solo")));
 	}
+	pushing_buses = false;
 	if (!missing.is_empty()) {
 		WARN_PRINT(vformat("Audio bus settings: the bus layout has no bus %s; the stored values are kept but not applied. Enable the project setting \"%s\" to create them.", String(", ").join(missing), SETTING_CREATE_MISSING_BUSES));
 	}
 }
 
-void AudioBusSettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
+void AudioBusSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	const AudioServer *audio_server = AudioServer::get_singleton();
 	if (audio_server == nullptr) {
 		return;
 	}
+	_connect_audio_server();
 	TypedArray<AudioBusSettings> buses;
 	for (int i = 0; i < audio_server->get_bus_count(); i++) {
 		buses.push_back(_make_entry_from_engine(i));
@@ -175,6 +179,34 @@ void AudioBusSettingsServer::_merge_layout_buses() {
 	if (!values_equal(merged, current)) {
 		pending->set(property, merged);
 	}
+}
+
+void AudioBusSettingsServer::_connect_audio_server() {
+	// AudioServer does not exist yet when this server is constructed: connected on the first read or apply (startup).
+	AudioServer *audio_server = AudioServer::get_singleton();
+	if (audio_server == nullptr) {
+		return;
+	}
+	const Callable callback = callable_mp(this, &AudioBusSettingsServer::_on_bus_layout_changed);
+	if (!audio_server->is_connected(SNAME("bus_layout_changed"), callback)) {
+		audio_server->connect(SNAME("bus_layout_changed"), callback);
+	}
+}
+
+void AudioBusSettingsServer::_on_bus_layout_changed() {
+	// A new layout (set_bus_layout(), add_bus(), remove_bus(), ...) resets the bus values: the applied values are
+	// pushed again. Before startup the layout becomes the defaults instead; buses added by _apply_settings() itself
+	// (create_missing_buses) are skipped, so the startup apply does not run twice.
+	if (pushing_buses || !is_started()) {
+		return;
+	}
+	const Ref<Resource> applied_settings = get_applied_settings();
+	if (applied_settings.is_null()) {
+		return;
+	}
+	PackedStringArray names;
+	names.push_back(get_list_property());
+	_apply_settings(applied_settings, names);
 }
 
 /////////////////////////////////////////////////////////////////////////////

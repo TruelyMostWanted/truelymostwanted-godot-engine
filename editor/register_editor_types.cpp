@@ -50,8 +50,11 @@
 #include "editor/export/editor_export_platform_extension.h"
 #include "editor/export/editor_export_platform_pc.h"
 #include "editor/export/editor_export_plugin.h"
+#include "editor/export/pck_export_plugin.h"
+#include "editor/export/pck_package_exporter.h"
 #include "editor/export/register_exporters.h"
 #include "editor/export/streaming_assets_export_plugin.h"
+#include "editor/export/streaming_assets_pack_builder.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -79,6 +82,7 @@
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
+#include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
 #include "editor/inspector/tool_button_editor_plugin.h"
 #include "editor/plugins/pck_extract_editor_plugin.h"
@@ -124,8 +128,8 @@
 #include "editor/scene/sprite_frames_editor_plugin.h"
 #include "editor/scene/texture/bit_map_editor_plugin.h"
 #include "editor/scene/texture/gradient_texture_2d_editor_plugin.h"
+#include "editor/scene/texture/sprite_sheet_editor_plugin.h"
 #include "editor/scene/texture/texture_3d_editor_plugin.h"
-#include "editor/scene/texture/texture_atlas_editor_plugin.h"
 #include "editor/scene/texture/texture_editor_plugin.h"
 #include "editor/scene/texture/texture_layered_editor_plugin.h"
 #include "editor/scene/texture/texture_region_editor_plugin.h"
@@ -183,6 +187,8 @@ void register_editor_types() {
 	GDREGISTER_CLASS(EditorExportPlatformExtension);
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsPackBuilder);
+	GDREGISTER_ABSTRACT_CLASS(PCKPackageExporter);
 
 	register_exporter_types();
 
@@ -247,7 +253,9 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<MarginContainerEditorPlugin>();
 	EditorPlugins::add_by_type<MaterialEditorPlugin>();
 	EditorPlugins::add_by_type<PackedSceneEditorPlugin>();
-	EditorPlugins::add_by_type<PckExtractEditorPlugin>();
+	EditorPlugins::add_by_type<PCKExtractEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageExporterEditorPlugin>();
 	EditorPlugins::add_by_type<ResourcePreloaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderFileEditorPlugin>();
@@ -258,7 +266,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<TextureEditorPlugin>();
 	EditorPlugins::add_by_type<TextureLayeredEditorPlugin>();
 	EditorPlugins::add_by_type<TextureRegionEditorPlugin>();
-	EditorPlugins::add_by_type<TextureAtlasEditorPlugin>();
+	EditorPlugins::add_by_type<SpriteSheetEditorPlugin>();
 	EditorPlugins::add_by_type<ThemeEditorPlugin>();
 	EditorPlugins::add_by_type<ToolButtonEditorPlugin>();
 	EditorPlugins::add_by_type<VirtualJoystickEditorPlugin>();

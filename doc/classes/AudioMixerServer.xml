@@ -5,9 +5,10 @@
 	</brief_description>
 	<description>
 		[AudioMixerServer] plays audio on named channels (for example [code]music[/code], [code]ambience[/code], [code]voice[/code] and [code]sfx[/code]) without nodes, so music keeps playing across [method SceneTree.change_scene_to_file] and the pause menu. Each channel is defined by an [AudioMixerChannel], plays on an existing audio bus, has a queue of streams with a cursor, and supports fades, cross-fades and overlapping one-shots.
-		Channels come from the [AudioMixerLayout] set in the project setting [code]audio/mixer/default_layout[/code] (loaded on first use), from [method load_layout] or from [method add_channel].
+		Channels come from the [AudioMixerLayout] set in the project setting [code]audio/mixer/default_layout[/code] (loaded on first use), from [method apply_layout] or from [method add_channel].
 		Streams can be given as an [AudioStream] or as a path. Queue entries given as a path are loaded when they start and released when they no longer play, so only the current entry (and, with [member AudioMixerChannel.preload_next], the next one) is kept in memory.
 		The volume of a voice is its fade gain (see [method get_fade_gain]) times the channel volume (see [method set_channel_volume_db]) times the volume of its bus. The mixer never changes buses or bus volumes.
+		Channels can duck (lower their volume) while [TTSServer] speaks, so spoken text stays understandable over music: enable [member AudioMixerChannel.duck_on_tts] and set [member AudioMixerChannel.duck_volume_db] and [member AudioMixerChannel.duck_fade_time]. The channels stay ducked until the last utterance ends or is canceled. [method duck] and [method unduck] do the same by hand, for dialog that plays as normal audio. The ducking offset is added to the channel volume, so a [method fade_out] during ducking still ends at silence.
 		[codeblocks]
 		[gdscript]
 		func _ready():
@@ -24,7 +25,7 @@
 			AudioMixerServer.play(&amp;"music")
 
 		func _on_level_started():
-			AudioMixerServer.next(&amp;"music") # Cross-fades for 2 seconds.
+			AudioMixerServer.play_next(&amp;"music") # Cross-fades for 2 seconds.
 
 		func _on_channel_started(channel, index, stream_path):
 			print("%s plays entry %d: %s" % [channel, index, stream_path])
@@ -47,7 +48,7 @@
 
 		private void OnLevelStarted()
 		{
-			AudioMixerServer.Next("music"); // Cross-fades for 2 seconds.
+			AudioMixerServer.PlayNext("music"); // Cross-fades for 2 seconds.
 		}
 
 		private void OnChannelStarted(StringName channel, long index, string streamPath)
@@ -71,13 +72,11 @@
 				Adds [param channel] under its [member AudioMixerChannel.channel_name]. If a channel with that name exists, its definition is replaced; its voices keep playing with the new volume and pitch, and its queue is kept.
 			</description>
 		</method>
-		<method name="change_index">
+		<method name="apply_layout">
 			<return type="void" />
-			<param index="0" name="channel" type="StringName" />
-			<param index="1" name="index" type="int" />
-			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<param index="0" name="layout" type="AudioMixerLayout" />
 			<description>
-				Moves the queue cursor of [param channel] to [param index]. If the channel is playing, it cross-fades (with [constant FADE_CURVE_EQUAL_POWER]) to that entry over [param fade_time] seconds; a negative [param fade_time] uses [member AudioMixerChannel.default_fade_time], [code]0.0[/code] switches at once. If the channel is not playing, only the cursor moves and [method play] starts there.
+				Stops and removes all channels, then adds the channels of [param layout].
 			</description>
 		</method>
 		<method name="clear_queue">
@@ -102,7 +101,31 @@
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="index" type="int" default="-1" />
 			<description>
-				Removes the queue entry at [param index] of [param channel], or the last entry if [param index] is negative. If the removed entry is the current one, it keeps playing, and the cursor moves to the entry before it, so [method next] plays the entry that followed.
+				Removes the queue entry at [param index] of [param channel], or the last entry if [param index] is negative. If the removed entry is the current one, it keeps playing, and the cursor moves to the entry before it, so [method play_next] plays the entry that followed.
+			</description>
+		</method>
+		<method name="duck">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="volume_db" type="float" />
+			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Lowers [param channel] by [param volume_db] decibels (clamped to [code]-80.0[/code] to [code]0.0[/code]) over [param fade_time] seconds until [method unduck] is called, for example while dialog plays as normal audio on another channel. A negative [param fade_time] uses [member AudioMixerChannel.duck_fade_time].
+				A manual duck and the duck while [TTSServer] speaks do not add up: the lower volume wins. Manual ducks do not depend on [method set_ducking_enabled].
+				[codeblocks]
+				[gdscript]
+				AudioMixerServer.duck(&amp;"music", -10.0)
+				AudioMixerServer.play(&amp;"voice", "res://dialog/intro.ogg")
+				await AudioMixerServer.channel_finished
+				AudioMixerServer.unduck(&amp;"music")
+				[/gdscript]
+				[csharp]
+				AudioMixerServer.Duck("music", -10.0f);
+				AudioMixerServer.Play("voice", "res://dialog/intro.ogg");
+				await ToSignal(AudioMixerServer.Singleton, AudioMixerServerInstance.SignalName.ChannelFinished);
+				AudioMixerServer.Unduck("music");
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="enqueue">
@@ -176,6 +199,13 @@
 				Fades the voices of [param channel] out over [param time] seconds and stops them at the end. One-shots stop at once. [method is_playing] returns [code]false[/code] from this call on. Emits [signal fade_finished] when the fade ends.
 			</description>
 		</method>
+		<method name="get_active_utterance_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of [TTSServer] utterances that have started and not yet ended or been canceled. While it is greater than [code]0[/code], channels with [member AudioMixerChannel.duck_on_tts] are ducked.
+				If the operating system loses the end event of an utterance, the mixer treats all utterances as finished after [TTSServer] has reported no speech for one second.
+			</description>
+		</method>
 		<method name="get_channel" qualifiers="const">
 			<return type="AudioMixerChannel" />
 			<param index="0" name="channel" type="StringName" />
@@ -216,18 +246,18 @@
 				Returns the names of all registered commands, in the order they were registered. Commands without a name are registered too (for [method execute_group]) but are not listed.
 			</description>
 		</method>
+		<method name="get_duck_volume_db" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the current ducking offset of [param channel] in decibels: [code]0.0[/code] when not ducked, the target offset when ducked, and the value in between while the duck fades.
+			</description>
+		</method>
 		<method name="get_fade_gain" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="channel" type="StringName" />
 			<description>
 				Returns the fade gain of the current voice of [param channel], from [code]0.0[/code] (silent) to [code]1.0[/code] (full volume), or [code]0.0[/code] if it is not playing.
-			</description>
-		</method>
-		<method name="get_index" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="channel" type="StringName" />
-			<description>
-				Returns the queue cursor of [param channel]: the index of the current or last played entry, or [code]-1[/code] if no entry has played yet.
 			</description>
 		</method>
 		<method name="get_playback_position" qualifiers="const">
@@ -242,6 +272,13 @@
 			<param index="0" name="channel" type="StringName" />
 			<description>
 				Returns the paths of the queue entries of [param channel]. Entries added as an [AudioStream] without a path are returned as empty strings.
+			</description>
+		</method>
+		<method name="get_queue_index" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the queue cursor of [param channel]: the index of the current or last played entry, or [code]-1[/code] if no entry has played yet.
 			</description>
 		</method>
 		<method name="get_voice_count" qualifiers="const">
@@ -265,6 +302,19 @@
 				Returns [code]true[/code] if a command named [param command_name] is registered.
 			</description>
 		</method>
+		<method name="is_ducked" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param channel] is ducked, either by [method duck] or because [TTSServer] speaks and [member AudioMixerChannel.duck_on_tts] is enabled. The volume may still be fading, see [method get_duck_volume_db].
+			</description>
+		</method>
+		<method name="is_ducking_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if channels are ducked while [TTSServer] speaks. See [method set_ducking_enabled].
+			</description>
+		</method>
 		<method name="is_fading" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="channel" type="StringName" />
@@ -286,21 +336,6 @@
 				Returns [code]true[/code] if [param channel] has a current voice, also while it is paused. Voices that fade out and one-shots do not count.
 			</description>
 		</method>
-		<method name="load_layout">
-			<return type="void" />
-			<param index="0" name="layout" type="AudioMixerLayout" />
-			<description>
-				Stops and removes all channels, then adds the channels of [param layout].
-			</description>
-		</method>
-		<method name="next">
-			<return type="void" />
-			<param index="0" name="channel" type="StringName" />
-			<param index="1" name="fade_time" type="float" default="-1.0" />
-			<description>
-				Moves to the next queue entry of [param channel] like [method change_index]. At the last entry, it starts again at the first one in [constant AudioMixerChannel.QUEUE_MODE_LOOP_QUEUE], picks a random other entry in [constant AudioMixerChannel.QUEUE_MODE_SHUFFLE], and does nothing in [constant AudioMixerChannel.QUEUE_MODE_STOP].
-			</description>
-		</method>
 		<method name="pause">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -317,6 +352,14 @@
 				Plays on [param channel] from [param from_position] seconds and stops the voices playing there. If [param stream] is [code]null[/code], plays the queue entry at the cursor (or the first entry); otherwise plays [param stream] (an [AudioStream] or a path) directly, without changing the queue. Resumes a paused channel. Emits [signal channel_started].
 			</description>
 		</method>
+		<method name="play_next">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Moves to the next queue entry of [param channel] like [method set_queue_index]. At the last entry, it starts again at the first one in [constant AudioMixerChannel.QUEUE_MODE_LOOP_QUEUE], picks a random other entry in [constant AudioMixerChannel.QUEUE_MODE_SHUFFLE], and does nothing in [constant AudioMixerChannel.QUEUE_MODE_STOP].
+			</description>
+		</method>
 		<method name="play_one_shot">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -324,15 +367,15 @@
 			<param index="2" name="volume_db" type="float" default="0.0" />
 			<param index="3" name="pitch_scale" type="float" default="1.0" />
 			<description>
-				Plays [param stream] (an [AudioStream] or a path) once on [param channel], next to the current voice, with an extra volume and pitch. At most [member AudioMixerChannel.polyphony] one-shots play at a time; the oldest one is stopped when another starts. One-shots emit no signals.
+				Plays [param stream] (an [AudioStream] or a path) once on [param channel], next to the current voice, with an extra volume and pitch. At most [member AudioMixerChannel.max_polyphony] one-shots play at a time; the oldest one is stopped when another starts. One-shots emit no signals.
 			</description>
 		</method>
-		<method name="previous">
+		<method name="play_previous">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="fade_time" type="float" default="-1.0" />
 			<description>
-				Moves to the previous queue entry of [param channel] like [method change_index]. At the first entry, it moves to the last one, except in [constant AudioMixerChannel.QUEUE_MODE_STOP], where it does nothing.
+				Moves to the previous queue entry of [param channel] like [method set_queue_index]. At the first entry, it moves to the last one, except in [constant AudioMixerChannel.QUEUE_MODE_STOP], where it does nothing.
 			</description>
 		</method>
 		<method name="register_commands">
@@ -392,6 +435,22 @@
 				Sets the volume of [param channel] in decibels, at once or, if [param fade_time] is greater than [code]0.0[/code], linearly in decibels over [param fade_time] seconds. Emits [signal fade_finished] when a fade ends. The volume of the bus is not changed.
 			</description>
 		</method>
+		<method name="set_ducking_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Enables or disables ducking while [TTSServer] speaks for all channels (enabled by default), for example from an accessibility option. Disabling it restores the ducked channels with their [member AudioMixerChannel.duck_fade_time]. Utterances are still counted, so enabling it again during speech ducks at once. Manual ducks from [method duck] are not affected.
+			</description>
+		</method>
+		<method name="set_queue_index">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="index" type="int" />
+			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Moves the queue cursor of [param channel] to [param index]. If the channel is playing, it cross-fades (with [constant FADE_CURVE_EQUAL_POWER]) to that entry over [param fade_time] seconds; a negative [param fade_time] uses [member AudioMixerChannel.default_fade_time], [code]0.0[/code] switches at once. If the channel is not playing, only the cursor moves and [method play] starts there.
+			</description>
+		</method>
 		<method name="stop">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -407,12 +466,21 @@
 				Calls [method stop] on all channels.
 			</description>
 		</method>
-		<method name="switch_clip">
+		<method name="switch_to_clip">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
 			<param index="1" name="clip" type="StringName" />
 			<description>
 				Switches the current voice of [param channel] to the clip named [param clip], if the voice plays an [AudioStreamInteractive] (module [code]interactive_music[/code]). Prints an error for other streams.
+			</description>
+		</method>
+		<method name="unduck">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Ends a manual duck of [param channel] started with [method duck] and restores its volume over [param fade_time] seconds. A negative [param fade_time] uses [member AudioMixerChannel.duck_fade_time]. If [TTSServer] still speaks and the channel ducks for speech, it stays ducked by [member AudioMixerChannel.duck_volume_db].
+				A voice that was faded out with [method fade_out] while ducked stays silent: ducking only offsets the volume and never restarts or raises a fade.
 			</description>
 		</method>
 		<method name="unregister_commands">
@@ -444,6 +512,13 @@
 			<param index="1" name="command" type="AudioCommand" />
 			<description>
 				Emitted after [param command] ran successfully through [method execute], [method execute_list], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
+			</description>
+		</signal>
+		<signal name="ducking_changed">
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="ducked" type="bool" />
+			<description>
+				Emitted when [param channel] becomes ducked ([param ducked] is [code]true[/code]) or is restored ([param ducked] is [code]false[/code]), at the start of the duck fade.
 			</description>
 		</signal>
 		<signal name="fade_finished">

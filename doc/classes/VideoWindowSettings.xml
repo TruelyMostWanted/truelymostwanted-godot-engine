@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoWindowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource for windows and display: mode, size, screen, V-Sync, content scale and HDR.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"video_window"[/code], which [VideoWindowSettingsServer] stores, loads and applies: mode, size, screen, position, window flags and V-Sync mode of the main window, the content scale of the root window, HDR output and the stored states of further windows.
+		Each property is one stored value; its default is the project setting it replaces. The enums are those of the engine ([enum DisplayServer.WindowMode], [enum DisplayServer.VSyncMode], [enum Window.ContentScaleMode], [enum Window.ContentScaleAspect], [enum Window.ContentScaleStretch]).
+		A [VideoWindowSettings] resource saved in [code]res://[/code] and named in the project setting [code]settings/defaults/video_window[/code] replaces the defaults, so a game can ship its own (for example fullscreen on the first start). Edit it in the Inspector like any resource.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="always_on_top" type="bool" setter="set_always_on_top" getter="is_always_on_top" default="false">
+			If [code]true[/code], the main window stays above other windows ([constant DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP]). The default is [member ProjectSettings.display/window/size/always_on_top].
+		</member>
+		<member name="borderless" type="bool" setter="set_borderless" getter="is_borderless" default="false">
+			If [code]true[/code], the main window has no title bar and no border ([constant DisplayServer.WINDOW_FLAG_BORDERLESS]). The default is [member ProjectSettings.display/window/size/borderless].
+		</member>
+		<member name="content_scale_aspect" type="int" setter="set_content_scale_aspect" getter="get_content_scale_aspect" enum="Window.ContentScaleAspect" default="0">
+			How the root window keeps the aspect ratio of the game when it is scaled ([member Window.content_scale_aspect]). The default is [member ProjectSettings.display/window/stretch/aspect]. Applied when the root window exists.
+		</member>
+		<member name="content_scale_factor" type="float" setter="set_content_scale_factor" getter="get_content_scale_factor" default="1.0">
+			Scale factor of the root window ([member Window.content_scale_factor]). The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped. The root window gets this factor times [member AccessibilitySettings.ui_scale] of [AccessibilitySettingsServer], the player's UI scale option.
+		</member>
+		<member name="content_scale_mode" type="int" setter="set_content_scale_mode" getter="get_content_scale_mode" enum="Window.ContentScaleMode" default="0">
+			How the root window scales the game to the window size ([member Window.content_scale_mode]). The default is [member ProjectSettings.display/window/stretch/mode].
+		</member>
+		<member name="content_scale_stretch" type="int" setter="set_content_scale_stretch" getter="get_content_scale_stretch" enum="Window.ContentScaleStretch" default="0">
+			Whether the root window scales by fractional or by integer factors ([member Window.content_scale_stretch]). The default is [member ProjectSettings.display/window/stretch/scale_mode].
+		</member>
+		<member name="hdr_max_luminance" type="float" setter="set_hdr_max_luminance" getter="get_hdr_max_luminance" default="-1.0">
+			Maximum luminance in nits for HDR output of the main window ([method DisplayServer.window_set_hdr_output_max_luminance]). [code]-1.0[/code] (the default) uses the value of the screen; negative values become [code]-1.0[/code].
+		</member>
+		<member name="hdr_output_requested" type="bool" setter="set_hdr_output_requested" getter="is_hdr_output_requested" default="false">
+			If [code]true[/code], the main window requests HDR output ([member Window.hdr_output_requested]). The default is [member ProjectSettings.display/window/hdr/request_hdr_output]. Applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the project value. Whether HDR is used depends on the platform, the driver and the screen; see [method SettingsServer.is_value_supported].
+		</member>
+		<member name="hdr_reference_luminance" type="float" setter="set_hdr_reference_luminance" getter="get_hdr_reference_luminance" default="-1.0">
+			Reference (paper white) luminance in nits for HDR output of the main window ([method DisplayServer.window_set_hdr_output_reference_luminance]). [code]-1.0[/code] (the default) uses the value of the screen; negative values become [code]-1.0[/code].
+		</member>
+		<member name="screen" type="int" setter="set_screen" getter="get_screen" default="-2">
+			The screen of the main window, an index from [code]0[/code] to [method DisplayServer.get_screen_count] minus one, or [constant DisplayServer.SCREEN_PRIMARY] (the default). If the screen does not exist when the window is placed (for example a monitor that was unplugged), the primary screen is used and the stored value stays. Values below [code]-2[/code] are clamped. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]).
+		</member>
+		<member name="transparent" type="bool" setter="set_transparent" getter="is_transparent" default="false">
+			If [code]true[/code], the main window has a transparent background ([constant DisplayServer.WINDOW_FLAG_TRANSPARENT]). Only applied if [member ProjectSettings.display/window/per_pixel_transparency/allowed] is enabled; the default is [member ProjectSettings.display/window/size/transparent].
+		</member>
+		<member name="unresizable" type="bool" setter="set_unresizable" getter="is_unresizable" default="false">
+			If [code]true[/code], the player can't resize the main window ([constant DisplayServer.WINDOW_FLAG_RESIZE_DISABLED]). The default is the opposite of [member ProjectSettings.display/window/size/resizable].
+		</member>
+		<member name="vsync_mode" type="int" setter="set_vsync_mode" getter="get_vsync_mode" enum="DisplayServer.VSyncMode" default="1">
+			The V-Sync mode of the main window ([method DisplayServer.window_set_vsync_mode]). The default is [member ProjectSettings.display/window/vsync/vsync_mode]. The command line argument [code]--disable-vsync[/code] overrides it for the session.
+		</member>
+		<member name="window_centered" type="bool" setter="set_window_centered" getter="is_window_centered" default="true">
+			If [code]true[/code] (the default), the main window is centered in the usable area of its [member screen] in windowed mode, and [member window_position] is ignored.
+		</member>
+		<member name="window_mode" type="int" setter="set_window_mode" getter="get_window_mode" enum="DisplayServer.WindowMode" default="0">
+			The mode of the main window: windowed, maximized, fullscreen or exclusive fullscreen. The default is [member ProjectSettings.display/window/size/mode]. The main window is created in this mode, so there is no visible change when the game starts. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]). The command line arguments [code]--fullscreen[/code], [code]--maximized[/code] and [code]--windowed[/code] override it for the session.
+		</member>
+		<member name="window_position" type="Vector2i" setter="set_window_position" getter="get_window_position" default="Vector2i(0, 0)">
+			Position of the main window in windowed mode, relative to the top-left corner of its [member screen]. Only used if [member window_centered] is [code]false[/code]. The window is always moved back into the usable area of the screen, so it stays visible after a change of the monitors.
+		</member>
+		<member name="window_size" type="Vector2i" setter="set_window_size" getter="get_window_size" default="Vector2i(1152, 648)">
+			Size of the main window in windowed mode, in pixels. The default is [member ProjectSettings.display/window/size/viewport_width] and [member ProjectSettings.display/window/size/viewport_height] (or the window size overrides). The size is kept while the window is maximized or fullscreen and used again when it is windowed. It is limited to the usable area of the screen. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]). The command line argument [code]--resolution[/code] overrides it for the session.
+		</member>
+		<member name="window_states" type="Dictionary" setter="set_window_states" getter="get_window_states" default="{}">
+			The stored states of further windows, keyed by node path (or by a key of the game). Each value is a [Dictionary] with [code]mode[/code] ([enum Window.Mode]), [code]size[/code] and [code]position[/code] ([Vector2i]) and, for windows that are not embedded, [code skip-lint]screen[/code] (the position is then relative to that screen). Use [method VideoWindowSettingsServer.save_window_state] and [method VideoWindowSettingsServer.restore_window_state] instead of changing it directly.
+		</member>
+	</members>
+</class>
