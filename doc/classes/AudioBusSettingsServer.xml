@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="AudioBusSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings server for the volume, mute and solo values of the audio buses.
+		Settings server for the volume, mute and solo values that the player may change on the audio buses.
 	</brief_description>
 	<description>
-		[AudioBusSettingsServer] is the settings domain [code]"audio_buses"[/code]: it stores the volume, mute and solo values of the buses of [AudioServer] for the player, loads them when the game starts and applies them before the first sound plays (in [constant SettingsServer.APPLY_PHASE_SERVERS], right after the default bus layout is loaded and before the [SceneTree] exists, so no [AudioStreamPlayer] can start earlier).
-		The settings resource is an [AudioBusListSettings] with one [AudioBusSettings] entry per bus. Buses are identified by their name ([member AudioBusSettings.bus_name]), not by their index, so a game update that adds or reorders buses keeps the stored values. The defaults are the values of the bus layout when the game starts. Buses of the layout that have no stored entry yet (added by a game update) keep their layout values and are added to the list after loading. Stored buses that the layout does not have are skipped with a warning, or created if [member create_missing_buses] is [code]true[/code].
-		The file is [code]user://settings/audio_buses.ini[/code] by default. Because the settings resource holds nothing but the list, it can also be stored as CSV with one row per bus ([member ProjectSettings.settings/general/default_format], or the format of the domain group [code]settings/&lt;domain&gt;/[/code], set to [constant ResourceTextSerializer.FORMAT_CSV]). The output and input device are a separate domain, see [AudioDeviceSettingsServer].
-		All typed methods below go through [method ListSettingsServer.set_entry_value] or [method ListSettingsServer.add_entry]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change is applied to [AudioServer] at once and saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
-		A new bus layout at runtime ([method AudioServer.set_bus_layout], [method AudioServer.add_bus], [method AudioServer.remove_bus], [method AudioServer.move_bus], all of which emit [signal AudioServer.bus_layout_changed]) resets the values of the buses. Once [SettingsServerManager] has started the domain, the server listens to that signal and applies the applied values ([method SettingsServer.get_applied_settings]) of all stored buses again; with [member create_missing_buses], stored buses that the new layout does not have are added. Pending changes in [constant SettingsServer.APPLY_MODE_MANUAL] still wait for [method SettingsServer.apply]. A layout set before startup becomes the base of the defaults instead, and buses added by the startup apply itself do not trigger a second pass.
+		[AudioBusSettingsServer] is the settings domain [code]"audio_bus"[/code]: it stores the values that the player may change on the buses of [AudioServer], loads them when the game starts and applies them before the first sound plays (in [constant SettingsServer.APPLY_PHASE_SERVERS], right after the default bus layout is loaded and before the [SceneTree] exists, so no [AudioStreamPlayer] can start earlier).
+		The project's [AudioBusLayout] ([member ProjectSettings.audio/buses/default_bus_layout]) is the only source of the buses, their effects, their routing and their default values. The settings only change values on top of it:
+		- [b]Player buses:[/b] [member player_buses] (project setting [member ProjectSettings.settings/audio_bus/player_buses]) names the buses the player controls; if it is empty, all buses of the layout are player buses. Other buses (mix buses, sends) are never touched.
+		- [b]Stored values:[/b] [member store_volume], [member store_mute] and [member store_solo] (project settings [code]settings/audio_bus/store_*[/code]; volume and mute on, solo off) decide which values are saved, loaded, applied, emitted as signals and settable. A value that is not stored is not written to the file, a value of the file that is not stored (any more) is ignored, and the setter prints a warning. A stored value that a file does not have (for example after the project turned on [member store_solo]) comes from the layout.
+		The settings resource is an [AudioBusListSettings] with one [AudioBusSettings] entry per player bus, in the order of the layout. The defaults are the values of the layout when the game starts; the project setting [code]settings/defaults/audio_bus[/code] is not used for this domain. Buses are identified by their name ([member AudioBusSettings.bus_name]), not by their index, so a game update that adds or reorders buses keeps the stored values; buses added by an update start with their layout values. A stored player bus that the layout does not have is skipped with one warning per bus and session, and its value stays in the settings file. [AudioServer] has no stable ids for buses: a bus that a game update renames loses the player's value.
+		The file is [code]user://settings/audio_bus.ini[/code] by default. It holds [AudioBusSettingsRows] with one [AudioBusSettingsRow] per bus, so it can also be stored as CSV with one line per bus and one column per stored value ([member ProjectSettings.settings/general/default_format], or [member ProjectSettings.settings/audio_bus/format] with [member ProjectSettings.settings/audio_bus/override_format], set to [constant ResourceTextSerializer.FORMAT_CSV]). The output and input device are a separate domain, see [AudioDeviceSettingsServer].
+		All typed setters go through [method ListSettingsServer.set_entry_value] or [method ListSettingsServer.add_entry]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change is applied to [AudioServer] at once and saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
+		A new bus layout at runtime ([method AudioServer.set_bus_layout], [method AudioServer.add_bus], [method AudioServer.remove_bus], [method AudioServer.move_bus], all of which emit [signal AudioServer.bus_layout_changed]) resets the values of the buses. Once [SettingsServerManager] has started the domain, the server listens to that signal and applies the applied values ([method SettingsServer.get_applied_settings]) of the player buses again; the other buses keep the mix of the new layout. Pending changes in [constant SettingsServer.APPLY_MODE_MANUAL] still wait for [method SettingsServer.apply]. A layout set before startup becomes the base of the defaults instead.
+		[b]Presets:[/b] an [AudioBusListSettings] saved in [code]res://[/code] is a preset, edited in the Inspector with a small mixer of the player buses. [method apply_preset] sets the stored values of the buses it lists; buses it does not list keep their values. [method get_current_preset] returns the preset while the values still match it; after a single change it returns [code]null[/code] and [method is_custom] returns [code]true[/code] ("Custom").
 		[codeblocks]
 		[gdscript]
 		# A volume slider from 0 to 100 %.
@@ -18,6 +22,11 @@
 		func _ready():
 			$MusicSlider.value = AudioBusSettingsServer.get_bus_volume_linear(&amp;"Music") * 100.0
 			$MuteCheck.button_pressed = AudioBusSettingsServer.is_bus_mute(&amp;"Master")
+
+		# A preset button and a "Custom" label.
+		func _on_night_mode_pressed():
+			AudioBusSettingsServer.apply_preset(load("res://audio/night_mode.tres"))
+			$PresetLabel.text = "Custom" if AudioBusSettingsServer.is_custom() else "Night mode"
 
 		# A menu with "Apply" and "Cancel".
 		func open_menu():
@@ -42,6 +51,13 @@
 		    GetNode&lt;CheckBox&gt;("MuteCheck").ButtonPressed = AudioBusSettingsServer.IsBusMute("Master");
 		}
 
+		// A preset button and a "Custom" label.
+		private void OnNightModePressed()
+		{
+		    AudioBusSettingsServer.ApplyPreset(GD.Load&lt;AudioBusListSettings&gt;("res://audio/night_mode.tres"));
+		    GetNode&lt;Label&gt;("PresetLabel").Text = AudioBusSettingsServer.IsCustom() ? "Custom" : "Night mode";
+		}
+
 		// A menu with "Apply" and "Cancel". Methods of the base classes are called through Singleton.
 		private void OpenMenu()
 		{
@@ -60,22 +76,28 @@
 		[/csharp]
 		[/codeblocks]
 		[b]Note:[/b] In C#, the static class [code skip-lint]AudioBusSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] and [ListSettingsServer] are called through [code]AudioBusSettingsServer.Singleton[/code].
-		[b]Note:[/b] [method AudioServer.set_bus_layout] replaces all bus values. If the game switches the bus layout at runtime, the stored values are not applied to the new layout automatically.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="apply_preset">
+			<return type="int" enum="Error" />
+			<param index="0" name="preset" type="AudioBusListSettings" />
+			<description>
+				Sets the stored values ([member store_volume], [member store_mute], [member store_solo]) of the player buses that [param preset] lists, in one change of the list: applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE]. Buses that the preset does not list, values that are not stored and buses that are not player buses keep their values. The preset becomes the current preset, see [method get_current_preset]. Returns [constant ERR_INVALID_PARAMETER] if [param preset] is [code]null[/code].
+			</description>
+		</method>
 		<method name="get_bus_names" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the names of all buses that have an entry, in the order of the list: the buses of the layout first, then stored buses that the layout does not have.
+				Returns the names of all buses that have an entry, in the order of the list: the player buses of the layout first, then stored player buses that the layout does not have.
 			</description>
 		</method>
 		<method name="get_bus_volume_db" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="bus" type="StringName" />
 			<description>
-				Returns the pending volume of the bus [param bus] in decibels. For a bus of the layout without an entry, returns its value in [AudioServer]. Reports an error and returns [code]0.0[/code] if there is no such bus.
+				Returns the pending volume of the bus [param bus] in decibels. If the volume is not stored ([member store_volume]), this is the value of the layout. For a bus of the layout without an entry, returns its value in [AudioServer]. Reports an error and returns [code]0.0[/code] if there is no such bus.
 			</description>
 		</method>
 		<method name="get_bus_volume_linear" qualifiers="const">
@@ -85,25 +107,51 @@
 				Returns the pending volume of the bus [param bus] as a linear value: [code]1.0[/code] is 0 dB (100 %), [code]0.0[/code] is silence (-80 dB or lower). Useful for sliders in percent.
 			</description>
 		</method>
+		<method name="get_current_preset" qualifiers="const">
+			<return type="AudioBusListSettings" />
+			<description>
+				Returns the preset of the last [method apply_preset] call while the pending values still match it (see [method matches_preset]); otherwise [code]null[/code]. The current preset is not saved: after a restart it is [code]null[/code] until a preset is applied again.
+			</description>
+		</method>
 		<method name="has_bus" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bus" type="StringName" />
 			<description>
-				Returns [code]true[/code] if the bus [param bus] has an entry or exists in the current bus layout of [AudioServer], that is, if its values can be set.
+				Returns [code]true[/code] if the bus [param bus] has an entry or exists in the current bus layout of [AudioServer].
 			</description>
 		</method>
 		<method name="is_bus_mute" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bus" type="StringName" />
 			<description>
-				Returns [code]true[/code] if the bus [param bus] is muted in the pending settings.
+				Returns [code]true[/code] if the bus [param bus] is muted in the pending settings. If the mute state is not stored ([member store_mute]), this is the value of the layout.
 			</description>
 		</method>
 		<method name="is_bus_solo" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bus" type="StringName" />
 			<description>
-				Returns [code]true[/code] if the bus [param bus] is in solo mode in the pending settings.
+				Returns [code]true[/code] if the bus [param bus] is in solo mode in the pending settings. If the solo state is not stored ([member store_solo]), this is the value of the layout.
+			</description>
+		</method>
+		<method name="is_custom" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if no preset is current: no preset was applied, or a value was changed after [method apply_preset] and the values no longer match the preset. A menu shows "Custom" then.
+			</description>
+		</method>
+		<method name="is_player_bus" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bus" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the player controls the bus [param bus]: [member player_buses] is empty or contains it. Returns [code]false[/code] for an empty name.
+			</description>
+		</method>
+		<method name="matches_preset" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="preset" type="AudioBusListSettings" />
+			<description>
+				Returns [code]true[/code] if the pending values of the player buses that [param preset] lists are equal to the preset's values. Only stored values are compared; buses without an entry are skipped. Use it to find out which of several presets the current values match.
 			</description>
 		</method>
 		<method name="set_bus_mute">
@@ -111,7 +159,7 @@
 			<param index="0" name="bus" type="StringName" />
 			<param index="1" name="mute" type="bool" />
 			<description>
-				Mutes or unmutes the bus [param bus]. Reports an error if the bus has no entry and does not exist in the bus layout.
+				Mutes or unmutes the bus [param bus]. Prints a warning and does nothing if the mute state is not stored ([member store_mute]) or [param bus] is not a player bus. Reports an error if the bus has no entry and does not exist in the bus layout.
 			</description>
 		</method>
 		<method name="set_bus_solo">
@@ -119,7 +167,7 @@
 			<param index="0" name="bus" type="StringName" />
 			<param index="1" name="solo" type="bool" />
 			<description>
-				Sets the solo mode of the bus [param bus]. Reports an error if the bus has no entry and does not exist in the bus layout.
+				Sets the solo mode of the bus [param bus]. Prints a warning and does nothing if the solo state is not stored ([member store_solo], off by default) or [param bus] is not a player bus. Reports an error if the bus has no entry and does not exist in the bus layout.
 			</description>
 		</method>
 		<method name="set_bus_volume_db">
@@ -127,7 +175,7 @@
 			<param index="0" name="bus" type="StringName" />
 			<param index="1" name="volume_db" type="float" />
 			<description>
-				Sets the volume of the bus [param bus] in decibels, clamped to -80 dB … 24 dB (the range of the bus slider in the editor). If the bus exists in the layout but has no entry yet, an entry with its current values is added first. Reports an error if the bus has no entry and does not exist in the bus layout.
+				Sets the volume of the bus [param bus] in decibels, clamped to -80 dB … 24 dB (the range of the bus slider in the editor). If the bus exists in the layout but has no entry yet (a layout set by the game), an entry with its layout values is added first. Prints a warning and does nothing if the volume is not stored ([member store_volume]) or [param bus] is not a player bus. Reports an error if the bus has no entry and does not exist in the bus layout.
 			</description>
 		</method>
 		<method name="set_bus_volume_linear">
@@ -140,35 +188,44 @@
 		</method>
 	</methods>
 	<members>
-		<member name="create_missing_buses" type="bool" setter="set_create_missing_buses" getter="is_create_missing_buses_enabled">
-			If [code]true[/code], a stored bus that the bus layout does not have is added to [AudioServer] at the end of the layout when the values are applied. If [code]false[/code], it is skipped with one warning per bus and session; its entry stays in the settings and in the file. Initialized from [member ProjectSettings.settings/audio/create_missing_buses] when the server is created, so the startup uses the project setting.
+		<member name="player_buses" type="PackedStringArray" setter="set_player_buses" getter="get_player_buses">
+			The buses the player controls. If empty, all buses of the layout. Only these buses have entries and get the stored values; other buses keep the values of the layout. Initialized from [member ProjectSettings.settings/audio_bus/player_buses] when the server is created, so the startup uses the project setting. A change takes effect on the next load or apply.
+		</member>
+		<member name="store_mute" type="bool" setter="set_store_mute" getter="is_storing_mute">
+			If [code]true[/code], the mute state of the player buses is saved, loaded, applied, emitted with [signal bus_mute_changed] and settable with [method set_bus_mute]. Initialized from [member ProjectSettings.settings/audio_bus/store_mute] when the server is created. A change takes effect on the next load, save or apply.
+		</member>
+		<member name="store_solo" type="bool" setter="set_store_solo" getter="is_storing_solo">
+			If [code]true[/code], the solo state of the player buses is saved, loaded, applied, emitted with [signal bus_solo_changed] and settable with [method set_bus_solo]. Initialized from [member ProjectSettings.settings/audio_bus/store_solo] (off by default) when the server is created. A change takes effect on the next load, save or apply.
+		</member>
+		<member name="store_volume" type="bool" setter="set_store_volume" getter="is_storing_volume">
+			If [code]true[/code], the volume of the player buses is saved, loaded, applied, emitted with [signal bus_volume_changed] and settable with [method set_bus_volume_db]. Initialized from [member ProjectSettings.settings/audio_bus/store_volume] when the server is created. A change takes effect on the next load, save or apply.
 		</member>
 	</members>
 	<signals>
 		<signal name="bus_layout_changed">
 			<description>
-				Emitted when the list of buses changed: after [AudioServer] got a new bus layout ([method AudioServer.set_bus_layout], [method AudioServer.add_bus], [method AudioServer.remove_bus], ...) and the stored values were pushed to it again, or when applied settings name other buses than before (for example a loaded file from another game version). Use it to rebuild an audio options menu with one slider per bus ([method get_bus_names]).
+				Emitted when the list of buses changed: after [AudioServer] got a new bus layout ([method AudioServer.set_bus_layout], [method AudioServer.add_bus], [method AudioServer.remove_bus], ...) and the stored values of the player buses were pushed to it again, or when applied settings name other buses than before (for example a loaded file from another game version). Use it to rebuild an audio options menu with one slider per bus ([method get_bus_names]).
 			</description>
 		</signal>
 		<signal name="bus_mute_changed">
 			<param index="0" name="bus_name" type="StringName" />
 			<param index="1" name="muted" type="bool" />
 			<description>
-				Emitted when the mute state of the bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+				Emitted when the mute state of the player bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], for buses that the bus layout does not have, or if [member store_mute] is [code]false[/code].
 			</description>
 		</signal>
 		<signal name="bus_solo_changed">
 			<param index="0" name="bus_name" type="StringName" />
 			<param index="1" name="solo" type="bool" />
 			<description>
-				Emitted when the solo state of the bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+				Emitted when the solo state of the player bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], for buses that the bus layout does not have, or if [member store_solo] is [code]false[/code] (the default).
 			</description>
 		</signal>
 		<signal name="bus_volume_changed">
 			<param index="0" name="bus_name" type="StringName" />
 			<param index="1" name="volume_db" type="float" />
 			<description>
-				Emitted when the volume of the bus [param bus_name] reached [AudioServer], in decibels. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+				Emitted when the volume of the player bus [param bus_name] reached [AudioServer], in decibels. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], for buses that the bus layout does not have, or if [member store_volume] is [code]false[/code].
 				Use it to update a volume label or to play a short sound at the new volume, for example on the [code]"Master"[/code] bus.
 			</description>
 		</signal>
