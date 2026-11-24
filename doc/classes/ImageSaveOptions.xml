@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ImageSaveOptions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Encoder options for saving an [ImageTexture] or an [Image] to an image file with [method ResourceSaver.save].
+	</brief_description>
+	<description>
+		[method ResourceSaver.save] writes an [ImageTexture] or an [Image] to .png, .jpg, .jpeg, .webp, .exr and .dds files. Its flags cannot carry encoder settings, so they are set in an [ImageSaveOptions] that is attached to the saved resource with [method attach_to]. Without attached options, the defaults of [method Image.save_jpg], [method Image.save_webp] and [method Image.save_exr] are used. PNG and DDS have no options.
+		The options are stored as metadata on the resource (key [code]image_save_options[/code]). They are not shared between resources and not global, so saving from several threads at once is safe. If the resource itself is saved as [code].tres[/code] or [code].res[/code], the attached options are saved with it.
+		[codeblocks]
+		[gdscript]
+		var image = Image.create_empty(64, 64, false, Image.FORMAT_RGBA8)
+		image.fill(Color.CORNFLOWER_BLUE)
+		var texture = ImageTexture.create_from_image(image)
+
+		var options = ImageSaveOptions.new()
+		options.webp_lossy = true
+		options.webp_quality = 0.8
+		options.attach_to(texture)
+		ResourceSaver.save(texture, "user://textures/blue.webp")
+
+		# Back to the defaults.
+		ImageSaveOptions.detach_from(texture)
+		[/gdscript]
+		[csharp]
+		var image = Image.CreateEmpty(64, 64, false, Image.Format.Rgba8);
+		image.Fill(Colors.CornflowerBlue);
+		var texture = ImageTexture.CreateFromImage(image);
+
+		var options = new ImageSaveOptions();
+		options.WebpLossy = true;
+		options.WebpQuality = 0.8f;
+		options.AttachTo(texture);
+		ResourceSaver.Save(texture, "user://textures/blue.webp");
+
+		// Back to the defaults.
+		ImageSaveOptions.DetachFrom(texture);
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] Encoders that are disabled in a custom build (for example [code]module_webp_enabled=no[/code]) are not available; saving to their extension then fails with [constant ERR_FILE_UNRECOGNIZED].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="attach_to">
+			<return type="void" />
+			<param index="0" name="resource" type="Resource" />
+			<description>
+				Attaches these options to [param resource] (an [ImageTexture] or an [Image]). [method ResourceSaver.save] uses them whenever it writes [param resource] to an image file. Later changes to these options apply to the next save. Replaces options attached before.
+			</description>
+		</method>
+		<method name="detach_from" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="resource" type="Resource" />
+			<description>
+				Removes the options attached to [param resource], if any. Its next save uses the default options.
+			</description>
+		</method>
+		<method name="get_attached" qualifiers="static">
+			<return type="ImageSaveOptions" />
+			<param index="0" name="resource" type="Resource" />
+			<description>
+				Returns the options attached to [param resource] with [method attach_to], or [code]null[/code] if there are none.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="exr_grayscale" type="bool" setter="set_exr_grayscale" getter="is_exr_grayscale" default="false">
+			If [code]true[/code], single-channel images ([constant Image.FORMAT_R8], [constant Image.FORMAT_RH], [constant Image.FORMAT_RF]) are written to OpenEXR files as a grayscale channel instead of a red channel. Ignored for images with more than one channel. See [method Image.save_exr].
+		</member>
+		<member name="jpg_quality" type="float" setter="set_jpg_quality" getter="get_jpg_quality" default="0.75">
+			Quality of JPEG files, between [code]0.0[/code] (smallest file) and [code]1.0[/code] (best quality). See [method Image.save_jpg].
+		</member>
+		<member name="webp_lossy" type="bool" setter="set_webp_lossy" getter="is_webp_lossy" default="false">
+			If [code]true[/code], WebP files are compressed lossy with [member webp_quality]. If [code]false[/code], they are lossless.
+		</member>
+		<member name="webp_quality" type="float" setter="set_webp_quality" getter="get_webp_quality" default="0.75">
+			Quality of lossy WebP files, between [code]0.0[/code] (smallest file) and [code]1.0[/code] (best quality). Ignored for lossless WebP. See [method Image.save_webp].
+		</member>
+	</members>
+</class>

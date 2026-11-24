@@ -310,6 +310,8 @@ public:
 	virtual uint64_t get_static_memory_usage() const;
 	virtual uint64_t get_static_memory_peak_usage() const;
 	virtual Dictionary get_memory_info() const;
+	virtual uint64_t get_process_memory_usage() const;
+	virtual Dictionary get_process_memory_info() const;
 
 	bool is_separate_thread_rendering_enabled() const { return _separate_thread_render; }
 

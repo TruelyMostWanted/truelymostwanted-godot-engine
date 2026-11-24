@@ -36,9 +36,12 @@
 #include "extensions/gltf_spec_gloss.h"
 #include "gltf_document.h"
 #include "gltf_state.h"
+#include "resource_format_gltf.h"
 #include "structures/gltf_object_model_property.h"
 
 #include "core/config/engine.h"
+#include "core/io/resource_loader.h"
+#include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
 
 #ifndef PHYSICS_3D_DISABLED
@@ -103,6 +106,9 @@ static void _editor_init() {
 }
 #endif // TOOLS_ENABLED
 
+static Ref<ResourceFormatLoaderGLTF> resource_loader_gltf;
+static Ref<ResourceFormatSaverGLTF> resource_saver_gltf;
+
 #define GLTF_REGISTER_DOCUMENT_EXTENSION(m_doc_ext_class) \
 	Ref<m_doc_ext_class> extension_##m_doc_ext_class; \
 	extension_##m_doc_ext_class.instantiate(); \
@@ -143,6 +149,13 @@ void initialize_gltf_module(ModuleInitializationLevel p_level) {
 		if (!is_editor) {
 			GLTF_REGISTER_DOCUMENT_EXTENSION(GLTFDocumentExtensionConvertImporterMesh);
 		}
+
+		// ResourceLoader/ResourceSaver for `.gltf` and `.glb` files that are not imported (user://, kept files).
+		ResourceFormatLoaderGLTF::define_project_settings();
+		resource_loader_gltf.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_gltf);
+		resource_saver_gltf.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_gltf);
 	}
 
 #ifdef TOOLS_ENABLED
@@ -166,5 +179,9 @@ void uninitialize_gltf_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	ResourceLoader::remove_resource_format_loader(resource_loader_gltf);
+	resource_loader_gltf.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_gltf);
+	resource_saver_gltf.unref();
 	GLTFDocument::unregister_all_gltf_document_extensions();
 }
