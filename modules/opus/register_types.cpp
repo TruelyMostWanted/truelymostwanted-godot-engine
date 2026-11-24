@@ -31,6 +31,7 @@
 #include "register_types.h"
 
 #include "audio_stream_opus.h"
+#include "audio_stream_opus_resource_format.h"
 
 #include "core/object/class_db.h"
 
@@ -46,10 +47,16 @@ static void _editor_init() {
 }
 #endif
 
+static Ref<ResourceFormatLoaderAudioStreamOpus> resource_loader_opus;
+
 void initialize_opus_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
 		GDREGISTER_CLASS(AudioStreamOpus);
 		GDREGISTER_CLASS(AudioStreamPlaybackOpus);
+
+		// Not at the front: ResourceFormatImporter keeps precedence for imported Opus files.
+		resource_loader_opus.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_opus);
 	}
 
 #ifdef TOOLS_ENABLED
@@ -62,4 +69,8 @@ void initialize_opus_module(ModuleInitializationLevel p_level) {
 }
 
 void uninitialize_opus_module(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && resource_loader_opus.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_opus);
+		resource_loader_opus.unref();
+	}
 }
