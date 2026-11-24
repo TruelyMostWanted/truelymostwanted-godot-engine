@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="PckPackageServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Reads, edits, builds, mounts and unmounts [code].pck[/code] files.
+		Reads, edits, builds, extracts, mounts and unmounts [code].pck[/code] files.
 	</brief_description>
 	<description>
 		[PckPackageServer] is the one place for everything about [code].pck[/code] files. It opens a pack and lists its content without mounting it ([method open]), reads and verifies single files, builds a new pack from a [PckPackage] ([method build]), writes the files of a pack into a folder ([method extract]), mounts and unmounts packs, and tells which pack provides a [code]res://[/code] file ([method get_pack_of]). Mods, DLC, patches and level editors use it to inspect and change packs at runtime.
