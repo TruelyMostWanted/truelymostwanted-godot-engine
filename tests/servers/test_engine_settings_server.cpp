@@ -57,7 +57,7 @@ struct TestSetup {
 	int low_processor_sleep = 6900;
 
 	explicit TestSetup(bool p_allow_simulation = true) {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		ProjectSettings::get_singleton()->set_setting("settings/engine/allow_simulation_values", p_allow_simulation);
 		// The test runner does not define the physics project settings; use the engine defaults, like a project does.
 		if (!ProjectSettings::get_singleton()->has_setting("physics/common/physics_ticks_per_second")) {
@@ -84,7 +84,7 @@ struct TestSetup {
 		engine->set_physics_jitter_fix(jitter_fix);
 		OS::get_singleton()->set_low_processor_usage_mode(low_processor);
 		OS::get_singleton()->set_low_processor_usage_mode_sleep_usec(low_processor_sleep);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 		ProjectSettings::get_singleton()->set_setting("settings/engine/allow_simulation_values", false);
 	}
 };
