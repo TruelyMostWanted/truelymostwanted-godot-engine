@@ -214,7 +214,7 @@
 			<return type="void" />
 			<param index="0" name="factor" type="float" />
 			<description>
-				Sets [member VideoWindowSettings.content_scale_factor]. Scale factor of the root window ([member Window.content_scale_factor]), for example a UI scale option. The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped.
+				Sets [member VideoWindowSettings.content_scale_factor]. Scale factor of the root window ([member Window.content_scale_factor]). The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped. The root window gets this factor times [member AccessibilitySettings.ui_scale] of [AccessibilitySettingsServer], the player's UI scale option.
 			</description>
 		</method>
 		<method name="set_content_scale_mode">

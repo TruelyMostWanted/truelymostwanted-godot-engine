@@ -31,6 +31,7 @@
 #include "json.h"
 
 #include "core/io/resource_loader.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/variant/container_type_validate.h"
@@ -602,6 +603,18 @@ Variant JSON::parse_string(const String &p_json_string) {
 	return json->get_data();
 }
 
+String JSON::serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options) {
+	const ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
+	ERR_FAIL_NULL_V(serializer, String());
+	return serializer->serialize(p_resource, ResourceTextSerializer::FORMAT_JSON, p_options);
+}
+
+Ref<Resource> JSON::deserialize(const String &p_text, const StringName &p_type_hint, const Ref<SerializerOptions> &p_options) {
+	const ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
+	ERR_FAIL_NULL_V(serializer, Ref<Resource>());
+	return serializer->deserialize(p_text, ResourceTextSerializer::FORMAT_JSON, p_type_hint, p_options);
+}
+
 void JSON::_bind_methods() {
 	ClassDB::bind_static_method("JSON", D_METHOD("stringify", "data", "indent", "sort_keys", "full_precision"), &JSON::stringify, DEFVAL(""), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_static_method("JSON", D_METHOD("parse_string", "json_string"), &JSON::parse_string);
@@ -615,6 +628,8 @@ void JSON::_bind_methods() {
 
 	ClassDB::bind_static_method("JSON", D_METHOD("from_native", "variant", "full_objects"), &JSON::from_native, DEFVAL(false));
 	ClassDB::bind_static_method("JSON", D_METHOD("to_native", "json", "allow_objects"), &JSON::to_native, DEFVAL(false));
+	ClassDB::bind_static_method("JSON", D_METHOD("serialize", "resource", "options"), &JSON::serialize, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_static_method("JSON", D_METHOD("deserialize", "text", "type_hint", "options"), &JSON::deserialize, DEFVAL(StringName()), DEFVAL(Ref<SerializerOptions>()));
 
 	ADD_PROPERTY(PropertyInfo(Variant::NIL, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_NIL_IS_VARIANT), "set_data", "get_data"); // Ensures that it can be serialized as binary.
 }

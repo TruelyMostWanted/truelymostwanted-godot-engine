@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioDeviceSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the audio output and input device.
+	</brief_description>
+	<description>
+		[AudioDeviceSettingsServer] is the settings domain [code]"audio"[/code]: it stores the output and the input device of [AudioServer] ([member AudioServer.output_device], [member AudioServer.input_device]) for the player, loads them when the game starts and applies them in [constant SettingsServer.APPLY_PHASE_SERVERS], before the first sound plays. The settings resource is an [AudioDeviceSettings]. The file is [code]user://settings/audio.ini[/code] by default; as a single record it is never stored as CSV. The bus volumes are a separate domain, see [AudioBusSettingsServer].
+		Device names are the names of the active audio driver (see [method AudioServer.get_output_device_list]), so they only mean something on the same machine and with the same driver. A device that the driver does not list (unplugged, another machine or driver) is replaced by [code]"Default"[/code] when the value is set or loaded, with a verbose message only and no error. The file keeps the old name until it is saved again, so a headset that is plugged in again is used at the next start.
+		Device selection is supported by the WASAPI driver (Windows), PulseAudio and ALSA (Linux and *BSD) and CoreAudio on macOS. The XAudio2 driver, Android, iOS and the Web only have [code]"Default"[/code]; use [method SettingsServer.is_value_supported] or [method is_device_selection_supported] to hide the option there. The input device also needs [member ProjectSettings.audio/driver/enable_input].
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			var output_list = $OutputList
+			output_list.visible = AudioDeviceSettingsServer.is_value_supported(&amp;"output_device")
+			for device in AudioServer.get_output_device_list():
+				output_list.add_item(device)
+				if device == AudioDeviceSettingsServer.get_output_device():
+					output_list.select(output_list.item_count - 1)
+
+		func _on_output_list_item_selected(index):
+			AudioDeviceSettingsServer.set_output_device($OutputList.get_item_text(index))
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var outputList = GetNode&lt;OptionButton&gt;("OutputList");
+		    // Methods of the base class are called through Singleton.
+		    outputList.Visible = AudioDeviceSettingsServer.Singleton.IsValueSupported("output_device");
+		    foreach (string device in AudioServer.GetOutputDeviceList())
+		    {
+		        outputList.AddItem(device);
+		        if (device == AudioDeviceSettingsServer.GetOutputDevice())
+		        {
+		            outputList.Select(outputList.ItemCount - 1);
+		        }
+		    }
+		}
+
+		private void OnOutputListItemSelected(long index)
+		{
+		    AudioDeviceSettingsServer.SetOutputDevice(GetNode&lt;OptionButton&gt;("OutputList").GetItemText((int)index));
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]AudioDeviceSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]AudioDeviceSettingsServer.Singleton[/code].
+		[b]Note:[/b] Most drivers switch the device on their audio thread, so [member AudioServer.output_device] may report the old device for a short time after a change.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_input_device" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the pending input device, [code]"Default"[/code] for the default device of the system.
+			</description>
+		</method>
+		<method name="get_output_device" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the pending output device, [code]"Default"[/code] for the default device of the system.
+			</description>
+		</method>
+		<method name="is_device_selection_supported" qualifiers="static">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the active audio driver can switch the device: WASAPI, PulseAudio, ALSA, and CoreAudio on macOS. Returns [code]false[/code] for all other drivers (XAudio2, Android, iOS, Web, Dummy) and when no audio driver is running.
+			</description>
+		</method>
+		<method name="set_input_device">
+			<return type="void" />
+			<param index="0" name="device" type="String" />
+			<description>
+				Sets the input device used for audio capture. A name that [method AudioServer.get_input_device_list] does not contain, or an empty string, becomes [code]"Default"[/code]. Only takes effect if [member ProjectSettings.audio/driver/enable_input] is [code]true[/code].
+			</description>
+		</method>
+		<method name="set_output_device">
+			<return type="void" />
+			<param index="0" name="device" type="String" />
+			<description>
+				Sets the output device. A name that [method AudioServer.get_output_device_list] does not contain, or an empty string, becomes [code]"Default"[/code].
+			</description>
+		</method>
+	</methods>
+</class>

@@ -179,9 +179,25 @@ private:
 		float adjustments_saturation = 1.0f;
 		bool use_1d_color_correction = false;
 		RID color_correction;
+
+		// Not affected by the global overrides (environment_set_ignore_global_overrides()).
+		bool ignore_global_overrides = false;
 	};
 
 	mutable RID_Owner<Environment, true> environment_owner;
+
+	// Global overrides: effects turned off for every environment, and multipliers for the adjustments.
+	uint32_t global_disabled_effects = 0;
+	float global_adjustment_brightness = 1.0f;
+	float global_adjustment_contrast = 1.0f;
+	float global_adjustment_saturation = 1.0f;
+
+	_FORCE_INLINE_ bool _is_effect_overridden(const Environment *p_env, RSE::EnvironmentEffect p_effect) const {
+		return !p_env->ignore_global_overrides && (global_disabled_effects & (1u << uint32_t(p_effect)));
+	}
+	_FORCE_INLINE_ bool _has_global_adjustment(const Environment *p_env) const {
+		return !p_env->ignore_global_overrides && (global_adjustment_brightness != 1.0f || global_adjustment_contrast != 1.0f || global_adjustment_saturation != 1.0f);
+	}
 
 public:
 	static RendererEnvironmentStorage *get_singleton() { return singleton; }
@@ -197,6 +213,11 @@ public:
 	bool is_environment(RID p_environment) const {
 		return environment_owner.owns(p_environment);
 	}
+
+	// Global overrides
+	void environment_set_global_effect_disabled(RSE::EnvironmentEffect p_effect, bool p_disabled);
+	void environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation);
+	void environment_set_ignore_global_overrides(RID p_env, bool p_ignore);
 
 	// Background
 	void environment_set_background(RID p_env, RSE::EnvironmentBG p_bg);

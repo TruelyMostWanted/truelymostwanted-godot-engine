@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PCKPackageExporter" inherits="Object" api_type="editor" keywords="pck, pack, dlc, mod, export, description" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Builds a [PCKPackage] description into a pack through the export pipeline of an export preset.
+	</brief_description>
+	<description>
+		[method PCKPackageServer.build] copies the bytes of every source as it is. A description that lists [code]res://art/a.png[/code] then produces a pack with the PNG source, but without the [code].import[/code] file and the imported texture, so [code]load("res://art/a.png")[/code] fails in an exported game. [PCKPackageExporter] builds the same description with the export pipeline of an export preset instead:
+		- An entry whose source is a [code]res://[/code] file is packed in exported form for the preset's platform: its [code].import[/code] file and imported artifacts (for example [code].ctex[/code] textures in the formats of the platform), [code].remap[/code] files, scenes and resources converted to binary, and tokenized scripts. The preset's export plugins, script export mode, exclude filter and options (such as the shader baker) apply. The target path of such an entry must equal its source path, because the export keeps [code]res://[/code] paths; a renamed entry is refused.
+		- By default, the files these resources depend on are packed too, like in the "Export selected resources" mode. Files that belong to the main pack are never written: [code]project.binary[/code], the UID and global class caches, the GDExtension list, autoloads, icons, and the files that export plugins add for the whole project.
+		- Entries with data in memory, with a source outside [code]res://[/code] ([code]user://[/code] or an absolute path) and entries read from [member PCKPackage.base_pack] are copied as they are. They win over an exported file with the same path. Removal entries are written as removals.
+		- [code].import[/code], [code].remap[/code] and [code].uid[/code] entries with a [code]res://[/code] source are not needed: the export writes them for their source file. Listed without their source, they are refused.
+		- Files are encrypted with the preset's encryption settings and key (see [method should_encrypt]), and entries with their own [code]encrypt[/code] flag are encrypted too. Without a key in the preset, the key compiled into the engine is used. The directory is encrypted if the preset or [member PCKPackage.encrypted_directory] asks for it.
+		The pack is written only if every entry could be built. Errors are printed and returned as an [enum Error] value.
+		[codeblocks]
+		[gdscript]
+		@tool
+		extends EditorScript
+
+		func _run():
+			var description := PCKPackage.new()
+			description.add_file("scenes/level_2.tscn", "res://scenes/level_2.tscn")
+			description.add_file("readme.txt", "user://dlc_readme.txt")
+			var plan := PCKPackageExporter.plan_description(description)
+			print(plan.export_sources, plan.raw_files, plan.errors)
+			var err := PCKPackageExporter.export_description(description, "Windows Desktop", "user://dlc.pck")
+			if err != OK:
+				push_error("Build failed: %s" % error_string(err))
+		[/gdscript]
+		[csharp]
+		using Godot;
+
+		[Tool]
+		public partial class BuildDlc : EditorScript
+		{
+			public override void _Run()
+			{
+				var description = new PckPackage();
+				description.AddFile("scenes/level_2.tscn", "res://scenes/level_2.tscn");
+				description.AddFile("readme.txt", "user://dlc_readme.txt");
+				var plan = PckPackageExporter.PlanDescription(description);
+				GD.Print(plan.ExportSources, plan.RawFiles, plan.Errors);
+				Error err = PckPackageExporter.ExportDescription(description, "Windows Desktop", "user://dlc.pck");
+				if (err != Error.Ok)
+				{
+					GD.PushError($"Build failed: {err}");
+				}
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+		The same build is available in the editor under [b]Project &gt; Tools &gt; Build Pack from Description...[/b] and on the command line:
+		[codeblock lang=text]
+		godot --headless --path &lt;project&gt; --export-pack-description "Windows Desktop" res://packs/dlc.tres builds/dlc.pck
+		[/codeblock]
+		The command waits for the first scan and import of the project, builds the pack in release mode and quits with exit code [code]0[/code], or [code]1[/code] if the build failed. A relative pack path is relative to the project folder.
+		The editor also registers an export plugin for packs. It keeps every file that is the export target of a preset out of new exports (for example [code]res://build/game.pck[/code], and the [code].pck[/code] next to an executable target), and warns when a preset encrypts a [code].pck[/code] file inside the main pack: such a pack is decrypted whole every time one of its files is opened. The export preset option [code]pck_packages/excluded_descriptions[/code] lists descriptions whose [code]res://[/code] sources are left out of the preset's normal exports, so content shipped as a separate pack is not in the main pack too.
+		[b]Note:[/b] This class is only available in editor builds and runs on the main thread. It cannot be instantiated: all methods are static.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="export_description" qualifiers="static">
+			<return type="int" enum="Error" />
+			<param index="0" name="description" type="PCKPackage" />
+			<param index="1" name="preset_name" type="String" />
+			<param index="2" name="target_path" type="String" />
+			<param index="3" name="debug" type="bool" default="false" />
+			<param index="4" name="include_dependencies" type="bool" default="true" />
+			<description>
+				Builds [param description] into a pack at [param target_path], with the export pipeline of the export preset named [param preset_name] (see [method get_preset_names]). [param debug] exports like a debug export. If [param include_dependencies] is [code]false[/code], only the listed [code]res://[/code] files (with their own [code].import[/code], [code].remap[/code] and imported files) are packed, not the files they depend on; use it when the main game already ships them.
+				Returns [constant ERR_DOES_NOT_EXIST] if there is no such preset. See [method export_description_with_preset] for the other errors.
+			</description>
+		</method>
+		<method name="export_description_with_preset" qualifiers="static">
+			<return type="int" enum="Error" />
+			<param index="0" name="description" type="PCKPackage" />
+			<param index="1" name="preset" type="EditorExportPreset" />
+			<param index="2" name="target_path" type="String" />
+			<param index="3" name="debug" type="bool" default="false" />
+			<param index="4" name="include_dependencies" type="bool" default="true" />
+			<description>
+				Like [method export_description], with an [EditorExportPreset], for example the one an [EditorExportPlugin] gets from [method EditorExportPlugin.get_export_preset]. The preset is never changed: the export uses a temporary copy that is not added to the project's presets.
+				This method may be called during another export, for example from an export plugin. The export plugins' [method EditorExportPlugin._export_begin] and [method EditorExportPlugin._export_end] are then not called a second time, so they keep the state of the running export. Outside an export, they are called for the build like for "Export PCK/ZIP".
+				Returns [constant ERR_INVALID_PARAMETER] for a null description or preset, an empty target path or a description that can't be built (see [method plan_description]), [constant ERR_FILE_NOT_FOUND] if a source file is missing, [constant ERR_BUSY] while another description is built, the project is scanned or [param target_path] is mounted, [constant ERR_FILE_MISSING_DEPENDENCIES] if the export wrote nothing for a listed file (it is excluded by the preset's exclude filter or skipped by an export plugin), and [constant ERR_UNCONFIGURED] outside the editor or without a matching export platform.
+			</description>
+		</method>
+		<method name="export_target_to_res_path" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="export_path" type="String" />
+			<param index="1" name="project_dir" type="String" />
+			<description>
+				Returns the [code]res://[/code] path of the export target [param export_path], or an empty string if the target is outside the project folder [param project_dir]. Export paths may be relative to the project folder, [code]res://[/code] paths or absolute paths; backslashes are accepted. The comparison with [param project_dir] ignores case.
+				[codeblock]
+				PCKPackageExporter.export_target_to_res_path("build/game.pck", "C:/Projects/Game") # "res://build/game.pck"
+				PCKPackageExporter.export_target_to_res_path("../builds/game.pck", "C:/Projects/Game") # ""
+				[/codeblock]
+			</description>
+		</method>
+		<method name="find_preset" qualifiers="static">
+			<return type="EditorExportPreset" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the export preset of the project named [param name], or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="get_export_target_paths" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the [code]res://[/code] paths of the export targets of all presets that lie inside the project folder. For a target that is not a [code].pck[/code] or [code].zip[/code] file (an executable), the [code].pck[/code] next to it is listed too. These files are never exported.
+			</description>
+		</method>
+		<method name="get_preset_names" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the project's export presets, in the order of the Export dialog.
+			</description>
+		</method>
+		<method name="is_building" qualifiers="static">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while a description is built. Export plugins can use it to tell a pack build from a normal export.
+			</description>
+		</method>
+		<method name="is_export_target" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if [param path] (a [code]res://[/code] path or a path relative to [code]res://[/code]) is listed by [method get_export_target_paths].
+			</description>
+		</method>
+		<method name="is_exporting" qualifiers="static">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while an export runs, from the export plugins' [method EditorExportPlugin._export_begin] to their [method EditorExportPlugin._export_end].
+			</description>
+		</method>
+		<method name="matches_encryption_filters" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="include_filters" type="PackedStringArray" />
+			<param index="2" name="exclude_filters" type="PackedStringArray" />
+			<description>
+				Returns [code]true[/code] if [param path] matches one of [param include_filters] and none of [param exclude_filters], with the rules of the export's encryption filters: [code]*[/code] and [code]?[/code] wildcards, case-insensitive, matched against the path with and without [code]res://[/code].
+				[codeblock]
+				PCKPackageExporter.matches_encryption_filters("res://dlc/a.pck", ["*"], ["*.pck"]) # false
+				[/codeblock]
+			</description>
+		</method>
+		<method name="plan_description" qualifiers="static">
+			<return type="PCKBuildPlan" />
+			<param index="0" name="description" type="PCKPackage" />
+			<description>
+				Returns how the entries of [param description] would be built, without building anything: the [code]res://[/code] sources that go through the export pipeline, the files copied as they are, the removals, the skipped [code].import[/code], [code].remap[/code] and [code].uid[/code] entries, and one error message per entry that can't be built. Nothing is built while [member PCKBuildPlan.valid] is [code]false[/code]. A null [param description] gives a plan with one error.
+			</description>
+		</method>
+		<method name="should_encrypt" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="preset" type="EditorExportPreset" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if [param preset] encrypts the file at [param path] in its packs: the preset's "Encrypt Exported PCK" option is on and [method matches_encryption_filters] matches its include and exclude filters. Returns [code]false[/code] for a null preset.
+			</description>
+		</method>
+	</methods>
+</class>

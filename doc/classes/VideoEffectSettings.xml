@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoEffectSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [VideoEffectSettingsServer]: effect quality and environment overrides.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"video_effect"[/code]. [VideoEffectSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_effect.ini[/code]. Change the values through the methods of [VideoEffectSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [VideoEffectSettingsServer] clamps values out of range and replaces invalid enum values with the default, with a warning, when they are set or loaded. Values the current renderer ignores are stored too, so that the same file works with every renderer.
+		It can also be used as the project defaults of the domain: save a [VideoEffectSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/video_effect[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="allow_fog" type="bool" setter="set_allow_fog" getter="is_fog_allowed" default="true">
+			If [code]false[/code], fog is turned off in every environment ([constant RenderingServer.ENV_EFFECT_FOG]); [code]true[/code] restores [member Environment.fog_enabled]. Turning fog off can reveal geometry the level hides in the fog. Every renderer.
+		</member>
+		<member name="allow_glow" type="bool" setter="set_allow_glow" getter="is_glow_allowed" default="true">
+			If [code]false[/code], glow is turned off in every environment ([method RenderingServer.environment_set_global_effect_disabled] with [constant RenderingServer.ENV_EFFECT_GLOW]). The environments keep their [member Environment.glow_enabled]; [code]true[/code] restores it. Every renderer.
+		</member>
+		<member name="allow_ssao" type="bool" setter="set_allow_ssao" getter="is_ssao_allowed" default="true">
+			If [code]false[/code], screen-space ambient occlusion is turned off in every environment ([constant RenderingServer.ENV_EFFECT_SSAO]); [code]true[/code] restores [member Environment.ssao_enabled]. Forward+ only.
+		</member>
+		<member name="allow_ssil" type="bool" setter="set_allow_ssil" getter="is_ssil_allowed" default="true">
+			If [code]false[/code], screen-space indirect lighting is turned off in every environment ([constant RenderingServer.ENV_EFFECT_SSIL]); [code]true[/code] restores [member Environment.ssil_enabled]. Forward+ only.
+		</member>
+		<member name="allow_ssr" type="bool" setter="set_allow_ssr" getter="is_ssr_allowed" default="true">
+			If [code]false[/code], screen-space reflections are turned off in every environment ([constant RenderingServer.ENV_EFFECT_SSR]); [code]true[/code] restores [member Environment.ssr_enabled]. Forward+ only.
+		</member>
+		<member name="allow_volumetric_fog" type="bool" setter="set_allow_volumetric_fog" getter="is_volumetric_fog_allowed" default="true">
+			If [code]false[/code], volumetric fog is turned off in every environment ([constant RenderingServer.ENV_EFFECT_VOLUMETRIC_FOG]); [code]true[/code] restores [member Environment.volumetric_fog_enabled]. Forward+ only.
+		</member>
+		<member name="brightness" type="float" setter="set_brightness" getter="get_brightness" default="1.0">
+			Multiplies [member Environment.adjustment_brightness] of every environment ([method RenderingServer.environment_set_global_adjustment]). An environment without adjustments counts as [code]1.0[/code]. Range [code]0.01[/code] to [code]8.0[/code]. Every renderer.
+		</member>
+		<member name="contrast" type="float" setter="set_contrast" getter="get_contrast" default="1.0">
+			Multiplies [member Environment.adjustment_contrast] of every environment. Range [code]0.01[/code] to [code]8.0[/code]. Every renderer.
+		</member>
+		<member name="dof_blur_quality" type="int" setter="set_dof_blur_quality" getter="get_dof_blur_quality" enum="RenderingServer.DOFBlurQuality" default="1">
+			The quality of the depth of field blur, pushed with [method RenderingServer.camera_attributes_set_dof_blur_quality]. Default: [member ProjectSettings.rendering/camera/depth_of_field/depth_of_field_bokeh_quality]. Forward+ and Mobile.
+		</member>
+		<member name="dof_bokeh_shape" type="int" setter="set_dof_bokeh_shape" getter="get_dof_bokeh_shape" enum="RenderingServer.DOFBokehShape" default="1">
+			The bokeh shape of the depth of field blur, pushed with [method RenderingServer.camera_attributes_set_dof_blur_bokeh_shape]. Default: [member ProjectSettings.rendering/camera/depth_of_field/depth_of_field_bokeh_shape]. Forward+ and Mobile.
+		</member>
+		<member name="dof_use_jitter" type="bool" setter="set_dof_use_jitter" getter="is_dof_using_jitter" default="false">
+			If [code]true[/code], the depth of field samples are jittered: smoother with fewer samples, needs TAA to hide the noise. Default: [member ProjectSettings.rendering/camera/depth_of_field/depth_of_field_use_jitter]. Forward+ and Mobile.
+		</member>
+		<member name="saturation" type="float" setter="set_saturation" getter="get_saturation" default="1.0">
+			Multiplies [member Environment.adjustment_saturation] of every environment. Range [code]0.01[/code] to [code]8.0[/code]. Every renderer.
+		</member>
+		<member name="sdfgi_frames_to_converge" type="int" setter="set_sdfgi_frames_to_converge" getter="get_sdfgi_frames_to_converge" enum="RenderingServer.EnvironmentSDFGIFramesToConverge" default="5">
+			The number of frames SDFGI takes to converge, pushed with [method RenderingServer.environment_set_sdfgi_frames_to_converge]. Fewer frames react faster and look noisier. Default: [member ProjectSettings.rendering/global_illumination/sdfgi/frames_to_converge]. Forward+ only.
+		</member>
+		<member name="sdfgi_frames_to_update_light" type="int" setter="set_sdfgi_frames_to_update_light" getter="get_sdfgi_frames_to_update_light" enum="RenderingServer.EnvironmentSDFGIFramesToUpdateLight" default="2">
+			The number of frames over which SDFGI spreads the update of dynamic lights, pushed with [method RenderingServer.environment_set_sdfgi_frames_to_update_light]. More frames are faster and react later. Default: [member ProjectSettings.rendering/global_illumination/sdfgi/frames_to_update_lights]. Forward+ only.
+		</member>
+		<member name="sdfgi_ray_count" type="int" setter="set_sdfgi_ray_count" getter="get_sdfgi_ray_count" enum="RenderingServer.EnvironmentSDFGIRayCount" default="1">
+			The number of rays per SDFGI probe and frame, pushed with [method RenderingServer.environment_set_sdfgi_ray_count]. More rays are smoother and slower. Default: [member ProjectSettings.rendering/global_illumination/sdfgi/probe_ray_count]. Forward+ only.
+		</member>
+		<member name="ssao_adaptive_target" type="float" setter="set_ssao_adaptive_target" getter="get_ssao_adaptive_target" default="0.5">
+			The quality target of [constant RenderingServer.ENV_SSAO_QUALITY_ULTRA], from [code]0.0[/code] to [code]1.0[/code]. Default: [member ProjectSettings.rendering/environment/ssao/adaptive_target]. Forward+ only.
+		</member>
+		<member name="ssao_blur_passes" type="int" setter="set_ssao_blur_passes" getter="get_ssao_blur_passes" default="2">
+			The number of SSAO blur passes ([code]0[/code] to [code]6[/code]). More passes are smoother and slower. Default: [member ProjectSettings.rendering/environment/ssao/blur_passes]. Forward+ only.
+		</member>
+		<member name="ssao_fadeout_from" type="float" setter="set_ssao_fadeout_from" getter="get_ssao_fadeout_from" default="50.0">
+			The distance in meters where SSAO starts to fade out. Default: [member ProjectSettings.rendering/environment/ssao/fadeout_from]. Forward+ only.
+		</member>
+		<member name="ssao_fadeout_to" type="float" setter="set_ssao_fadeout_to" getter="get_ssao_fadeout_to" default="300.0">
+			The distance in meters where SSAO has faded out completely. Default: [member ProjectSettings.rendering/environment/ssao/fadeout_to]. Forward+ only.
+		</member>
+		<member name="ssao_half_size" type="bool" setter="set_ssao_half_size" getter="is_ssao_half_size_enabled" default="true">
+			If [code]true[/code], SSAO is rendered at half resolution: much faster, a bit blurrier. Default: [member ProjectSettings.rendering/environment/ssao/half_size]. Forward+ only.
+		</member>
+		<member name="ssao_quality" type="int" setter="set_ssao_quality" getter="get_ssao_quality" enum="RenderingServer.EnvironmentSSAOQuality" default="2">
+			The quality of screen-space ambient occlusion, pushed with [method RenderingServer.environment_set_ssao_quality]. Higher is slower. [constant RenderingServer.ENV_SSAO_QUALITY_ULTRA] uses [member ssao_adaptive_target]. Default: [member ProjectSettings.rendering/environment/ssao/quality]. Forward+ only.
+		</member>
+		<member name="ssil_adaptive_target" type="float" setter="set_ssil_adaptive_target" getter="get_ssil_adaptive_target" default="0.5">
+			The quality target of [constant RenderingServer.ENV_SSIL_QUALITY_ULTRA], from [code]0.0[/code] to [code]1.0[/code]. Default: [member ProjectSettings.rendering/environment/ssil/adaptive_target]. Forward+ only.
+		</member>
+		<member name="ssil_blur_passes" type="int" setter="set_ssil_blur_passes" getter="get_ssil_blur_passes" default="4">
+			The number of SSIL blur passes ([code]0[/code] to [code]6[/code]). Default: [member ProjectSettings.rendering/environment/ssil/blur_passes]. Forward+ only.
+		</member>
+		<member name="ssil_fadeout_from" type="float" setter="set_ssil_fadeout_from" getter="get_ssil_fadeout_from" default="50.0">
+			The distance in meters where SSIL starts to fade out. Default: [member ProjectSettings.rendering/environment/ssil/fadeout_from]. Forward+ only.
+		</member>
+		<member name="ssil_fadeout_to" type="float" setter="set_ssil_fadeout_to" getter="get_ssil_fadeout_to" default="300.0">
+			The distance in meters where SSIL has faded out completely. Default: [member ProjectSettings.rendering/environment/ssil/fadeout_to]. Forward+ only.
+		</member>
+		<member name="ssil_half_size" type="bool" setter="set_ssil_half_size" getter="is_ssil_half_size_enabled" default="true">
+			If [code]true[/code], SSIL is rendered at half resolution. Default: [member ProjectSettings.rendering/environment/ssil/half_size]. Forward+ only.
+		</member>
+		<member name="ssil_quality" type="int" setter="set_ssil_quality" getter="get_ssil_quality" enum="RenderingServer.EnvironmentSSILQuality" default="2">
+			The quality of screen-space indirect lighting, pushed with [method RenderingServer.environment_set_ssil_quality]. Higher is slower. Default: [member ProjectSettings.rendering/environment/ssil/quality]. Forward+ only.
+		</member>
+		<member name="sss_depth_scale" type="float" setter="set_sss_depth_scale" getter="get_sss_depth_scale" default="0.01">
+			The depth scale of subsurface scattering. Default: [member ProjectSettings.rendering/environment/subsurface_scattering/subsurface_scattering_depth_scale]. Forward+ only.
+		</member>
+		<member name="sss_quality" type="int" setter="set_sss_quality" getter="get_sss_quality" enum="RenderingServer.SubSurfaceScatteringQuality" default="1">
+			The quality of subsurface scattering, pushed with [method RenderingServer.sub_surface_scattering_set_quality]. [constant RenderingServer.SUB_SURFACE_SCATTERING_QUALITY_DISABLED] turns it off. Default: [member ProjectSettings.rendering/environment/subsurface_scattering/subsurface_scattering_quality]. Forward+ only.
+		</member>
+		<member name="sss_scale" type="float" setter="set_sss_scale" getter="get_sss_scale" default="0.05">
+			The screen-space scale of subsurface scattering, pushed with [method RenderingServer.sub_surface_scattering_set_scale]. Default: [member ProjectSettings.rendering/environment/subsurface_scattering/subsurface_scattering_scale]. Forward+ only.
+		</member>
+		<member name="volumetric_fog_use_filter" type="bool" setter="set_volumetric_fog_use_filter" getter="is_volumetric_fog_using_filter" default="true">
+			If [code]true[/code], the volumetric fog is blurred to hide the froxel structure, pushed with [method RenderingServer.environment_set_volumetric_fog_filter_active]. Default: [member ProjectSettings.rendering/environment/volumetric_fog/use_filter]. Forward+ only.
+		</member>
+		<member name="volumetric_fog_volume_depth" type="int" setter="set_volumetric_fog_volume_depth" getter="get_volumetric_fog_volume_depth" default="64">
+			The depth of the volumetric fog froxel buffer ([code]16[/code] to [code]512[/code]). Default: [member ProjectSettings.rendering/environment/volumetric_fog/volume_depth]. Forward+ only.
+		</member>
+		<member name="volumetric_fog_volume_size" type="int" setter="set_volumetric_fog_volume_size" getter="get_volumetric_fog_volume_size" default="64">
+			The width and height of the volumetric fog froxel buffer ([code]16[/code] to [code]512[/code]), pushed with [method RenderingServer.environment_set_volumetric_fog_volume_size]. Higher is sharper and much slower. Default: [member ProjectSettings.rendering/environment/volumetric_fog/volume_size]. Forward+ only.
+		</member>
+		<member name="voxel_gi_quality" type="int" setter="set_voxel_gi_quality" getter="get_voxel_gi_quality" enum="RenderingServer.VoxelGIQuality" default="0">
+			The quality of [VoxelGI] (number of cones), pushed with [method RenderingServer.voxel_gi_set_quality]. Default: [member ProjectSettings.rendering/global_illumination/voxel_gi/quality]. Forward+ and Mobile.
+		</member>
+	</members>
+</class>

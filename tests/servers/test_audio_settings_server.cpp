@@ -37,10 +37,11 @@ TEST_FORCE_LINK(test_audio_settings_server)
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/math/math_funcs.h"
+#include "servers/audio/audio_bus_layout.h"
 #include "servers/audio/audio_server.h"
 #include "servers/settings/audio_bus_settings_server.h"
+#include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
-#include "servers/settings/audio_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/test_utils.h"
 
@@ -84,13 +85,13 @@ static Ref<AudioBusSettings> make_bus(const String &p_name, float p_volume_db) {
 	return bus;
 }
 
-TEST_CASE("[Audio][AudioSettingsServer] Both domains are engine singletons registered with the manager") {
+TEST_CASE("[Audio][AudioDeviceSettingsServer] Both domains are engine singletons registered with the manager") {
 	TestSetup setup;
-	AudioSettingsServer *audio = AudioSettingsServer::get_singleton();
+	AudioDeviceSettingsServer *audio = AudioDeviceSettingsServer::get_singleton();
 	AudioBusSettingsServer *buses = AudioBusSettingsServer::get_singleton();
 	REQUIRE(audio != nullptr);
 	REQUIRE(buses != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("AudioSettingsServer"));
+	CHECK(Engine::get_singleton()->has_singleton("AudioDeviceSettingsServer"));
 	CHECK(Engine::get_singleton()->has_singleton("AudioBusSettingsServer"));
 
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
@@ -268,15 +269,105 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Buses added to the layout later keep 
 	memdelete(server);
 }
 
-TEST_CASE("[Audio][AudioSettingsServer] Devices: unknown names fall back to \"Default\" without an error") {
+TEST_CASE("[Audio][AudioBusSettingsServer] Stored values are applied again after AudioServer.set_bus_layout()") {
 	TestSetup setup;
 	AudioServer *audio_server = AudioServer::get_singleton();
-	AudioSettingsServer *server = memnew(AudioSettingsServer);
+	// The layout of the game: Master and Music at -6 dB.
+	const Ref<AudioBusLayout> game_layout = audio_server->generate_bus_layout();
+	Ref<AudioBusLayout> master_only;
+	master_only.instantiate();
+
+	AudioBusSettingsServer *server = memnew(AudioBusSettingsServer);
+	server->set_file_path(temp_file("layout_changed.ini"));
+	server->startup();
+	server->set_bus_volume_db("Music", -20.0);
+	server->set_bus_mute("Music", true);
+	server->set_bus_solo("Music", true);
+	REQUIRE(audio_server->get_bus_volume_db(1) == doctest::Approx(-20.0));
+
+	// The new layout resets the bus values; the stored ones are pushed again.
+	audio_server->set_bus_layout(game_layout);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-20.0));
+	CHECK(audio_server->is_bus_mute(1));
+	CHECK(audio_server->is_bus_solo(1));
+	CHECK(server->get_bus_volume_db("Music") == doctest::Approx(-20.0));
+	CHECK_FALSE(server->is_dirty());
+
+	// A layout without "Music": the entry stays and is skipped with a warning.
+	ERR_PRINT_OFF;
+	audio_server->set_bus_layout(master_only);
+	ERR_PRINT_ON;
+	CHECK(audio_server->get_bus_count() == 1);
+	CHECK(server->find_entry("Music") >= 0);
+
+	// With create_missing_buses, the bus is added again, once.
+	server->set_create_missing_buses(true);
+	audio_server->set_bus_layout(master_only);
+	CHECK(audio_server->get_bus_count() == 2);
+	REQUIRE(audio_server->get_bus_index("Music") == 1);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-20.0));
+	CHECK(audio_server->is_bus_mute(1));
+
+	// In APPLY_MODE_MANUAL, the applied values come back, not the pending ones.
+	server->set_create_missing_buses(false);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	server->set_bus_volume_db("Music", -30.0);
+	audio_server->set_bus_layout(game_layout);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-20.0));
+	CHECK(server->is_dirty());
+	memdelete(server);
+
+	// The freed server is no longer connected to the signal.
+	audio_server->set_bus_layout(game_layout);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-6.0));
+}
+
+TEST_CASE("[Audio][AudioBusSettingsServer] Layout changes before and during startup are not applied twice") {
+	TestSetup setup;
+	AudioServer *audio_server = AudioServer::get_singleton();
+	const Ref<AudioBusLayout> game_layout = audio_server->generate_bus_layout();
+	const String path = temp_file("layout_startup.ini");
+	{
+		AudioBusSettingsServer *server = memnew(AudioBusSettingsServer);
+		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+		server->set_file_path(path);
+		server->set_bus_volume_db("Music", -18.0);
+		server->add_entry(make_bus("Voice", -9.0));
+		ERR_PRINT_OFF;
+		CHECK(server->apply() == OK);
+		ERR_PRINT_ON;
+		CHECK(server->save() == OK);
+		memdelete(server);
+	}
+
+	AudioBusSettingsServer *server = memnew(AudioBusSettingsServer);
+	server->set_create_missing_buses(true);
+	server->set_file_path(path);
+	// Before startup, a new layout (here: back to the layout of the game) is the base of the defaults: nothing is pushed.
+	audio_server->set_bus_layout(game_layout);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-6.0));
+	CHECK(audio_server->get_bus_count() == 2);
+
+	// The startup apply adds "Voice" (add_bus() emits bus_layout_changed) without a second pass.
+	server->startup();
+	CHECK(audio_server->get_bus_count() == 3);
+	CHECK(audio_server->get_bus_index("Voice") == 2);
+	CHECK(audio_server->get_bus_volume_db(1) == doctest::Approx(-18.0));
+	CHECK(audio_server->get_bus_volume_db(2) == doctest::Approx(-9.0));
+	const Array default_buses = server->get_default_value("buses");
+	CHECK(default_buses.size() == 2);
+	memdelete(server);
+}
+
+TEST_CASE("[Audio][AudioDeviceSettingsServer] Devices: unknown names fall back to \"Default\" without an error") {
+	TestSetup setup;
+	AudioServer *audio_server = AudioServer::get_singleton();
+	AudioDeviceSettingsServer *server = memnew(AudioDeviceSettingsServer);
 	CHECK(server->get_domain() == StringName("audio"));
 	CHECK(server->get_output_device() == "Default");
 	CHECK(server->get_input_device() == "Default");
 	// The dummy driver has only "Default".
-	CHECK_FALSE(AudioSettingsServer::is_device_selection_supported());
+	CHECK_FALSE(AudioDeviceSettingsServer::is_device_selection_supported());
 	CHECK_FALSE(server->is_value_supported("output_device"));
 	CHECK_FALSE(server->is_value_supported("input_device"));
 

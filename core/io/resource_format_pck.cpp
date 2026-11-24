@@ -35,7 +35,7 @@
 #include "core/object/class_db.h"
 
 Ref<Resource> ResourceFormatLoaderPck::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
-	Ref<PckPackage> package;
+	Ref<PCKPackage> package;
 	package.instantiate();
 	// Opens the directory only: the pack is not mounted.
 	const Error err = package->open_pack(p_path);
@@ -53,29 +53,29 @@ void ResourceFormatLoaderPck::get_recognized_extensions(List<String> *p_extensio
 }
 
 bool ResourceFormatLoaderPck::handles_type(const String &p_type) const {
-	return ClassDB::is_parent_class("PckPackage", p_type);
+	return ClassDB::is_parent_class("PCKPackage", p_type);
 }
 
 String ResourceFormatLoaderPck::get_resource_type(const String &p_path) const {
-	return p_path.get_extension().to_lower() == "pck" ? "PckPackage" : "";
+	return p_path.get_extension().to_lower() == "pck" ? "PCKPackage" : "";
 }
 
 Error ResourceFormatSaverPck::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
-	const Ref<PckPackage> package = p_resource;
+	const Ref<PCKPackage> package = p_resource;
 	ERR_FAIL_COND_V(package.is_null(), ERR_INVALID_PARAMETER);
-	PckPackageServer *server = PckPackageServer::get_singleton();
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	ERR_FAIL_NULL_V(server, ERR_UNAVAILABLE);
 	// Encrypted files use the key of the package, or the key compiled into the engine.
-	// Use `PckPackageServer.build()` for any other key.
+	// Use `PCKPackageServer.build()` for any other key.
 	return server->build(package, p_path);
 }
 
 void ResourceFormatSaverPck::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (Object::cast_to<PckPackage>(*p_resource)) {
+	if (Object::cast_to<PCKPackage>(*p_resource)) {
 		p_extensions->push_back("pck");
 	}
 }
 
 bool ResourceFormatSaverPck::recognize(const Ref<Resource> &p_resource) const {
-	return Object::cast_to<PckPackage>(*p_resource) != nullptr;
+	return Object::cast_to<PCKPackage>(*p_resource) != nullptr;
 }
