@@ -36,7 +36,10 @@ TEST_FORCE_LINK(test_streaming_assets_export_plugin)
 
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/streaming_assets_server.h"
+#include "core/os/os.h"
 #include "editor/export/streaming_assets_export_plugin.h"
+#include "editor/export/streaming_assets_pack_builder.h"
 #include "tests/test_utils.h"
 
 namespace TestStreamingAssetsExportPlugin {
@@ -55,7 +58,9 @@ TEST_CASE("[StreamingAssetsExportPlugin] expand_template") {
 	CHECK(Plugin::expand_template("{exe_name}/{exe_name}.data", "a") == "a/a.data");
 	CHECK(Plugin::expand_template("Assets", "MyGame") == "Assets");
 	// Unknown placeholders stay unchanged.
-	CHECK(Plugin::expand_template("{app_name}/x", "MyGame") == "{app_name}/x");
+	CHECK(Plugin::expand_template("{unknown}/x", "MyGame") == "{unknown}/x");
+	// The plugin and the runtime share StreamingAssetsServer::expand_template().
+	CHECK(Plugin::expand_template("{app_name}/{exe_name}", "MyGame") == StreamingAssetsServer::expand_template("{app_name}/{exe_name}", "MyGame"));
 }
 
 TEST_CASE("[StreamingAssetsExportPlugin] is_valid_target_folder") {
@@ -128,27 +133,85 @@ TEST_CASE("[StreamingAssetsExportPlugin] collect_files") {
 }
 
 TEST_CASE("[StreamingAssetsExportPlugin] resolve_placement") {
-	const PackedStringArray windows = { "pc", "windows", "x86_64" };
-	const PackedStringArray linux = { "pc", "linux", "linuxbsd", "x86_64" };
-	const PackedStringArray macos = { "pc", "macos", "arm64" };
-	const PackedStringArray android = { "mobile", "android", "arm64" };
-	const PackedStringArray web = { "web" };
-	const PackedStringArray ios = { "mobile", "ios", "arm64" };
+	const PackedStringArray tags_windows = { "pc", "windows", "x86_64" };
+	const PackedStringArray tags_linux = { "pc", "linux", "linuxbsd", "x86_64" };
+	const PackedStringArray tags_macos = { "pc", "macos", "arm64" };
+	const PackedStringArray tags_android = { "mobile", "android", "arm64" };
+	const PackedStringArray tags_web = { "web" };
+	const PackedStringArray tags_ios = { "mobile", "ios", "arm64" };
 
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.pck", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_EXTERNAL);
-	CHECK(Plugin::resolve_placement(linux, "/build/Game.x86_64", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.pck", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_EXTERNAL);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.x86_64", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EXTERNAL);
 
 	// ZIP exports cannot hold an external folder.
-	CHECK(Plugin::resolve_placement(windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(linux, "/build/Game.ZIP", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.ZIP", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
 
-	// Bundles (#90), Android and Web use the fallback.
-	CHECK(Plugin::resolve_placement(macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+	// macOS, iOS and visionOS use the bundle resources (#90), also inside a `.zip`.
+	const PackedStringArray tags_visionos = { "visionos", "arm64" };
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.zip", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_visionos, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+
+	// Android and Web use the fallback.
+	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+
+	// `pack` mode (#91): a second pack next to the main pack on desktop, the fallback everywhere else.
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_PACK);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.pck", Plugin::FALLBACK_NONE, Plugin::MODE_PACK) == Plugin::PLACEMENT_PACK);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_NONE, Plugin::MODE_PACK) == Plugin::PLACEMENT_NONE);
+	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	// The default mode is `raw`.
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED, Plugin::MODE_RAW) == Plugin::PLACEMENT_EXTERNAL);
+}
+
+TEST_CASE("[StreamingAssetsExportPlugin] get_export_exe_name") {
+	const PackedStringArray tags_windows = { "pc", "windows", "x86_64" };
+	const PackedStringArray tags_macos = { "pc", "macos", "arm64" };
+	const PackedStringArray tags_ios = { "mobile", "ios", "arm64" };
+
+	CHECK(Plugin::get_export_exe_name(tags_windows, "C:/build/MyGame.exe", "My Game") == "MyGame");
+	CHECK(Plugin::get_export_exe_name(tags_ios, "/build/MyGame.ipa", "My Game") == "MyGame");
+	// macOS: `.app` exports name the bundle after the file, the other formats after the application.
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.app", "My Game") == "MyGame");
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.zip", "My Game") == OS::get_singleton()->get_safe_dir_name("My Game"));
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.dmg", "") == "Unnamed");
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] get_pack_path") {
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("C:/build/Game.exe", "Game.streaming.pck") == "C:/build/Game.streaming.pck");
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("C:\\build\\Game.pck", "Game.streaming.pck") == "C:/build/Game.streaming.pck");
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", " assets.pck ") == "/build/assets.pck");
+	// Only a plain file name is accepted.
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", "sub/assets.pck").is_empty());
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", "").is_empty());
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("", "assets.pck").is_empty());
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] make_description_for_files") {
+	const Ref<PCKPackage> description = StreamingAssetsPackBuilder::make_description_for_files("res://streaming_assets", { "a.png", "levels/l1.tscn", "data/b.json" });
+	REQUIRE(description.is_valid());
+	CHECK(description->is_description());
+	CHECK(description->get_file_count() == 3);
+	// The target is the `res://` path, so the export keeps the path and `load()` finds the file once mounted.
+	CHECK(description->has_file("streaming_assets/a.png"));
+	CHECK(description->has_file("streaming_assets/levels/l1.tscn"));
+	CHECK(description->has_file("streaming_assets/data/b.json"));
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] make_description refuses folders outside res://") {
+	ERR_PRINT_OFF;
+	CHECK(StreamingAssetsPackBuilder::make_description("user://streaming_assets").is_null());
+	CHECK(StreamingAssetsPackBuilder::make_description("res://").is_null());
+	CHECK(StreamingAssetsPackBuilder::build(Ref<EditorExportPreset>(), "res://streaming_assets", "user://a.pck") == ERR_INVALID_PARAMETER);
+	ERR_PRINT_ON;
 }
 
 } // namespace TestStreamingAssetsExportPlugin

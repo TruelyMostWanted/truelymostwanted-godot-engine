@@ -74,7 +74,7 @@ Error SettingsServerManager::register_server(SettingsServer *p_server) {
 	ERR_FAIL_COND_V_MSG(domain == StringName(), ERR_INVALID_PARAMETER, "A settings server needs a domain name: implement _get_domain() (C++: get_domain()).");
 	const ObjectID id = p_server->get_instance_id();
 	bool duplicate = false;
-	int phase = -1;
+	SettingsServer::ApplyPhase phase = SettingsServer::APPLY_PHASE_NONE;
 	bool enabled = false;
 	{
 		MutexLock lock(mutex);
@@ -98,7 +98,7 @@ Error SettingsServerManager::register_server(SettingsServer *p_server) {
 	}
 	ERR_FAIL_COND_V_MSG(duplicate, ERR_ALREADY_EXISTS, vformat("A settings server for the domain \"%s\" is already registered.", domain));
 	// Registered after its startup phase (for example by a module or a GDExtension at scene level).
-	if (enabled && phase >= 0 && int(p_server->get_apply_phase()) <= phase) {
+	if (enabled && phase != SettingsServer::APPLY_PHASE_NONE && int(p_server->get_apply_phase()) <= int(phase)) {
 		p_server->startup();
 	}
 	emit_signal(SNAME("server_registered"), domain);
@@ -212,7 +212,7 @@ void SettingsServerManager::reset_all_to_defaults() {
 	}
 }
 
-bool SettingsServerManager::is_any_dirty() const {
+bool SettingsServerManager::has_dirty_servers() const {
 	for (SettingsServer *server : _get_servers_snapshot()) {
 		if (server->is_dirty()) {
 			return true;
@@ -225,7 +225,11 @@ String SettingsServerManager::get_storage_folder() const {
 	return SettingsServer::get_storage_folder();
 }
 
-int SettingsServerManager::get_startup_phase() const {
+ResourceTextSerializer::Format SettingsServerManager::get_storage_format() const {
+	return SettingsServer::get_storage_format();
+}
+
+SettingsServer::ApplyPhase SettingsServerManager::get_startup_phase() const {
 	MutexLock lock(mutex);
 	return startup_phase;
 }
@@ -266,6 +270,10 @@ void SettingsServerManager::_create_custom_servers() {
 			WARN_PRINT(vformat("Settings: can't create an instance of \"%s\".", entry));
 			continue;
 		}
+		if (int(server->get_apply_phase()) < int(SettingsServer::APPLY_PHASE_SCENE)) {
+			// Scripts can't run before the DisplayServer and the script languages exist.
+			print_verbose(vformat("Settings: the script domain \"%s\" asks for an earlier apply phase; script domains from \"%s\" start in APPLY_PHASE_SCENE.", server->get_domain(), SETTING_CUSTOM_SERVERS));
+		}
 		{
 			MutexLock lock(mutex);
 			owned.push_back(object->get_instance_id());
@@ -287,13 +295,14 @@ void SettingsServerManager::startup(SettingsServer::ApplyPhase p_phase) {
 		MutexLock lock(mutex);
 		startup_enabled = enabled;
 	}
-	if (p_phase == SettingsServer::APPLY_PHASE_SCENE) {
-		// Script domains: their classes are loaded now.
-		_create_custom_servers();
-	}
 	{
 		MutexLock lock(mutex);
-		startup_phase = MAX(startup_phase, int(p_phase));
+		startup_phase = SettingsServer::ApplyPhase(MAX(int(startup_phase), int(p_phase)));
+	}
+	if (p_phase == SettingsServer::APPLY_PHASE_SCENE) {
+		// Script domains: their classes are loaded now. The phase is already APPLY_PHASE_SCENE, so register_server()
+		// starts each one at once, whatever phase its _get_apply_phase() returns (the latest phase is the only one left).
+		_create_custom_servers();
 	}
 	if (!enabled) {
 		return;
@@ -303,7 +312,7 @@ void SettingsServerManager::startup(SettingsServer::ApplyPhase p_phase) {
 			server->startup();
 		}
 	}
-	emit_signal(SNAME("startup_applied"), int(p_phase));
+	emit_signal(SNAME("startup_applied"), p_phase);
 }
 
 void SettingsServerManager::finish() {
@@ -336,13 +345,14 @@ void SettingsServerManager::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_all"), &SettingsServerManager::apply_all);
 	ClassDB::bind_method(D_METHOD("revert_all"), &SettingsServerManager::revert_all);
 	ClassDB::bind_method(D_METHOD("reset_all_to_defaults"), &SettingsServerManager::reset_all_to_defaults);
-	ClassDB::bind_method(D_METHOD("is_any_dirty"), &SettingsServerManager::is_any_dirty);
+	ClassDB::bind_method(D_METHOD("has_dirty_servers"), &SettingsServerManager::has_dirty_servers);
 	ClassDB::bind_method(D_METHOD("get_storage_folder"), &SettingsServerManager::get_storage_folder);
+	ClassDB::bind_method(D_METHOD("get_storage_format"), &SettingsServerManager::get_storage_format);
 	ClassDB::bind_method(D_METHOD("get_startup_phase"), &SettingsServerManager::get_startup_phase);
 
 	ADD_SIGNAL(MethodInfo("server_registered", PropertyInfo(Variant::STRING_NAME, "domain")));
 	ADD_SIGNAL(MethodInfo("server_unregistered", PropertyInfo(Variant::STRING_NAME, "domain")));
-	ADD_SIGNAL(MethodInfo("startup_applied", PropertyInfo(Variant::INT, "phase")));
+	ADD_SIGNAL(MethodInfo("startup_applied", PropertyInfo(Variant::INT, "phase", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "SettingsServer.ApplyPhase")));
 }
 
 SettingsServerManager::SettingsServerManager() {

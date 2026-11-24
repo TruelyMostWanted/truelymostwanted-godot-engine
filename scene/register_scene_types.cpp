@@ -45,6 +45,7 @@
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
+#include "scene/audio/audio_command.h"
 #include "scene/audio/audio_mixer_server.h"
 #include "scene/audio/audio_stream_player.h"
 #include "scene/debugger/scene_debugger.h"
@@ -102,6 +103,7 @@
 #include "scene/main/canvas_item.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/http_request.h"
+#include "scene/main/http_response.h"
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
@@ -121,6 +123,7 @@
 #include "scene/resources/audio/audio_stream_polyphonic.h"
 #include "scene/resources/audio/audio_stream_randomizer.h"
 #include "scene/resources/audio/audio_stream_wav.h"
+#include "scene/resources/audio/audio_stream_wav_resource_format.h"
 #include "scene/resources/bit_map.h"
 #include "scene/resources/blit_material.h"
 #include "scene/resources/bone_map.h"
@@ -136,16 +139,19 @@
 #include "scene/resources/environment.h"
 #include "scene/resources/external_texture.h"
 #include "scene/resources/font.h"
+#include "scene/resources/font_file_resource_format.h"
 #include "scene/resources/gradient.h"
 #include "scene/resources/gradient_texture.h"
+#include "scene/resources/image_save_options.h"
 #include "scene/resources/image_texture.h"
+#include "scene/resources/image_texture_resource_format.h"
 #include "scene/resources/immediate_mesh.h"
 #include "scene/resources/label_settings.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/mesh_texture.h"
 #include "scene/resources/multimesh.h"
-#include "scene/resources/texture_atlas.h"
+#include "scene/resources/sprite_sheet.h"
 #if !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/navigation_mesh.h"
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
@@ -386,6 +392,9 @@
 
 static AudioMixerServer *audio_mixer_server = nullptr;
 
+static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
+static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
+
 static Ref<ResourceFormatSaverText> resource_saver_text;
 static Ref<ResourceFormatLoaderText> resource_loader_text;
 
@@ -393,12 +402,17 @@ static Ref<ResourceFormatLoaderCompressedTexture2D> resource_loader_compressed_t
 static Ref<ResourceFormatLoaderStreamedTexture2D> resource_loader_streamed_texture;
 static Ref<ResourceFormatLoaderCompressedTextureLayered> resource_loader_texture_layered;
 static Ref<ResourceFormatLoaderCompressedTexture3D> resource_loader_texture_3d;
+static Ref<ResourceFormatLoaderImageTexture> resource_loader_image_texture;
+static Ref<ResourceFormatSaverImageTexture> resource_saver_image_texture;
 
 static Ref<ResourceFormatSaverShader> resource_saver_shader;
 static Ref<ResourceFormatLoaderShader> resource_loader_shader;
 
 static Ref<ResourceFormatSaverShaderInclude> resource_saver_shader_include;
 static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
+
+static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
+static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
 
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
@@ -429,6 +443,15 @@ void register_scene_types() {
 		ResourceLoader::add_resource_format_loader(resource_loader_texture_3d);
 	}
 
+	if constexpr (GD_IS_CLASS_ENABLED(ImageTexture)) {
+		// Loader not at the front: ResourceFormatImporter keeps precedence for imported images.
+		resource_loader_image_texture.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_image_texture);
+		// Saver at the front: takes PNG and WebP from ResourceSaverPNG and ResourceSaverWebP to apply ImageSaveOptions.
+		resource_saver_image_texture.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_image_texture, true);
+	}
+
 	resource_saver_text.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_text, true);
 
@@ -449,6 +472,15 @@ void register_scene_types() {
 
 		resource_loader_shader_include.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_shader_include, true);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		// Not at the front: ResourceFormatImporter keeps precedence for imported fonts.
+		resource_saver_font_file.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_font_file);
+
+		resource_loader_font_file.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
 	}
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -477,6 +509,8 @@ void register_scene_types() {
 	GDREGISTER_VIRTUAL_CLASS(MultiplayerAPIExtension);
 
 	GDREGISTER_CLASS(HTTPRequest);
+	GDREGISTER_CLASS(HTTPRequestTarget);
+	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
@@ -971,8 +1005,9 @@ void register_scene_types() {
 	GDREGISTER_CLASS(StreamedTexture2D);
 	GDREGISTER_CLASS(PortableCompressedTexture2D);
 	GDREGISTER_CLASS(ImageTexture);
+	GDREGISTER_CLASS(ImageSaveOptions);
 	GDREGISTER_CLASS(AtlasTexture);
-	GDREGISTER_CLASS(TextureAtlas);
+	GDREGISTER_CLASS(SpriteSheet);
 	GDREGISTER_CLASS(MeshTexture);
 	GDREGISTER_CLASS(CurveTexture);
 	GDREGISTER_CLASS(CurveXYZTexture);
@@ -1059,6 +1094,17 @@ void register_scene_types() {
 	GDREGISTER_ABSTRACT_CLASS(AudioStreamPlaybackPolyphonic);
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
+	GDREGISTER_CLASS(AudioCommand);
+	GDREGISTER_CLASS(AudioCommandList);
+
+	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
+		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
+		resource_saver_audio_stream_wav.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_audio_stream_wav);
+
+		resource_loader_audio_stream_wav.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_audio_stream_wav);
+	}
 
 	OS::get_singleton()->yield(); // may take time to init
 
@@ -1370,6 +1416,14 @@ void unregister_scene_types() {
 		audio_mixer_server = nullptr;
 	}
 
+	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
+		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
+		resource_saver_audio_stream_wav.unref();
+
+		ResourceLoader::remove_resource_format_loader(resource_loader_audio_stream_wav);
+		resource_loader_audio_stream_wav.unref();
+	}
+
 	if constexpr (GD_IS_CLASS_ENABLED(TextureLayered)) {
 		ResourceLoader::remove_resource_format_loader(resource_loader_texture_layered);
 		resource_loader_texture_layered.unref();
@@ -1378,6 +1432,13 @@ void unregister_scene_types() {
 	if constexpr (GD_IS_CLASS_ENABLED(Texture3D)) {
 		ResourceLoader::remove_resource_format_loader(resource_loader_texture_3d);
 		resource_loader_texture_3d.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(ImageTexture)) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_image_texture);
+		resource_loader_image_texture.unref();
+		ResourceSaver::remove_resource_format_saver(resource_saver_image_texture);
+		resource_saver_image_texture.unref();
 	}
 
 	if constexpr (GD_IS_CLASS_ENABLED(CompressedTexture2D)) {
@@ -1410,6 +1471,14 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_shader_include);
 		resource_loader_shader_include.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		ResourceSaver::remove_resource_format_saver(resource_saver_font_file);
+		resource_saver_font_file.unref();
+
+		ResourceLoader::remove_resource_format_loader(resource_loader_font_file);
+		resource_loader_font_file.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either

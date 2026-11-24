@@ -46,13 +46,16 @@
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
 #include "core/io/config_file.h"
+#include "core/io/csv_format.h"
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
 #include "core/io/files_manifest_server.h"
+#include "core/io/files_manifest_validation.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
+#include "core/io/ini_format.h"
 #include "core/io/json.h"
 #include "core/io/json_resource_format.h"
 #include "core/io/marshalls.h"
@@ -61,6 +64,8 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_build_plan.h"
+#include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
@@ -75,12 +80,15 @@
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
+#include "core/io/serializer_options.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
+#include "core/io/streaming_assets_server.h"
 #include "core/io/tcp_server.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
+#include "core/io/xml_format.h"
 #include "core/io/xml_parser.h"
 #include "core/io/xml_writer.h"
 #include "core/math/a_star.h"
@@ -132,7 +140,8 @@ static ResourceTextSerializer *_resource_text_serializer = nullptr;
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
 static FilesManifestServer *_files_manifest_server = nullptr;
-static PckPackageServer *_pck_package_server = nullptr;
+static PCKPackageServer *_pck_package_server = nullptr;
+static StreamingAssetsServer *_streaming_assets_server = nullptr;
 static ResourceDatabase *_resource_database = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
 static CoreBind::OS *_os = nullptr;
@@ -310,7 +319,7 @@ void register_core_types() {
 	resource_saver_resource_xml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
-	// `.pck` files as `PckPackage` resources: loading opens a pack without mounting it, saving builds one.
+	// `.pck` files as `PCKPackage` resources: loading opens a pack without mounting it, saving builds one.
 	resource_loader_pck.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_pck);
 	resource_saver_pck.instantiate();
@@ -333,6 +342,9 @@ void register_core_types() {
 	GDREGISTER_CLASS(XMLParser);
 	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
+	GDREGISTER_CLASS(XML);
+	GDREGISTER_CLASS(INI);
+	GDREGISTER_CLASS(CSV);
 	GDREGISTER_CLASS(RegExMatch);
 	GDREGISTER_CLASS(RegEx);
 
@@ -347,6 +359,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(RandomNumberGenerator);
 	GDREGISTER_ABSTRACT_CLASS(SeedServer);
 	seed_server = memnew(SeedServer);
+	GDREGISTER_CLASS(SerializerOptions);
 	GDREGISTER_ABSTRACT_CLASS(ResourceTextSerializer);
 	_resource_text_serializer = memnew(ResourceTextSerializer);
 #ifndef DISABLE_DEPRECATED
@@ -388,8 +401,13 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
-	GDREGISTER_CLASS(PckPackage);
-	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
+	GDREGISTER_CLASS(FilesManifestValidation);
+	GDREGISTER_CLASS(PCKExtractResult);
+	GDREGISTER_CLASS(PCKPackage);
+	GDREGISTER_CLASS(PCKPackageEntry);
+	GDREGISTER_CLASS(PCKBuildPlan);
+	GDREGISTER_ABSTRACT_CLASS(PCKPackageServer);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
 	GDREGISTER_CLASS(PreloadList);
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
@@ -418,7 +436,9 @@ void register_core_types() {
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
 	_files_manifest_server = memnew(FilesManifestServer);
-	_pck_package_server = memnew(PckPackageServer);
+	_pck_package_server = memnew(PCKPackageServer);
+	// Registers the locked `streaming://` prefix; `setup()` points it at the files later.
+	_streaming_assets_server = memnew(StreamingAssetsServer);
 	_resource_database = memnew(ResourceDatabase);
 	_os = memnew(CoreBind::OS);
 	_engine = memnew(CoreBind::Engine);
@@ -448,6 +468,7 @@ void register_core_settings() {
 
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 	ResourceTextSerializer::register_settings();
+	StreamingAssetsServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -476,7 +497,8 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
-	Engine::get_singleton()->add_singleton(Engine::Singleton("PckPackageServer", PckPackageServer::get_singleton(), "PckPackageServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("PCKPackageServer", PCKPackageServer::get_singleton(), "PCKPackageServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("StreamingAssetsServer", StreamingAssetsServer::get_singleton(), "StreamingAssetsServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceDatabase", ResourceDatabase::get_singleton(), "ResourceDatabase"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
@@ -489,6 +511,8 @@ void register_core_extensions() {
 
 	// The project settings are loaded here: register the default path prefixes before extensions can replace them.
 	PathPrefixServer::get_singleton()->register_default_prefixes();
+	// The main pack is loaded too: resolve `streaming://` and mount the streaming pack before anything loads resources.
+	StreamingAssetsServer::get_singleton()->setup();
 
 	// Hardcoded for now.
 	GDExtension::initialize_gdextensions();
@@ -526,6 +550,7 @@ void unregister_core_types() {
 	memdelete(_os);
 	memdelete(_resource_saver);
 	memdelete(_resource_loader);
+	memdelete(_streaming_assets_server);
 	memdelete(_pck_package_server);
 	memdelete(_files_manifest_server);
 	memdelete(_path_prefix_server);

@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/io/resource.h"
+#include "core/io/serializer_options.h"
 #include "core/variant/variant.h"
 
 class JSON : public Resource {
@@ -96,6 +97,10 @@ public:
 	_FORCE_INLINE_ static Variant to_native(const Variant &p_json, bool p_allow_objects = false) {
 		return _to_native(p_json, p_allow_objects, 0);
 	}
+
+	// A Resource as JSON text and back: the same as ResourceTextSerializer with FORMAT_JSON.
+	static String serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+	static Ref<Resource> deserialize(const String &p_text, const StringName &p_type_hint = StringName(), const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 
 	void set_data(const Variant &p_data);
 	_FORCE_INLINE_ Variant get_data() const { return data; }

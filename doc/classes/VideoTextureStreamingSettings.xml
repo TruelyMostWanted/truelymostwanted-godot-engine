@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoTextureStreamingSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [VideoTextureStreamingSettingsServer]: texture streaming and its VRAM budget.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"video_texture_streaming"[/code]. [VideoTextureStreamingSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_texture_streaming.ini[/code]. Change the values through the methods of [VideoTextureStreamingSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [VideoTextureStreamingSettingsServer] clamps values out of range with a warning when they are set or loaded.
+		[b]Note:[/b] This class only exists when the engine is built with the [code]texture_streaming[/code] module (not in the Web export, which has no [RenderingDevice]).
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="false">
+			If [code]true[/code], textures imported with streaming are streamed: only the mip levels the camera needs are kept in VRAM. Written to [member ProjectSettings.rendering/textures/streaming/enabled] before the renderers start, so a change takes effect at the [b]next start[/b] of the game ([constant SettingsServer.SETTING_FLAG_RESTART_REQUIRED]): the renderers compile the streaming shader path and [TextureStreaming] starts its threads only at startup. Forward+ and Mobile only.
+		</member>
+		<member name="max_lod" type="int" setter="set_max_lod" getter="get_max_lod" default="3">
+			The worst mip level streamed textures may drop to, pushed to [member TextureStreaming.max_lod_override]. Valid range: [code]0[/code] to [code]13[/code]. Takes effect at once.
+		</member>
+		<member name="memory_budget_enabled" type="bool" setter="set_memory_budget_enabled" getter="is_memory_budget_enabled" default="false">
+			If [code]true[/code], texture streaming keeps the streamed textures within [member memory_budget_mb] by lowering their mip levels. Written to [member ProjectSettings.rendering/textures/streaming/memory_budget_enabled], which [TextureStreaming] reads again when the project settings change: takes effect on the next frame.
+		</member>
+		<member name="memory_budget_mb" type="int" setter="set_memory_budget_mb" getter="get_memory_budget_mb" default="512">
+			The VRAM budget of streamed textures in MiB, pushed to [member TextureStreaming.memory_budget_mb_override]. Used while [member memory_budget_enabled] is on. Lower values use less VRAM and show blurrier textures. Valid range: [code]0[/code] to [code]65535[/code]. Takes effect at once.
+		</member>
+		<member name="min_lod" type="int" setter="set_min_lod" getter="get_min_lod" default="0">
+			The best mip level streamed textures may use ([code]0[/code] = full resolution), pushed to [member TextureStreaming.min_lod_override]. [code]1[/code] halves the largest texture size and saves about three quarters of the VRAM of streamed textures. Valid range: [code]0[/code] to [code]13[/code]. Takes effect at once.
+		</member>
+	</members>
+</class>

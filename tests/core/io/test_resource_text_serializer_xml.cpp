@@ -43,6 +43,12 @@ TEST_FORCE_LINK(test_resource_text_serializer_xml)
 #include "core/variant/typed_dictionary.h"
 #include "tests/test_utils.h"
 
+#include "modules/modules_enabled.gen.h" // For yaml.
+
+#ifdef MODULE_YAML_ENABLED
+#include "modules/yaml/yaml.h"
+#endif
+
 namespace TestResourceTextSerializerXML {
 
 class XMLTestEntry : public Resource {
@@ -291,7 +297,7 @@ TEST_CASE("[ResourceTextSerializer][XML] Layout of the text") {
 	REQUIRE(serializer != nullptr);
 	const Ref<XMLTestEntry> entry = make_xml_entry("Ann", 3);
 
-	const String text = serializer->serialize(entry, "xml");
+	const String text = serializer->serialize(entry, ResourceTextSerializer::FORMAT_XML);
 	CHECK(text ==
 			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 			"<resource type=\"XMLTestEntry\" format_version=\"1\">\n"
@@ -304,20 +310,24 @@ TEST_CASE("[ResourceTextSerializer][XML] Layout of the text") {
 			"  <tint>#ff0000ff</tint>\n"
 			"  <code kind=\"string\">007</code>\n"
 			"</resource>\n");
-	check_xml_entry(serializer->deserialize(text, "xml"), "Ann", 3);
+	check_xml_entry(serializer->deserialize(text, ResourceTextSerializer::FORMAT_XML), "Ann", 3);
 
 	// An empty indent writes one line.
-	const String line = serializer->serialize(entry, "xml", { { "indent", "" }, { "enums_as_names", false } });
+	Ref<SerializerOptions> line_options;
+	line_options.instantiate();
+	line_options->set_indent("");
+	line_options->set_enums_as_names(false);
+	const String line = serializer->serialize(entry, ResourceTextSerializer::FORMAT_XML, line_options);
 	CHECK_FALSE(line.contains("\n"));
 	CHECK(line.contains("<mode>5</mode>"));
-	check_xml_entry(serializer->deserialize(line, "xml"), "Ann", 3);
+	check_xml_entry(serializer->deserialize(line, ResourceTextSerializer::FORMAT_XML), "Ann", 3);
 }
 
 TEST_CASE("[ResourceTextSerializer][XML] Round trip keeps every stored property") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	const Ref<XMLTestSettings> settings = make_xml_settings();
 
-	const String text = serializer->serialize(settings, "xml");
+	const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_XML);
 	CHECK(text.contains("<resource type=\"XMLTestSettings\" format_version=\"1\">"));
 	CHECK(text.contains("<title>Fish &amp; &lt;Chips&gt; \"quoted\"\nsecond line&#13;\n</title>"));
 	CHECK(text.contains("<entries kind=\"array\">"));
@@ -331,9 +341,13 @@ TEST_CASE("[ResourceTextSerializer][XML] Round trip keeps every stored property"
 	// Nested resources of the declared type have no type attribute.
 	CHECK(text.count("type=\"") == 1);
 
-	check_xml_settings(serializer->deserialize(text, "xml"));
-	check_xml_settings(serializer->deserialize(serializer->serialize(settings, "xml", { { "indent", "" } }), "xml"));
-	check_xml_settings(serializer->deserialize(serializer->serialize(settings, "xml", { { "indent", "\t" } }), "xml"));
+	check_xml_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_XML));
+	Ref<SerializerOptions> indent_options;
+	indent_options.instantiate();
+	indent_options->set_indent("");
+	check_xml_settings(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_XML, indent_options), ResourceTextSerializer::FORMAT_XML));
+	indent_options->set_indent("\t");
+	check_xml_settings(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_XML, indent_options), ResourceTextSerializer::FORMAT_XML));
 }
 
 TEST_CASE("[ResourceTextSerializer][XML] Through ResourceSaver and ResourceLoader") {
@@ -392,7 +406,7 @@ TEST_CASE("[ResourceTextSerializer][XML] Hand-written file") {
 						"\t</main>\n"
 						"\t<entry key=\"numbers\" kind=\"array\"><item>1</item><item>2</item></entry>\n"
 						"</resource>\n";
-	const Ref<XMLTestSettings> settings = serializer->deserialize(text, "xml");
+	const Ref<XMLTestSettings> settings = serializer->deserialize(text, ResourceTextSerializer::FORMAT_XML);
 	REQUIRE(settings.is_valid());
 	CHECK(settings->get_title() == "<b>bold</b>");
 	const Ref<XMLTestEntry> main = settings->get_main();
@@ -406,9 +420,9 @@ TEST_CASE("[ResourceTextSerializer][XML] Hand-written file") {
 	CHECK(settings->get_numbers().size() == 2);
 
 	ERR_PRINT_OFF;
-	CHECK(serializer->deserialize("<resource type=\"XMLTestEntry\"><name>Open</resource>", "xml").is_null());
-	CHECK(serializer->deserialize("<resource type=\"XMLTestEntry\"><name>Open</name>", "xml").is_null());
-	CHECK(serializer->deserialize("<other><name>x</name></other>", "xml").is_null());
+	CHECK(serializer->deserialize("<resource type=\"XMLTestEntry\"><name>Open</resource>", ResourceTextSerializer::FORMAT_XML).is_null());
+	CHECK(serializer->deserialize("<resource type=\"XMLTestEntry\"><name>Open</name>", ResourceTextSerializer::FORMAT_XML).is_null());
+	CHECK(serializer->deserialize("<other><name>x</name></other>", ResourceTextSerializer::FORMAT_XML).is_null());
 	ERR_PRINT_ON;
 }
 
@@ -416,35 +430,51 @@ TEST_CASE("[ResourceTextSerializer] serialize() and deserialize() for all format
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	const Ref<XMLTestSettings> settings = make_xml_settings();
 
-	const PackedStringArray formats = serializer->get_formats();
-	CHECK(formats.has("json"));
-	CHECK(formats.has("ini"));
-	CHECK(formats.has("csv"));
-	CHECK(formats.has("xml"));
-	CHECK(formats.find("json") < formats.find("xml"));
-	CHECK(serializer->has_format("xml"));
-	CHECK(serializer->has_format(".JSON"));
-	CHECK_FALSE(serializer->has_format("yaml"));
+	const PackedInt32Array formats = serializer->get_available_formats();
+	CHECK(formats.has(ResourceTextSerializer::FORMAT_JSON));
+	CHECK(formats.has(ResourceTextSerializer::FORMAT_INI));
+	CHECK(formats.has(ResourceTextSerializer::FORMAT_CSV));
+	CHECK(formats.has(ResourceTextSerializer::FORMAT_XML));
+#ifndef MODULE_YAML_ENABLED
+	CHECK_FALSE(formats.has(ResourceTextSerializer::FORMAT_YAML));
+#endif
+	CHECK(formats.find(ResourceTextSerializer::FORMAT_JSON) < formats.find(ResourceTextSerializer::FORMAT_XML));
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_XML));
+#ifndef MODULE_YAML_ENABLED
+	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
+	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_MAX));
+
+	// Extensions.
+	CHECK(serializer->get_format_extension(ResourceTextSerializer::FORMAT_JSON) == "json");
+	CHECK(serializer->get_format_extension(ResourceTextSerializer::FORMAT_TOML) == "toml");
+	CHECK(serializer->get_format_extension(ResourceTextSerializer::FORMAT_MAX).is_empty());
+	CHECK(serializer->get_format_from_extension(".JSON") == ResourceTextSerializer::FORMAT_JSON);
+	CHECK(serializer->get_format_from_extension("xml") == ResourceTextSerializer::FORMAT_XML);
+	CHECK(serializer->get_format_from_extension("yml") == ResourceTextSerializer::FORMAT_YAML);
+	CHECK(serializer->get_format_from_extension("tres") == ResourceTextSerializer::FORMAT_MAX);
 
 	// The same text as the static C++ functions with the same options.
-	const ResourceTextSerializer::Options options = ResourceTextSerializer::get_options(Dictionary());
+	const ResourceTextSerializer::Options options = ResourceTextSerializer::get_options(Ref<SerializerOptions>());
 	String expected;
 	String error;
 	REQUIRE(ResourceTextSerializer::write_json(settings, options, expected, error) == OK);
-	CHECK(serializer->serialize(settings, "json") == expected);
+	CHECK(serializer->serialize(settings, ResourceTextSerializer::FORMAT_JSON) == expected);
 	REQUIRE(ResourceTextSerializer::write_ini(settings, options, expected, error) == OK);
-	CHECK(serializer->serialize(settings, "ini") == expected);
+	CHECK(serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI) == expected);
 	REQUIRE(ResourceTextSerializer::write_xml(settings, options, expected, error) == OK);
-	CHECK(serializer->serialize(settings, "xml") == expected);
+	CHECK(serializer->serialize(settings, ResourceTextSerializer::FORMAT_XML) == expected);
 
 	// JSON has one number type, so only the XML round trip is checked in full here.
-	CHECK(serializer->deserialize(serializer->serialize(settings, "json"), "json").is_valid());
-	CHECK(serializer->deserialize(serializer->serialize(settings, "ini"), "ini").is_valid());
+	CHECK(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_JSON), ResourceTextSerializer::FORMAT_JSON).is_valid());
+	CHECK(serializer->deserialize(serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI), ResourceTextSerializer::FORMAT_INI).is_valid());
 
+#ifndef MODULE_YAML_ENABLED
 	ERR_PRINT_OFF;
-	CHECK(serializer->serialize(settings, "yaml").is_empty());
-	CHECK(serializer->deserialize("a: 1", "yaml").is_null());
+	CHECK(serializer->serialize(settings, ResourceTextSerializer::FORMAT_YAML).is_empty());
+	CHECK(serializer->deserialize("a: 1", ResourceTextSerializer::FORMAT_YAML).is_null());
 	ERR_PRINT_ON;
+#endif
 }
 
 static Error _write_test_format(const Ref<Resource> &p_resource, const ResourceTextSerializer::Options &p_options, String &r_text, String &r_error) {
@@ -461,15 +491,25 @@ TEST_CASE("[ResourceTextSerializer] register_format() adds a format") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	const Ref<XMLTestEntry> entry = make_xml_entry("Ann", 3);
 
-	ResourceTextSerializer::register_format("test", &_write_test_format, &_parse_test_format);
-	CHECK(serializer->get_formats().has("test"));
-	CHECK(serializer->serialize(entry, "test") == "test:XMLTestEntry");
-	const Ref<XMLTestEntry> back = serializer->deserialize("test:XMLTestEntry", "test");
+	// YAML has no implementation in core, so its slot is free for the test; with the YAML module, the module's
+	// functions are registered again at the end.
+#ifndef MODULE_YAML_ENABLED
+	REQUIRE_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
+	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_YAML, &_write_test_format, &_parse_test_format);
+	CHECK(serializer->get_available_formats().has(ResourceTextSerializer::FORMAT_YAML));
+	CHECK(serializer->serialize(entry, ResourceTextSerializer::FORMAT_YAML) == "test:XMLTestEntry");
+	const Ref<XMLTestEntry> back = serializer->deserialize("test:XMLTestEntry", ResourceTextSerializer::FORMAT_YAML);
 	CHECK(back.is_valid());
 
-	ResourceTextSerializer::unregister_format("test");
-	CHECK_FALSE(serializer->has_format("test"));
-	CHECK(serializer->has_format("json"));
+	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_YAML);
+	CHECK_FALSE(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_JSON));
+
+#ifdef MODULE_YAML_ENABLED
+	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_YAML, &YAML::write_resource, &YAML::parse_format);
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_YAML));
+#endif
 }
 
 } // namespace TestResourceTextSerializerXML

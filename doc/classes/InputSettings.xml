@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [InputSettingsServer]: sensitivity, inversion, deadzone, vibration, toggle actions and the input options of the engine.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"input"[/code]. [InputSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/input.ini[/code]. Change the values through [InputSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		Only [member emulate_mouse_from_touch], [member emulate_touch_from_mouse] and [member use_accumulated_input] reach the engine ([Input]). All other values are game-side values: the engine stores them, and the game applies them through the helpers of [InputSettingsServer], for example [method InputSettingsServer.apply_to_mouse_motion].
+		It can also be used as the project defaults of the domain: save an [InputSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/input[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="allow_keyboard_for_current_player" type="bool" setter="set_allow_keyboard_for_current_player" getter="is_keyboard_allowed_for_current_player" default="true">
+			If [code]true[/code], keyboard, mouse and touch events belong to the first player (see [method InputSettingsServer.is_player_event]). Turn it off when the first player uses a gamepad and another player uses the keyboard.
+		</member>
+		<member name="emulate_mouse_from_touch" type="bool" setter="set_emulate_mouse_from_touch" getter="is_emulating_mouse_from_touch" default="true">
+			If [code]true[/code], touch events also send mouse events (see [member Input.emulate_mouse_from_touch]). The default is the value the engine has when the domain starts, which comes from [member ProjectSettings.input_devices/pointing/emulate_mouse_from_touch].
+		</member>
+		<member name="emulate_touch_from_mouse" type="bool" setter="set_emulate_touch_from_mouse" getter="is_emulating_touch_from_mouse" default="false">
+			If [code]true[/code], mouse events also send touch events (see [member Input.emulate_touch_from_mouse]). The default is the value the engine has when the domain starts, which comes from [member ProjectSettings.input_devices/pointing/emulate_touch_from_mouse].
+		</member>
+		<member name="first_player_device_id" type="int" setter="set_first_player_device_id" getter="get_first_player_device_id" default="-1">
+			The joypad device of the first player (see [member InputEvent.device]), or [code]-1[/code] for any joypad. Used by [method InputSettingsServer.is_player_event].
+		</member>
+		<member name="gamepad_deadzone" type="float" setter="set_gamepad_deadzone" getter="get_gamepad_deadzone" default="0.2">
+			The radial deadzone of the look stick, from [code]0.0[/code] to [code]0.95[/code]. Used by [method InputSettingsServer.apply_to_stick].
+		</member>
+		<member name="gamepad_sensitivity" type="float" setter="set_gamepad_sensitivity" getter="get_gamepad_sensitivity" default="1.0">
+			The factor for the look stick of a gamepad, from [code]0.01[/code] to [code]10.0[/code].
+		</member>
+		<member name="gamepad_x_inverted" type="bool" setter="set_gamepad_x_inverted" getter="is_gamepad_x_inverted" default="false">
+			If [code]true[/code], the horizontal look axis of a gamepad is inverted.
+		</member>
+		<member name="gamepad_y_inverted" type="bool" setter="set_gamepad_y_inverted" getter="is_gamepad_y_inverted" default="false">
+			If [code]true[/code], the vertical look axis of a gamepad is inverted.
+		</member>
+		<member name="keyboard_sensitivity" type="float" setter="set_keyboard_sensitivity" getter="get_keyboard_sensitivity" default="1.0">
+			The factor for looking or turning with keys, from [code]0.01[/code] to [code]10.0[/code].
+		</member>
+		<member name="keyboard_x_inverted" type="bool" setter="set_keyboard_x_inverted" getter="is_keyboard_x_inverted" default="false">
+			If [code]true[/code], the horizontal look axis of the keyboard is inverted.
+		</member>
+		<member name="keyboard_y_inverted" type="bool" setter="set_keyboard_y_inverted" getter="is_keyboard_y_inverted" default="false">
+			If [code]true[/code], the vertical look axis of the keyboard is inverted.
+		</member>
+		<member name="mouse_confined" type="bool" setter="set_mouse_confined" getter="is_mouse_confined" default="false">
+			If [code]true[/code], the cursor stays inside the window while it is visible (see [method InputSettingsServer.set_mouse_captured]).
+		</member>
+		<member name="mouse_sensitivity" type="float" setter="set_mouse_sensitivity" getter="get_mouse_sensitivity" default="1.0">
+			The factor for mouse motion, from [code]0.01[/code] to [code]10.0[/code].
+		</member>
+		<member name="mouse_smoothing" type="float" setter="set_mouse_smoothing" getter="get_mouse_smoothing" default="0.0">
+			How much [method InputSettingsServer.apply_to_mouse_motion] blends a motion with the previous one, from [code]0.0[/code] (off) to [code]0.95[/code].
+		</member>
+		<member name="mouse_x_inverted" type="bool" setter="set_mouse_x_inverted" getter="is_mouse_x_inverted" default="false">
+			If [code]true[/code], the horizontal mouse axis is inverted.
+		</member>
+		<member name="mouse_y_inverted" type="bool" setter="set_mouse_y_inverted" getter="is_mouse_y_inverted" default="false">
+			If [code]true[/code], the vertical mouse axis is inverted.
+		</member>
+		<member name="toggle_actions" type="PackedStringArray" setter="set_toggle_actions" getter="get_toggle_actions" default="PackedStringArray()">
+			The input actions that toggle instead of being held, for example [code]"crouch"[/code], [code]"sprint"[/code] or [code]"aim"[/code]. Empty names and duplicates are removed. Used by [method InputSettingsServer.is_action_active].
+		</member>
+		<member name="use_accumulated_input" type="bool" setter="set_use_accumulated_input" getter="is_using_accumulated_input" default="true">
+			If [code]true[/code], similar input events in one frame are merged (see [member Input.use_accumulated_input]).
+		</member>
+		<member name="vibration_enabled" type="bool" setter="set_vibration_enabled" getter="is_vibration_enabled" default="true">
+			If [code]false[/code], [method InputSettingsServer.vibrate] does nothing.
+		</member>
+		<member name="vibration_strength" type="float" setter="set_vibration_strength" getter="get_vibration_strength" default="1.0">
+			The factor for the magnitudes passed to [method InputSettingsServer.vibrate], from [code]0.0[/code] to [code]1.0[/code].
+		</member>
+	</members>
+</class>

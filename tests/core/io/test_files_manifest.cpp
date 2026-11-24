@@ -186,7 +186,7 @@ TEST_CASE("[FilesManifest] Missing folders report an error or are created") {
 	CHECK(err == ERR_FILE_NOT_FOUND);
 	CHECK_FALSE(DirAccess::dir_exists_absolute(missing));
 
-	manifest->set_create_non_existing_folders(true);
+	manifest->set_create_missing_folders(true);
 	CHECK(manifest->get_paths(&err) == make_paths(root, { "a.tres", "b.res", "m.tres" }));
 	CHECK(err == OK);
 	CHECK(DirAccess::dir_exists_absolute(missing));

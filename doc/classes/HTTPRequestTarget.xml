@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="HTTPRequestTarget" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A reusable description of one HTTP request, sent by [HTTPRequest].
+	</brief_description>
+	<description>
+		[HTTPRequestTarget] describes one HTTP request: the [member url], the HTTP [member method], the [member query] parameters, the [member headers] and a typed body. It can be edited in the Inspector and saved as a [code].tres[/code] file, so one target can be reused by many nodes and calls. Send it with [method HTTPRequest.request_target]; the answer arrives as an [HTTPResponse] through [signal HTTPRequest.response_received].
+		Placeholders written as [code]{name}[/code] in [member url], [member headers], [member query], [member body_text] and [member body_fields] are replaced with the values of the [code]variables[/code] dictionary passed to [method HTTPRequest.request_target] or to the [code]build_*[/code] methods. Unknown placeholders stay unchanged.
+		[codeblocks]
+		[gdscript]
+		var target = HTTPRequestTarget.new()
+		target.url = "https://example.com/api/players/{id}"
+		target.method = HTTPClient.METHOD_POST
+		target.body_type = HTTPRequestTarget.BODY_TYPE_JSON
+		target.body_fields = { "name": "{name}", "score": 100 }
+
+		$HTTPRequest.response_received.connect(func(response): print(response.status_code, " ", response.get_json()))
+		$HTTPRequest.request_target(target, { "id": 7, "name": "Ada" })
+		[/gdscript]
+		[csharp]
+		var target = new HttpRequestTarget();
+		target.Url = "https://example.com/api/players/{id}";
+		target.Method = HttpClient.Method.Post;
+		target.BodyType = HttpRequestTarget.BodyTypeEnum.Json;
+		target.BodyFields = new Godot.Collections.Dictionary { { "name", "{name}" }, { "score", 100 } };
+
+		var request = GetNode&lt;HttpRequest&gt;("HTTPRequest");
+		request.ResponseReceived += response =&gt; GD.Print(response.StatusCode, " ", response.GetJson());
+		request.RequestTarget(target, new Godot.Collections.Dictionary { { "id", 7 }, { "name", "Ada" } });
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] Placeholders in [member url] are inserted without URI encoding, so a placeholder can hold a host or several path segments. Put values entered by users into [member query], which is encoded.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="build_body" qualifiers="const">
+			<return type="PackedByteArray" />
+			<param index="0" name="variables" type="Dictionary" default="{}" />
+			<description>
+				Returns the request body for [member body_type] with the placeholders replaced from [param variables]:
+				- [constant BODY_TYPE_NONE]: an empty array.
+				- [constant BODY_TYPE_TEXT]: [member body_text] as UTF-8.
+				- [constant BODY_TYPE_JSON]: [member body_fields] written with [method JSON.stringify] (keys keep their order), or [member body_text] if [member body_fields] is empty.
+				- [constant BODY_TYPE_FORM_URLENCODED]: [member body_fields] encoded like [method encode_query], or [member body_text] if [member body_fields] is empty.
+				- [constant BODY_TYPE_BINARY]: [member body_data], unchanged.
+			</description>
+		</method>
+		<method name="build_headers" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="variables" type="Dictionary" default="{}" />
+			<description>
+				Returns the request headers as [code]"Name: value"[/code] lines, with the placeholders replaced from [param variables]. A [code]Content-Type[/code] header from [method get_content_type] is added unless [member headers] already has one (the name is compared without case).
+			</description>
+		</method>
+		<method name="build_url" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="variables" type="Dictionary" default="{}" />
+			<description>
+				Returns the full URL: [member url] with the placeholders replaced from [param variables], followed by the encoded [member query]. If [member url] already contains a query string, the parameters are appended with [code]&amp;[/code]; a fragment ([code]#...[/code]) stays at the end.
+			</description>
+		</method>
+		<method name="encode_query" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="fields" type="Dictionary" />
+			<description>
+				Encodes [param fields] as a URL query string, with the same rules as [method HTTPClient.query_string_from_dict]: keys and values are URI-encoded, an [Array] value repeats the key for each element, and a [code]null[/code] value adds only the key.
+				[codeblock]
+				print(HTTPRequestTarget.encode_query({ "q": "red apple", "tag": ["a", "b"], "flag": null }))
+				# Prints "q=red%20apple&amp;tag=a&amp;tag=b&amp;flag"
+				[/codeblock]
+			</description>
+		</method>
+		<method name="fill_placeholders" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="variables" type="Dictionary" />
+			<description>
+				Returns [param text] with every [code]{key}[/code] replaced by the matching value of [param variables], converted to [String]. Placeholders without a value stay unchanged.
+			</description>
+		</method>
+		<method name="get_content_type" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the [code]Content-Type[/code] for the current [member body_type]. See [method get_content_type_for].
+			</description>
+		</method>
+		<method name="get_content_type_for" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="body_type" type="int" enum="HTTPRequestTarget.BodyType" />
+			<description>
+				Returns the [code]Content-Type[/code] that is sent for [param body_type]: [code]text/plain; charset=utf-8[/code], [code]application/json[/code], [code]application/x-www-form-urlencoded[/code] or [code]application/octet-stream[/code]. Returns an empty string for [constant BODY_TYPE_NONE].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="accept_gzip" type="bool" setter="set_accept_gzip" getter="is_accepting_gzip" default="true">
+			If [code]true[/code], the request accepts compressed response bodies and decompresses them. Replaces [member HTTPRequest.accept_gzip] for this request.
+		</member>
+		<member name="body_data" type="PackedByteArray" setter="set_body_data" getter="get_body_data" default="PackedByteArray()">
+			The raw body sent with [constant BODY_TYPE_BINARY]. Placeholders are not replaced.
+		</member>
+		<member name="body_fields" type="Dictionary" setter="set_body_fields" getter="get_body_fields" default="{}">
+			The fields of a [constant BODY_TYPE_JSON] or [constant BODY_TYPE_FORM_URLENCODED] body. Placeholders are replaced in keys and in [String] values, also inside nested arrays and dictionaries. If empty, [member body_text] is sent instead.
+		</member>
+		<member name="body_text" type="String" setter="set_body_text" getter="get_body_text" default="&quot;&quot;">
+			The body text sent with [constant BODY_TYPE_TEXT], and with [constant BODY_TYPE_JSON] or [constant BODY_TYPE_FORM_URLENCODED] when [member body_fields] is empty. Placeholders are replaced as plain text.
+		</member>
+		<member name="body_type" type="int" setter="set_body_type" getter="get_body_type" enum="HTTPRequestTarget.BodyType" default="0">
+			The kind of body that is sent. It selects the body property that is used and the [code]Content-Type[/code] header (see [method get_content_type]). The Inspector shows only the body properties of the selected type.
+		</member>
+		<member name="headers" type="Dictionary" setter="set_headers" getter="get_headers" default="{}">
+			The request headers as header names mapped to values, for example [code]{ "Authorization": "Bearer {token}" }[/code]. Placeholders are replaced in names and values.
+		</member>
+		<member name="max_redirects" type="int" setter="set_max_redirects" getter="get_max_redirects" default="8">
+			The maximum number of redirects that are followed. [code]-1[/code] allows any number. Replaces [member HTTPRequest.max_redirects] for this request.
+			[b]Note:[/b] On the Web platform, the browser follows redirects and this value is ignored.
+		</member>
+		<member name="method" type="int" setter="set_method" getter="get_method" enum="HTTPClient.Method" default="0">
+			The HTTP method (verb) of the request.
+		</member>
+		<member name="query" type="Dictionary" setter="set_query" getter="get_query" default="{}">
+			The query parameters appended to [member url], encoded with [method encode_query]. Placeholders are replaced in keys and [String] values before encoding.
+		</member>
+		<member name="timeout" type="float" setter="set_timeout" getter="get_timeout" default="0.0">
+			The time in seconds before the request times out. [code]0.0[/code] disables the timeout. Replaces [member HTTPRequest.timeout] for this request.
+		</member>
+		<member name="url" type="String" setter="set_url" getter="get_url" default="&quot;&quot;">
+			The URL of the request, without the [member query] parameters, for example [code]https://example.com/api/players/{id}[/code].
+		</member>
+	</members>
+	<constants>
+		<constant name="BODY_TYPE_NONE" value="0" enum="BodyType">
+			The request has no body.
+		</constant>
+		<constant name="BODY_TYPE_TEXT" value="1" enum="BodyType">
+			The body is [member body_text], sent as [code]text/plain; charset=utf-8[/code].
+		</constant>
+		<constant name="BODY_TYPE_JSON" value="2" enum="BodyType">
+			The body is JSON built from [member body_fields] (or [member body_text]), sent as [code]application/json[/code].
+		</constant>
+		<constant name="BODY_TYPE_FORM_URLENCODED" value="3" enum="BodyType">
+			The body is a URL-encoded form built from [member body_fields] (or [member body_text]), sent as [code]application/x-www-form-urlencoded[/code].
+		</constant>
+		<constant name="BODY_TYPE_BINARY" value="4" enum="BodyType">
+			The body is [member body_data], sent as [code]application/octet-stream[/code].
+		</constant>
+	</constants>
+</class>

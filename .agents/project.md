@@ -107,33 +107,25 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='d0b5c8e63e'
-CURRENT_MILESTONE='Phase 3 · Settings / Phase 4 · Packs and streaming'
+LAST_INTEGRATED_COMMIT='30ad6d8ff9'
+CURRENT_MILESTONE='Resource formats, settings domains, API review'
 UPDATED='2026-11-24'
 ```
 
-Gemergt seit dem letzten Stand: #60, #9, #10, #36, #35, #50, #15, #53, #77, #68, #16, #74. Concepts entschieden und geschlossen: #13 (→ #74–#76), #31 (→ #77–#80), #65 (→ #83–#86), #66 (→ #87–#91).
+Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
 
-**Fertig von Agenten, wartet auf Integration (ungebaut):**
-- #51 `51-feature-texture-atlas-editor` – Achtung Regel: die neuen Laufzeit-Methoden in `TextureAtlas` (Commit 62388e1ead) gehören auf Branch `50-feature-texture-atlas` (cherry-pick dort, erneut squash-mergen), Editor-Teil bleibt auf 51. Fund: Fehlertext „region region_name“ in `set_regions()` (#50-Branch).
-- #70 `70-feature-load-result` – Wiki-Seiten ResourceLoader/Saver/FormatLoader sind volle Kopien: gegen Live-Stand abgleichen.
-- #87 auf Branch `03-feature-path-prefix-server` (Engine); Testprojekt-Branch `03-feature-path-prefix-server-87` → `03-feature-path-prefix-server` vorspulen (alter Worktree der Vor-Session blockiert ihn).
-- #83 auf Branch `10-feature-pck-package-server` (Engine); Testprojekt-Branch `83-pck-package-resource` → `10-feature-pck-package-server` vorspulen.
-- #89 `89-feature-streaming-assets-export-plugin` (berührt `editor/editor_node.cpp`, `.github/CODEOWNERS`).
-- #78 `78-feature-performance-recorder` (Overhead-Tabelle aus Check-Ausgabe „recorder_time“ ins Issue).
+**Stand (2026-11-24, Mittag):** Gemergt seit #99: #10/#15–#20-Umbenennungen, #90, #26 (+Testfix), #73, #155 YAML, #85, #122, #86 (+PCKBuildPlan typisiert, im Core registriert), #21, #79, #71, #89/#91 Pack-Modus, #22. Wiki aktuell bis #91 (Batch #22 läuft).
+**Fallen neu:** Glue-Generator löscht alte generierte Dateien nicht (Klasse zwischen Core/Editor verschoben → alte Datei in `modules/mono/glue/GodotSharp/*/Generated` löschen, Quelle `touch`en, Assemblies neu, im Test-Worktree `.godot/mono/temp` löschen). Datenklassen, die C# zur Laufzeit braucht, im Core registrieren. `integrate.sh` bricht bei roten Unit-Tests ab (ein Merge von #26 ging vorher mit roten Tests durch, korrigiert).
+**Laufende Agenten:** #23, #24, #27, #28, Wiki #22. Danach: #25 (Presets, nach #21–#24), #29, #30, #76, #80, #121.
+**Alt (überholt):** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
 
-**Gestoppt bei 95 % des 5-Stunden-Limits (2026-11-24):** #17 (`17-feature-language-settings`; Besitzer: `LanguageSettings.xml` fertigstellen lassen), #95 (`95-feature-scene-format-loaders`), #96 (`96-feature-font-format-loaders`) mit WIP-Commit und `scratch/issues/<N>/knowledge.md`; mit frischem Agenten fortsetzen.
-- #87 in Arbeit im Hauptbaum: Branch `03-feature-path-prefix-server` gebaut (0/0), Prefix-Tests 9/9, Volltests 1575/1575, Glue/Assemblies 0, doctool ohne Diff; offen: Checks (Testprojekt-Branch `03-feature-path-prefix-server` auf `-87` vorgespult), Kommentar, Merge.
+**Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
 
-**Gestoppt am Limit (2026-11-24 ~01:40, WIP in Scratch/Branches):** #98 Wiki-Umbau (Clone `scratch/issues/98/wiki`, nicht gepusht, `rename-map.txt`), #99 API-Review (`scratch/issues/99/review.md`), #101 `101-feature-image-texture-loader`, #102–#104 Audio-Loader (`102-feature-wav-loader` …), #100 `100-feature-http-request-target`. #17: Wiki-Entwürfe + Checks fertig (Testprojekt-Commit 1919c31/454057f), Build fehlt. Neue Issues: #98–#105.
+**Achtung Stash:** `git stash list` hat `stash@{1}` „new feature for resoure-loader“ (vom Besitzer, alt, auf master) und `stash@{0}` „ACCIDENTAL …“ (versehentlich angewendete Kopie davon, mit Konfliktmarkern). Nichts verworfen; die Skripte nutzen keinen Stash mehr. Besitzer entscheidet über das Löschen.
 
-**Danach:** #84 (nach #83, gleiche Dateien), #85/#86 (nach #83), #88 (nach #87), #90, #91; #75 (nach #74), #76; #79/#80 (nach #78); #93 SerializerOptions (Branch 05, alle Aufrufer); #73 Formatklassen; #71 (Branch 15); #18–#30 Settings-Domänen nach Muster #16; Fund #16: `AudioServer.set_bus_layout()` setzt Bus-Werte zurück (Issue anlegen, Branch 16).
-
-**Testprojekt:** C# kompiliert alle Feature-Ordner zusammen; Änderungen an Checks mehrerer Features in einem kombinierten Hilfs-Worktree testen (Branches zusammenführen), dann je Branch committen. Vor `git merge main` in Test-Worktrees die ungetrackten `.uid`/`.import` anderer Features löschen.
+**Danach:** #99 restliche Umbenennungen je Feature-Branch (Reihenfolge in `scratch/issues/99/review.md`), #73 Formatklassen (nach #93), #85/#86 (PCK-Inspector/Exporter), #90/#91 (Apple-Bundles, Pack-Modus), #76, #79/#80, #71 (Branch 15), #121 (Import-Absturz), #122 (Bus-Layout, Branch 16), Settings-Domänen #18, #20–#30.
 
 ## Übergabe
-
-**Zuerst fortsetzen:** die Integrationsliste oben (je Issue: Branch, `git merge truely-godot-engine`, Build mit Tests, Volltests, Glue, Assemblies, `--doctool`, Checks, Kommentar, PR + Squash-Merge, Wiki, Testprojekt).
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 
