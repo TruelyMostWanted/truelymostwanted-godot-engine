@@ -3709,6 +3709,18 @@
 		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
 		</member>
+		<member name="settings/camera/far" type="float" setter="" getter="" default="4000.0">
+			The default of [member CameraSettings.far]: the far clip plane distance in meters that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera/field_of_view" type="float" setter="" getter="" default="75.0">
+			The default of [member CameraSettings.field_of_view]: the field of view in degrees that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera/keep_aspect" type="int" setter="" getter="" default="1">
+			The default of [member CameraSettings.keep_aspect]: whether the field of view is horizontal ([code]0[/code], Keep Width) or vertical ([code]1[/code], Keep Height). See [enum Camera3D.KeepAspect].
+		</member>
+		<member name="settings/camera/near" type="float" setter="" getter="" default="0.05">
+			The default of [member CameraSettings.near]: the near clip plane distance in meters that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>
