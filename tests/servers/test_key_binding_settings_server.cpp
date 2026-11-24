@@ -183,7 +183,7 @@ TEST_CASE("[KeyBindingSettingsServer] Text form of key, mouse button, joypad but
 	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("PhysicalKey:W")) == "W");
 }
 
-TEST_CASE("[KeyBindingSettingsServer] Defaults come from InputMap; rebinding reaches InputMap at once") {
+TEST_CASE("[SceneTree][KeyBindingSettingsServer] Defaults come from InputMap; rebinding reaches InputMap at once") {
 	TestSetup setup;
 	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
 	const PackedStringArray actions = server->get_action_names();
@@ -230,7 +230,7 @@ TEST_CASE("[KeyBindingSettingsServer] Defaults come from InputMap; rebinding rea
 	memdelete(server);
 }
 
-TEST_CASE("[KeyBindingSettingsServer] Conflicts and reset to the project bindings") {
+TEST_CASE("[SceneTree][KeyBindingSettingsServer] Conflicts and reset to the project bindings") {
 	TestSetup setup;
 	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
 
@@ -261,7 +261,7 @@ TEST_CASE("[KeyBindingSettingsServer] Conflicts and reset to the project binding
 	memdelete(server);
 }
 
-TEST_CASE("[KeyBindingSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (INI, JSON, CSV)") {
+TEST_CASE("[SceneTree][KeyBindingSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (INI, JSON, CSV)") {
 	TestSetup setup;
 	for (const String &extension : { String("ini"), String("json"), String("csv") }) {
 		const String path = temp_file("key_bindings." + extension);
@@ -306,7 +306,7 @@ TEST_CASE("[KeyBindingSettingsServer] Rebound, saved, restarted: the new key wor
 	}
 }
 
-TEST_CASE("[KeyBindingSettingsServer] A saved action that no longer exists is skipped; new project actions keep their bindings") {
+TEST_CASE("[SceneTree][KeyBindingSettingsServer] A saved action that no longer exists is skipped; new project actions keep their bindings") {
 	TestSetup setup;
 	const String path = temp_file("key_bindings_old.ini");
 	{
@@ -346,7 +346,7 @@ TEST_CASE("[KeyBindingSettingsServer] A saved action that no longer exists is sk
 	memdelete(server);
 }
 
-TEST_CASE("[KeyBindingSettingsServer] Other event types of an action are kept") {
+TEST_CASE("[SceneTree][KeyBindingSettingsServer] Other event types of an action are kept") {
 	TestSetup setup;
 	Ref<InputEventScreenTouch> touch;
 	touch.instantiate();
