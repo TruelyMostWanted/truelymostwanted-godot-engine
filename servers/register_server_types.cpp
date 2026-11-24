@@ -94,6 +94,10 @@
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_quality_settings.h"
 #include "servers/settings/video_quality_settings_server.h"
+#include "servers/settings/video_texture_settings.h"
+#include "servers/settings/video_texture_settings_server.h"
+#include "servers/settings/video_texture_streaming_settings.h"
+#include "servers/settings/video_texture_streaming_settings_server.h"
 #include "servers/settings/video_window_settings.h"
 #include "servers/settings/video_window_settings_server.h"
 #include "servers/text/text_server.h"
@@ -181,6 +185,10 @@ static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
 static VideoWindowSettingsServer *video_window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
 static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
+static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
+#ifdef MODULE_TEXTURE_STREAMING_ENABLED
+static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
+#endif
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -250,6 +258,19 @@ void register_server_types() {
 	video_quality_settings_server = memnew(VideoQualitySettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoQualitySettingsServer", VideoQualitySettingsServer::get_singleton(), "VideoQualitySettingsServer"));
 	settings_server_manager->register_server(video_quality_settings_server);
+	GDREGISTER_CLASS(VideoTextureSettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoTextureSettingsServer);
+	video_texture_settings_server = memnew(VideoTextureSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureSettingsServer", VideoTextureSettingsServer::get_singleton(), "VideoTextureSettingsServer"));
+	settings_server_manager->register_server(video_texture_settings_server);
+#ifdef MODULE_TEXTURE_STREAMING_ENABLED
+	// Only with the texture_streaming module (#22); otherwise the domain is missing.
+	GDREGISTER_CLASS(VideoTextureStreamingSettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoTextureStreamingSettingsServer);
+	video_texture_streaming_settings_server = memnew(VideoTextureStreamingSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureStreamingSettingsServer", VideoTextureStreamingSettingsServer::get_singleton(), "VideoTextureStreamingSettingsServer"));
+	settings_server_manager->register_server(video_texture_streaming_settings_server);
+#endif
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -486,6 +507,12 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+#ifdef MODULE_TEXTURE_STREAMING_ENABLED
+	memdelete(video_texture_streaming_settings_server);
+	video_texture_streaming_settings_server = nullptr;
+#endif
+	memdelete(video_texture_settings_server);
+	video_texture_settings_server = nullptr;
 	memdelete(video_quality_settings_server);
 	video_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
