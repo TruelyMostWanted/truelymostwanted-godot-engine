@@ -82,7 +82,7 @@ Vector<uint8_t> PckPackageServer::read_file(const Ref<PckPackage> &p_package, co
 
 Error PckPackageServer::verify(const Ref<PckPackage> &p_package) {
 	ERR_FAIL_COND_V_MSG(p_package.is_null(), ERR_INVALID_PARAMETER, "The package is null.");
-	ERR_FAIL_COND_V_MSG(p_package->is_sparse_bundle(), ERR_UNAVAILABLE, vformat("Pack \"%s\" is a sparse bundle: its files are stored next to the pack and can't be verified here.", p_package->get_path()));
+	ERR_FAIL_COND_V_MSG(p_package->is_sparse_bundle(), ERR_UNAVAILABLE, vformat("Pack \"%s\" is a sparse bundle: its files are stored next to the pack and can't be verified here.", p_package->get_pack_path()));
 	for (const KeyValue<String, PckPackage::Entry> &kv : p_package->get_entry_map()) {
 		const PckPackage::Entry &entry = kv.value;
 		// Removal entries have no data, delta entries store a patch, and pending entries are not in the pack yet.
@@ -96,7 +96,7 @@ Error PckPackageServer::verify(const Ref<PckPackage> &p_package) {
 		}
 		unsigned char hash[16];
 		CryptoCore::md5(data.ptr(), data.size(), hash);
-		ERR_FAIL_COND_V_MSG(memcmp(hash, entry.md5, 16) != 0, ERR_FILE_CORRUPT, vformat("The MD5 sum of \"res://%s\" in pack \"%s\" does not match: the pack is corrupt.", kv.key, p_package->get_path()));
+		ERR_FAIL_COND_V_MSG(memcmp(hash, entry.md5, 16) != 0, ERR_FILE_CORRUPT, vformat("The MD5 sum of \"res://%s\" in pack \"%s\" does not match: the pack is corrupt.", kv.key, p_package->get_pack_path()));
 	}
 	return OK;
 }
@@ -114,13 +114,20 @@ Error PckPackageServer::build(const Ref<PckPackage> &p_package, const String &p_
 	}
 	const String key_hex = String::hex_encode_buffer(key.ptr(), key.size());
 
+	PackedStringArray missing_sources;
 	for (const KeyValue<String, PckPackage::Entry> &kv : p_package->get_entry_map()) {
 		ERR_FAIL_COND_V_MSG(kv.value.delta, ERR_UNAVAILABLE, vformat("\"res://%s\" is a delta patch: packs with delta patches can't be rebuilt.", kv.key));
+		if (!kv.value.removal && kv.value.source_type == PckPackage::SOURCE_FILE && !FileAccess::exists(kv.value.source_path)) {
+			missing_sources.push_back(kv.value.source_path);
+		}
 	}
+	// A description may name files that don't exist yet: report all missing sources before anything is written.
+	ERR_FAIL_COND_V_MSG(!missing_sources.is_empty(), ERR_FILE_NOT_FOUND, vformat("Can't build pack \"%s\": %d source files are missing: %s.", p_target_path, missing_sources.size(), String(", ").join(missing_sources)));
 
 	// Writing over the source pack would destroy the data that is still being read: write a temporary file first.
-	const bool same_file = !p_package->get_path().is_empty() && _same_pack_path(p_package->get_path(), p_target_path);
-	const String write_path = same_file ? p_target_path + ".tmp" : p_target_path;
+	const bool same_file = !p_package->get_pack_path().is_empty() && _same_pack_path(p_package->get_pack_path(), p_target_path);
+	const bool same_base = !p_package->get_base_pack().is_empty() && _same_pack_path(p_package->get_base_pack(), p_target_path);
+	const String write_path = (same_file || same_base) ? p_target_path + ".tmp" : p_target_path;
 
 	Ref<PCKPacker> packer;
 	packer.instantiate();
@@ -152,15 +159,19 @@ Error PckPackageServer::build(const Ref<PckPackage> &p_package, const String &p_
 		return err;
 	}
 
-	if (same_file) {
+	if (same_file || same_base) {
+		// The cached directory of the base pack points into the old file.
+		p_package->release_base_pack();
 		if (DirAccess::rename_absolute(write_path, p_target_path) != OK) {
 			// Some platforms don't replace an existing file on rename.
 			DirAccess::remove_absolute(p_target_path);
 			err = DirAccess::rename_absolute(write_path, p_target_path);
 			ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Can't replace pack \"%s\" with the new pack \"%s\".", p_target_path, write_path));
 		}
-		// The offsets of the package point into the old file: read the new one.
-		err = p_package->open_pack(p_target_path, key_hex);
+		if (same_file) {
+			// The offsets of the package point into the old file: read the new one.
+			err = p_package->open_pack(p_target_path, key_hex);
+		}
 	}
 	return err;
 }

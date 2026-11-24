@@ -1550,8 +1550,17 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
+			The [AudioBusSettingsServer] singleton.
+		</member>
+		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
+			The [AudioMixerServer] singleton.
+		</member>
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
+		</member>
+		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
+			The [AudioSettingsServer] singleton.
 		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
@@ -1605,6 +1614,9 @@
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
 		</member>
+		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
+			The [LanguageSettingsServer] singleton.
+		</member>
 		<member name="Marshalls" type="Marshalls" setter="" getter="">
 			The [Marshalls] singleton.
 		</member>
@@ -1638,6 +1650,9 @@
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
+		</member>
+		<member name="PerformanceRecorder" type="PerformanceRecorder" setter="" getter="">
+			The [PerformanceRecorder] singleton.
 		</member>
 		<member name="PhysicsServer2D" type="PhysicsServer2D" setter="" getter="">
 			The [PhysicsServer2D] singleton.
