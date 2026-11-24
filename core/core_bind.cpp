@@ -153,9 +153,9 @@ PackedStringArray ResourceLoader::get_cached_paths() {
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact) {
+PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact_type) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_for_type(p_type, p_exact, &paths);
+	ResourceCache::get_cached_paths_for_type(p_type, p_exact_type, &paths);
 	return _cached_paths_to_packed(paths);
 }
 
@@ -320,7 +320,7 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
 	ClassDB::bind_method(D_METHOD("get_cached_ref", "path"), &ResourceLoader::get_cached_ref);
 	ClassDB::bind_method(D_METHOD("get_cached_paths"), &ResourceLoader::get_cached_paths);
-	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact_type"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension"), &ResourceLoader::get_cached_paths_with_extension);
 	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("exists", "path", "type_hint"), &ResourceLoader::exists, DEFVAL(""));

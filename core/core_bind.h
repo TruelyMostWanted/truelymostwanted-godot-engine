@@ -86,7 +86,7 @@ public:
 	bool has_cached(const String &p_path);
 	Ref<Resource> get_cached_ref(const String &p_path);
 	PackedStringArray get_cached_paths();
-	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact = false);
+	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact_type = false);
 	PackedStringArray get_cached_paths_with_extension(const String &p_extension);
 	PackedStringArray get_cached_paths_in_directory(const String &p_directory, bool p_recursive = true);
 	bool exists(const String &p_path, const String &p_type_hint = "");
