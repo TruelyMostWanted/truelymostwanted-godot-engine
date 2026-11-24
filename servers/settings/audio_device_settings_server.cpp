@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  audio_settings_server.cpp                                             */
+/*  audio_device_settings_server.cpp                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "audio_settings_server.h"
+#include "audio_device_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
@@ -40,40 +40,40 @@
 
 static constexpr const char *DEFAULT_DEVICE = "Default";
 
-AudioSettingsServer *AudioSettingsServer::singleton = nullptr;
+AudioDeviceSettingsServer *AudioDeviceSettingsServer::singleton = nullptr;
 
-AudioSettingsServer *AudioSettingsServer::get_singleton() {
+AudioDeviceSettingsServer *AudioDeviceSettingsServer::get_singleton() {
 	return singleton;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Engine targets. Without an AudioServer (headless tools, unit tests) nothing is pushed.
 
-void AudioSettingsServer::_push_output_device(const String &p_device) {
+void AudioDeviceSettingsServer::_push_output_device(const String &p_device) {
 	AudioServer *audio_server = AudioServer::get_singleton();
 	if (audio_server != nullptr) {
 		audio_server->set_output_device(p_device);
 	}
 }
 
-String AudioSettingsServer::_pull_output_device() {
+String AudioDeviceSettingsServer::_pull_output_device() {
 	AudioServer *audio_server = AudioServer::get_singleton();
 	return audio_server != nullptr ? audio_server->get_output_device() : String(DEFAULT_DEVICE);
 }
 
-void AudioSettingsServer::_push_input_device(const String &p_device) {
+void AudioDeviceSettingsServer::_push_input_device(const String &p_device) {
 	AudioServer *audio_server = AudioServer::get_singleton();
 	if (audio_server != nullptr) {
 		audio_server->set_input_device(p_device);
 	}
 }
 
-String AudioSettingsServer::_pull_input_device() {
+String AudioDeviceSettingsServer::_pull_input_device() {
 	AudioServer *audio_server = AudioServer::get_singleton();
 	return audio_server != nullptr ? audio_server->get_input_device() : String(DEFAULT_DEVICE);
 }
 
-String AudioSettingsServer::_validate_device(const String &p_device, bool p_input) {
+String AudioDeviceSettingsServer::_validate_device(const String &p_device, bool p_input) {
 	if (p_device.is_empty() || p_device == DEFAULT_DEVICE) {
 		return DEFAULT_DEVICE;
 	}
@@ -91,7 +91,7 @@ String AudioSettingsServer::_validate_device(const String &p_device, bool p_inpu
 	return DEFAULT_DEVICE;
 }
 
-bool AudioSettingsServer::is_device_selection_supported() {
+bool AudioDeviceSettingsServer::is_device_selection_supported() {
 	const AudioDriver *driver = AudioDriver::get_singleton();
 	if (driver == nullptr) {
 		return false;
@@ -107,22 +107,22 @@ bool AudioSettingsServer::is_device_selection_supported() {
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName AudioSettingsServer::get_domain() const {
+StringName AudioDeviceSettingsServer::get_domain() const {
 	return SNAME("audio");
 }
 
-SettingsServer::ApplyPhase AudioSettingsServer::get_apply_phase() const {
+SettingsServer::ApplyPhase AudioDeviceSettingsServer::get_apply_phase() const {
 	// After AudioServer::init(), before the SceneTree exists.
 	return APPLY_PHASE_SERVERS;
 }
 
-Ref<Resource> AudioSettingsServer::_create_default_settings() const {
-	Ref<AudioSettings> default_settings;
+Ref<Resource> AudioDeviceSettingsServer::_create_default_settings() const {
+	Ref<AudioDeviceSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-Variant AudioSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant AudioDeviceSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	const Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (p_name == SNAME("output_device")) {
 		return _validate_device(value, false);
@@ -133,7 +133,7 @@ Variant AudioSettingsServer::_validate_setting(const StringName &p_name, const V
 	return value;
 }
 
-bool AudioSettingsServer::is_value_supported(const StringName &p_name) const {
+bool AudioDeviceSettingsServer::is_value_supported(const StringName &p_name) const {
 	if (!SettingsServer::is_value_supported(p_name)) {
 		return false;
 	}
@@ -151,39 +151,39 @@ bool AudioSettingsServer::is_value_supported(const StringName &p_name) const {
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-void AudioSettingsServer::set_output_device(const String &p_device) {
+void AudioDeviceSettingsServer::set_output_device(const String &p_device) {
 	set_value(SNAME("output_device"), p_device);
 }
 
-String AudioSettingsServer::get_output_device() const {
+String AudioDeviceSettingsServer::get_output_device() const {
 	return get_value(SNAME("output_device"));
 }
 
-void AudioSettingsServer::set_input_device(const String &p_device) {
+void AudioDeviceSettingsServer::set_input_device(const String &p_device) {
 	set_value(SNAME("input_device"), p_device);
 }
 
-String AudioSettingsServer::get_input_device() const {
+String AudioDeviceSettingsServer::get_input_device() const {
 	return get_value(SNAME("input_device"));
 }
 
-void AudioSettingsServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioSettingsServer::set_output_device);
-	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioSettingsServer::get_output_device);
-	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioSettingsServer::set_input_device);
-	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioSettingsServer::get_input_device);
-	ClassDB::bind_static_method("AudioSettingsServer", D_METHOD("is_device_selection_supported"), &AudioSettingsServer::is_device_selection_supported);
+void AudioDeviceSettingsServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioDeviceSettingsServer::set_output_device);
+	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioDeviceSettingsServer::get_output_device);
+	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioDeviceSettingsServer::set_input_device);
+	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioDeviceSettingsServer::get_input_device);
+	ClassDB::bind_static_method("AudioDeviceSettingsServer", D_METHOD("is_device_selection_supported"), &AudioDeviceSettingsServer::is_device_selection_supported);
 }
 
-AudioSettingsServer::AudioSettingsServer() {
+AudioDeviceSettingsServer::AudioDeviceSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
-	bind_setting_callbacks(SNAME("output_device"), callable_mp_static(&AudioSettingsServer::_push_output_device), callable_mp_static(&AudioSettingsServer::_pull_output_device));
-	bind_setting_callbacks(SNAME("input_device"), callable_mp_static(&AudioSettingsServer::_push_input_device), callable_mp_static(&AudioSettingsServer::_pull_input_device));
+	bind_setting_callbacks(SNAME("output_device"), callable_mp_static(&AudioDeviceSettingsServer::_push_output_device), callable_mp_static(&AudioDeviceSettingsServer::_pull_output_device));
+	bind_setting_callbacks(SNAME("input_device"), callable_mp_static(&AudioDeviceSettingsServer::_push_input_device), callable_mp_static(&AudioDeviceSettingsServer::_pull_input_device));
 }
 
-AudioSettingsServer::~AudioSettingsServer() {
+AudioDeviceSettingsServer::~AudioDeviceSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}

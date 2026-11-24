@@ -39,8 +39,8 @@ TEST_FORCE_LINK(test_audio_settings_server)
 #include "core/math/math_funcs.h"
 #include "servers/audio/audio_server.h"
 #include "servers/settings/audio_bus_settings_server.h"
+#include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
-#include "servers/settings/audio_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/test_utils.h"
 
@@ -84,13 +84,13 @@ static Ref<AudioBusSettings> make_bus(const String &p_name, float p_volume_db) {
 	return bus;
 }
 
-TEST_CASE("[Audio][AudioSettingsServer] Both domains are engine singletons registered with the manager") {
+TEST_CASE("[Audio][AudioDeviceSettingsServer] Both domains are engine singletons registered with the manager") {
 	TestSetup setup;
-	AudioSettingsServer *audio = AudioSettingsServer::get_singleton();
+	AudioDeviceSettingsServer *audio = AudioDeviceSettingsServer::get_singleton();
 	AudioBusSettingsServer *buses = AudioBusSettingsServer::get_singleton();
 	REQUIRE(audio != nullptr);
 	REQUIRE(buses != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("AudioSettingsServer"));
+	CHECK(Engine::get_singleton()->has_singleton("AudioDeviceSettingsServer"));
 	CHECK(Engine::get_singleton()->has_singleton("AudioBusSettingsServer"));
 
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
@@ -268,15 +268,15 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Buses added to the layout later keep 
 	memdelete(server);
 }
 
-TEST_CASE("[Audio][AudioSettingsServer] Devices: unknown names fall back to \"Default\" without an error") {
+TEST_CASE("[Audio][AudioDeviceSettingsServer] Devices: unknown names fall back to \"Default\" without an error") {
 	TestSetup setup;
 	AudioServer *audio_server = AudioServer::get_singleton();
-	AudioSettingsServer *server = memnew(AudioSettingsServer);
+	AudioDeviceSettingsServer *server = memnew(AudioDeviceSettingsServer);
 	CHECK(server->get_domain() == StringName("audio"));
 	CHECK(server->get_output_device() == "Default");
 	CHECK(server->get_input_device() == "Default");
 	// The dummy driver has only "Default".
-	CHECK_FALSE(AudioSettingsServer::is_device_selection_supported());
+	CHECK_FALSE(AudioDeviceSettingsServer::is_device_selection_supported());
 	CHECK_FALSE(server->is_value_supported("output_device"));
 	CHECK_FALSE(server->is_value_supported("input_device"));
 

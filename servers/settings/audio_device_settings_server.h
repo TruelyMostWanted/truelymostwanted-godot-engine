@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  audio_settings_server.h                                               */
+/*  audio_device_settings_server.h                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -32,12 +32,12 @@
 
 #include "servers/settings/settings_server.h"
 
-// Settings domain `audio`: the output and the input device of AudioServer (AudioSettings).
+// Settings domain `audio`: the output and the input device of AudioServer (AudioDeviceSettings).
 // The bus values are a separate list domain (AudioBusSettingsServer), so that list can be stored as CSV.
-class AudioSettingsServer : public SettingsServer {
-	GDCLASS(AudioSettingsServer, SettingsServer);
+class AudioDeviceSettingsServer : public SettingsServer {
+	GDCLASS(AudioDeviceSettingsServer, SettingsServer);
 
-	static AudioSettingsServer *singleton;
+	static AudioDeviceSettingsServer *singleton;
 
 	static void _push_output_device(const String &p_device);
 	static String _pull_output_device();
@@ -52,7 +52,7 @@ protected:
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
 public:
-	static AudioSettingsServer *get_singleton();
+	static AudioDeviceSettingsServer *get_singleton();
 
 	// True if the active audio driver can switch devices (WASAPI, PulseAudio, ALSA, CoreAudio on macOS).
 	static bool is_device_selection_supported();
@@ -66,6 +66,6 @@ public:
 	void set_input_device(const String &p_device);
 	String get_input_device() const;
 
-	AudioSettingsServer();
-	~AudioSettingsServer();
+	AudioDeviceSettingsServer();
+	~AudioDeviceSettingsServer();
 };
