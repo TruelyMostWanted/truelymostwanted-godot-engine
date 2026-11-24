@@ -3751,6 +3751,9 @@
 		<member name="settings/paths/language_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"language"[/code] settings domain ([LanguageSettingsServer]), for example [code]user://settings/language.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/language.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
+		<member name="settings/paths/tts_personas_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"tts_personas"[/code] settings domain ([TTSPersonaSettingsServer]), for example [code]user://settings/tts_personas.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/tts_personas.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
 		<member name="settings/paths/video_effect_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_effect"[/code] settings domain ([VideoEffectSettingsServer]), for example [code]user://settings/video_effect.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_effect.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
