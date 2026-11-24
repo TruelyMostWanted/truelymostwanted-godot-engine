@@ -92,6 +92,7 @@
 			<description>
 				Loads a resource when the engine finds this loader to be compatible. If the loaded resource is the result of an import, [param original_path] will target the source file. Returns a [Resource] object on success, or an [enum Error] constant in case of failure.
 				The [param cache_mode] property defines whether and how the cache should be used or updated when loading the resource. See [enum CacheMode] for details.
+				[b]Why the return type is [Variant]:[/b] one script function has to return "a resource [i]or[/i] an error". GDScript has no out-parameters and no generics, and the binding layer (GDScript, C#, GDExtension) cannot expose a C++ struct, so a [Variant] holding either a [Resource] or an [enum Error] code as [int] is the only form that works in every language. Changing it to [Resource] would break every existing loader written in GDScript, C# or GDExtension (and the GDExtension ABI), so it stays as it is. Push an error with a message ([method @GlobalScope.push_error]) before returning the code: [method ResourceLoader.load_result] passes that message on to the caller in [member ResourceLoadResult.error_message].
 			</description>
 		</method>
 		<method name="_recognize_path" qualifiers="virtual const">

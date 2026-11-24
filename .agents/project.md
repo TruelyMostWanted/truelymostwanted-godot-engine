@@ -40,6 +40,8 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24 (ca. 01:30): Besitzer, **voll autonom ohne Rückfragen**: alle Issues (Konzept, Design, Code, Wiki, Tests, Merge) selbst abarbeiten. Vorgaben: (1) Namen von Features/APIs aussagekräftig machen, Parameter und Typen nutzen (Enums statt Strings, typisierte Options-Klassen statt Dictionary, z. B. `ResourceTextSerializer`); was im Inspector bearbeitbar sein soll → `Resource`, Rest Backend/Server. (2) **Wiki zuerst**: Guides kurz, direkt, verständlich; Home/Sidebar nach Themen gruppiert (Text-Serialisierung, Settings, File I/O, Laden & Speichern von Ressourcen, Packs, Audio, Performance …), Klassenreferenz alphabetisch. (3) Neu: `HttpRequestTarget`-Resource für `HTTPRequest`; Input-Settings (#19) einfach für Spiele; Laufzeit-Loader/-Saver für typische Assets (Bilder, Audio, Video …), **je Ressource ein eigenes Issue und Branch**. (4) Session-Limit: auf automatische Fortsetzung warten. Caveman, sparsam.
+- 2026-11-24: 5-Stunden-Limit bei 95 %: keine neuen Agenten; laufende mit WIP gestoppt.
 - 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
 - 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
@@ -105,30 +107,22 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='d0b5c8e63e'
-CURRENT_MILESTONE='Phase 3 · Settings / Phase 4 · Packs and streaming'
+LAST_INTEGRATED_COMMIT='30ad6d8ff9'
+CURRENT_MILESTONE='Resource formats, settings domains, API review'
 UPDATED='2026-11-24'
 ```
 
-Gemergt seit dem letzten Stand: #60, #9, #10, #36, #35, #50, #15, #53, #77, #68, #16, #74. Concepts entschieden und geschlossen: #13 (→ #74–#76), #31 (→ #77–#80), #65 (→ #83–#86), #66 (→ #87–#91).
+Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
 
-**Fertig von Agenten, wartet auf Integration (ungebaut):**
-- #51 `51-feature-texture-atlas-editor` – Achtung Regel: die neuen Laufzeit-Methoden in `TextureAtlas` (Commit 62388e1ead) gehören auf Branch `50-feature-texture-atlas` (cherry-pick dort, erneut squash-mergen), Editor-Teil bleibt auf 51. Fund: Fehlertext „region region_name“ in `set_regions()` (#50-Branch).
-- #70 `70-feature-load-result` – Wiki-Seiten ResourceLoader/Saver/FormatLoader sind volle Kopien: gegen Live-Stand abgleichen.
-- #87 auf Branch `03-feature-path-prefix-server` (Engine); Testprojekt-Branch `03-feature-path-prefix-server-87` → `03-feature-path-prefix-server` vorspulen (alter Worktree der Vor-Session blockiert ihn).
-- #83 auf Branch `10-feature-pck-package-server` (Engine); Testprojekt-Branch `83-pck-package-resource` → `10-feature-pck-package-server` vorspulen.
-- #89 `89-feature-streaming-assets-export-plugin` (berührt `editor/editor_node.cpp`, `.github/CODEOWNERS`).
-- #78 `78-feature-performance-recorder` (Overhead-Tabelle aus Check-Ausgabe „recorder_time“ ins Issue).
+**Laufende Agenten:** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
 
-**Laufende Agenten:** #17 (Sprache), #95 (glTF/GLB/FBX-Loader), #96 (Font-Loader + Shader-Checks).
+**Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
 
-**Danach:** #84 (nach #83, gleiche Dateien), #85/#86 (nach #83), #88 (nach #87), #90, #91; #75 (nach #74), #76; #79/#80 (nach #78); #93 SerializerOptions (Branch 05, alle Aufrufer); #73 Formatklassen; #71 (Branch 15); #18–#30 Settings-Domänen nach Muster #16; Fund #16: `AudioServer.set_bus_layout()` setzt Bus-Werte zurück (Issue anlegen, Branch 16).
+**Achtung Stash:** `git stash list` hat `stash@{1}` „new feature for resoure-loader“ (vom Besitzer, alt, auf master) und `stash@{0}` „ACCIDENTAL …“ (versehentlich angewendete Kopie davon, mit Konfliktmarkern). Nichts verworfen; die Skripte nutzen keinen Stash mehr. Besitzer entscheidet über das Löschen.
 
-**Testprojekt:** C# kompiliert alle Feature-Ordner zusammen; Änderungen an Checks mehrerer Features in einem kombinierten Hilfs-Worktree testen (Branches zusammenführen), dann je Branch committen. Vor `git merge main` in Test-Worktrees die ungetrackten `.uid`/`.import` anderer Features löschen.
+**Danach:** #99 restliche Umbenennungen je Feature-Branch (Reihenfolge in `scratch/issues/99/review.md`), #73 Formatklassen (nach #93), #85/#86 (PCK-Inspector/Exporter), #90/#91 (Apple-Bundles, Pack-Modus), #76, #79/#80, #71 (Branch 15), #121 (Import-Absturz), #122 (Bus-Layout, Branch 16), Settings-Domänen #18, #20–#30.
 
 ## Übergabe
-
-**Zuerst fortsetzen:** die Integrationsliste oben (je Issue: Branch, `git merge truely-godot-engine`, Build mit Tests, Volltests, Glue, Assemblies, `--doctool`, Checks, Kommentar, PR + Squash-Merge, Wiki, Testprojekt).
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 

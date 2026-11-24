@@ -37,6 +37,7 @@
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/thread.h"
+#include "scene/audio/audio_command.h"
 #include "scene/main/node.h"
 #include "scene/main/scene_tree.h"
 #include "servers/audio/audio_server.h"
@@ -1133,6 +1134,48 @@ Ref<AudioStreamPlayback> AudioMixerServer::get_channel_playback(const StringName
 	return current >= 0 ? channel->voices[current].playback : Ref<AudioStreamPlayback>();
 }
 
+// Commands.
+
+Error AudioMixerServer::execute(const Ref<AudioCommand> &p_command) {
+	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
+	return command_registry->execute(p_command);
+}
+
+Error AudioMixerServer::execute_list(const Ref<AudioCommandList> &p_list) {
+	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
+	return command_registry->execute_list(p_list);
+}
+
+Error AudioMixerServer::register_commands(const Ref<AudioCommandList> &p_list) {
+	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
+	return command_registry->register_commands(p_list);
+}
+
+void AudioMixerServer::unregister_commands(const Ref<AudioCommandList> &p_list) {
+	MIXER_THREAD_GUARD();
+	command_registry->unregister_commands(p_list);
+}
+
+bool AudioMixerServer::has_command(const StringName &p_name) const {
+	MIXER_THREAD_GUARD_V(false);
+	return command_registry->has_command(p_name);
+}
+
+Error AudioMixerServer::execute_named(const StringName &p_name) {
+	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
+	return command_registry->execute_named(p_name);
+}
+
+Error AudioMixerServer::execute_group(const StringName &p_group) {
+	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
+	return command_registry->execute_group(p_group);
+}
+
+PackedStringArray AudioMixerServer::get_command_names() const {
+	MIXER_THREAD_GUARD_V(PackedStringArray());
+	return command_registry->get_command_names();
+}
+
 // Tick.
 
 void AudioMixerServer::process(double p_delta) {
@@ -1156,6 +1199,7 @@ void AudioMixerServer::reset() {
 	}
 	channels.clear();
 	pending_signals.clear();
+	command_registry->clear();
 	_remove_callback();
 }
 
@@ -1200,10 +1244,20 @@ void AudioMixerServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("switch_clip", "channel", "clip"), &AudioMixerServer::switch_clip);
 	ClassDB::bind_method(D_METHOD("get_channel_playback", "channel"), &AudioMixerServer::get_channel_playback);
 
+	ClassDB::bind_method(D_METHOD("execute", "command"), &AudioMixerServer::execute);
+	ClassDB::bind_method(D_METHOD("execute_list", "list"), &AudioMixerServer::execute_list);
+	ClassDB::bind_method(D_METHOD("register_commands", "list"), &AudioMixerServer::register_commands);
+	ClassDB::bind_method(D_METHOD("unregister_commands", "list"), &AudioMixerServer::unregister_commands);
+	ClassDB::bind_method(D_METHOD("has_command", "command_name"), &AudioMixerServer::has_command);
+	ClassDB::bind_method(D_METHOD("execute_named", "command_name"), &AudioMixerServer::execute_named);
+	ClassDB::bind_method(D_METHOD("execute_group", "group"), &AudioMixerServer::execute_group);
+	ClassDB::bind_method(D_METHOD("get_command_names"), &AudioMixerServer::get_command_names);
+
 	ADD_SIGNAL(MethodInfo("channel_started", PropertyInfo(Variant::STRING_NAME, "channel"), PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::STRING, "stream_path")));
 	ADD_SIGNAL(MethodInfo("channel_finished", PropertyInfo(Variant::STRING_NAME, "channel"), PropertyInfo(Variant::INT, "index")));
 	ADD_SIGNAL(MethodInfo("queue_finished", PropertyInfo(Variant::STRING_NAME, "channel")));
 	ADD_SIGNAL(MethodInfo("fade_finished", PropertyInfo(Variant::STRING_NAME, "channel")));
+	ADD_SIGNAL(MethodInfo("command_executed", PropertyInfo(Variant::STRING_NAME, "command_name"), PropertyInfo(Variant::OBJECT, "command", PROPERTY_HINT_RESOURCE_TYPE, "AudioCommand")));
 
 	BIND_ENUM_CONSTANT(FADE_CURVE_LINEAR);
 	BIND_ENUM_CONSTANT(FADE_CURVE_EASE_IN);
@@ -1214,6 +1268,8 @@ void AudioMixerServer::_bind_methods() {
 AudioMixerServer::AudioMixerServer() {
 	singleton = this;
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "audio/mixer/default_layout", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, "audio/mixer/default_commands", PROPERTY_HINT_FILE, "*.tres,*.res,*.json,*.ini,*.csv"), "");
+	command_registry = memnew(AudioCommandRegistry(this));
 }
 
 AudioMixerServer::~AudioMixerServer() {
@@ -1221,6 +1277,8 @@ AudioMixerServer::~AudioMixerServer() {
 		_stop_channel(E.value, 0.0f, FADE_CURVE_LINEAR);
 	}
 	channels.clear();
+	memdelete(command_registry);
+	command_registry = nullptr;
 	_remove_callback();
 	singleton = nullptr;
 }

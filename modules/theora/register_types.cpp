@@ -31,6 +31,7 @@
 #include "register_types.h"
 
 #include "video_stream_theora.h"
+#include "video_stream_theora_resource_format.h"
 
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LanguageSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the language: locale, pseudolocalization, layout direction and auto-translate mode.
+	</brief_description>
+	<description>
+		[LanguageSettingsServer] is the settings domain [code]"language"[/code]: it stores the locale chosen by the player and related options, loads them when the game starts and applies them to [TranslationServer] and the root window. The settings resource is a [LanguageSettings]. The file is [code]user://settings/language.ini[/code] by default; as a single record it is never stored as CSV.
+		The domain is applied in [constant SettingsServer.APPLY_PHASE_SERVERS], after the project translations are loaded and before the main loop, the autoloads and the main scene exist, so the first text the player sees is already in the stored language. The layout direction and the auto-translate mode of the root window are pushed as soon as the root window exists, at the latest in [constant SettingsServer.APPLY_PHASE_SCENE], before the main scene is loaded.
+		The locale is chosen in this order: the command line argument [code]--language[/code] (or [code]-l[/code]), then [member ProjectSettings.internationalization/locale/test], then the stored locale, then the locale of the operating system. The first two are set as a session override (see [method SettingsServer.set_session_override]) when the game starts: they are applied but never saved, and a call to [method set_locale] replaces them.
+		An empty locale follows the operating system. A stored locale for which no translation is loaded (for example a language removed in a game update) is replaced by [method get_project_locale] when it is applied, with a verbose message only and no error; the stored value stays, so it is used again once the translation exists. If the project has no translations at all, the locale is set as it is.
+		A change of the locale or of pseudolocalization sends [constant MainLoop.NOTIFICATION_TRANSLATION_CHANGED], so auto-translated nodes update themselves. Texts that a script translated with [method Object.tr] and stored must be translated again.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			var language_list = $LanguageList
+			language_list.add_item("System language")
+			language_list.set_item_metadata(0, "")
+			for locale in LanguageSettingsServer.get_available_locales():
+				language_list.add_item(TranslationServer.get_locale_name(locale))
+				language_list.set_item_metadata(language_list.item_count - 1, locale)
+				if locale == LanguageSettingsServer.get_locale():
+					language_list.select(language_list.item_count - 1)
+
+		func _on_language_list_item_selected(index):
+			LanguageSettingsServer.set_locale($LanguageList.get_item_metadata(index))
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var languageList = GetNode&lt;OptionButton&gt;("LanguageList");
+		    languageList.AddItem("System language");
+		    languageList.SetItemMetadata(0, "");
+		    foreach (string locale in LanguageSettingsServer.GetAvailableLocales())
+		    {
+		        languageList.AddItem(TranslationServer.GetLocaleName(locale));
+		        languageList.SetItemMetadata(languageList.ItemCount - 1, locale);
+		        if (locale == LanguageSettingsServer.GetLocale())
+		        {
+		            languageList.Select(languageList.ItemCount - 1);
+		        }
+		    }
+		}
+
+		private void OnLanguageListItemSelected(long index)
+		{
+		    var languageList = GetNode&lt;OptionButton&gt;("LanguageList");
+		    LanguageSettingsServer.SetLocale(languageList.GetItemMetadata((int)index).AsString());
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C#, the static class [code skip-lint]LanguageSettingsServer[/code] only has the methods of this class. The methods of [SettingsServer] are called through [code]LanguageSettingsServer.Singleton[/code].
+		[b]Note:[/b] The Web export has no command line, so [code]--language[/code] has no effect there. The locale of the operating system is the browser language.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_available_locales" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the locales of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
+			</description>
+		</method>
+		<method name="get_command_line_locale" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns the locale passed with the command line argument [code]--language[/code] or [code]-l[/code], or an empty string.
+			</description>
+		</method>
+		<method name="get_layout_direction" qualifiers="const">
+			<return type="int" enum="Window.LayoutDirection" />
+			<description>
+				Returns the pending layout direction of the root window.
+			</description>
+		</method>
+		<method name="get_locale" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the pending locale chosen by the player, or an empty string if the game follows the operating system. The locale that is active now is [method TranslationServer.get_locale]; it differs while a session override is set or when no translation is loaded for the stored locale.
+			</description>
+		</method>
+		<method name="get_project_locale" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns the locale used for an empty [member LanguageSettings.locale]: [member ProjectSettings.internationalization/locale/test] if it is set, otherwise the locale of the operating system ([method OS.get_locale]).
+			</description>
+		</method>
+		<method name="get_root_auto_translate_mode" qualifiers="const">
+			<return type="int" enum="Node.AutoTranslateMode" />
+			<description>
+				Returns the pending auto-translate mode of the root window.
+			</description>
+		</method>
+		<method name="is_pseudolocalization_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if pseudolocalization is enabled in the pending settings.
+			</description>
+		</method>
+		<method name="set_layout_direction">
+			<return type="void" />
+			<param index="0" name="direction" type="int" enum="Window.LayoutDirection" />
+			<description>
+				Sets the layout direction of the root window (see [method Window.set_layout_direction]). [constant Window.LAYOUT_DIRECTION_INHERITED] follows [member ProjectSettings.internationalization/rendering/root_node_layout_direction].
+			</description>
+		</method>
+		<method name="set_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Sets the locale, for example [code]"fr"[/code] or [code]"pt-BR"[/code]. The locale is standardized (see [method TranslationServer.standardize_locale]), so [code]"pt-BR"[/code] is stored as [code]"pt_BR"[/code]. An empty string follows the operating system. Replaces a session override from the command line or the test locale.
+			</description>
+		</method>
+		<method name="set_pseudolocalization_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Enables or disables pseudolocalization ([member TranslationServer.pseudolocalization_enabled]).
+			</description>
+		</method>
+		<method name="set_root_auto_translate_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="Node.AutoTranslateMode" />
+			<description>
+				Sets the auto-translate mode of the root window ([member Node.auto_translate_mode]). With [constant Node.AUTO_TRANSLATE_MODE_DISABLED], nodes that inherit the mode show their texts untranslated.
+			</description>
+		</method>
+	</methods>
+</class>
