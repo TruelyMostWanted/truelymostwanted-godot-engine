@@ -40,6 +40,9 @@ USE_CAVEMAN='true'
 ```
 
 Änderungen:
+- 2026-11-24 (ca. 01:30): Besitzer, **voll autonom ohne Rückfragen**: alle Issues (Konzept, Design, Code, Wiki, Tests, Merge) selbst abarbeiten. Vorgaben: (1) Namen von Features/APIs aussagekräftig machen, Parameter und Typen nutzen (Enums statt Strings, typisierte Options-Klassen statt Dictionary, z. B. `ResourceTextSerializer`); was im Inspector bearbeitbar sein soll → `Resource`, Rest Backend/Server. (2) **Wiki zuerst**: Guides kurz, direkt, verständlich; Home/Sidebar nach Themen gruppiert (Text-Serialisierung, Settings, File I/O, Laden & Speichern von Ressourcen, Packs, Audio, Performance …), Klassenreferenz alphabetisch. (3) Neu: `HttpRequestTarget`-Resource für `HTTPRequest`; Input-Settings (#19) einfach für Spiele; Laufzeit-Loader/-Saver für typische Assets (Bilder, Audio, Video …), **je Ressource ein eigenes Issue und Branch**. (4) Session-Limit: auf automatische Fortsetzung warten. Caveman, sparsam.
+- 2026-11-24: 5-Stunden-Limit bei 95 %: keine neuen Agenten; laufende mit WIP gestoppt.
+- 2026-11-24: Besitzer: **Änderungen an bestehenden Features auf deren Branch** (nicht nur Bugs: Umbenennungen, API-Anpassungen, Doku-/Testfixes), Engine und Testprojekt, danach erneut squash-mergen. Neue Issues mit neuen Klassen behalten ihren Branch.
 - 2026-11-24: Besitzer: 3–5 Issues parallel (Wochen-/Session-Limit zurückgesetzt). MAX_ISSUE_AGENTS=5.
 - 2026-11-23: angelegt (Besitzer: Ordnerstruktur des Engine-Repositorys, Squash-Merge nach grüner CI, Feature-Branches bleiben bestehen, gemeinsamer SCons-Cache, Board mit Skill-Status und Phasen, `.agents/state/` lokal)
 - 2026-11-23: Besitzer: Entscheidungen (auch Concept-Issues) trifft der Orchestrator selbstständig und vorausschauend; Entscheidung als Kommentar „Decision“ ins Issue. APPROVAL=Autonomous.
@@ -104,21 +107,22 @@ OPT_COMPLETED='2663aaea'
 ## Stand
 
 ```ini
-LAST_INTEGRATED_COMMIT='e17517d82c'
-CURRENT_MILESTONE='Phase 3 · Settings'
+LAST_INTEGRATED_COMMIT='30ad6d8ff9'
+CURRENT_MILESTONE='Resource formats, settings domains, API review'
 UPDATED='2026-11-24'
 ```
 
-**In Arbeit (Agenten, ohne Build):** #53 (`53-feature-loader-index-scripts`), #68 (`68-feature-xml-and-unified-serializer`), #16 (`16-feature-audio-settings`); Concepts #13, #31 (Entwurf `scratch/issues/<N>/issue-comment.md` + `followups/`).
+Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+ Laufzeit-Teil auf Branch 50), #100, #101, #102, #103, #104, #105, #95, #96, #19. Wiki neu nach Themen (#98 erledigt), alle Seiten dieser Features eingepflegt (letzter Batch #96/#19 läuft per Agent).
+
+**Laufende Agenten:** #93 (SerializerOptions + Format-Enum, Branch `05-feature-resource-text-formats`, inkl. Aufrufer und Test-Branches), #88 (`88-feature-streaming-assets-server`), #84 (Branch `10-feature-pck-package-server`), #75 (`75-feature-audio-commands`, ggf. Mini-Commit auf `74-…`).
+
+**Werkzeuge:** `scratch/integrate.sh <N> <engine-branch> <test-branch> <feature-folder> [all|build|checks]` (Merge, Build, Tests, Glue, Assemblies, doctool, Checks; nur Summen) und `scratch/merge.sh` (Kommentar, PR, Squash-Merge, Testprojekt nach main, Board). Wiki: Clone `scratch/issues/98/wiki`, Einpflegen per Sonnet-Agent mit `scratch/brief-wiki-integrate.md`. Brief für Issue-Agenten: `scratch/brief-common.md`.
+
+**Achtung Stash:** `git stash list` hat `stash@{1}` „new feature for resoure-loader“ (vom Besitzer, alt, auf master) und `stash@{0}` „ACCIDENTAL …“ (versehentlich angewendete Kopie davon, mit Konfliktmarkern). Nichts verworfen; die Skripte nutzen keinen Stash mehr. Besitzer entscheidet über das Löschen.
+
+**Danach:** #99 restliche Umbenennungen je Feature-Branch (Reihenfolge in `scratch/issues/99/review.md`), #73 Formatklassen (nach #93), #85/#86 (PCK-Inspector/Exporter), #90/#91 (Apple-Bundles, Pack-Modus), #76, #79/#80, #71 (Branch 15), #121 (Import-Absturz), #122 (Bus-Layout, Branch 16), Settings-Domänen #18, #20–#30.
 
 ## Übergabe
-
-**Zuerst fortsetzen:**
-1. Berichte der laufenden Agenten integrieren, je Issue nacheinander: Branch im Hauptbaum, `git merge truely-godot-engine`, Build (Mono, `tests=yes`), Unit-Tests einzeln + gesamt, Glue, Assemblies, `--doctool`, Checks im Testprojekt-Worktree (`scratch/issues/<N>/testproject`, Junction `nuget-local`), Issue-Kommentar, PR + Squash-Merge, Wiki (`scratch/wiki`, `wiki-toc.py`), Testprojekt-Branch pushen und in `main` mergen, Board.
-2. Concepts #13, #31: Entwurf prüfen, als Kommentar posten, Folge-Issues anlegen.
-3. Danach: #70 (nach #53, gleiche Dateien), #71 (SettingsServer-Folgepunkte), Settings-Domänen #17–#30 (Muster aus #16), #51 (Atlas-Editor inkl. Inspector aus #50).
-4. Batch-CI 45272798826 (nach #15; enthält #9, #10, #35, #36, #50, #15) prüfen. macOS/iOS bekommen weiterhin keinen Runner (Infrastruktur).
-5. Reste alter Agent-Worktrees unter `.claude/worktrees/` (abgemeldet bzw. detached; Löschen braucht Freigabe des Besitzers).
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
 

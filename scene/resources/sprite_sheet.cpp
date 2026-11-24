@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  texture_atlas.cpp                                                     */
+/*  sprite_sheet.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,9 +28,10 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "texture_atlas.h"
+#include "sprite_sheet.h"
 
 #include "core/io/file_access.h"
+#include "core/io/image.h"
 #include "core/io/json.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_text_serializer.h"
@@ -85,7 +86,7 @@ static bool _variant_to_int(const Variant &p_value, int &r_value) {
 }
 
 // Reads the keys X, Y, Width, Height and the optional MarginX, MarginY, SourceWidth, SourceHeight of one sprite.
-static Error _dictionary_to_entry(const String &p_name, const Dictionary &p_values, TextureAtlas::Entry &r_entry, String &r_error) {
+static Error _dictionary_to_entry(const String &p_name, const Dictionary &p_values, SpriteSheet::Entry &r_entry, String &r_error) {
 	const char *required[4] = { KEY_X, KEY_Y, KEY_WIDTH, KEY_HEIGHT };
 	int values[4] = { 0, 0, 0, 0 };
 	for (int i = 0; i < 4; i++) {
@@ -150,7 +151,7 @@ static Error _parse_json_root(const String &p_text, Dictionary &r_root, String &
 	return OK;
 }
 
-bool TextureAtlas::is_valid_region_name(const String &p_name) {
+bool SpriteSheet::is_valid_region_name(const String &p_name) {
 	if (p_name.is_empty() || p_name != p_name.strip_edges()) {
 		return false;
 	}
@@ -163,7 +164,7 @@ bool TextureAtlas::is_valid_region_name(const String &p_name) {
 	return true;
 }
 
-String TextureAtlas::texture_packer_name_to_region_name(const String &p_file_name) {
+String SpriteSheet::texture_packer_name_to_region_name(const String &p_file_name) {
 	String name = p_file_name.strip_edges();
 	const String extension = name.get_extension().to_lower();
 	if (extension == "png" || extension == "jpg" || extension == "jpeg" || extension == "webp" || extension == "bmp" || extension == "tga" || extension == "gif" || extension == "svg" || extension == "ktx" || extension == "dds") {
@@ -173,7 +174,7 @@ String TextureAtlas::texture_packer_name_to_region_name(const String &p_file_nam
 	return name.strip_edges();
 }
 
-int TextureAtlas::split_trailing_number(const String &p_name, String &r_base) {
+int SpriteSheet::split_trailing_number(const String &p_name, String &r_base) {
 	int start = p_name.length();
 	while (start > 0 && is_digit(p_name[start - 1])) {
 		start--;
@@ -194,7 +195,7 @@ int TextureAtlas::split_trailing_number(const String &p_name, String &r_base) {
 /////////////////////////////////////////////////////////////////////////////
 // Regions and cached textures.
 
-void TextureAtlas::_update_cached_texture(Region &r_region) const {
+void SpriteSheet::_update_cached_texture(Region &r_region) const {
 	if (r_region.texture.is_null()) {
 		return;
 	}
@@ -204,13 +205,13 @@ void TextureAtlas::_update_cached_texture(Region &r_region) const {
 	r_region.texture->set_filter_clip(filter_clip);
 }
 
-void TextureAtlas::_update_all_cached_textures() {
+void SpriteSheet::_update_all_cached_textures() {
 	for (KeyValue<StringName, Region> &E : regions) {
 		_update_cached_texture(E.value);
 	}
 }
 
-Error TextureAtlas::_check_rect(const String &p_name, const Rect2i &p_rect, const Ref<Texture2D> &p_texture, String &r_error) {
+Error SpriteSheet::_check_rect(const String &p_name, const Rect2i &p_rect, const Ref<Texture2D> &p_texture, String &r_error) {
 	if (p_rect.size.x <= 0 || p_rect.size.y <= 0) {
 		r_error = vformat("Sprite \"%s\": width and height must be greater than 0 (%s).", p_name, p_rect);
 		return ERR_INVALID_PARAMETER;
@@ -225,7 +226,7 @@ Error TextureAtlas::_check_rect(const String &p_name, const Rect2i &p_rect, cons
 	return OK;
 }
 
-Error TextureAtlas::_check_margin(const String &p_name, const Rect2i &p_margin, String &r_error) {
+Error SpriteSheet::_check_margin(const String &p_name, const Rect2i &p_margin, String &r_error) {
 	if (p_margin.position.x < 0 || p_margin.position.y < 0 || p_margin.size.x < 0 || p_margin.size.y < 0) {
 		r_error = vformat("Sprite \"%s\": the margin %s must not be negative.", p_name, p_margin);
 		return ERR_INVALID_PARAMETER;
@@ -233,7 +234,7 @@ Error TextureAtlas::_check_margin(const String &p_name, const Rect2i &p_margin, 
 	return OK;
 }
 
-void TextureAtlas::set_texture(const Ref<Texture2D> &p_texture) {
+void SpriteSheet::set_texture(const Ref<Texture2D> &p_texture) {
 	if (texture == p_texture) {
 		return;
 	}
@@ -252,15 +253,15 @@ void TextureAtlas::set_texture(const Ref<Texture2D> &p_texture) {
 	_update_all_cached_textures();
 	emit_changed();
 	if (!outside.is_empty()) {
-		ERR_PRINT(vformat("TextureAtlas: %d region(s) lie outside the new texture: %s.", outside.size(), String(", ").join(outside)));
+		ERR_PRINT(vformat("SpriteSheet: %d region(s) lie outside the new texture: %s.", outside.size(), String(", ").join(outside)));
 	}
 }
 
-Ref<Texture2D> TextureAtlas::get_sheet_texture() const {
+Ref<Texture2D> SpriteSheet::get_sheet_texture() const {
 	return texture;
 }
 
-void TextureAtlas::set_texture_path(const String &p_path) {
+void SpriteSheet::set_texture_path(const String &p_path) {
 	if (texture_path == p_path) {
 		return;
 	}
@@ -268,11 +269,11 @@ void TextureAtlas::set_texture_path(const String &p_path) {
 	emit_changed();
 }
 
-String TextureAtlas::get_texture_path() const {
+String SpriteSheet::get_texture_path() const {
 	return texture_path;
 }
 
-void TextureAtlas::set_filter_clip(bool p_enable) {
+void SpriteSheet::set_filter_clip(bool p_enable) {
 	if (filter_clip == p_enable) {
 		return;
 	}
@@ -281,11 +282,11 @@ void TextureAtlas::set_filter_clip(bool p_enable) {
 	emit_changed();
 }
 
-bool TextureAtlas::is_filter_clip() const {
+bool SpriteSheet::is_filter_clip() const {
 	return filter_clip;
 }
 
-void TextureAtlas::set_regions(const TypedDictionary<StringName, Rect2i> &p_regions) {
+void SpriteSheet::set_regions(const TypedDictionary<StringName, Rect2i> &p_regions) {
 	HashMap<StringName, Region> new_regions;
 	new_regions.reserve(p_regions.size());
 	PackedStringArray errors;
@@ -294,7 +295,7 @@ void TextureAtlas::set_regions(const TypedDictionary<StringName, Rect2i> &p_regi
 		const Rect2i rect = E.value;
 		String error;
 		if (!is_valid_region_name(region_name)) {
-			errors.push_back(vformat("\"%s\" is not a valid region region_name.", region_name));
+			errors.push_back(vformat("\"%s\" is not a valid region name.", region_name));
 			continue;
 		}
 		if (_check_rect(region_name, rect, texture, error) != OK) {
@@ -314,11 +315,11 @@ void TextureAtlas::set_regions(const TypedDictionary<StringName, Rect2i> &p_regi
 	_update_all_cached_textures();
 	emit_changed();
 	for (const String &error : errors) {
-		ERR_PRINT("TextureAtlas: " + error);
+		ERR_PRINT("SpriteSheet: " + error);
 	}
 }
 
-TypedDictionary<StringName, Rect2i> TextureAtlas::get_regions() const {
+TypedDictionary<StringName, Rect2i> SpriteSheet::get_regions() const {
 	TypedDictionary<StringName, Rect2i> ret;
 	for (const KeyValue<StringName, Region> &E : regions) {
 		ret[E.key] = E.value.rect;
@@ -326,7 +327,7 @@ TypedDictionary<StringName, Rect2i> TextureAtlas::get_regions() const {
 	return ret;
 }
 
-void TextureAtlas::set_margins(const TypedDictionary<StringName, Rect2i> &p_margins) {
+void SpriteSheet::set_margins(const TypedDictionary<StringName, Rect2i> &p_margins) {
 	for (KeyValue<StringName, Region> &E : regions) {
 		E.value.margin = Rect2i();
 	}
@@ -349,11 +350,11 @@ void TextureAtlas::set_margins(const TypedDictionary<StringName, Rect2i> &p_marg
 	_update_all_cached_textures();
 	emit_changed();
 	for (const String &error : errors) {
-		ERR_PRINT("TextureAtlas: " + error);
+		ERR_PRINT("SpriteSheet: " + error);
 	}
 }
 
-TypedDictionary<StringName, Rect2i> TextureAtlas::get_margins() const {
+TypedDictionary<StringName, Rect2i> SpriteSheet::get_margins() const {
 	TypedDictionary<StringName, Rect2i> ret;
 	for (const KeyValue<StringName, Region> &E : regions) {
 		if (E.value.margin != Rect2i()) {
@@ -363,11 +364,11 @@ TypedDictionary<StringName, Rect2i> TextureAtlas::get_margins() const {
 	return ret;
 }
 
-Error TextureAtlas::set_region(const StringName &p_name, const Rect2i &p_rect) {
-	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_name), ERR_INVALID_PARAMETER, vformat("TextureAtlas: \"%s\" is not a valid region name (not empty, no '/', ':', '\"', control characters or surrounding spaces).", p_name));
+Error SpriteSheet::set_region(const StringName &p_name, const Rect2i &p_rect) {
+	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_name), ERR_INVALID_PARAMETER, vformat("SpriteSheet: \"%s\" is not a valid region name (not empty, no '/', ':', '\"', control characters or surrounding spaces).", p_name));
 	String error;
 	if (_check_rect(p_name, p_rect, texture, error) != OK) {
-		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "TextureAtlas: " + error);
+		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "SpriteSheet: " + error);
 	}
 	Region *region = regions.getptr(p_name);
 	if (region == nullptr) {
@@ -385,35 +386,35 @@ Error TextureAtlas::set_region(const StringName &p_name, const Rect2i &p_rect) {
 	return OK;
 }
 
-void TextureAtlas::remove_region(const StringName &p_name) {
-	ERR_FAIL_COND_MSG(!regions.has(p_name), vformat("TextureAtlas: the region \"%s\" does not exist.", p_name));
+void SpriteSheet::remove_region(const StringName &p_name) {
+	ERR_FAIL_COND_MSG(!regions.has(p_name), vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
 	regions.erase(p_name);
 	emit_changed();
 }
 
-Error TextureAtlas::rename_region(const StringName &p_from, const StringName &p_to) {
-	ERR_FAIL_COND_V_MSG(!regions.has(p_from), ERR_DOES_NOT_EXIST, vformat("TextureAtlas: the region \"%s\" does not exist.", p_from));
+Error SpriteSheet::rename_region(const StringName &p_from, const StringName &p_to) {
+	ERR_FAIL_COND_V_MSG(!regions.has(p_from), ERR_DOES_NOT_EXIST, vformat("SpriteSheet: the region \"%s\" does not exist.", p_from));
 	if (p_from == p_to) {
 		return OK;
 	}
-	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_to), ERR_INVALID_PARAMETER, vformat("TextureAtlas: \"%s\" is not a valid region name.", p_to));
-	ERR_FAIL_COND_V_MSG(regions.has(p_to), ERR_ALREADY_EXISTS, vformat("TextureAtlas: the region \"%s\" exists already.", p_to));
+	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_to), ERR_INVALID_PARAMETER, vformat("SpriteSheet: \"%s\" is not a valid region name.", p_to));
+	ERR_FAIL_COND_V_MSG(regions.has(p_to), ERR_ALREADY_EXISTS, vformat("SpriteSheet: the region \"%s\" exists already.", p_to));
 	regions.replace_key(p_from, p_to);
 	emit_changed();
 	return OK;
 }
 
-bool TextureAtlas::has_region(const StringName &p_name) const {
+bool SpriteSheet::has_region(const StringName &p_name) const {
 	return regions.has(p_name);
 }
 
-Rect2i TextureAtlas::get_region(const StringName &p_name) const {
+Rect2i SpriteSheet::get_region(const StringName &p_name) const {
 	const Region *region = regions.getptr(p_name);
-	ERR_FAIL_NULL_V_MSG(region, Rect2i(), vformat("TextureAtlas: the region \"%s\" does not exist.", p_name));
+	ERR_FAIL_NULL_V_MSG(region, Rect2i(), vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
 	return region->rect;
 }
 
-void TextureAtlas::_set_region_order(const PackedStringArray &p_order) {
+void SpriteSheet::_set_region_order(const PackedStringArray &p_order) {
 	// Regions named in the order first, in that order; the rest keep their current order.
 	HashMap<StringName, Region> ordered;
 	ordered.reserve(regions.size());
@@ -432,11 +433,11 @@ void TextureAtlas::_set_region_order(const PackedStringArray &p_order) {
 	regions = ordered;
 }
 
-PackedStringArray TextureAtlas::_get_region_order() const {
+PackedStringArray SpriteSheet::_get_region_order() const {
 	return get_region_names();
 }
 
-PackedStringArray TextureAtlas::get_region_names() const {
+PackedStringArray SpriteSheet::get_region_names() const {
 	PackedStringArray names;
 	names.resize(regions.size());
 	String *ptr = names.ptrw();
@@ -447,11 +448,11 @@ PackedStringArray TextureAtlas::get_region_names() const {
 	return names;
 }
 
-int TextureAtlas::get_region_count() const {
+int SpriteSheet::get_region_count() const {
 	return regions.size();
 }
 
-void TextureAtlas::clear_regions() {
+void SpriteSheet::clear_regions() {
 	if (regions.is_empty()) {
 		return;
 	}
@@ -459,12 +460,12 @@ void TextureAtlas::clear_regions() {
 	emit_changed();
 }
 
-Error TextureAtlas::set_region_margin(const StringName &p_name, const Rect2i &p_margin) {
+Error SpriteSheet::set_region_margin(const StringName &p_name, const Rect2i &p_margin) {
 	Region *region = regions.getptr(p_name);
-	ERR_FAIL_NULL_V_MSG(region, ERR_DOES_NOT_EXIST, vformat("TextureAtlas: the region \"%s\" does not exist.", p_name));
+	ERR_FAIL_NULL_V_MSG(region, ERR_DOES_NOT_EXIST, vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
 	String error;
 	if (_check_margin(p_name, p_margin, error) != OK) {
-		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "TextureAtlas: " + error);
+		ERR_FAIL_V_MSG(ERR_INVALID_PARAMETER, "SpriteSheet: " + error);
 	}
 	if (region->margin == p_margin) {
 		return OK;
@@ -475,20 +476,230 @@ Error TextureAtlas::set_region_margin(const StringName &p_name, const Rect2i &p_
 	return OK;
 }
 
-Rect2i TextureAtlas::get_region_margin(const StringName &p_name) const {
+Rect2i SpriteSheet::get_region_margin(const StringName &p_name) const {
 	const Region *region = regions.getptr(p_name);
-	ERR_FAIL_NULL_V_MSG(region, Rect2i(), vformat("TextureAtlas: the region \"%s\" does not exist.", p_name));
+	ERR_FAIL_NULL_V_MSG(region, Rect2i(), vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
 	return region->margin;
 }
 
-Ref<AtlasTexture> TextureAtlas::get_texture(const StringName &p_name) {
+Ref<AtlasTexture> SpriteSheet::get_region_texture(const StringName &p_name) {
 	Region *region = regions.getptr(p_name);
-	ERR_FAIL_NULL_V_MSG(region, Ref<AtlasTexture>(), vformat("TextureAtlas: the region \"%s\" does not exist.", p_name));
+	ERR_FAIL_NULL_V_MSG(region, Ref<AtlasTexture>(), vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
 	if (region->texture.is_null()) {
 		region->texture.instantiate();
 		_update_cached_texture(*region);
 	}
 	return region->texture;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Slicing.
+
+namespace {
+
+struct RectTopComparator {
+	_FORCE_INLINE_ bool operator()(const Rect2i &p_a, const Rect2i &p_b) const {
+		if (p_a.position.y != p_b.position.y) {
+			return p_a.position.y < p_b.position.y;
+		}
+		return p_a.position.x < p_b.position.x;
+	}
+};
+
+struct RectLeftComparator {
+	_FORCE_INLINE_ bool operator()(const Rect2i &p_a, const Rect2i &p_b) const {
+		if (p_a.position.x != p_b.position.x) {
+			return p_a.position.x < p_b.position.x;
+		}
+		return p_a.position.y < p_b.position.y;
+	}
+};
+
+// True if the boxes overlap or share an edge or a corner.
+bool rects_touch(const Rect2i &p_a, const Rect2i &p_b) {
+	return p_a.position.x <= p_b.position.x + p_b.size.x && p_b.position.x <= p_a.position.x + p_a.size.x &&
+			p_a.position.y <= p_b.position.y + p_b.size.y && p_b.position.y <= p_a.position.y + p_a.size.y;
+}
+
+} // namespace
+
+TypedArray<Rect2i> SpriteSheet::detect_sprite_rects(const Ref<Image> &p_image, float p_alpha_threshold) {
+	TypedArray<Rect2i> ret;
+	ERR_FAIL_COND_V_MSG(p_image.is_null() || p_image->is_empty(), ret, "SpriteSheet: the image is empty.");
+
+	Ref<Image> image;
+	image.instantiate();
+	image->copy_internals_from(p_image);
+	if (image->is_compressed()) {
+		ERR_FAIL_COND_V_MSG(image->decompress() != OK, ret, "SpriteSheet: the image cannot be decompressed.");
+	}
+	if (image->get_format() != Image::FORMAT_RGBA8) {
+		image->convert(Image::FORMAT_RGBA8);
+	}
+	const int width = image->get_width();
+	const int height = image->get_height();
+	const uint8_t *data = image->get_data().ptr();
+
+	bool opaque_alpha[256];
+	for (int i = 0; i < 256; i++) {
+		opaque_alpha[i] = float(i) / 255.0f > p_alpha_threshold;
+	}
+
+	// Groups of 8-connected opaque pixels (flood fill with an explicit stack).
+	LocalVector<uint8_t> visited;
+	visited.resize(uint32_t(width) * uint32_t(height));
+	memset(visited.ptr(), 0, visited.size());
+	LocalVector<uint32_t> stack;
+	LocalVector<Rect2i> boxes;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			const uint32_t index = uint32_t(y) * uint32_t(width) + uint32_t(x);
+			if (visited[index] || !opaque_alpha[data[index * 4 + 3]]) {
+				continue;
+			}
+			visited[index] = 1;
+			stack.push_back(index);
+			Vector2i from(x, y);
+			Vector2i to(x, y);
+			while (!stack.is_empty()) {
+				const uint32_t current = stack[stack.size() - 1];
+				stack.resize(stack.size() - 1);
+				const int cx = int(current % uint32_t(width));
+				const int cy = int(current / uint32_t(width));
+				from = from.min(Vector2i(cx, cy));
+				to = to.max(Vector2i(cx, cy));
+				for (int dy = -1; dy <= 1; dy++) {
+					const int ny = cy + dy;
+					if (ny < 0 || ny >= height) {
+						continue;
+					}
+					for (int dx = -1; dx <= 1; dx++) {
+						const int nx = cx + dx;
+						if (nx < 0 || nx >= width) {
+							continue;
+						}
+						const uint32_t neighbor = uint32_t(ny) * uint32_t(width) + uint32_t(nx);
+						if (!visited[neighbor] && opaque_alpha[data[neighbor * 4 + 3]]) {
+							visited[neighbor] = 1;
+							stack.push_back(neighbor);
+						}
+					}
+				}
+			}
+			boxes.push_back(Rect2i(from, to - from + Vector2i(1, 1)));
+		}
+	}
+
+	// Boxes that overlap or touch belong to one sprite (for example a shadow next to a character).
+	bool merged = true;
+	while (merged) {
+		merged = false;
+		for (uint32_t i = 0; i < boxes.size(); i++) {
+			for (uint32_t j = i + 1; j < boxes.size(); j++) {
+				if (rects_touch(boxes[i], boxes[j])) {
+					boxes[i] = boxes[i].merge(boxes[j]);
+					boxes.remove_at_unordered(j);
+					j = i; // Check the grown box against all others again.
+					merged = true;
+				}
+			}
+		}
+	}
+
+	// Rows: a box starts a row; the next boxes belong to it while they start above its bottom edge.
+	boxes.sort_custom<RectTopComparator>();
+	uint32_t row_start = 0;
+	while (row_start < boxes.size()) {
+		const int row_bottom = boxes[row_start].get_end().y;
+		uint32_t row_end = row_start + 1;
+		while (row_end < boxes.size() && boxes[row_end].position.y < row_bottom) {
+			row_end++;
+		}
+		LocalVector<Rect2i> row;
+		for (uint32_t i = row_start; i < row_end; i++) {
+			row.push_back(boxes[i]);
+		}
+		row.sort_custom<RectLeftComparator>();
+		for (const Rect2i &rect : row) {
+			ret.push_back(rect);
+		}
+		row_start = row_end;
+	}
+	return ret;
+}
+
+TypedArray<Rect2i> SpriteSheet::make_grid_rects(const Vector2i &p_area_size, const Vector2i &p_cell_size, const Vector2i &p_separation, const Vector2i &p_offset) {
+	TypedArray<Rect2i> ret;
+	ERR_FAIL_COND_V_MSG(p_cell_size.x <= 0 || p_cell_size.y <= 0, ret, "SpriteSheet: the cell size must be greater than 0.");
+	ERR_FAIL_COND_V_MSG(p_separation.x < 0 || p_separation.y < 0 || p_offset.x < 0 || p_offset.y < 0, ret, "SpriteSheet: separation and offset must not be negative.");
+	for (int y = p_offset.y; y + p_cell_size.y <= p_area_size.y; y += p_cell_size.y + p_separation.y) {
+		for (int x = p_offset.x; x + p_cell_size.x <= p_area_size.x; x += p_cell_size.x + p_separation.x) {
+			ret.push_back(Rect2i(Vector2i(x, y), p_cell_size));
+		}
+	}
+	return ret;
+}
+
+String SpriteSheet::make_unique_region_name(const String &p_prefix) const {
+	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_prefix + "0"), String(), vformat("SpriteSheet: \"%s\" is not a valid name prefix.", p_prefix));
+	int number = 0;
+	String region_name = p_prefix + itos(number);
+	while (regions.has(region_name)) {
+		region_name = p_prefix + itos(++number);
+	}
+	return region_name;
+}
+
+PackedStringArray SpriteSheet::add_regions(const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
+	PackedStringArray names;
+	ERR_FAIL_COND_V_MSG(!is_valid_region_name(p_prefix + "0"), names, vformat("SpriteSheet: \"%s\" is not a valid name prefix.", p_prefix));
+	LocalVector<Rect2i> rects;
+	int number = 0;
+	for (int i = 0; i < p_rects.size(); i++) {
+		const Rect2i rect = p_rects[i];
+		String region_name = p_prefix + itos(number++);
+		while (regions.has(region_name)) {
+			region_name = p_prefix + itos(number++);
+		}
+		String error;
+		if (_check_rect(region_name, rect, texture, error) != OK) {
+			ERR_FAIL_V_MSG(PackedStringArray(), "SpriteSheet: no region was added. " + error);
+		}
+		rects.push_back(rect);
+		names.push_back(region_name);
+	}
+	if (names.is_empty()) {
+		return names;
+	}
+	for (uint32_t i = 0; i < rects.size(); i++) {
+		Region region;
+		region.rect = rects[i];
+		regions.insert(names[i], region);
+	}
+	emit_changed();
+	return names;
+}
+
+PackedStringArray SpriteSheet::auto_slice(const String &p_prefix, float p_alpha_threshold) {
+	ERR_FAIL_COND_V_MSG(texture.is_null(), PackedStringArray(), "SpriteSheet: auto slice needs a texture.");
+	const Ref<Image> image = texture->get_image();
+	ERR_FAIL_COND_V_MSG(image.is_null() || image->is_empty(), PackedStringArray(), "SpriteSheet: the texture has no image data to slice.");
+	const TypedArray<Rect2i> found = detect_sprite_rects(image, p_alpha_threshold);
+	TypedArray<Rect2i> new_rects;
+	for (int i = 0; i < found.size(); i++) {
+		const Rect2i rect = found[i];
+		bool exists = false;
+		for (const KeyValue<StringName, Region> &E : regions) {
+			if (E.value.rect == rect) {
+				exists = true;
+				break;
+			}
+		}
+		if (!exists) {
+			new_rects.push_back(rect);
+		}
+	}
+	return add_regions(new_rects, p_prefix);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -525,8 +736,8 @@ String strip_trailing_separators(const String &p_text) {
 
 } // namespace
 
-Ref<SpriteFrames> TextureAtlas::create_sprite_frames(const String &p_prefix, double p_fps) {
-	ERR_FAIL_COND_V_MSG(p_fps < 0.0, Ref<SpriteFrames>(), "TextureAtlas: fps must not be negative.");
+Ref<SpriteFrames> SpriteSheet::create_sprite_frames(const String &p_prefix, double p_fps) {
+	ERR_FAIL_COND_V_MSG(p_fps < 0.0, Ref<SpriteFrames>(), "SpriteSheet: fps must not be negative.");
 	HashMap<String, LocalVector<AtlasFrame>> animations;
 	int order = 0;
 	for (const KeyValue<StringName, Region> &E : regions) {
@@ -560,7 +771,7 @@ Ref<SpriteFrames> TextureAtlas::create_sprite_frames(const String &p_prefix, dou
 		}
 		frames->set_animation_speed(animation, p_fps);
 		for (const AtlasFrame &frame : E.value) {
-			frames->add_frame(animation, get_texture(frame.name));
+			frames->add_frame(animation, get_region_texture(frame.name));
 		}
 	}
 	if (!animations.is_empty() && !animations.has(default_animation) && frames->has_animation(default_animation)) {
@@ -572,7 +783,7 @@ Ref<SpriteFrames> TextureAtlas::create_sprite_frames(const String &p_prefix, dou
 /////////////////////////////////////////////////////////////////////////////
 // Applying parsed entries.
 
-Error TextureAtlas::apply_entries(const String &p_texture_path, const LocalVector<Entry> &p_entries, String &r_error) {
+Error SpriteSheet::apply_entries(const String &p_texture_path, const LocalVector<Entry> &p_entries, String &r_error) {
 	HashSet<StringName> names;
 	for (const Entry &entry : p_entries) {
 		if (!is_valid_region_name(entry.name)) {
@@ -630,19 +841,19 @@ Error TextureAtlas::apply_entries(const String &p_texture_path, const LocalVecto
 	return OK;
 }
 
-Error TextureAtlas::_load_entries(Error p_parse_error, const String &p_texture_path, const LocalVector<Entry> &p_entries, const String &p_error, const String &p_format) {
+Error SpriteSheet::_load_entries(Error p_parse_error, const String &p_texture_path, const LocalVector<Entry> &p_entries, const String &p_error, const String &p_format) {
 	if (p_parse_error != OK) {
-		ERR_FAIL_V_MSG(p_parse_error, vformat("TextureAtlas: %s: %s", p_format, p_error));
+		ERR_FAIL_V_MSG(p_parse_error, vformat("SpriteSheet: %s: %s", p_format, p_error));
 	}
 	String error;
 	const Error err = apply_entries(p_texture_path, p_entries, error);
 	if (err != OK) {
-		ERR_FAIL_V_MSG(err, vformat("TextureAtlas: %s: %s", p_format, error));
+		ERR_FAIL_V_MSG(err, vformat("SpriteSheet: %s: %s", p_format, error));
 	}
 	return OK;
 }
 
-String TextureAtlas::_get_written_texture_path() const {
+String SpriteSheet::_get_written_texture_path() const {
 	if (!texture_path.is_empty()) {
 		return texture_path;
 	}
@@ -663,7 +874,7 @@ String TextureAtlas::_get_written_texture_path() const {
 /////////////////////////////////////////////////////////////////////////////
 // JSON.
 
-Error TextureAtlas::parse_json(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
+Error SpriteSheet::parse_json(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
 	r_entries.clear();
 	Dictionary root;
 	if (_parse_json_root(p_text, root, r_error) != OK) {
@@ -696,7 +907,7 @@ Error TextureAtlas::parse_json(const String &p_text, String &r_texture_path, Loc
 	return OK;
 }
 
-String TextureAtlas::save_as_json(const String &p_indent) const {
+String SpriteSheet::_write_json(const String &p_indent) const {
 	Dictionary root;
 	root[KEY_TEXTURE_PATH] = _get_written_texture_path();
 	Dictionary sprites;
@@ -707,18 +918,10 @@ String TextureAtlas::save_as_json(const String &p_indent) const {
 	return JSON::stringify(root, p_indent, false);
 }
 
-Error TextureAtlas::load_from_json(const String &p_text) {
-	String path;
-	LocalVector<Entry> entries;
-	String error;
-	const Error err = parse_json(p_text, path, entries, error);
-	return _load_entries(err, path, entries, error, "JSON");
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // CSV.
 
-Error TextureAtlas::parse_csv(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
+Error SpriteSheet::parse_csv(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
 	r_entries.clear();
 	const Vector<Vector<String>> rows = ResourceTextSerializer::parse_csv_rows(p_text, ',');
 	if (rows.size() < 2 || rows[0].size() < 2 || rows[0][0].strip_edges() != KEY_TEXTURE_PATH) {
@@ -768,7 +971,7 @@ Error TextureAtlas::parse_csv(const String &p_text, String &r_texture_path, Loca
 	return OK;
 }
 
-String TextureAtlas::save_as_csv() const {
+String SpriteSheet::_write_csv() const {
 	bool has_margins = false;
 	for (const KeyValue<StringName, Region> &E : regions) {
 		if (E.value.margin != Rect2i()) {
@@ -815,18 +1018,10 @@ String TextureAtlas::save_as_csv() const {
 	return text;
 }
 
-Error TextureAtlas::load_from_csv(const String &p_text) {
-	String path;
-	LocalVector<Entry> entries;
-	String error;
-	const Error err = parse_csv(p_text, path, entries, error);
-	return _load_entries(err, path, entries, error, "CSV");
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // INI.
 
-Error TextureAtlas::parse_ini(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
+Error SpriteSheet::parse_ini(const String &p_text, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
 	r_entries.clear();
 	LocalVector<ResourceTextSerializer::Section> sections;
 	if (ResourceTextSerializer::parse_ini_sections(p_text, sections, r_error) != OK) {
@@ -856,7 +1051,7 @@ Error TextureAtlas::parse_ini(const String &p_text, String &r_texture_path, Loca
 	return OK;
 }
 
-String TextureAtlas::save_as_ini() const {
+String SpriteSheet::_write_ini() const {
 	String text = vformat("[%s]\n%s=%s\n", INI_SECTION_ATLAS, KEY_TEXTURE_PATH, _get_written_texture_path());
 	for (const KeyValue<StringName, Region> &E : regions) {
 		text += vformat("\n[%s]\n", E.key);
@@ -868,18 +1063,10 @@ String TextureAtlas::save_as_ini() const {
 	return text;
 }
 
-Error TextureAtlas::load_from_ini(const String &p_text) {
-	String path;
-	LocalVector<Entry> entries;
-	String error;
-	const Error err = parse_ini(p_text, path, entries, error);
-	return _load_entries(err, path, entries, error, "INI");
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // TexturePacker JSON.
 
-static Error _texture_packer_frame_to_entry(const String &p_file_name, const Dictionary &p_frame, TextureAtlas::Entry &r_entry, String &r_error) {
+static Error _texture_packer_frame_to_entry(const String &p_file_name, const Dictionary &p_frame, SpriteSheet::Entry &r_entry, String &r_error) {
 	if (bool(p_frame.get("rotated", false))) {
 		r_error = vformat("Frame \"%s\" is rotated; rotated frames are not supported. Export the sheet without rotation.", p_file_name);
 		return ERR_INVALID_DATA;
@@ -898,7 +1085,7 @@ static Error _texture_packer_frame_to_entry(const String &p_file_name, const Dic
 			return ERR_PARSE_ERROR;
 		}
 	}
-	r_entry.name = TextureAtlas::texture_packer_name_to_region_name(p_file_name);
+	r_entry.name = SpriteSheet::texture_packer_name_to_region_name(p_file_name);
 	r_entry.rect = Rect2i(values[0], values[1], values[2], values[3]);
 	r_entry.margin = Rect2i();
 
@@ -924,7 +1111,7 @@ static Error _texture_packer_frame_to_entry(const String &p_file_name, const Dic
 	return OK;
 }
 
-Error TextureAtlas::parse_texture_packer_json(const String &p_text, const String &p_base_dir, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
+Error SpriteSheet::parse_texture_packer_json(const String &p_text, const String &p_base_dir, String &r_texture_path, LocalVector<Entry> &r_entries, String &r_error) {
 	r_entries.clear();
 	Dictionary root;
 	if (_parse_json_root(p_text, root, r_error) != OK) {
@@ -994,7 +1181,7 @@ Error TextureAtlas::parse_texture_packer_json(const String &p_text, const String
 	return OK;
 }
 
-Error TextureAtlas::import_texture_packer_json(const String &p_text, const String &p_base_dir) {
+Error SpriteSheet::import_texture_packer_json(const String &p_text, const String &p_base_dir) {
 	String path;
 	LocalVector<Entry> entries;
 	String error;
@@ -1003,45 +1190,73 @@ Error TextureAtlas::import_texture_packer_json(const String &p_text, const Strin
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// Text.
+
+Error SpriteSheet::load_from_text(const String &p_text, ResourceTextSerializer::Format p_format) {
+	String path;
+	LocalVector<Entry> entries;
+	String error;
+	Error err = OK;
+	switch (p_format) {
+		case ResourceTextSerializer::FORMAT_JSON:
+			err = parse_json(p_text, path, entries, error);
+			break;
+		case ResourceTextSerializer::FORMAT_CSV:
+			err = parse_csv(p_text, path, entries, error);
+			break;
+		case ResourceTextSerializer::FORMAT_INI:
+			err = parse_ini(p_text, path, entries, error);
+			break;
+		default:
+			ERR_FAIL_V_MSG(ERR_UNAVAILABLE, vformat("SpriteSheet: the text format %s is not supported (JSON, CSV or INI expected).", ResourceTextSerializer::get_format_display_name(p_format)));
+	}
+	return _load_entries(err, path, entries, error, ResourceTextSerializer::get_format_display_name(p_format));
+}
+
+String SpriteSheet::to_text(ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options) const {
+	switch (p_format) {
+		case ResourceTextSerializer::FORMAT_JSON:
+			return _write_json(ResourceTextSerializer::get_options(p_options).indent);
+		case ResourceTextSerializer::FORMAT_CSV:
+			return _write_csv();
+		case ResourceTextSerializer::FORMAT_INI:
+			return _write_ini();
+		default:
+			break;
+	}
+	ERR_FAIL_V_MSG(String(), vformat("SpriteSheet: the text format %s is not supported (JSON, CSV or INI expected).", ResourceTextSerializer::get_format_display_name(p_format)));
+}
+
+/////////////////////////////////////////////////////////////////////////////
 // Files.
 
-Error TextureAtlas::load_from_file(const String &p_path) {
+Error SpriteSheet::load_from_file(const String &p_path) {
 	Error err = OK;
 	const String text = FileAccess::get_file_as_string(p_path, &err);
-	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("TextureAtlas: cannot read \"%s\".", p_path));
-	const String extension = p_path.get_extension().to_lower();
-	if (extension == "json") {
+	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("SpriteSheet: cannot read \"%s\".", p_path));
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(p_path.get_extension());
+	if (format == ResourceTextSerializer::FORMAT_JSON) {
 		Dictionary root;
 		String error;
 		if (_parse_json_root(text, root, error) == OK && root.has("frames")) {
 			return import_texture_packer_json(text, p_path.get_base_dir());
 		}
-		return load_from_json(text);
 	}
-	if (extension == "csv") {
-		return load_from_csv(text);
+	if (format == ResourceTextSerializer::FORMAT_JSON || format == ResourceTextSerializer::FORMAT_CSV || format == ResourceTextSerializer::FORMAT_INI) {
+		return load_from_text(text, format);
 	}
-	if (extension == "ini") {
-		return load_from_ini(text);
-	}
-	ERR_FAIL_V_MSG(ERR_FILE_UNRECOGNIZED, vformat("TextureAtlas: unknown file extension of \"%s\" (json, csv or ini expected).", p_path));
+	ERR_FAIL_V_MSG(ERR_FILE_UNRECOGNIZED, vformat("SpriteSheet: unknown file extension of \"%s\" (json, csv or ini expected).", p_path));
 }
 
-Error TextureAtlas::save_to_file(const String &p_path) const {
-	const String extension = p_path.get_extension().to_lower();
-	String text;
-	if (extension == "json") {
-		text = save_as_json();
-	} else if (extension == "csv") {
-		text = save_as_csv();
-	} else if (extension == "ini") {
-		text = save_as_ini();
-	} else {
-		ERR_FAIL_V_MSG(ERR_FILE_UNRECOGNIZED, vformat("TextureAtlas: unknown file extension of \"%s\" (json, csv or ini expected).", p_path));
+Error SpriteSheet::save_to_file(const String &p_path) const {
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(p_path.get_extension());
+	if (format != ResourceTextSerializer::FORMAT_JSON && format != ResourceTextSerializer::FORMAT_CSV && format != ResourceTextSerializer::FORMAT_INI) {
+		ERR_FAIL_V_MSG(ERR_FILE_UNRECOGNIZED, vformat("SpriteSheet: unknown file extension of \"%s\" (json, csv or ini expected).", p_path));
 	}
+	const String text = to_text(format);
 	Error err = OK;
 	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
-	ERR_FAIL_COND_V_MSG(file.is_null(), err != OK ? err : ERR_CANT_OPEN, vformat("TextureAtlas: cannot write \"%s\".", p_path));
+	ERR_FAIL_COND_V_MSG(file.is_null(), err != OK ? err : ERR_CANT_OPEN, vformat("SpriteSheet: cannot write \"%s\".", p_path));
 	file->store_string(text);
 	return OK;
 }
@@ -1049,46 +1264,48 @@ Error TextureAtlas::save_to_file(const String &p_path) const {
 /////////////////////////////////////////////////////////////////////////////
 // Bindings.
 
-void TextureAtlas::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_texture", "texture"), &TextureAtlas::set_texture);
-	ClassDB::bind_method(D_METHOD("get_sheet_texture"), &TextureAtlas::get_sheet_texture);
-	ClassDB::bind_method(D_METHOD("set_texture_path", "path"), &TextureAtlas::set_texture_path);
-	ClassDB::bind_method(D_METHOD("get_texture_path"), &TextureAtlas::get_texture_path);
-	ClassDB::bind_method(D_METHOD("set_filter_clip", "enable"), &TextureAtlas::set_filter_clip);
-	ClassDB::bind_method(D_METHOD("is_filter_clip"), &TextureAtlas::is_filter_clip);
-	ClassDB::bind_method(D_METHOD("set_regions", "regions"), &TextureAtlas::set_regions);
-	ClassDB::bind_method(D_METHOD("get_regions"), &TextureAtlas::get_regions);
-	ClassDB::bind_method(D_METHOD("set_margins", "margins"), &TextureAtlas::set_margins);
-	ClassDB::bind_method(D_METHOD("_set_region_order", "order"), &TextureAtlas::_set_region_order);
-	ClassDB::bind_method(D_METHOD("_get_region_order"), &TextureAtlas::_get_region_order);
-	ClassDB::bind_method(D_METHOD("get_margins"), &TextureAtlas::get_margins);
+void SpriteSheet::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_texture", "texture"), &SpriteSheet::set_texture);
+	ClassDB::bind_method(D_METHOD("get_sheet_texture"), &SpriteSheet::get_sheet_texture);
+	ClassDB::bind_method(D_METHOD("set_texture_path", "path"), &SpriteSheet::set_texture_path);
+	ClassDB::bind_method(D_METHOD("get_texture_path"), &SpriteSheet::get_texture_path);
+	ClassDB::bind_method(D_METHOD("set_filter_clip", "enable"), &SpriteSheet::set_filter_clip);
+	ClassDB::bind_method(D_METHOD("is_filter_clip"), &SpriteSheet::is_filter_clip);
+	ClassDB::bind_method(D_METHOD("set_regions", "regions"), &SpriteSheet::set_regions);
+	ClassDB::bind_method(D_METHOD("get_regions"), &SpriteSheet::get_regions);
+	ClassDB::bind_method(D_METHOD("set_margins", "margins"), &SpriteSheet::set_margins);
+	ClassDB::bind_method(D_METHOD("_set_region_order", "order"), &SpriteSheet::_set_region_order);
+	ClassDB::bind_method(D_METHOD("_get_region_order"), &SpriteSheet::_get_region_order);
+	ClassDB::bind_method(D_METHOD("get_margins"), &SpriteSheet::get_margins);
 
-	ClassDB::bind_method(D_METHOD("set_region", "name", "rect"), &TextureAtlas::set_region);
-	ClassDB::bind_method(D_METHOD("remove_region", "name"), &TextureAtlas::remove_region);
-	ClassDB::bind_method(D_METHOD("rename_region", "from", "to"), &TextureAtlas::rename_region);
-	ClassDB::bind_method(D_METHOD("has_region", "name"), &TextureAtlas::has_region);
-	ClassDB::bind_method(D_METHOD("get_region", "name"), &TextureAtlas::get_region);
-	ClassDB::bind_method(D_METHOD("get_region_names"), &TextureAtlas::get_region_names);
-	ClassDB::bind_method(D_METHOD("get_region_count"), &TextureAtlas::get_region_count);
-	ClassDB::bind_method(D_METHOD("clear_regions"), &TextureAtlas::clear_regions);
-	ClassDB::bind_method(D_METHOD("set_region_margin", "name", "margin"), &TextureAtlas::set_region_margin);
-	ClassDB::bind_method(D_METHOD("get_region_margin", "name"), &TextureAtlas::get_region_margin);
+	ClassDB::bind_method(D_METHOD("set_region", "name", "rect"), &SpriteSheet::set_region);
+	ClassDB::bind_method(D_METHOD("remove_region", "name"), &SpriteSheet::remove_region);
+	ClassDB::bind_method(D_METHOD("rename_region", "from", "to"), &SpriteSheet::rename_region);
+	ClassDB::bind_method(D_METHOD("has_region", "name"), &SpriteSheet::has_region);
+	ClassDB::bind_method(D_METHOD("get_region", "name"), &SpriteSheet::get_region);
+	ClassDB::bind_method(D_METHOD("get_region_names"), &SpriteSheet::get_region_names);
+	ClassDB::bind_method(D_METHOD("get_region_count"), &SpriteSheet::get_region_count);
+	ClassDB::bind_method(D_METHOD("clear_regions"), &SpriteSheet::clear_regions);
+	ClassDB::bind_method(D_METHOD("make_unique_region_name", "prefix"), &SpriteSheet::make_unique_region_name);
+	ClassDB::bind_method(D_METHOD("add_regions", "rects", "prefix"), &SpriteSheet::add_regions, DEFVAL("sprite_"));
+	ClassDB::bind_method(D_METHOD("auto_slice", "prefix", "alpha_threshold"), &SpriteSheet::auto_slice, DEFVAL("sprite_"), DEFVAL(0.1));
 
-	ClassDB::bind_method(D_METHOD("get_texture", "name"), &TextureAtlas::get_texture);
-	ClassDB::bind_method(D_METHOD("create_sprite_frames", "prefix", "fps"), &TextureAtlas::create_sprite_frames, DEFVAL(String()), DEFVAL(5.0));
+	ClassDB::bind_method(D_METHOD("set_region_margin", "name", "margin"), &SpriteSheet::set_region_margin);
+	ClassDB::bind_method(D_METHOD("get_region_margin", "name"), &SpriteSheet::get_region_margin);
 
-	ClassDB::bind_method(D_METHOD("save_as_json", "indent"), &TextureAtlas::save_as_json, DEFVAL("\t"));
-	ClassDB::bind_method(D_METHOD("load_from_json", "json"), &TextureAtlas::load_from_json);
-	ClassDB::bind_method(D_METHOD("save_as_csv"), &TextureAtlas::save_as_csv);
-	ClassDB::bind_method(D_METHOD("load_from_csv", "csv"), &TextureAtlas::load_from_csv);
-	ClassDB::bind_method(D_METHOD("save_as_ini"), &TextureAtlas::save_as_ini);
-	ClassDB::bind_method(D_METHOD("load_from_ini", "ini"), &TextureAtlas::load_from_ini);
-	ClassDB::bind_method(D_METHOD("import_texture_packer_json", "json", "base_dir"), &TextureAtlas::import_texture_packer_json, DEFVAL(String()));
-	ClassDB::bind_method(D_METHOD("load_from_file", "path"), &TextureAtlas::load_from_file);
-	ClassDB::bind_method(D_METHOD("save_to_file", "path"), &TextureAtlas::save_to_file);
+	ClassDB::bind_method(D_METHOD("get_region_texture", "name"), &SpriteSheet::get_region_texture);
+	ClassDB::bind_method(D_METHOD("create_sprite_frames", "prefix", "fps"), &SpriteSheet::create_sprite_frames, DEFVAL(String()), DEFVAL(5.0));
 
-	ClassDB::bind_static_method("TextureAtlas", D_METHOD("is_valid_region_name", "name"), &TextureAtlas::is_valid_region_name);
-	ClassDB::bind_static_method("TextureAtlas", D_METHOD("texture_packer_name_to_region_name", "file_name"), &TextureAtlas::texture_packer_name_to_region_name);
+	ClassDB::bind_method(D_METHOD("load_from_text", "text", "format"), &SpriteSheet::load_from_text);
+	ClassDB::bind_method(D_METHOD("to_text", "format", "options"), &SpriteSheet::to_text, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_method(D_METHOD("import_texture_packer_json", "json", "base_dir"), &SpriteSheet::import_texture_packer_json, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("load_from_file", "path"), &SpriteSheet::load_from_file);
+	ClassDB::bind_method(D_METHOD("save_to_file", "path"), &SpriteSheet::save_to_file);
+
+	ClassDB::bind_static_method("SpriteSheet", D_METHOD("is_valid_region_name", "name"), &SpriteSheet::is_valid_region_name);
+	ClassDB::bind_static_method("SpriteSheet", D_METHOD("texture_packer_name_to_region_name", "file_name"), &SpriteSheet::texture_packer_name_to_region_name);
+	ClassDB::bind_static_method("SpriteSheet", D_METHOD("detect_sprite_rects", "image", "alpha_threshold"), &SpriteSheet::detect_sprite_rects, DEFVAL(0.1));
+	ClassDB::bind_static_method("SpriteSheet", D_METHOD("make_grid_rects", "area_size", "cell_size", "separation", "offset"), &SpriteSheet::make_grid_rects, DEFVAL(Vector2i()), DEFVAL(Vector2i()));
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_sheet_texture");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "texture_path"), "set_texture_path", "get_texture_path");

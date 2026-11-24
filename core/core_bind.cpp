@@ -38,10 +38,12 @@
 #include "core/debugger/script_debugger.h"
 #include "core/io/file_access.h"
 #include "core/io/marshalls.h"
+#include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_callable.h"
 #include "core/math/geometry_2d.h"
 #include "core/math/geometry_3d.h"
 #include "core/object/class_db.h"
+#include "core/object/script_language.h"
 #include "core/os/keyboard.h"
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
@@ -212,6 +214,97 @@ bool ResourceLoader::is_extension_registered(const String &p_extension) {
 	return ResourceFormatLoaderCallable::is_extension_registered(p_extension);
 }
 
+// The path as `::ResourceLoader` resolves it: `uid://` to its file, relative to `res://`, else localized.
+static String _load_result_local_path(const String &p_path) {
+	const ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(p_path);
+	if (uid != ResourceUID::INVALID_ID) {
+		return ResourceUID::get_singleton()->has_id(uid) ? ResourceUID::get_singleton()->get_id_path(uid) : p_path;
+	}
+	if (p_path.is_relative_path()) {
+		return ("res://" + p_path).simplify_path();
+	}
+	return ProjectSettings::get_singleton()->localize_path(p_path);
+}
+
+// True if `p_resource` is a `p_type`: a native class or a global script class (`class_name`).
+static bool _load_result_is_type(const Ref<Resource> &p_resource, const String &p_type) {
+	if (ClassDB::class_exists(p_type)) {
+		return p_resource->is_class(p_type);
+	}
+	if (!ScriptServer::is_global_class(p_type)) {
+		return true; // Unknown type hints are only a hint for the loader, as in `load()`.
+	}
+	Ref<Script> script = p_resource->get_script();
+	while (script.is_valid()) {
+		if (String(script->get_global_name()) == p_type) {
+			return true;
+		}
+		script = script->get_base_script();
+	}
+	return false;
+}
+
+static Ref<ResourceLoadResult> _make_load_result(const String &p_path, const String &p_type_hint, const Ref<Resource> &p_resource, Error p_error, const String &p_message) {
+	const String path = _load_result_local_path(p_path);
+	if (p_error == OK && p_resource.is_valid()) {
+		if (!p_type_hint.is_empty() && !_load_result_is_type(p_resource, p_type_hint)) {
+			return ResourceLoadResult::create(path, Ref<Resource>(), ERR_INVALID_DATA, vformat("Wrong resource type in '%s': expected %s, got %s.", path, p_type_hint, p_resource->get_class()));
+		}
+		return ResourceLoadResult::create(path, p_resource, OK, String());
+	}
+
+	Error error = p_error == OK ? ERR_CANT_ACQUIRE_RESOURCE : p_error;
+	String message = p_message;
+	if (error != ERR_FILE_NOT_FOUND && !path.is_empty() && !::ResourceLoader::exists(path) && !FileAccess::exists(path)) {
+		// Loaders report a missing file differently (ERR_FILE_CANT_OPEN, FAILED, ...); unify it.
+		error = ERR_FILE_NOT_FOUND;
+		const String not_found = vformat("Resource file not found: '%s'.", path);
+		message = message.is_empty() ? not_found : not_found + "\n" + message;
+	}
+	return ResourceLoadResult::create(path, Ref<Resource>(), error, message);
+}
+
+Ref<ResourceLoadResult> ResourceLoader::load_result(const String &p_path, const String &p_type_hint, CacheMode p_cache_mode) {
+	Error err = OK;
+	Ref<Resource> res;
+	String message;
+	{
+		// Catches what is printed on this thread; `last_load_error_message` holds what the load
+		// task printed, also when it ran on a worker thread. No lock is held here (#60).
+		ResourceErrorCapture error_capture;
+		::ResourceLoader::last_load_error_message = String();
+		res = ::ResourceLoader::load(p_path, p_type_hint, ResourceFormatLoader::CacheMode(p_cache_mode), &err);
+		if (res.is_null() || err != OK) {
+			message = ::ResourceLoader::last_load_error_message;
+			if (message.is_empty()) {
+				message = error_capture.get_message();
+			}
+		}
+	}
+	return _make_load_result(p_path, p_type_hint, res, err, message);
+}
+
+Ref<ResourceLoadResult> ResourceLoader::load_threaded_get_result(const String &p_path) {
+	Error err = OK;
+	Ref<Resource> res;
+	String message;
+	{
+		ResourceErrorCapture error_capture;
+		::ResourceLoader::last_load_error_message = String();
+		res = ::ResourceLoader::load_threaded_get(p_path, &err);
+		if (res.is_null() || err != OK) {
+			message = ::ResourceLoader::last_load_error_message;
+			if (message.is_empty()) {
+				message = error_capture.get_message();
+			}
+		}
+	}
+	if (err == ERR_INVALID_PARAMETER && message.is_empty()) {
+		message = vformat("No threaded load was requested for '%s', or its result was already collected.", p_path);
+	}
+	return _make_load_result(p_path, String(), res, err, message);
+}
+
 void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("load_threaded_request", "path", "type_hint", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request, DEFVAL(""), DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_get_status", "path", "progress"), &ResourceLoader::load_threaded_get_status, DEFVAL_ARRAY);
@@ -240,6 +333,8 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("register_extension", "extension", "load", "type", "at_front"), &ResourceLoader::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceLoader::unregister_extension);
 	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceLoader::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("load_result", "path", "type_hint", "cache_mode"), &ResourceLoader::load_result, DEFVAL(""), DEFVAL(CACHE_MODE_REUSE));
+	ClassDB::bind_method(D_METHOD("load_threaded_get_result", "path"), &ResourceLoader::load_threaded_get_result);
 
 	BIND_ENUM_CONSTANT(THREAD_LOAD_INVALID_RESOURCE);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);
@@ -300,6 +395,23 @@ bool ResourceSaver::is_extension_registered(const String &p_extension) {
 	return ResourceFormatSaverCallable::is_extension_registered(p_extension);
 }
 
+Ref<ResourceSaveResult> ResourceSaver::save_result(const Ref<Resource> &p_resource, const String &p_path, BitField<SaverFlags> p_flags) {
+	if (p_resource.is_null()) {
+		return ResourceSaveResult::create(p_path, ERR_INVALID_PARAMETER, "The resource to save is null.");
+	}
+	const String path = p_path.is_empty() ? p_resource->get_path() : p_path;
+	Error err = OK;
+	String message;
+	{
+		ResourceErrorCapture error_capture;
+		err = ::ResourceSaver::save(p_resource, p_path, p_flags);
+		if (err != OK) {
+			message = error_capture.get_message();
+		}
+	}
+	return ResourceSaveResult::create(path, err, message);
+}
+
 void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("save", "resource", "path", "flags"), &ResourceSaver::save, DEFVAL(""), DEFVAL((uint32_t)FLAG_NONE));
 	ClassDB::bind_method(D_METHOD("set_uid", "resource", "uid"), &ResourceSaver::set_uid);
@@ -310,6 +422,7 @@ void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("register_extension", "extension", "save", "type", "at_front"), &ResourceSaver::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceSaver::unregister_extension);
 	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceSaver::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("save_result", "resource", "path", "flags"), &ResourceSaver::save_result, DEFVAL(""), DEFVAL((uint32_t)FLAG_NONE));
 
 	BIND_BITFIELD_FLAG(FLAG_NONE);
 	BIND_BITFIELD_FLAG(FLAG_RELATIVE_PATHS);
@@ -710,6 +823,14 @@ Dictionary OS::get_memory_info() const {
 	return ::OS::get_singleton()->get_memory_info();
 }
 
+uint64_t OS::get_process_memory_usage() const {
+	return ::OS::get_singleton()->get_process_memory_usage();
+}
+
+Dictionary OS::get_process_memory_info() const {
+	return ::OS::get_singleton()->get_process_memory_info();
+}
+
 /** This method uses a signed argument for better error reporting as it's used from the scripting API. */
 void OS::delay_usec(int p_usec) const {
 	ERR_FAIL_COND_MSG(
@@ -931,6 +1052,8 @@ void OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_static_memory_usage"), &OS::get_static_memory_usage);
 	ClassDB::bind_method(D_METHOD("get_static_memory_peak_usage"), &OS::get_static_memory_peak_usage);
 	ClassDB::bind_method(D_METHOD("get_memory_info"), &OS::get_memory_info);
+	ClassDB::bind_method(D_METHOD("get_process_memory_usage"), &OS::get_process_memory_usage);
+	ClassDB::bind_method(D_METHOD("get_process_memory_info"), &OS::get_process_memory_info);
 
 	ClassDB::bind_method(D_METHOD("move_to_trash", "path"), &OS::move_to_trash);
 	ClassDB::bind_method(D_METHOD("get_user_data_dir"), &OS::get_user_data_dir);

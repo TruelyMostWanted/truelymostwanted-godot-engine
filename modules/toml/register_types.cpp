@@ -35,10 +35,15 @@
 
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
 
 static Ref<ResourceFormatLoaderResourceTOML> resource_loader_toml;
 static Ref<ResourceFormatSaverResourceTOML> resource_saver_toml;
+
+static Error _parse_toml_format(const String &p_text, const String &p_type_hint, const ResourceTextSerializer::Options &p_options, Ref<Resource> &r_resource, String &r_error) {
+	return TOML::parse_resource(p_text, p_type_hint, r_resource, r_error);
+}
 
 void initialize_toml_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -51,6 +56,9 @@ void initialize_toml_module(ModuleInitializationLevel p_level) {
 	ResourceLoader::add_resource_format_loader(resource_loader_toml);
 	resource_saver_toml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_toml);
+
+	// ResourceTextSerializer.serialize(resource, FORMAT_TOML) and deserialize(text, FORMAT_TOML).
+	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_TOML, &TOML::write_resource, &_parse_toml_format);
 }
 
 void uninitialize_toml_module(ModuleInitializationLevel p_level) {
@@ -58,6 +66,7 @@ void uninitialize_toml_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
+	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_TOML);
 	ResourceLoader::remove_resource_format_loader(resource_loader_toml);
 	resource_loader_toml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_toml);

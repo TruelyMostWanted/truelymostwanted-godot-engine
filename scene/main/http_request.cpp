@@ -37,6 +37,7 @@
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/thread.h"
+#include "scene/main/http_response.h"
 #include "scene/main/timer.h"
 
 Error HTTPRequest::_request() {
@@ -122,12 +123,21 @@ Error HTTPRequest::request(const String &p_url, const Vector<String> &p_custom_h
 }
 
 Error HTTPRequest::request_raw(const String &p_url, const Vector<String> &p_custom_headers, HTTPClient::Method p_method, const Vector<uint8_t> &p_request_data_raw) {
+	// Set by `request_target()` right before this call; cleared for every other request.
+	Ref<HTTPRequestTarget> target = next_target;
+	next_target.unref();
+
 	ERR_FAIL_COND_V(!is_inside_tree(), ERR_UNCONFIGURED);
 	ERR_FAIL_COND_V_MSG(requesting, ERR_BUSY, "HTTPRequest is processing a request. Wait for completion or cancel it before attempting a new one.");
 
-	if (timeout > 0) {
+	active_target = target;
+	request_accept_gzip = target.is_valid() ? target->is_accepting_gzip() : accept_gzip;
+	request_max_redirects = target.is_valid() ? target->get_max_redirects() : max_redirects;
+	const double request_timeout = target.is_valid() ? target->get_timeout() : timeout;
+
+	if (request_timeout > 0) {
 		timer->stop();
-		timer->start(timeout);
+		timer->start(request_timeout);
 	}
 
 	method = p_method;
@@ -136,7 +146,7 @@ Error HTTPRequest::request_raw(const String &p_url, const Vector<String> &p_cust
 
 	headers = p_custom_headers;
 
-	if (accept_gzip) {
+	if (request_accept_gzip) {
 		// If the user has specified an Accept-Encoding header, don't overwrite it.
 		if (!has_header(headers, "Accept-Encoding")) {
 			headers.push_back("Accept-Encoding: gzip, deflate");
@@ -164,6 +174,17 @@ Error HTTPRequest::request_raw(const String &p_url, const Vector<String> &p_cust
 	}
 
 	return OK;
+}
+
+Error HTTPRequest::request_target(const Ref<HTTPRequestTarget> &p_target, const Dictionary &p_variables) {
+	ERR_FAIL_COND_V(p_target.is_null(), ERR_INVALID_PARAMETER);
+
+	const String target_url = p_target->build_url(p_variables);
+	const PackedStringArray target_headers = p_target->build_headers(p_variables);
+	const PackedByteArray target_body = p_target->build_body(p_variables);
+
+	next_target = p_target;
+	return request_raw(target_url, target_headers, p_target->get_method(), target_body);
 }
 
 void HTTPRequest::_thread_func(void *p_userdata) {
@@ -279,7 +300,7 @@ bool HTTPRequest::_handle_response(bool *ret_value) {
 	if (_is_automatic_redirect()) {
 		// Follow redirect.
 
-		if (max_redirects >= 0 && redirections >= max_redirects) {
+		if (request_max_redirects >= 0 && redirections >= request_max_redirects) {
 			_defer_done(RESULT_REDIRECT_LIMIT_REACHED, response_code, response_headers, PackedByteArray());
 			*ret_value = true;
 			return true;
@@ -332,7 +353,7 @@ bool HTTPRequest::_handle_response(bool *ret_value) {
 
 	// Check if we need to start streaming decompression.
 	String content_encoding;
-	if (accept_gzip) {
+	if (request_accept_gzip) {
 		content_encoding = get_header_value(response_headers, "Content-Encoding").to_lower();
 	}
 	if (content_encoding == "gzip") {
@@ -547,9 +568,14 @@ void HTTPRequest::_defer_done(int p_status, int p_code, const PackedStringArray 
 }
 
 void HTTPRequest::_request_done(int p_status, int p_code, const PackedStringArray &p_headers, const PackedByteArray &p_data) {
+	// A handler of `request_completed` may start the next request, so keep the target of this one.
+	Ref<HTTPRequestTarget> target = active_target;
+	active_target.unref();
+
 	cancel_request();
 
 	emit_signal(SNAME("request_completed"), p_status, p_code, p_headers, p_data);
+	emit_signal(SNAME("response_received"), HTTPResponse::create(Result(p_status), p_code, p_headers, p_data, target));
 }
 
 void HTTPRequest::_notification(int p_what) {
@@ -687,6 +713,7 @@ void HTTPRequest::set_tls_options(const Ref<TLSOptions> &p_options) {
 void HTTPRequest::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("request", "url", "custom_headers", "method", "request_data"), &HTTPRequest::request, DEFVAL(PackedStringArray()), DEFVAL(HTTPClient::METHOD_GET), DEFVAL(String()));
 	ClassDB::bind_method(D_METHOD("request_raw", "url", "custom_headers", "method", "request_data_raw"), &HTTPRequest::request_raw, DEFVAL(PackedStringArray()), DEFVAL(HTTPClient::METHOD_GET), DEFVAL(PackedByteArray()));
+	ClassDB::bind_method(D_METHOD("request_target", "target", "variables"), &HTTPRequest::request_target, DEFVAL(Dictionary()));
 	ClassDB::bind_method(D_METHOD("cancel_request"), &HTTPRequest::cancel_request);
 	ClassDB::bind_method(D_METHOD("set_tls_options", "client_options"), &HTTPRequest::set_tls_options);
 
@@ -736,6 +763,7 @@ void HTTPRequest::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "timeout", PROPERTY_HINT_RANGE, "0,3600,0.1,or_greater,suffix:s"), "set_timeout", "get_timeout");
 
 	ADD_SIGNAL(MethodInfo("request_completed", PropertyInfo(Variant::INT, "result"), PropertyInfo(Variant::INT, "response_code"), PropertyInfo(Variant::PACKED_STRING_ARRAY, "headers"), PropertyInfo(Variant::PACKED_BYTE_ARRAY, "body")));
+	ADD_SIGNAL(MethodInfo("response_received", PropertyInfo(Variant::OBJECT, "response", PROPERTY_HINT_RESOURCE_TYPE, HTTPResponse::get_class_static())));
 
 	BIND_ENUM_CONSTANT(RESULT_SUCCESS);
 	BIND_ENUM_CONSTANT(RESULT_CHUNKED_BODY_SIZE_MISMATCH);

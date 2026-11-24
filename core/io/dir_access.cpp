@@ -229,6 +229,11 @@ String DirAccess::fix_path(const String &p_path) const {
 
 DirAccess::CreateFunc DirAccess::create_func[ACCESS_MAX] = { nullptr, nullptr, nullptr };
 
+// A registered prefix that resolves into `res://` or `user://` uses the engine access, including the PCK.
+static String _resolve_prefixed_path(const String &p_path) {
+	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
+}
+
 Ref<DirAccess> DirAccess::create_for_path(const String &p_path) {
 	Ref<DirAccess> da;
 	if (p_path.begins_with("res://")) {
@@ -243,9 +248,10 @@ Ref<DirAccess> DirAccess::create_for_path(const String &p_path) {
 }
 
 Ref<DirAccess> DirAccess::open(const String &p_path, Error *r_error) {
-	Ref<DirAccess> da = create_for_path(p_path);
+	const String path = _resolve_prefixed_path(p_path);
+	Ref<DirAccess> da = create_for_path(path);
 	ERR_FAIL_COND_V_MSG(da.is_null(), nullptr, vformat("Cannot create DirAccess for path '%s'.", p_path));
-	Error err = da->change_dir(p_path);
+	Error err = da->change_dir(path);
 	if (r_error) {
 		*r_error = err;
 	}
@@ -282,18 +288,21 @@ String DirAccess::_get_drive_label(int p_idx) {
 }
 
 Error DirAccess::make_dir_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->make_dir(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->make_dir(dir);
 }
 
 Error DirAccess::make_dir_recursive_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->make_dir_recursive(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->make_dir_recursive(dir);
 }
 
 bool DirAccess::dir_exists_absolute(const String &p_dir) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_dir);
-	return d->dir_exists(p_dir);
+	const String dir = _resolve_prefixed_path(p_dir);
+	Ref<DirAccess> d = DirAccess::create_for_path(dir);
+	return d->dir_exists(dir);
 }
 
 Error DirAccess::copy_absolute(const String &p_from, const String &p_to, int p_chmod_flags) {
@@ -312,8 +321,9 @@ Error DirAccess::rename_absolute(const String &p_from, const String &p_to) {
 }
 
 Error DirAccess::remove_absolute(const String &p_path) {
-	Ref<DirAccess> d = DirAccess::create_for_path(p_path);
-	return d->remove(p_path);
+	const String path = _resolve_prefixed_path(p_path);
+	Ref<DirAccess> d = DirAccess::create_for_path(path);
+	return d->remove(path);
 }
 
 Ref<DirAccess> DirAccess::create(AccessType p_access) {

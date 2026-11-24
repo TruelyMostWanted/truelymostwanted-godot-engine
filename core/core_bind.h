@@ -34,6 +34,7 @@
 #include "core/io/files_manifest.h"
 #include "core/io/logger.h"
 #include "core/io/resource_loader.h"
+#include "core/io/resource_result.h"
 #include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
 #include "core/object/script_backtrace.h"
@@ -102,6 +103,9 @@ public:
 	Error unregister_extension(const String &p_extension);
 	bool is_extension_registered(const String &p_extension);
 
+	Ref<ResourceLoadResult> load_result(const String &p_path, const String &p_type_hint = "", CacheMode p_cache_mode = CACHE_MODE_REUSE);
+	Ref<ResourceLoadResult> load_threaded_get_result(const String &p_path);
+
 	ResourceLoader() { singleton = this; }
 };
 
@@ -137,6 +141,8 @@ public:
 	Error register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type = "Resource", bool p_at_front = false);
 	Error unregister_extension(const String &p_extension);
 	bool is_extension_registered(const String &p_extension);
+
+	Ref<ResourceSaveResult> save_result(const Ref<Resource> &p_resource, const String &p_path, BitField<SaverFlags> p_flags);
 
 	ResourceSaver() { singleton = this; }
 };
@@ -288,6 +294,8 @@ public:
 	uint64_t get_static_memory_usage() const;
 	uint64_t get_static_memory_peak_usage() const;
 	Dictionary get_memory_info() const;
+	uint64_t get_process_memory_usage() const;
+	Dictionary get_process_memory_info() const;
 
 	void delay_usec(int p_usec) const;
 	void delay_msec(int p_msec) const;

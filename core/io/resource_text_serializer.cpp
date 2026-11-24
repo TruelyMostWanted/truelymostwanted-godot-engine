@@ -59,10 +59,32 @@ static constexpr const char *KEY_FORMAT_VERSION = "$format_version";
 static constexpr const char *KEY_SCRIPT = "$script";
 static constexpr const char *SECTION_ROOT = "root";
 
-static constexpr const char *SETTING_JSON_INDENT = "filesystem/resources/text_formats/json_indent";
+static constexpr const char *SETTING_INDENT = "filesystem/resources/text_formats/indent";
 static constexpr const char *SETTING_ENUMS_AS_NAMES = "filesystem/resources/text_formats/enums_as_names";
-static constexpr const char *SETTING_INI_PLAIN_VALUES = "filesystem/resources/text_formats/ini_plain_values";
+static constexpr const char *SETTING_SORT_KEYS = "filesystem/resources/text_formats/sort_keys";
+static constexpr const char *SETTING_FULL_PRECISION_FLOATS = "filesystem/resources/text_formats/full_precision_floats";
 static constexpr const char *SETTING_CSV_DELIMITER = "filesystem/resources/text_formats/csv_delimiter";
+static constexpr const char *SETTING_CSV_HEADERS = "filesystem/resources/text_formats/csv_headers";
+static constexpr const char *SETTING_INI_PLAIN_VALUES = "filesystem/resources/text_formats/ini_plain_values";
+static constexpr const char *SETTING_XML_DECLARATION = "filesystem/resources/text_formats/xml_declaration";
+
+// Set while a resource is encoded with SerializerOptions.full_precision_floats (see _plain_real()).
+static thread_local bool tls_full_precision_floats = false;
+
+namespace {
+
+struct FullPrecisionScope {
+	bool previous = false;
+	explicit FullPrecisionScope(bool p_enable) {
+		previous = tls_full_precision_floats;
+		tls_full_precision_floats = p_enable;
+	}
+	~FullPrecisionScope() {
+		tls_full_precision_floats = previous;
+	}
+};
+
+} // namespace
 
 ResourceTextSerializer *ResourceTextSerializer::get_singleton() {
 	return singleton;
@@ -72,10 +94,14 @@ ResourceTextSerializer *ResourceTextSerializer::get_singleton() {
 // Settings and options.
 
 void ResourceTextSerializer::register_settings() {
-	GLOBAL_DEF(SETTING_JSON_INDENT, "  ");
+	GLOBAL_DEF(SETTING_INDENT, "  ");
 	GLOBAL_DEF(SETTING_ENUMS_AS_NAMES, true);
-	GLOBAL_DEF(SETTING_INI_PLAIN_VALUES, false);
+	GLOBAL_DEF(SETTING_SORT_KEYS, false);
+	GLOBAL_DEF(SETTING_FULL_PRECISION_FLOATS, false);
 	GLOBAL_DEF(SETTING_CSV_DELIMITER, ",");
+	GLOBAL_DEF(SETTING_CSV_HEADERS, true);
+	GLOBAL_DEF(SETTING_INI_PLAIN_VALUES, false);
+	GLOBAL_DEF(SETTING_XML_DECLARATION, true);
 }
 
 ResourceTextSerializer::Options ResourceTextSerializer::get_default_options() {
@@ -84,38 +110,49 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_default_options() {
 	if (settings == nullptr) {
 		return options;
 	}
-	if (settings->has_setting(SETTING_JSON_INDENT)) {
-		options.indent = settings->get_setting_with_override(SETTING_JSON_INDENT);
+	if (settings->has_setting(SETTING_INDENT)) {
+		options.indent = settings->get_setting_with_override(SETTING_INDENT);
 	}
 	if (settings->has_setting(SETTING_ENUMS_AS_NAMES)) {
 		options.enums_as_names = settings->get_setting_with_override(SETTING_ENUMS_AS_NAMES);
 	}
-	if (settings->has_setting(SETTING_INI_PLAIN_VALUES)) {
-		options.plain_ini = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES);
+	if (settings->has_setting(SETTING_SORT_KEYS)) {
+		options.sort_keys = settings->get_setting_with_override(SETTING_SORT_KEYS);
+	}
+	if (settings->has_setting(SETTING_FULL_PRECISION_FLOATS)) {
+		options.full_precision_floats = settings->get_setting_with_override(SETTING_FULL_PRECISION_FLOATS);
 	}
 	if (settings->has_setting(SETTING_CSV_DELIMITER)) {
 		options.csv_delimiter = settings->get_setting_with_override(SETTING_CSV_DELIMITER);
 	}
+	if (settings->has_setting(SETTING_CSV_HEADERS)) {
+		options.csv_headers = settings->get_setting_with_override(SETTING_CSV_HEADERS);
+	}
+	if (settings->has_setting(SETTING_INI_PLAIN_VALUES)) {
+		options.ini_plain_values = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES);
+	}
+	if (settings->has_setting(SETTING_XML_DECLARATION)) {
+		options.xml_declaration = settings->get_setting_with_override(SETTING_XML_DECLARATION);
+	}
 	return options;
 }
 
-ResourceTextSerializer::Options ResourceTextSerializer::get_options(const Dictionary &p_overrides) {
-	Options options = get_default_options();
-	if (p_overrides.has("indent")) {
-		options.indent = p_overrides["indent"];
+ResourceTextSerializer::Options ResourceTextSerializer::get_options(const Ref<SerializerOptions> &p_options) {
+	if (p_options.is_null()) {
+		return get_default_options();
 	}
-	if (p_overrides.has("enums_as_names")) {
-		options.enums_as_names = p_overrides["enums_as_names"];
-	}
-	if (p_overrides.has("plain")) {
-		options.plain_ini = p_overrides["plain"];
-	}
-	if (p_overrides.has("delimiter")) {
-		options.csv_delimiter = p_overrides["delimiter"];
-	}
-	if (p_overrides.has("defaults")) {
-		options.defaults = Ref<Resource>(p_overrides["defaults"]);
-	}
+	// Read through the getters once per call, so the formats never call Object::get().
+	Options options;
+	options.indent = p_options->get_indent();
+	options.enums_as_names = p_options->is_enums_as_names();
+	options.defaults = p_options->get_defaults();
+	options.include_type_marker = p_options->is_include_type_marker();
+	options.sort_keys = p_options->is_sort_keys();
+	options.full_precision_floats = p_options->is_full_precision_floats();
+	options.csv_delimiter = p_options->get_csv_delimiter();
+	options.csv_headers = p_options->is_csv_headers();
+	options.ini_plain_values = p_options->is_ini_plain_values();
+	options.xml_declaration = p_options->is_xml_declaration();
 	return options;
 }
 
@@ -373,16 +410,23 @@ static String _get_declared_type(const PropertyInfo &p_info, const Variant &p_sc
 /////////////////////////////////////////////////////////////////////////////
 // Plain values.
 
-// Shortest decimal form of a real_t, so 0.1f is written as 0.1 and not as 0.10000000149011612.
+// Shortest decimal form of a real_t, so 0.1f is written as 0.1 and not as 0.10000000149011612,
+// unless SerializerOptions.full_precision_floats asks for the exact value.
 static double _plain_real(real_t p_value) {
 #ifdef REAL_T_IS_DOUBLE
 	return p_value;
 #else
+	if (tls_full_precision_floats) {
+		return p_value;
+	}
 	return String::num_scientific(p_value).to_float();
 #endif
 }
 
 static double _plain_float32(float p_value) {
+	if (tls_full_precision_floats) {
+		return p_value;
+	}
 	return String::num_scientific(p_value).to_float();
 }
 
@@ -998,6 +1042,7 @@ namespace {
 struct TreeEncoder {
 	bool plain = true;
 	bool enums_as_names = true;
+	bool include_type_marker = true; // `$type` of the root.
 	Ref<Resource> defaults; // Root values equal to these are skipped.
 	LocalVector<ResourceTextSerializer::Section> *sections = nullptr;
 	HashSet<const Resource *> stack;
@@ -1021,11 +1066,11 @@ Dictionary TreeEncoder::encode_resource(const Ref<Resource> &p_resource, const S
 	}
 
 	const String type = ResourceTextSerializer::get_type_name(p_resource.ptr());
-	if (p_root || type != p_declared) {
+	if (p_root ? include_type_marker : type != p_declared) {
 		result[KEY_TYPE] = type;
 	}
 	if (p_root) {
-		result[KEY_FORMAT_VERSION] = int(ResourceTextSerializer::FORMAT_VERSION);
+		result[KEY_FORMAT_VERSION] = int(ResourceTextSerializer::TEXT_LAYOUT_VERSION);
 	}
 	const Ref<Script> script = p_resource->get_script();
 	if (script.is_valid() && script->get_global_name() == StringName()) {
@@ -1287,8 +1332,8 @@ Ref<Resource> TreeDecoder::decode_resource(const Dictionary &p_data, const Strin
 		}
 		if (key == KEY_FORMAT_VERSION) {
 			int64_t version = 0;
-			if (_to_int(kv.value, version) && version > ResourceTextSerializer::FORMAT_VERSION) {
-				WARN_PRINT(vformat("'%s' was written with format version %d; this engine reads version %d.", p_where, version, int(ResourceTextSerializer::FORMAT_VERSION)));
+			if (_to_int(kv.value, version) && version > ResourceTextSerializer::TEXT_LAYOUT_VERSION) {
+				WARN_PRINT(vformat("'%s' was written with format version %d; this engine reads version %d.", p_where, version, int(ResourceTextSerializer::TEXT_LAYOUT_VERSION)));
 			}
 			continue;
 		}
@@ -1680,20 +1725,47 @@ DecodeResult TreeDecoder::decode_value(const Variant &p_data, const PropertyInfo
 /////////////////////////////////////////////////////////////////////////////
 // Tree API.
 
+// SerializerOptions.sort_keys: sorts every Dictionary of the tree in place.
+static void _sort_tree_keys(const Variant &p_value) {
+	if (p_value.get_type() == Variant::DICTIONARY) {
+		Dictionary dictionary = p_value;
+		dictionary.sort();
+		for (const KeyValue<Variant, Variant> &kv : dictionary) {
+			_sort_tree_keys(kv.value);
+		}
+	} else if (p_value.get_type() == Variant::ARRAY) {
+		const Array array = p_value;
+		for (int i = 0; i < array.size(); i++) {
+			_sort_tree_keys(array[i]);
+		}
+	}
+}
+
 Error ResourceTextSerializer::encode_resource(const Ref<Resource> &p_resource, const Options &p_options, bool p_plain, Dictionary &r_tree, String &r_error, LocalVector<Section> *r_sections) {
 	if (p_resource.is_null()) {
 		r_error = "The resource is null.";
 		return ERR_INVALID_PARAMETER;
 	}
+	const FullPrecisionScope precision(p_options.full_precision_floats);
 	TreeEncoder encoder;
 	encoder.plain = p_plain;
 	encoder.enums_as_names = p_options.enums_as_names;
+	encoder.include_type_marker = p_options.include_type_marker;
 	encoder.defaults = p_options.defaults;
 	encoder.sections = r_sections;
 	r_tree = encoder.encode_resource(p_resource, String(), true, SECTION_ROOT);
 	if (!encoder.error.is_empty()) {
 		r_error = encoder.error;
 		return ERR_INVALID_DATA;
+	}
+	if (p_options.sort_keys) {
+		// INI sections share their Dictionary with the tree, so sorting the tree sorts most of them too.
+		_sort_tree_keys(r_tree);
+		if (r_sections != nullptr) {
+			for (Section &section : *r_sections) {
+				section.second.sort();
+			}
+		}
 	}
 	return OK;
 }
@@ -1740,7 +1812,7 @@ Error ResourceTextSerializer::write_json(const Ref<Resource> &p_resource, const 
 	if (err != OK) {
 		return err;
 	}
-	r_text = JSON::stringify(tree, p_options.indent, false, true);
+	r_text = JSON::stringify(tree, p_options.indent, p_options.sort_keys, true);
 	if (!p_options.indent.is_empty()) {
 		r_text += "\n";
 	}
@@ -1774,7 +1846,7 @@ Error ResourceTextSerializer::parse_json(const String &p_text, const String &p_t
 Error ResourceTextSerializer::write_ini(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error) {
 	LocalVector<Section> sections;
 	Dictionary tree;
-	const Error err = encode_resource(p_resource, p_options, p_options.plain_ini, tree, r_error, &sections);
+	const Error err = encode_resource(p_resource, p_options, p_options.ini_plain_values, tree, r_error, &sections);
 	if (err != OK) {
 		return err;
 	}
@@ -1785,7 +1857,7 @@ Error ResourceTextSerializer::write_ini(const Ref<Resource> &p_resource, const O
 		}
 		text += "[" + sections[i].first + "]\n";
 		for (const KeyValue<Variant, Variant> &kv : sections[i].second) {
-			const String value = p_options.plain_ini ? _ini_plain_text(kv.value) : _ini_variant_text(kv.value);
+			const String value = p_options.ini_plain_values ? _ini_plain_text(kv.value) : _ini_variant_text(kv.value);
 			text += String(kv.key).property_name_encode() + "=" + value + "\n";
 		}
 	}
@@ -2057,6 +2129,11 @@ static Error _find_csv_list(const Ref<Resource> &p_resource, PropertyInfo &r_lis
 	return OK;
 }
 
+// Columns of a CSV without header row: the stored properties of the element class, in property order.
+static bool _is_csv_positional_column(const PropertyInfo &p_info) {
+	return !(p_info.name == "resource_local_to_scene" || p_info.name == "resource_name" || p_info.name.begins_with("metadata/"));
+}
+
 static Ref<Resource> _instantiate_element(const Array &p_list, String &r_error) {
 	const Ref<Script> script = p_list.get_typed_script();
 	if (script.is_valid()) {
@@ -2166,6 +2243,7 @@ Error ResourceTextSerializer::write_csv(const Ref<Resource> &p_resource, const O
 	}
 	const Array list = p_resource->get(list_info.name);
 	const char32_t delimiter = _csv_delimiter(p_options);
+	const FullPrecisionScope precision(p_options.full_precision_floats);
 
 	// Columns: the stored properties of the element class.
 	String instantiate_error;
@@ -2178,6 +2256,13 @@ Error ResourceTextSerializer::write_csv(const Ref<Resource> &p_resource, const O
 	LocalVector<PropertyInfo> properties;
 	_get_serialized_properties(sample.ptr(), properties);
 	for (const PropertyInfo &info : properties) {
+		if (!p_options.csv_headers) {
+			// Without a header the reader maps the cells by position: always the same columns.
+			if (_is_csv_positional_column(info)) {
+				columns.push_back(info);
+			}
+			continue;
+		}
 		bool used = !(info.name == "resource_local_to_scene" || info.name == "resource_name");
 		for (int i = 0; i < list.size() && !used; i++) {
 			const Ref<Resource> element = list[i];
@@ -2193,11 +2278,13 @@ Error ResourceTextSerializer::write_csv(const Ref<Resource> &p_resource, const O
 	encoder.enums_as_names = p_options.enums_as_names;
 
 	String text;
-	Vector<String> header;
-	for (const PropertyInfo &info : columns) {
-		header.push_back(info.name);
+	if (p_options.csv_headers) {
+		Vector<String> header;
+		for (const PropertyInfo &info : columns) {
+			header.push_back(info.name);
+		}
+		text += write_csv_row(header, delimiter);
 	}
-	text += write_csv_row(header, delimiter);
 	for (int i = 0; i < list.size(); i++) {
 		const Ref<Resource> element = list[i];
 		Vector<String> cells;
@@ -2232,13 +2319,33 @@ Error ResourceTextSerializer::parse_csv(const String &p_text, const String &p_ty
 
 	const Vector<Vector<String>> rows = parse_csv_rows(p_text, _csv_delimiter(p_options));
 	Array items;
-	if (!rows.is_empty()) {
-		Vector<String> header = rows[0];
+	Vector<String> header;
+	int first_row = 1;
+	if (!p_options.csv_headers) {
+		// No header row: the columns are the stored properties of the element class.
+		String element_error;
+		const Ref<Resource> sample = _instantiate_element(probe->get(list_info.name), element_error);
+		if (sample.is_null()) {
+			r_error = element_error;
+			return ERR_INVALID_DATA;
+		}
+		LocalVector<PropertyInfo> properties;
+		_get_serialized_properties(sample.ptr(), properties);
+		for (const PropertyInfo &info : properties) {
+			if (_is_csv_positional_column(info)) {
+				header.push_back(info.name);
+			}
+		}
+		first_row = 0;
+	} else if (!rows.is_empty()) {
+		header = rows[0];
 		for (int c = 0; c < header.size(); c++) {
 			header.write[c] = header[c].strip_edges();
 		}
+	}
+	if (!rows.is_empty()) {
 		bool warned = false;
-		for (int r = 1; r < rows.size(); r++) {
+		for (int r = first_row; r < rows.size(); r++) {
 			const Vector<String> &row = rows[r];
 			if (row.size() > header.size() && !warned) {
 				WARN_PRINT(vformat("CSV row %d has more cells than the header; extra cells are skipped.", r + 1));
@@ -2263,7 +2370,7 @@ Error ResourceTextSerializer::parse_csv(const String &p_text, const String &p_ty
 /////////////////////////////////////////////////////////////////////////////
 // Bound API.
 
-Dictionary ResourceTextSerializer::resource_to_dictionary(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
+Dictionary ResourceTextSerializer::resource_to_dictionary(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options) const {
 	Dictionary tree;
 	String error;
 	if (encode_resource(p_resource, get_options(p_options), true, tree, error) != OK) {
@@ -2273,7 +2380,7 @@ Dictionary ResourceTextSerializer::resource_to_dictionary(const Ref<Resource> &p
 	return tree;
 }
 
-Ref<Resource> ResourceTextSerializer::dictionary_to_resource(const Dictionary &p_data, const String &p_type_hint) const {
+Ref<Resource> ResourceTextSerializer::dictionary_to_resource(const Dictionary &p_data, const StringName &p_type_hint) const {
 	Ref<Resource> resource;
 	String error;
 	if (decode_resource(p_data, p_type_hint, resource, error) != OK) {
@@ -2283,92 +2390,48 @@ Ref<Resource> ResourceTextSerializer::dictionary_to_resource(const Dictionary &p
 	return resource;
 }
 
-String ResourceTextSerializer::resource_to_json(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_json(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
+bool ResourceTextSerializer::can_serialize(const Ref<Resource> &p_resource, Format p_format) const {
+	if (p_resource.is_null() || !has_format_implementation(p_format)) {
+		return false;
 	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::json_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_json(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
+	if (p_format == FORMAT_CSV) {
+		// CSV holds only one list of simple values.
+		String error;
+		return check_csv(p_resource, error) == OK;
 	}
-	return resource;
-}
-
-String ResourceTextSerializer::resource_to_ini(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_ini(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::ini_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_ini(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
-}
-
-bool ResourceTextSerializer::can_save_as_csv(const Ref<Resource> &p_resource) const {
-	String error;
-	return check_csv(p_resource, error) == OK;
-}
-
-String ResourceTextSerializer::resource_to_csv(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_csv(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::csv_to_resource(const String &p_text, const String &p_type_hint, const Dictionary &p_options) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_csv(p_text, p_type_hint, get_options(p_options), resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
+	return true;
 }
 
 void ResourceTextSerializer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("resource_to_dictionary", "resource", "options"), &ResourceTextSerializer::resource_to_dictionary, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("dictionary_to_resource", "data", "type_hint"), &ResourceTextSerializer::dictionary_to_resource, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("resource_to_dictionary", "resource", "options"), &ResourceTextSerializer::resource_to_dictionary, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_method(D_METHOD("dictionary_to_resource", "data", "type_hint"), &ResourceTextSerializer::dictionary_to_resource, DEFVAL(StringName()));
 
-	ClassDB::bind_method(D_METHOD("resource_to_json", "resource", "options"), &ResourceTextSerializer::resource_to_json, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("json_to_resource", "text", "type_hint"), &ResourceTextSerializer::json_to_resource, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("can_serialize", "resource", "format"), &ResourceTextSerializer::can_serialize);
 
-	ClassDB::bind_method(D_METHOD("resource_to_ini", "resource", "options"), &ResourceTextSerializer::resource_to_ini, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("ini_to_resource", "text", "type_hint"), &ResourceTextSerializer::ini_to_resource, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("serialize", "resource", "format", "options"), &ResourceTextSerializer::serialize, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_method(D_METHOD("deserialize", "text", "format", "type_hint", "options"), &ResourceTextSerializer::deserialize, DEFVAL(StringName()), DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_method(D_METHOD("is_format_available", "format"), &ResourceTextSerializer::is_format_available);
+	ClassDB::bind_method(D_METHOD("get_available_formats"), &ResourceTextSerializer::get_available_formats);
+	ClassDB::bind_method(D_METHOD("get_format_extension", "format"), &ResourceTextSerializer::get_format_extension);
+	ClassDB::bind_method(D_METHOD("get_format_from_extension", "extension"), &ResourceTextSerializer::get_format_from_extension);
 
-	ClassDB::bind_method(D_METHOD("can_save_as_csv", "resource"), &ResourceTextSerializer::can_save_as_csv);
-	ClassDB::bind_method(D_METHOD("resource_to_csv", "resource", "options"), &ResourceTextSerializer::resource_to_csv, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("csv_to_resource", "text", "type_hint", "options"), &ResourceTextSerializer::csv_to_resource, DEFVAL(Dictionary()));
+	BIND_ENUM_CONSTANT(FORMAT_JSON);
+	BIND_ENUM_CONSTANT(FORMAT_INI);
+	BIND_ENUM_CONSTANT(FORMAT_CSV);
+	BIND_ENUM_CONSTANT(FORMAT_XML);
+	BIND_ENUM_CONSTANT(FORMAT_TOML);
+	BIND_ENUM_CONSTANT(FORMAT_YAML);
+	BIND_ENUM_CONSTANT(FORMAT_MAX);
 
-	BIND_CONSTANT(FORMAT_VERSION);
+	BIND_CONSTANT(TEXT_LAYOUT_VERSION);
 }
 
 ResourceTextSerializer::ResourceTextSerializer() {
 	singleton = this;
+	register_builtin_formats();
 }
 
 ResourceTextSerializer::~ResourceTextSerializer() {
+	clear_formats();
 	singleton = nullptr;
 }
