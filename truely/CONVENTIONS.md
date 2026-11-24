@@ -31,7 +31,7 @@ Branches und Remotes in [`README.md`](README.md).
 | Enums | Typ `PascalCase`, Werte `UPPER_SNAKE_CASE` | `UtteranceEvent::UTTERANCE_STARTED` |
 | Dateien | `snake_case` | `servers/tts/tts_server.h` |
 | Project Settings | `bereich/gruppe/name` in `snake_case` | `filesystem/resources/preload_lists` |
-| C# (automatisch) | `PascalCase` | `TTSServer.Speak()`, `DefaultPersona`, `UtteranceStarted` |
+| C# (automatisch) | `PascalCase` | `TtsServer.Speak()`, `DefaultPersona`, `UtteranceStarted` |
 
 ### 1.2a Benennung und Typen der API
 
