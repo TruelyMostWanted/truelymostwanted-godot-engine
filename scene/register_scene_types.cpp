@@ -121,6 +121,7 @@
 #include "scene/resources/audio/audio_stream_polyphonic.h"
 #include "scene/resources/audio/audio_stream_randomizer.h"
 #include "scene/resources/audio/audio_stream_wav.h"
+#include "scene/resources/audio/audio_stream_wav_resource_format.h"
 #include "scene/resources/bit_map.h"
 #include "scene/resources/blit_material.h"
 #include "scene/resources/bone_map.h"
@@ -385,6 +386,9 @@
 #endif // PHYSICS_3D_DISABLED
 
 static AudioMixerServer *audio_mixer_server = nullptr;
+
+static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
+static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
 
 static Ref<ResourceFormatSaverText> resource_saver_text;
 static Ref<ResourceFormatLoaderText> resource_loader_text;
@@ -1060,6 +1064,15 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
 
+	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
+		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
+		resource_saver_audio_stream_wav.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_audio_stream_wav);
+
+		resource_loader_audio_stream_wav.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_audio_stream_wav);
+	}
+
 	OS::get_singleton()->yield(); // may take time to init
 
 #ifndef _2D_DISABLED
@@ -1368,6 +1381,14 @@ void unregister_scene_types() {
 	if (audio_mixer_server) {
 		memdelete(audio_mixer_server);
 		audio_mixer_server = nullptr;
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
+		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
+		resource_saver_audio_stream_wav.unref();
+
+		ResourceLoader::remove_resource_format_loader(resource_loader_audio_stream_wav);
+		resource_loader_audio_stream_wav.unref();
 	}
 
 	if constexpr (GD_IS_CLASS_ENABLED(TextureLayered)) {
