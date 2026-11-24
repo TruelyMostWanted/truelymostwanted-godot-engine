@@ -168,4 +168,7 @@ if ($Push -and -not $Check) {
     Invoke-Git push -q origin $EngineBranch
 }
 
+$statusFile = Join-Path $Root 'truely/godot-status.txt'
+$status = if (Test-Path $statusFile) { (Get-Content $statusFile -TotalCount 1).Trim() } else { '(missing)' }
+Write-Host "Reminder: truely/godot-status.txt says '$status'. If Godot moved to a new status (e.g. beta6, rc1, stable), update it." -ForegroundColor Yellow
 Write-Host 'Done.' -ForegroundColor Green

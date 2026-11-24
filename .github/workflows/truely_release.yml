@@ -1,0 +1,332 @@
+name: 📦 Truely Release
+# truely-godot-engine: builds the editors (standard and Mono) and the export templates of all desktop
+# platforms and the Web, packs them and publishes a GitHub release. Started by hand only.
+# Names: Truely_Godot<version>-<status>_<hash>_<platform>, tag truely-godot<version>-<status>-<hash>.
+# The status of the Godot base (e.g. beta5) comes from truely/godot-status.txt.
+on:
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the release as a draft
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truely-release
+  cancel-in-progress: false
+
+# Release builds never restore the shared SCons cache: cached objects of version-dependent files
+# carried old version strings into new builds.
+env:
+  BUILD_NAME: truely
+  SCONS_FLAGS: production=yes debug_symbols=no
+  PYTHONIOENCODING: utf8
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  setup:
+    name: 🏷️ Names
+    runs-on: ubuntu-24.04
+    outputs:
+      status: ${{ steps.names.outputs.status }}
+      config: ${{ steps.names.outputs.config }}
+      name: ${{ steps.names.outputs.name }}
+      tag: ${{ steps.names.outputs.tag }}
+      title: ${{ steps.names.outputs.title }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Compute names
+        id: names
+        run: |
+          python3 - <<'EOF'
+          import os, re, runpy
+          v = runpy.run_path("version.py")
+          status = open("truely/godot-status.txt", encoding="utf-8").read().strip()
+          number = f"{v['major']}.{v['minor']}" + (f".{v['patch']}" if v["patch"] else "")
+          sha = os.environ["GITHUB_SHA"][:7]
+          base = f"{number}-{status}"
+          m = re.fullmatch(r"([a-z]+)(\d*)", status)
+          pretty = f"{number} {m.group(1)} {m.group(2)}".strip() if m else f"{number} {status}"
+          out = {
+              "status": status,
+              "config": f"{number}.{status}",
+              "name": f"Truely_Godot{base}_{sha}",
+              "tag": f"truely-godot{base}-{sha}",
+              "title": f"Truely (Godot {pretty}, {sha})",
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              for key, value in out.items():
+                  print(f"{key}={value}", file=f)
+                  print(f"{key}={value}")
+          EOF
+
+  linux:
+    name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    needs: setup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libwayland-bin
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Setup .NET SDK
+        if: matrix.mono && matrix.target == 'editor'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download pre-built AccessKit
+        run: python ./misc/scripts/install_accesskit.py
+
+      - name: Compilation
+        run: |
+          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
+          scons platform=linuxbsd target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} accesskit=yes
+
+      # Glue and assemblies for all three editors, built here like the official release scripts do.
+      - name: Generate C# glue and build .NET assemblies
+        if: matrix.mono && matrix.target == 'editor'
+        run: |
+          ./bin/godot.linuxbsd.editor.x86_64.mono --headless --generate-mono-glue ./modules/mono/glue
+          # The .NET projects write to ./bin/GodotSharp (fixed path), so build one platform at a time.
+          for platform in linuxbsd windows macos; do
+            find modules/mono -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+            rm -rf ./bin/GodotSharp
+            python ./modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin --godot-platform="$platform"
+            mkdir -p "./sharp/$platform"
+            mv ./bin/GodotSharp "./sharp/$platform/GodotSharp"
+          done
+
+      - name: Prepare artifact
+        run: |
+          rm -rf ./bin/build_deps ./bin/obj
+          strip bin/godot.*
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-linux-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
+          path: bin/godot.*
+
+      - name: Upload GodotSharp
+        if: matrix.mono && matrix.target == 'editor'
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-godotsharp
+          path: sharp/
+
+  windows:
+    name: 🏁 Windows ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    needs: setup
+    runs-on: windows-latest
+    timeout-minutes: 240
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download Direct3D 12 SDK, ANGLE and AccessKit
+        shell: bash
+        run: |
+          python ./misc/scripts/install_d3d12_sdk_windows.py
+          python ./misc/scripts/install_angle.py
+          python ./misc/scripts/install_accesskit.py
+
+      - name: Compilation
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
+          scons platform=windows target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} d3d12=yes angle=yes accesskit=yes
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          rm -rf ./bin/build_deps ./bin/obj
+          rm -f bin/*.exp bin/*.lib bin/*.pdb
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-windows-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
+          path: bin/godot.*
+
+  macos:
+    name: 🍎 macOS ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    needs: setup
+    runs-on: macos-26
+    timeout-minutes: 240
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download ANGLE, AccessKit and the Vulkan SDK
+        run: |
+          python ./misc/scripts/install_angle.py
+          python ./misc/scripts/install_accesskit.py
+          sh misc/scripts/install_vulkan_sdk_macos.sh
+
+      - name: Compilation (x86_64 and arm64)
+        run: |
+          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
+          FLAGS="platform=macos target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} vulkan=yes angle=yes accesskit=yes"
+          # Metal is not supported in x86_64 builds.
+          scons $FLAGS arch=x86_64 metal=no
+          scons $FLAGS arch=arm64
+
+      - name: Prepare artifact (lipo, ad-hoc signature)
+        run: |
+          suffix="${{ matrix.mono && '.mono' || '' }}"
+          out="./bin/godot.macos.${{ matrix.target }}.universal$suffix"
+          lipo -create "./bin/godot.macos.${{ matrix.target }}.x86_64$suffix" "./bin/godot.macos.${{ matrix.target }}.arm64$suffix" -output "$out"
+          rm "./bin/godot.macos.${{ matrix.target }}.x86_64$suffix" "./bin/godot.macos.${{ matrix.target }}.arm64$suffix"
+          rm -rf ./bin/build_deps ./bin/obj
+          strip "$out"
+          codesign --force --sign - "$out"
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-macos-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
+          path: bin/godot.*
+
+  web:
+    name: 🌐 Web ${{ matrix.target }}${{ matrix.threads == 'no' && ' (no threads)' || '' }}
+    needs: setup
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+      EM_VERSION: 6.0.12
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [template_debug, template_release]
+        threads: ["yes", "no"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EM_VERSION }}
+          no-cache: true
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Compilation
+        run: |
+          rm -rf editor
+          scons platform=web target=${{ matrix.target }} $SCONS_FLAGS threads=${{ matrix.threads }} use_closure_compiler=yes
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-web-${{ matrix.target }}-threads-${{ matrix.threads }}
+          path: bin/godot.web.*.zip
+
+  package:
+    name: 📦 Package and release
+    needs: [setup, linux, windows, macos, web]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      NAME: ${{ needs.setup.outputs.name }}
+      CONFIG: ${{ needs.setup.outputs.config }}
+      TAG: ${{ needs.setup.outputs.tag }}
+      TITLE: ${{ needs.setup.outputs.title }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Check the version string
+        run: |
+          chmod +x artifacts/godot.linuxbsd.*
+          expected="$CONFIG.truely.${GITHUB_SHA:0:9}"
+          actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --version | tail -n 1)"
+          echo "expected $expected, got $actual"
+          [ "$actual" = "$expected" ]
+
+      - name: Package
+        run: bash .github/truely/package-release.sh artifacts release "$NAME" "$CONFIG"
+
+      - name: Release notes
+        run: |
+          cat > notes.md <<EOF
+          Truely Godot Engine at commit $GITHUB_SHA, based on Godot $CONFIG. Version string: \`$CONFIG.truely.${GITHUB_SHA:0:9}\` (Mono: \`$CONFIG.mono.truely.${GITHUB_SHA:0:9}\`).
+
+          **Editors:** \`*_win64.zip\`, \`*_linux.x86_64.zip\`, \`*_macos.universal.zip\` and the same with \`mono_\` for C#.
+          **Export templates:** \`*_export_templates.tpz\` and \`*_mono_export_templates.tpz\` (Windows, Linux, macOS, Web with and without threads). Install them in the editor: Editor > Manage Export Templates > Install from File.
+
+          - **Self-contained mode:** every editor zip contains a \`._sc_\` file next to the editor. Settings, caches and export templates stay in that folder, so this build and the official Godot of the same version never overwrite each other's templates. Keep the folder together.
+          - **macOS:** the builds are not signed or notarized. First start: right-click Godot.app > Open. For the self-contained mode, run \`xattr -dr com.apple.quarantine <folder>\` once, otherwise macOS starts the app from a random path and the \`._sc_\` file is not found.
+          - **Mono (C#):** needs the .NET SDK 10 or newer. The editor brings its own Godot NuGet packages (GodotSharp/Tools/nupkgs).
+          - **Web:** no C# support.
+          EOF
+
+      - name: Create release
+        run: |
+          prerelease=""
+          if [ "$(cat truely/godot-status.txt)" != "stable" ]; then prerelease="--prerelease"; fi
+          draft=""
+          if [ "${{ inputs.draft }}" = "true" ]; then draft="--draft"; fi
+          gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "$TITLE" --notes-file notes.md $prerelease $draft
