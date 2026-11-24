@@ -659,6 +659,17 @@ Files extracted from upstream source:
 - `LICENSE`
 
 
+## libsimplewebm
+
+- Upstream: https://github.com/The-Simplicity-Group/libsimplewebm
+- Version: git (0754c5156573b503875d352d640ddb3821c44c0a, 2026)
+- License: MIT
+
+Files extracted from upstream source:
+
+- `*`, except `example/`
+
+
 ## libtheora
 
 - Upstream: https://github.com/xiph/theora
@@ -683,6 +694,17 @@ Files extracted from upstream source:
 - `lib/*` except from: `CMakeLists.txt`, `lookups.pl`, `Makefile.*`, `misc.c`
 - `include/vorbis/` minus `Makefile.am`
 - `COPYING`
+
+
+## libvpx
+
+- Upstream: https://github.com/webmproject/libvpx
+- Version: 1.17.0 (6df3ec34557879fff673706f4a1d9fbd0f3a6f0e, 2026)
+- License: BSD-3-Clause
+
+Files extracted from upstream source:
+
+- `*`
 
 
 ## libwebp
