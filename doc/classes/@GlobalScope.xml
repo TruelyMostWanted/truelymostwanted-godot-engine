@@ -1565,6 +1565,9 @@
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
 		</member>
+		<member name="CameraSettingsServer" type="CameraSettingsServer" setter="" getter="">
+			The [CameraSettingsServer] singleton.
+		</member>
 		<member name="ClassDB" type="ClassDB" setter="" getter="">
 			The [ClassDB] singleton.
 		</member>
