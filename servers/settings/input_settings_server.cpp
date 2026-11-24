@@ -77,7 +77,7 @@ void InputSettingsServer::_push_use_accumulated_input(bool p_enable) {
 }
 
 bool InputSettingsServer::_pull_use_accumulated_input() {
-	const Input *input = Input::get_singleton();
+	Input *input = Input::get_singleton();
 	return input != nullptr ? input->is_using_accumulated_input() : true;
 }
 
