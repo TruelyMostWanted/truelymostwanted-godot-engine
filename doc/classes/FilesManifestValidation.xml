@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FilesManifestValidation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The result of [method FilesManifestServer.validate].
+	</brief_description>
+	<description>
+		A [FilesManifestValidation] is returned by [method FilesManifestServer.validate]. It lists what is missing or unknown in one [FilesManifest]: folders of [member FilesManifest.folder_paths] and files of [member FilesManifest.file_paths] that do not exist, and extensions of [member FilesManifest.extensions] that no resource loader recognizes. It is read-only after creation.
+		[codeblocks]
+		[gdscript]
+		var validation := FilesManifestServer.validate("mods")
+		if validation.error == ERR_FILE_NOT_FOUND:
+			FilesManifestServer.create_missing_folders("mods")
+		[/gdscript]
+		[csharp]
+		FilesManifestValidation validation = FilesManifestServer.Validate("mods");
+		if (validation.Error == Error.FileNotFound)
+		{
+		    FilesManifestServer.CreateMissingFolders("mods");
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="error" type="int" setter="" getter="get_error" enum="Error" default="3">
+			[constant OK] if nothing is missing or unknown. [constant ERR_FILE_NOT_FOUND] if [member missing_folders] or [member missing_files] is not empty, otherwise [constant ERR_FILE_UNRECOGNIZED] if [member unknown_extensions] is not empty. [constant ERR_DOES_NOT_EXIST] if no manifest is registered under the given name.
+		</member>
+		<member name="missing_files" type="PackedStringArray" setter="" getter="get_missing_files" default="PackedStringArray()">
+			The entries of [member FilesManifest.file_paths] that do not exist, as written in the manifest.
+		</member>
+		<member name="missing_folders" type="PackedStringArray" setter="" getter="get_missing_folders" default="PackedStringArray()">
+			The entries of [member FilesManifest.folder_paths] that do not exist, as written in the manifest. [method FilesManifestServer.create_missing_folders] creates them.
+		</member>
+		<member name="unknown_extensions" type="PackedStringArray" setter="" getter="get_unknown_extensions" default="PackedStringArray()">
+			The entries of [member FilesManifest.extensions] that no resource loader recognizes. A multi-part extension such as [code].tres.json[/code] is known if its last part is.
+		</member>
+		<member name="valid" type="bool" setter="" getter="is_valid" default="false">
+			[code]true[/code] if [member error] is [constant OK].
+		</member>
+	</members>
+</class>

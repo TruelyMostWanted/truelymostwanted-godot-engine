@@ -53,7 +53,7 @@
 			<return type="Resource" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Returns the noise generator called [param name]. On first use a new [FastNoiseLite] is created and gets the seed derived from [member global_seed] and [param name]. Returns [code]null[/code] if the engine was built without the noise module.
+				Returns the noise generator called [param name]. On first use a new [FastNoiseLite] is created and gets the seed derived from [member global_seed] and [param name]. Returns [code]null[/code] if the engine was built without the noise module. The return type is [Resource] because [Noise] belongs to the optional noise module; cast it to [Noise] or [FastNoiseLite].
 				[b]Note:[/b] Only the seed is managed. Other settings of the noise (type, frequency, fractal) are set by the caller.
 			</description>
 		</method>
@@ -74,6 +74,13 @@
 			<return type="PackedStringArray" />
 			<description>
 				Returns the names of all random streams, sorted.
+			</description>
+		</method>
+		<method name="get_seed_from_text" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns the seed for [param text] without setting it. The value is the same on every platform and in every engine version.
 			</description>
 		</method>
 		<method name="get_state" qualifiers="const">
@@ -108,13 +115,7 @@
 			<param index="1" name="noise" type="Resource" />
 			<description>
 				Registers [param noise] under [param name] and sets its seed from [member global_seed] and [param name]. [param noise] can be any [Resource] with an integer property [code]seed[/code], for example [FastNoiseLite] or a noise class from a GDExtension. Replaces a noise generator with the same name.
-			</description>
-		</method>
-		<method name="remove_noise">
-			<return type="void" />
-			<param index="0" name="name" type="String" />
-			<description>
-				Removes the noise generator called [param name].
+				[b]Note:[/b] The parameter is typed [Resource], not [Noise]: [Noise] belongs to the optional noise module, which the core cannot depend on, and noise classes from a GDExtension do not have to inherit [Noise].
 			</description>
 		</method>
 		<method name="remove_rng">
@@ -128,7 +129,7 @@
 			<return type="int" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Sets [member global_seed] to [method text_to_seed] of [param text] and returns it. For example, [code]"Daily-2026-11-23"[/code] gives every player the same daily challenge.
+				Sets [member global_seed] to [method get_seed_from_text] of [param text] and returns it. For example, [code]"Daily-2026-11-23"[/code] gives every player the same daily challenge.
 			</description>
 		</method>
 		<method name="set_state">
@@ -138,11 +139,11 @@
 				Restores a state from [method get_state]: sets [member global_seed], reseeds all streams and noise generators, then restores the state of every stream in [param state]. Streams that do not exist yet are created. Emits [signal seed_changed].
 			</description>
 		</method>
-		<method name="text_to_seed" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="text" type="String" />
+		<method name="unregister_noise">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
 			<description>
-				Returns the seed for [param text] without setting it. The value is the same on every platform and in every engine version.
+				Removes the noise generator called [param name]. A later [method get_noise] with this name creates a new [FastNoiseLite].
 			</description>
 		</method>
 	</methods>

@@ -7,6 +7,7 @@
 		A singleton used to load resource files from the filesystem.
 		It uses the many [ResourceFormatLoader] classes registered in the engine (either built-in or from a plugin) to load files into memory and convert them to a format that can be used by the engine.
 		[b]Note:[/b] You have to import the files into the engine first to load them using [method load]. If you want to load [Image]s at run-time, you may use [method Image.load]. If you want to import audio files, you can use the snippet described in [member AudioStreamMP3.data].
+		[b]Note:[/b] [code].gltf[/code], [code].glb[/code] and [code].fbx[/code] files that are not imported (for example in [code]user://[/code], or kept with the "Keep File" import mode) load as a [PackedScene] without an import step, using the [code]filesystem/scene_formats/*[/code] project settings. Imported files keep loading as imported scenes.
 		[b]Note:[/b] Non-resource files such as plain text files cannot be read using [ResourceLoader]. Use [FileAccess] for those files instead, and be aware that non-resource files are not exported by default (see notes in the [FileAccess] class description for instructions on exporting them).
 	</description>
 	<tutorials>
@@ -132,7 +133,7 @@
 			<param index="0" name="manifest" type="FilesManifest" />
 			<description>
 				Returns all paths described by [param manifest]: the files in its [member FilesManifest.folder_paths] that match [member FilesManifest.extensions] and [member FilesManifest.type_hint], then its [member FilesManifest.file_paths], without duplicates. The paths are in their canonical form (see [method PathPrefixServer.resolve]); use them as keys for [method load_threaded_get_status] and [method load_threaded_get].
-				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_non_existing_folders] is [code]true[/code] and the folder is writable.
+				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_missing_folders] is [code]true[/code] and the folder is writable.
 			</description>
 		</method>
 		<method name="get_recognized_extensions_for_type">
@@ -195,7 +196,7 @@
 				The registered [ResourceFormatLoader]s are queried sequentially to find the first one which can handle the file's extension, and then attempt loading. If loading fails, the remaining ResourceFormatLoaders are also attempted.
 				An optional [param type_hint] can be used to further specify the [Resource] type that should be handled by the [ResourceFormatLoader]. Anything that inherits from [Resource] can be used as a type hint, for example [Image].
 				The [param cache_mode] property defines whether and how the cache should be used or updated when loading the resource.
-				Returns an empty resource if no [ResourceFormatLoader] could handle the file, and prints an error if no file is found at the specified path.
+				Returns an empty resource if no [ResourceFormatLoader] could handle the file, and prints an error if no file is found at the specified path. Use [method load_result] to get the [enum Error] code and the loader's message as well.
 				GDScript has a simplified [method @GDScript.load] built-in method which can be used in most situations, leaving the use of [ResourceLoader] for more advanced scenarios.
 				[b]Note:[/b] If [member ProjectSettings.editor/export/convert_text_resources_to_binary] is [code]true[/code], [method @GDScript.load] will not be able to read converted files in an exported project. If you rely on run-time loading of files present within the PCK, set [member ProjectSettings.editor/export/convert_text_resources_to_binary] to [code]false[/code].
 				[b]Note:[/b] Relative paths will be prefixed with [code]"res://"[/code] before loading, to avoid unexpected results make sure your paths are absolute.
@@ -225,12 +226,53 @@
 				[/codeblocks]
 			</description>
 		</method>
+		<method name="load_result">
+			<return type="ResourceLoadResult" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="type_hint" type="String" default="&quot;&quot;" />
+			<param index="2" name="cache_mode" type="int" enum="ResourceLoader.CacheMode" default="1" />
+			<description>
+				Loads a resource like [method load] and reports why it failed: the returned [ResourceLoadResult] holds the resource, or the [enum Error] code and the message the loader printed. The resource is the same (cached) instance that [method load] returns.
+				[member ResourceLoadResult.error] is [constant ERR_FILE_NOT_FOUND] if there is no file at [param path] (whatever code the loader returned), [constant ERR_INVALID_DATA] if the loaded resource is not a [param type_hint] (a native class or a global script class), otherwise the code of the loader. [member ResourceLoadResult.error_message] holds the errors printed while the resource and its dependencies were loaded, also on worker threads; if nothing was printed, the name of the error code and the path. The errors are still printed as with [method load].
+				[codeblocks]
+				[gdscript]
+				var result := ResourceLoader.load_result("res://data/items.tres")
+				if not result.ok:
+					push_error(result.error_message)
+					return
+				var items: Resource = result.resource
+				[/gdscript]
+				[csharp]
+				ResourceLoadResult result = ResourceLoader.LoadResult("res://data/items.tres");
+				if (!result.Ok)
+				{
+				    GD.PushError(result.ErrorMessage);
+				    return;
+				}
+				Resource items = result.Resource;
+				// Shorter, with a type check: ResourceLoader.TryLoad&lt;T&gt;().
+				if (ResourceLoader.TryLoad&lt;Texture2D&gt;("res://icon.svg", out Texture2D icon, out Error error))
+				{
+				    GD.Print(icon.GetSize());
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="load_threaded_get">
 			<return type="Resource" />
 			<param index="0" name="path" type="String" />
 			<description>
 				Returns the resource loaded by [method load_threaded_request].
 				If this is called before the loading thread is done (i.e. [method load_threaded_get_status] is not [constant THREAD_LOAD_LOADED]), the calling thread will be blocked until the resource has finished loading. However, it's recommended to use [method load_threaded_get_status] to known when the load has actually completed.
+			</description>
+		</method>
+		<method name="load_threaded_get_result">
+			<return type="ResourceLoadResult" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns the result of a load started with [method load_threaded_request], like [method load_threaded_get], but as a [ResourceLoadResult] with the [enum Error] code and the message the loader printed on its worker thread. Blocks like [method load_threaded_get] if the load is not finished yet.
+				If no threaded load was requested for [param path], or its result was already collected, [member ResourceLoadResult.error] is [constant ERR_INVALID_PARAMETER].
 			</description>
 		</method>
 		<method name="load_threaded_get_status">
@@ -318,6 +360,7 @@
 				[param type] is the class of the loaded resources: a [Resource] class or a global script class ([code]class_name[/code]) that extends [Resource]. A load with a type hint only uses this format if [param type] is the hint or inherits it, and [method get_resource_type] reports [param type] (or the native base class of a script class). If [param at_front] is [code]true[/code], the format is asked before all other registered loaders, so it can take over extensions of other formats.
 				Registering an extension again replaces the previous [Callable]. Returns [constant OK], or [constant ERR_INVALID_PARAMETER] if the extension, the callable or the type is not valid.
 				The format behaves like any other [ResourceFormatLoader]: loaded resources are cached as with [method load], and [method load_threaded_request] works as well. No [code].uid[/code] files are used for these files.
+				[b]Note:[/b] [param load] returns a [Variant] (a [Resource] or an [enum Error] code) for the same reason as [method ResourceFormatLoader._load]: script functions have no out-parameters, and the binding layer cannot return a C++ struct. Callers of [method load] who need the code and the message use [method load_result].
 				[codeblocks]
 				[gdscript]
 				func _ready():

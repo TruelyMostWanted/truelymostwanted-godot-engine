@@ -46,7 +46,7 @@ class FilesManifest : public Resource {
 	PackedStringArray folder_paths;
 	PackedStringArray file_paths;
 	bool recursive = true;
-	bool create_non_existing_folders = false;
+	bool create_missing_folders = false;
 
 	void _collect_folder(const String &p_folder, int p_depth, HashSet<String> &r_seen, PackedStringArray &r_paths) const;
 	bool _type_matches(const String &p_path) const;
@@ -83,15 +83,15 @@ public:
 	void set_recursive(bool p_recursive);
 	bool is_recursive() const;
 
-	void set_create_non_existing_folders(bool p_create);
-	bool is_create_non_existing_folders() const;
+	void set_create_missing_folders(bool p_create);
+	bool is_create_missing_folders() const;
 
 	// True if `p_path` ends with one of the extensions (case-insensitive), or if there are no extensions.
 	bool matches_extension(const String &p_path) const;
 
 	// All paths of the manifest: the files found in the folders (sorted per folder, in the order of
 	// `folder_paths`), then the single files, without duplicates. Missing folders are created if
-	// `create_non_existing_folders` is set and the folder is writable. `r_error` receives the first
+	// `create_missing_folders` is set and the folder is writable. `r_error` receives the first
 	// error; everything else is still collected.
 	PackedStringArray get_paths(Error *r_error = nullptr) const;
 	// Loads all paths. Returns path -> Resource; paths that fail to load are left out.
