@@ -102,7 +102,8 @@ if env["webm_vp8"]:
         "vp8/decoder/detokenize.c",
         "vp8/decoder/onyxd_if.c",
     ]
-    if env["threads"]:
+    # vpx_config.h disables CONFIG_MULTITHREAD for Emscripten, so threading.c only builds elsewhere.
+    if env["platform"] != "web":
         thirdparty_sources += ["vp8/decoder/threading.c"]
 
 thirdparty_sources = [thirdparty_dir + file for file in thirdparty_sources]
