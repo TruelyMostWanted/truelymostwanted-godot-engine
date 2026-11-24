@@ -90,6 +90,10 @@ private:
 	Ref<Theme> overlay_theme;
 	Ref<Theme> previous_root_theme;
 	bool overlay_active = false;
+	// The overlay as first theme of the default theme context: Controls without a Control or Window parent chain
+	// (for example under a Node or Node2D) do not inherit the root window's theme.
+	Ref<Theme> context_overlay;
+	void _set_context_overlay(const Ref<Theme> &p_theme);
 	ObjectID focus_root; // The root window whose `gui_focus_changed` is connected.
 
 	static Window *_get_root();

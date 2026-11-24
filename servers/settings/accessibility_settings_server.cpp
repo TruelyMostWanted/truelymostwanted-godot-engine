@@ -316,6 +316,23 @@ void AccessibilitySettingsServer::_fill_overlay_theme(const Ref<Theme> &p_theme)
 	}
 }
 
+void AccessibilitySettingsServer::_set_context_overlay(const Ref<Theme> &p_theme) {
+	ThemeDB *theme_db = ThemeDB::get_singleton();
+	ThemeContext *context = theme_db != nullptr ? theme_db->get_default_theme_context() : nullptr;
+	if (context == nullptr || p_theme == context_overlay) {
+		return;
+	}
+	Vector<Ref<Theme>> themes = context->get_themes();
+	if (context_overlay.is_valid()) {
+		themes.erase(context_overlay);
+	}
+	if (p_theme.is_valid()) {
+		themes.insert(0, p_theme);
+	}
+	context_overlay = p_theme;
+	context->set_themes(themes);
+}
+
 void AccessibilitySettingsServer::_update_theme() {
 	Window *root = _get_root();
 	if (root == nullptr) {
@@ -331,6 +348,7 @@ void AccessibilitySettingsServer::_update_theme() {
 			overlay_theme.unref();
 			previous_root_theme.unref();
 		}
+		_set_context_overlay(Ref<Theme>());
 		return;
 	}
 	if (!overlay_active || root->get_theme() != overlay_theme) {
@@ -346,6 +364,7 @@ void AccessibilitySettingsServer::_update_theme() {
 	_fill_overlay_theme(theme);
 	overlay_theme = theme;
 	root->set_theme(theme);
+	_set_context_overlay(theme);
 }
 
 /////////////////////////////////////////////////////////////////////////////
