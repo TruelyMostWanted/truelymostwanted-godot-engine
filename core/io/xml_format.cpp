@@ -238,7 +238,10 @@ Error XML::parse_text(const String &p_text, Dictionary &r_data, String &r_error,
 	r_data = Dictionary();
 	r_error = String();
 	r_line = 0;
-	const PackedByteArray buffer = p_text.to_utf8_buffer();
+	// XMLParser keeps the type of the previous node when the input ends in one or two
+	// whitespace characters, so a trailing "\n\n" after a root `<a/>` would read as a second root.
+	// Trailing whitespace carries no data; dropping it keeps the line numbers.
+	const PackedByteArray buffer = p_text.strip_edges(false, true).to_utf8_buffer();
 	if (buffer.is_empty()) {
 		r_error = "Line 1: the text is empty.";
 		r_line = 1;

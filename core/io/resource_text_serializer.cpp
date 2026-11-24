@@ -2070,62 +2070,56 @@ Error ResourceTextSerializer::parse_csv_rows(const String &p_text, char32_t p_de
 	const int length = p_text.length();
 	for (int i = start; i < length; i++) {
 		const char32_t c = p_text[i];
-		if (c == '
-') {
+		if (c == '\n') {
 			line++;
-	}
-	if (in_quotes) {
-		if (c == '"') {
-			if (i + 1 < length && p_text[i + 1] == '"') {
-				cell += '"';
-				i++;
+		}
+		if (in_quotes) {
+			if (c == '"') {
+				if (i + 1 < length && p_text[i + 1] == '"') {
+					cell += '"';
+					i++;
+				} else {
+					in_quotes = false;
+				}
 			} else {
-				in_quotes = false;
+				cell += c;
 			}
+			continue;
+		}
+		if (c == '"' && cell.is_empty()) {
+			in_quotes = true;
+			quote_line = line;
+			row_has_content = true;
+		} else if (c == p_delimiter) {
+			row.push_back(cell);
+			cell = String();
+			row_has_content = true;
+		} else if (c == '\n' || c == '\r') {
+			if (c == '\r' && i + 1 < length && p_text[i + 1] == '\n') {
+				i++;
+				line++;
+			}
+			if (row_has_content || !cell.is_empty()) {
+				row.push_back(cell);
+				r_rows.push_back(row);
+			}
+			row.clear();
+			cell = String();
+			row_has_content = false;
 		} else {
 			cell += c;
 		}
-		continue;
 	}
-	if (c == '"' && cell.is_empty()) {
-		in_quotes = true;
-		quote_line = line;
-		row_has_content = true;
-	} else if (c == p_delimiter) {
+	if (row_has_content || !cell.is_empty()) {
 		row.push_back(cell);
-		cell = String();
-		row_has_content = true;
-		} else if (c == '
-' || c == '
-') {
-			if (c == '
-' && i + 1 < length && p_text[i + 1] == '
-') {
-				i++;
-				line++;
-}
-if (row_has_content || !cell.is_empty()) {
-	row.push_back(cell);
-	r_rows.push_back(row);
-}
-row.clear();
-cell = String();
-row_has_content = false;
-}
-else {
-	cell += c;
-}
-}
-if (row_has_content || !cell.is_empty()) {
-	row.push_back(cell);
-	r_rows.push_back(row);
-}
-if (in_quotes) {
-	r_error = vformat("Line %d: the quoted cell is not closed.", quote_line);
-	r_error_line = quote_line;
-	return ERR_PARSE_ERROR;
-}
-return OK;
+		r_rows.push_back(row);
+	}
+	if (in_quotes) {
+		r_error = vformat("Line %d: the quoted cell is not closed.", quote_line);
+		r_error_line = quote_line;
+		return ERR_PARSE_ERROR;
+	}
+	return OK;
 }
 
 char32_t ResourceTextSerializer::get_csv_delimiter(const Options &p_options) {

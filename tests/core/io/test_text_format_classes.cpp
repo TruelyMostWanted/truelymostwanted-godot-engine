@@ -213,6 +213,17 @@ TEST_CASE("[XML] Errors with line numbers") {
 	CHECK(xml->parse("") == ERR_PARSE_ERROR);
 	CHECK(xml->get_data().is_empty());
 
+	// Trailing whitespace after the root is not a second root.
+	CHECK(xml->parse("<a/>
+
+") == OK);
+	CHECK(xml->parse("<a/>
+") == OK);
+	CHECK(xml->parse("<a>x</a>
+
+") == OK);
+	CHECK(Dictionary(xml->get_data())["text"] == "x");
+
 	Dictionary invalid;
 	invalid["name"] = "1st";
 	ERR_PRINT_OFF;
@@ -263,6 +274,7 @@ TEST_CASE("[INI] Stringify and parse again, typed and plain") {
 	const Dictionary plain_data = INI::parse_string(plain_text);
 	CHECK(Dictionary(plain_data["audio"])["device"] == "Speakers (USB)");
 	CHECK(Dictionary(plain_data["audio"])["volume"] == Variant(0.5));
+	CHECK(plain_data == data);
 }
 
 TEST_CASE("[INI] Errors with line numbers") {
