@@ -84,6 +84,7 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/video_window_settings_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 
@@ -266,6 +267,8 @@ static bool init_expand_to_title_found = false;
 #endif
 static bool use_custom_res = true;
 static bool force_res = false;
+static bool cmdline_screen_set = false; // `--screen`; init_use_custom_screen is also set by the project settings.
+static bool cmdline_position_set = false; // `--position`; init_use_custom_pos likewise.
 
 // Debug
 
@@ -1448,6 +1451,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			if (N) {
 				init_screen = N->get().to_int();
 				init_use_custom_screen = true;
+				cmdline_screen_set = true;
 
 				N = N->next();
 			} else {
@@ -1472,6 +1476,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 				init_custom_pos = Point2(x, y);
 				init_use_custom_pos = true;
+				cmdline_position_set = true;
 
 				N = N->next();
 			} else {
@@ -3353,6 +3358,14 @@ Error Main::setup2(bool p_show_boot_logo) {
 
 	if (!editor && !project_manager) { // Player settings, phase 1: before the DisplayServer exists.
 		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_PRE_DISPLAY);
+		if (VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
+			VideoWindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
+			VideoWindowSettingsServer::get_singleton()->get_boot_window(boot_window);
+			window_mode = boot_window.mode;
+			window_vsync_mode = boot_window.vsync_mode;
+			window_flags = boot_window.flags;
+			window_size = boot_window.size;
+		}
 	}
 
 	/* Initialize Input */
@@ -3488,6 +3501,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 #endif // PHYSICS_2D_DISABLED
 
 			return err;
+		}
+
+		if (!editor && !project_manager && VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
+			VideoWindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
 		}
 
 #ifdef TOOLS_ENABLED
@@ -4079,6 +4096,36 @@ void Main::setup_boot_logo() {
 
 String Main::get_locale_override() {
 	return locale;
+}
+
+Dictionary Main::get_command_line_window_options() {
+	Dictionary options;
+	if (init_fullscreen) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
+	} else if (init_maximized) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_MAXIMIZED);
+	} else if (init_windowed) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_WINDOWED);
+	}
+	if (force_res) {
+		options["window_size"] = Vector2i(window_size);
+	}
+	if (cmdline_screen_set) {
+		options["screen"] = init_screen;
+	}
+	if (cmdline_position_set) {
+		options["window_position"] = Vector2i(init_custom_pos);
+	}
+	if (init_always_on_top) {
+		options["always_on_top"] = true;
+	}
+	if (disable_vsync) {
+		options["vsync_mode"] = int(DisplayServerEnums::VSYNC_DISABLED);
+	}
+	if (init_embed_parent_window_id) {
+		options["embedded"] = true;
+	}
+	return options;
 }
 
 // everything the main loop needs to know about frame timings
