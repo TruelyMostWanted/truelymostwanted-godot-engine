@@ -65,11 +65,13 @@
 #include "core/io/pck_package_server.h"
 #include "core/io/pck_packer.h"
 #include "core/io/resource_database.h"
+#include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_format_pck.h"
 #include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
+#include "core/io/resource_result.h"
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
@@ -121,6 +123,8 @@ static Ref<ResourceFormatLoaderResourceINI> resource_loader_resource_ini;
 static Ref<ResourceFormatSaverResourceINI> resource_saver_resource_ini;
 static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
 static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
+static Ref<ResourceFormatLoaderResourceXML> resource_loader_resource_xml;
+static Ref<ResourceFormatSaverResourceXML> resource_saver_resource_xml;
 static Ref<ResourceFormatLoaderPck> resource_loader_pck;
 static Ref<ResourceFormatSaverPck> resource_saver_pck;
 static ResourceTextSerializer *_resource_text_serializer = nullptr;
@@ -178,6 +182,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(Time);
 	_time = memnew(Time);
 	ResourceLoader::initialize();
+	ResourceErrorCapture::initialize();
 
 	Variant::register_types();
 
@@ -285,6 +290,8 @@ void register_core_types() {
 	ResourceLoader::add_resource_format_loader(resource_loader_resource_ini);
 	resource_loader_resource_csv.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_resource_csv);
+	resource_loader_resource_xml.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_resource_xml);
 
 	if constexpr (GD_IS_CLASS_ENABLED(JSON)) {
 		resource_saver_json.instantiate();
@@ -300,6 +307,8 @@ void register_core_types() {
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_ini);
 	resource_saver_resource_csv.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_csv);
+	resource_saver_resource_xml.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
 	// `.pck` files as `PckPackage` resources: loading opens a pack without mounting it, saving builds one.
 	resource_loader_pck.instantiate();
@@ -385,6 +394,8 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
+	GDREGISTER_CLASS(ResourceLoadResult);
+	GDREGISTER_CLASS(ResourceSaveResult);
 	GDREGISTER_CLASS(CoreBind::OS);
 	GDREGISTER_CLASS(CoreBind::Engine);
 	GDREGISTER_CLASS(CoreBind::Special::ClassDB);
@@ -573,6 +584,10 @@ void unregister_core_types() {
 	resource_loader_resource_csv.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_resource_csv);
 	resource_saver_resource_csv.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_resource_xml);
+	resource_loader_resource_xml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_resource_xml);
+	resource_saver_resource_xml.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_pck);
 	resource_loader_pck.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_pck);
@@ -591,6 +606,7 @@ void unregister_core_types() {
 		resource_loader_gdextension.unref();
 	}
 
+	ResourceErrorCapture::finalize();
 	ResourceLoader::finalize();
 
 	ClassDB::cleanup_defaults();

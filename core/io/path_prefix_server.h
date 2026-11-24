@@ -63,6 +63,10 @@ public:
 	virtual bool is_folder() const { return true; }
 	// True if paths below this prefix are opaque IDs (`uid://`): no `.`/`..` normalization.
 	virtual bool is_opaque() const { return false; }
+	// One step of the prefix chain, used by `PathPrefixServer::resolve_engine_path()`. May return a path
+	// with another prefix. Logics that resolve their target themselves (the folder logic) override it to
+	// return the unresolved target, so that the chain can stop at `res://` or `user://`. Not bound.
+	virtual String forward_path(const String &p_prefix, const String &p_path) const { return globalize_path(p_prefix, p_path); }
 };
 
 class PathPrefixServer : public Object {
@@ -136,6 +140,10 @@ public:
 
 	String globalize(const String &p_path) const;
 	String localize(const String &p_global_path) const;
+	// Follows the prefix chain of `p_path` until it reaches `res://`, `user://` or `uid://`, so that
+	// FileAccess, DirAccess and ResourceLoader can use their engine access (including the PCK).
+	// Returns `p_path` unchanged if the chain does not reach one of them.
+	String resolve_engine_path(const String &p_path) const;
 
 	Ref<PathInfo> resolve(const String &p_path) const;
 	Ref<PathInfo> resolve_safe(const String &p_path, bool p_for_write, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;
