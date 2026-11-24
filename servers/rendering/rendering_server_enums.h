@@ -697,6 +697,17 @@ enum EnvironmentSSRRoughnessQuality {
 	ENV_SSR_ROUGHNESS_QUALITY_HIGH,
 };
 
+// Effects that environment_set_global_effect_disabled() can turn off for every environment.
+enum EnvironmentEffect {
+	ENV_EFFECT_GLOW,
+	ENV_EFFECT_SSAO,
+	ENV_EFFECT_SSIL,
+	ENV_EFFECT_SSR,
+	ENV_EFFECT_FOG,
+	ENV_EFFECT_VOLUMETRIC_FOG,
+	ENV_EFFECT_MAX,
+};
+
 enum EnvironmentSSAOQuality {
 	ENV_SSAO_QUALITY_VERY_LOW,
 	ENV_SSAO_QUALITY_LOW,

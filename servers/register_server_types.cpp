@@ -94,6 +94,8 @@
 #include "servers/settings/list_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/video_effect_settings.h"
+#include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_quality_settings.h"
 #include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_shadow_settings.h"
@@ -191,6 +193,7 @@ static EngineSettingsServer *engine_settings_server = nullptr;
 static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
 static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
+static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
 #endif
@@ -276,6 +279,11 @@ void register_server_types() {
 	video_texture_settings_server = memnew(VideoTextureSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureSettingsServer", VideoTextureSettingsServer::get_singleton(), "VideoTextureSettingsServer"));
 	settings_server_manager->register_server(video_texture_settings_server);
+	GDREGISTER_CLASS(VideoEffectSettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoEffectSettingsServer);
+	video_effect_settings_server = memnew(VideoEffectSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoEffectSettingsServer", VideoEffectSettingsServer::get_singleton(), "VideoEffectSettingsServer"));
+	settings_server_manager->register_server(video_effect_settings_server);
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	// Only with the texture_streaming module (#22); otherwise the domain is missing.
 	GDREGISTER_CLASS(VideoTextureStreamingSettings);
@@ -536,6 +544,8 @@ void unregister_server_types() {
 	memdelete(video_texture_streaming_settings_server);
 	video_texture_streaming_settings_server = nullptr;
 #endif
+	memdelete(video_effect_settings_server);
+	video_effect_settings_server = nullptr;
 	memdelete(video_texture_settings_server);
 	video_texture_settings_server = nullptr;
 	memdelete(video_shadow_settings_server);

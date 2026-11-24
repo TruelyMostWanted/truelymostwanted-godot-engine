@@ -1389,6 +1389,24 @@
 				Configures fog depth for the specified environment RID. Only has an effect when the fog mode of the environment is [constant ENV_FOG_MODE_DEPTH]. See [code]fog_depth_*[/code] properties in [Environment] for more information.
 			</description>
 		</method>
+		<method name="environment_set_global_adjustment">
+			<return type="void" />
+			<param index="0" name="brightness" type="float" />
+			<param index="1" name="contrast" type="float" />
+			<param index="2" name="saturation" type="float" />
+			<description>
+				Multiplies the brightness, contrast and saturation adjustment of every environment by these values, without changing the environments. An environment whose author did not enable adjustments uses [code]1.0[/code] as its own values; while any of the three values differs from [code]1.0[/code], the adjustment pass runs for it (without its color correction texture). Environments marked with [method environment_set_ignore_global_overrides] are not affected. All three at [code]1.0[/code] (the default) turn the global adjustment off.
+				[b]Note:[/b] Adjustments are only applied to 3D rendering with an environment.
+			</description>
+		</method>
+		<method name="environment_set_global_effect_disabled">
+			<return type="void" />
+			<param index="0" name="effect" type="int" enum="RenderingServer.EnvironmentEffect" />
+			<param index="1" name="disabled" type="bool" />
+			<description>
+				If [param disabled] is [code]true[/code], the [param effect] is turned off for every environment, as if it was disabled in each of them. The environments keep their own values: setting [param disabled] to [code]false[/code] again restores what each environment has. This also covers environments created later. Environments marked with [method environment_set_ignore_global_overrides] are not affected. Use this for player settings such as "Screen-space reflections: Off".
+			</description>
+		</method>
 		<method name="environment_set_glow">
 			<return type="void" />
 			<param index="0" name="env" type="RID" />
@@ -1406,6 +1424,14 @@
 			<param index="12" name="glow_map" type="RID" />
 			<description>
 				Configures glow for the specified environment RID. See [code]glow_*[/code] properties in [Environment] for more information.
+			</description>
+		</method>
+		<method name="environment_set_ignore_global_overrides">
+			<return type="void" />
+			<param index="0" name="env" type="RID" />
+			<param index="1" name="ignore" type="bool" />
+			<description>
+				If [param ignore] is [code]true[/code], the environment [param env] is not affected by [method environment_set_global_effect_disabled] and [method environment_set_global_adjustment] (for example an environment that must always look the same, like a menu background or a viewport rendering a preview).
 			</description>
 		</method>
 		<method name="environment_set_sdfgi">
@@ -5888,6 +5914,27 @@
 		</constant>
 		<constant name="ENV_SDFGI_Y_SCALE_100_PERCENT" value="2" enum="EnvironmentSDFGIYScale">
 			Use 100% scale for SDFGI on the Y (vertical) axis. SDFGI cells will be as tall as they are wide. This is usually the best choice for highly vertical scenes. The downside is that light leaking may become more noticeable with thin floors and ceilings.
+		</constant>
+		<constant name="ENV_EFFECT_GLOW" value="0" enum="EnvironmentEffect">
+			Glow (see [member Environment.glow_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_SSAO" value="1" enum="EnvironmentEffect">
+			Screen-space ambient occlusion (see [member Environment.ssao_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_SSIL" value="2" enum="EnvironmentEffect">
+			Screen-space indirect lighting (see [member Environment.ssil_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_SSR" value="3" enum="EnvironmentEffect">
+			Screen-space reflections (see [member Environment.ssr_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_FOG" value="4" enum="EnvironmentEffect">
+			Fog (see [member Environment.fog_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_VOLUMETRIC_FOG" value="5" enum="EnvironmentEffect">
+			Volumetric fog (see [member Environment.volumetric_fog_enabled]).
+		</constant>
+		<constant name="ENV_EFFECT_MAX" value="6" enum="EnvironmentEffect">
+			Represents the size of the [enum EnvironmentEffect] enum.
 		</constant>
 		<constant name="ENV_SDFGI_RAY_COUNT_4" value="0" enum="EnvironmentSDFGIRayCount">
 			Throw 4 rays per frame when converging SDFGI. This has the lowest GPU requirements, but creates the most noisy result.
