@@ -81,6 +81,8 @@
 #include "servers/settings/audio_bus_settings_server.h"
 #include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
+#include "servers/settings/engine_settings.h"
+#include "servers/settings/engine_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
 #include "servers/settings/key_binding.h"
@@ -175,6 +177,7 @@ static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
 static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
 static VideoWindowSettingsServer *video_window_settings_server = nullptr;
+static EngineSettingsServer *engine_settings_server = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -234,6 +237,11 @@ void register_server_types() {
 	video_window_settings_server = memnew(VideoWindowSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoWindowSettingsServer", VideoWindowSettingsServer::get_singleton(), "VideoWindowSettingsServer"));
 	settings_server_manager->register_server(video_window_settings_server);
+	GDREGISTER_CLASS(EngineSettings);
+	GDREGISTER_ABSTRACT_CLASS(EngineSettingsServer);
+	engine_settings_server = memnew(EngineSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineSettingsServer", EngineSettingsServer::get_singleton(), "EngineSettingsServer"));
+	settings_server_manager->register_server(engine_settings_server);
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -470,6 +478,8 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+	memdelete(engine_settings_server);
+	engine_settings_server = nullptr;
 	memdelete(video_window_settings_server);
 	video_window_settings_server = nullptr;
 	memdelete(key_binding_settings_server);
