@@ -43,6 +43,7 @@ TEST_FORCE_LINK(test_language_settings_server)
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestLanguageSettingsServer {
@@ -244,6 +245,36 @@ TEST_CASE("[SceneTree][LanguageSettingsServer] Layout direction and auto-transla
 	server->reset_to_defaults();
 	CHECK(root->get_layout_direction() == original_direction);
 	CHECK(root->get_auto_translate_mode() == original_mode);
+	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "locale_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("locale", String("fr_FR"));
+	SIGNAL_CHECK_FALSE("locale_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { String("fr_FR") } };
+	SIGNAL_CHECK("locale_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("locale_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("locale");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("locale_changed");
+	CHECK(server->apply() == OK);
+	const Array default_args = { { default_value } };
+	SIGNAL_CHECK("locale_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "locale_changed");
 	memdelete(server);
 }
 
