@@ -204,6 +204,10 @@ TEST_CASE("[VideoShadowSettingsServer] Values are saved and loaded") {
 		server->set_positional_shadow_atlas_quadrant_subdiv(2, Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_DISABLED);
 		server->set_positional_shadow_atlas_quadrant_subdiv(3, Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_256);
 		server->set_positional_soft_shadow_filter_quality(RenderingServerEnums::SHADOW_QUALITY_SOFT_VERY_LOW);
+		// save() writes the applied values.
+		ERR_PRINT_OFF;
+		CHECK(server->apply() == OK);
+		ERR_PRINT_ON;
 		CHECK(server->save() == OK);
 		memdelete(server);
 	}
