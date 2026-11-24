@@ -138,6 +138,7 @@
 #include "scene/resources/environment.h"
 #include "scene/resources/external_texture.h"
 #include "scene/resources/font.h"
+#include "scene/resources/font_file_resource_format.h"
 #include "scene/resources/gradient.h"
 #include "scene/resources/gradient_texture.h"
 #include "scene/resources/image_save_options.h"
@@ -409,6 +410,9 @@ static Ref<ResourceFormatLoaderShader> resource_loader_shader;
 static Ref<ResourceFormatSaverShaderInclude> resource_saver_shader_include;
 static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
 
+static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
+static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
+
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
 
@@ -467,6 +471,15 @@ void register_scene_types() {
 
 		resource_loader_shader_include.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_shader_include, true);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		// Not at the front: ResourceFormatImporter keeps precedence for imported fonts.
+		resource_saver_font_file.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_font_file);
+
+		resource_loader_font_file.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
 	}
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -1455,6 +1468,14 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_shader_include);
 		resource_loader_shader_include.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		ResourceSaver::remove_resource_format_saver(resource_saver_font_file);
+		resource_saver_font_file.unref();
+
+		ResourceLoader::remove_resource_format_loader(resource_loader_font_file);
+		resource_loader_font_file.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either
