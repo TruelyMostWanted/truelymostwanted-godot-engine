@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/io/files_manifest.h"
+#include "core/io/files_manifest_validation.h"
 #include "core/object/object.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
@@ -87,10 +88,10 @@ public:
 	Error add_extension(const String &p_name, const String &p_extension);
 	Error remove_extension(const String &p_name, const String &p_extension);
 
-	PackedStringArray get_paths(const String &p_name);
+	PackedStringArray get_file_paths(const String &p_name);
 	Error refresh(const String &p_name);
 
-	Dictionary validate(const String &p_name);
+	Ref<FilesManifestValidation> validate(const String &p_name);
 	Error create_missing_folders(const String &p_name);
 	Error save_manifest(const String &p_name, const String &p_path = String());
 

@@ -71,7 +71,7 @@ public:
 	// Seeds.
 	void set_global_seed(int64_t p_seed);
 	int64_t get_global_seed() const;
-	int64_t text_to_seed(const String &p_text) const;
+	int64_t get_seed_from_text(const String &p_text) const;
 	int64_t set_seed_from_text(const String &p_text);
 	int64_t randomize_seed();
 	int64_t get_derived_seed(const String &p_name) const;
@@ -89,7 +89,7 @@ public:
 	Ref<Resource> get_noise(const String &p_name);
 	void register_noise(const String &p_name, const Ref<Resource> &p_noise);
 	bool has_noise(const String &p_name) const;
-	void remove_noise(const String &p_name);
+	void unregister_noise(const String &p_name);
 	PackedStringArray get_noise_names() const;
 
 	// Save and restore.

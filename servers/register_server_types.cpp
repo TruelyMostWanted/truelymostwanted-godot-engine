@@ -83,6 +83,8 @@
 #include "servers/settings/audio_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
+#include "servers/settings/key_binding.h"
+#include "servers/settings/key_binding_settings_server.h"
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
@@ -163,12 +165,13 @@ static bool has_server_feature_callback(const String &p_feature) {
 }
 
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
-static TtsServer *tts_server = nullptr;
+static TTSServer *tts_server = nullptr;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioSettingsServer *audio_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
 static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
+static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -185,10 +188,10 @@ void register_server_types() {
 
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TextServerManager", TextServerManager::get_singleton(), "TextServerManager"));
 
-	GDREGISTER_CLASS(TtsPersona);
-	GDREGISTER_ABSTRACT_CLASS(TtsServer);
-	tts_server = memnew(TtsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("TtsServer", TtsServer::get_singleton(), "TtsServer"));
+	GDREGISTER_CLASS(TTSPersona);
+	GDREGISTER_ABSTRACT_CLASS(TTSServer);
+	tts_server = memnew(TTSServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSServer", TTSServer::get_singleton(), "TTSServer"));
 
 	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
 	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
@@ -217,6 +220,12 @@ void register_server_types() {
 	input_settings_server = memnew(InputSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputSettingsServer", InputSettingsServer::get_singleton(), "InputSettingsServer"));
 	settings_server_manager->register_server(input_settings_server);
+	GDREGISTER_CLASS(KeyBinding);
+	GDREGISTER_CLASS(KeyBindingList);
+	GDREGISTER_ABSTRACT_CLASS(KeyBindingSettingsServer);
+	key_binding_settings_server = memnew(KeyBindingSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("KeyBindingSettingsServer", KeyBindingSettingsServer::get_singleton(), "KeyBindingSettingsServer"));
+	settings_server_manager->register_server(key_binding_settings_server);
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -453,6 +462,8 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+	memdelete(key_binding_settings_server);
+	key_binding_settings_server = nullptr;
 	memdelete(input_settings_server);
 	input_settings_server = nullptr;
 	memdelete(language_settings_server);
