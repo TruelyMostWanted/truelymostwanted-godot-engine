@@ -164,11 +164,42 @@ void ListSettingsServer::set_entry_value(int p_index, const StringName &p_name, 
 	bool valid = false;
 	const Variant current = entry->get(p_name, &valid);
 	ERR_FAIL_COND_MSG(!valid, vformat("Settings domain \"%s\": the entries have no value \"%s\".", get_domain(), p_name));
-	if (values_equal(current, p_value)) {
+	// Entry values are validated like single values: range and enum hints of the entry, then _validate_entry_value().
+	const Variant value = _validate_entry(p_index, entry, p_name, p_value);
+	if (values_equal(current, value)) {
 		return;
 	}
-	entry->set(p_name, p_value);
+	entry->set(p_name, value);
 	notify_value_changed(get_list_property());
+}
+
+Variant ListSettingsServer::_validate_entry(int p_index, const Ref<Resource> &p_entry, const StringName &p_name, const Variant &p_value) const {
+	Variant value = validate_property_value(p_entry.ptr(), p_name, p_value);
+	Variant ret;
+	if (GDVIRTUAL_CALL(_validate_entry_value, p_index, p_name, value, ret)) {
+		value = ret;
+	}
+	return value;
+}
+
+void ListSettingsServer::_validate_loaded_settings(const Ref<Resource> &p_settings) {
+	// Hand-edited entries are clamped like hand-edited single values.
+	const StringName property = get_list_property();
+	if (property == StringName() || p_settings.is_null()) {
+		return;
+	}
+	const Array list = p_settings->get(property);
+	for (int i = 0; i < list.size(); i++) {
+		const Ref<Resource> entry = list[i];
+		if (entry.is_null()) {
+			continue;
+		}
+		LocalVector<PropertyInfo> infos;
+		get_value_infos(entry.ptr(), infos);
+		for (const PropertyInfo &info : infos) {
+			entry->set(info.name, _validate_entry(i, entry, info.name, entry->get(info.name)));
+		}
+	}
 }
 
 Variant ListSettingsServer::get_entry_value(int p_index, const StringName &p_name) const {
@@ -195,4 +226,5 @@ void ListSettingsServer::_bind_methods() {
 
 	GDVIRTUAL_BIND(_get_list_property);
 	GDVIRTUAL_BIND(_get_entry_key);
+	GDVIRTUAL_BIND(_validate_entry_value, "index", "name", "value");
 }

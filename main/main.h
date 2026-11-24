@@ -75,6 +75,8 @@ public:
 	static String get_locale_override();
 	// Window options consumed by setup(): `window_mode`, `window_size`, `screen`, `window_position`, `always_on_top`, `vsync_mode`, `embedded` (only those given).
 	static Dictionary get_command_line_window_options();
+	// Engine options consumed by setup(): `max_fps`, `time_scale` (only those given).
+	static Dictionary get_command_line_engine_options();
 	static void setup_boot_logo();
 	static Error test_setup();
 	static void test_cleanup();

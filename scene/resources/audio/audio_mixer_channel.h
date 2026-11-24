@@ -56,6 +56,9 @@ private:
 	bool pause_with_tree = false;
 	bool stop_on_scene_change = false;
 	bool preload_next = false;
+	bool duck_on_tts = false;
+	float duck_volume_db = -12.0f;
+	float duck_fade_time = 0.25f;
 
 protected:
 	static void _bind_methods();
@@ -93,6 +96,15 @@ public:
 
 	void set_preload_next(bool p_enabled);
 	bool is_preload_next() const;
+
+	void set_duck_on_tts(bool p_enabled);
+	bool is_duck_on_tts() const;
+
+	void set_duck_volume_db(float p_volume_db);
+	float get_duck_volume_db() const;
+
+	void set_duck_fade_time(float p_time);
+	float get_duck_fade_time() const;
 };
 
 VARIANT_ENUM_CAST(AudioMixerChannel::QueueMode);

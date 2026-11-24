@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [InputMapSettingsServer]: the events of all [InputMap] actions.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"input_map"[/code]: one [InputMapAction] per bound slot of every action, grouped by action. It holds nothing but the list, so [InputMapSettingsServer] can store it as CSV with one row per event. [InputMapSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [InputMapSettingsServer] to change the events.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="actions" type="InputMapAction[]" setter="set_actions" getter="get_actions" default="[]">
+			The rows, one per slot. An action without any event has one empty row that carries its [member InputMapAction.deadzone].
+		</member>
+	</members>
+</class>

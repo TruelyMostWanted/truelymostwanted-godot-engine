@@ -1550,8 +1550,13 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AccessibilitySettingsServer" type="AccessibilitySettingsServer" setter="" getter="">
+		</member>
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
+		</member>
+		<member name="AudioDeviceSettingsServer" type="AudioDeviceSettingsServer" setter="" getter="">
+			The [AudioDeviceSettingsServer] singleton.
 		</member>
 		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
 			The [AudioMixerServer] singleton.
@@ -1559,11 +1564,11 @@
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
 		</member>
-		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
-			The [AudioSettingsServer] singleton.
-		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
+		</member>
+		<member name="CameraSettingsServer" type="CameraSettingsServer" setter="" getter="">
+			The [CameraSettingsServer] singleton.
 		</member>
 		<member name="ClassDB" type="ClassDB" setter="" getter="">
 			The [ClassDB] singleton.
@@ -1580,6 +1585,9 @@
 		</member>
 		<member name="EngineDebugger" type="EngineDebugger" setter="" getter="">
 			The [EngineDebugger] singleton.
+		</member>
+		<member name="EngineSettingsServer" type="EngineSettingsServer" setter="" getter="">
+			The [EngineSettingsServer] singleton.
 		</member>
 		<member name="FilesManifestServer" type="FilesManifestServer" setter="" getter="">
 			The [FilesManifestServer] singleton.
@@ -1606,6 +1614,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputMapSettingsServer" type="InputMapSettingsServer" setter="" getter="">
+			The [InputMapSettingsServer] singleton.
+		</member>
 		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
 			The [InputSettingsServer] singleton.
 		</member>
@@ -1616,9 +1627,6 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
-		</member>
-		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
-			The [KeyBindingSettingsServer] singleton.
 		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
@@ -1648,11 +1656,11 @@
 		<member name="OS" type="OS" setter="" getter="">
 			The [OS] singleton.
 		</member>
+		<member name="PCKPackageServer" type="PCKPackageServer" setter="" getter="">
+			The [PCKPackageServer] singleton.
+		</member>
 		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
 			The [PathPrefixServer] singleton.
-		</member>
-		<member name="PckPackageServer" type="PckPackageServer" setter="" getter="">
-			The [PckPackageServer] singleton.
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
@@ -1719,6 +1727,21 @@
 		</member>
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
+		</member>
+		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
+			The [VideoEffectSettingsServer] singleton.
+		</member>
+		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
+			The [VideoQualitySettingsServer] singleton.
+		</member>
+		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
+			The [VideoShadowSettingsServer] singleton.
+		</member>
+		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
+			The [VideoTextureSettingsServer] singleton.
+		</member>
+		<member name="VideoTextureStreamingSettingsServer" type="VideoTextureStreamingSettingsServer" setter="" getter="">
+			The [VideoTextureStreamingSettingsServer] singleton.
 		</member>
 		<member name="VideoWindowSettingsServer" type="VideoWindowSettingsServer" setter="" getter="">
 			The [VideoWindowSettingsServer] singleton.

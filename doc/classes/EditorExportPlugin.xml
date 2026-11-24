@@ -266,6 +266,7 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Adds an Apple embedded platform bundle file from the given [param path] to the exported project.
+				[b]Note:[/b] [param path] may also be a folder inside [code]res://[/code]. It is copied recursively and added as a folder reference, so it lands in the root of the app bundle under its own name. To choose the path inside the bundle, or to add files from outside the project, use [method add_bundle_resource].
 			</description>
 		</method>
 		<method name="add_apple_embedded_platform_cpp_code">
@@ -320,6 +321,46 @@
 			<description>
 				Adds a Swift Package Manager package to the Apple embedded platform's Xcode project. The [param url] is the URL of the package, [param version] is the version requirement (e.g. "1.0.0"), and [param products] is an array of product names to include from the package.
 				[b]Note:[/b] Only supported on iOS and visionOS.
+			</description>
+		</method>
+		<method name="add_bundle_resource">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="target" type="String" default="&quot;&quot;" />
+			<description>
+				Adds a data file or folder to the resources of the exported app bundle. [param path] is a [code]res://[/code], [code]user://[/code] or absolute path; a folder is copied recursively and unchanged, with every file in it.
+				[param target] is the path of the copy, relative to the bundle resources. If it is empty, the file or folder name of [param path] is used. It must not be absolute and must not contain [code].[/code] or [code]..[/code] segments; an invalid call prints an error and adds nothing.
+				On macOS, the copy is placed in [code]Contents/Resources/[/code] before the app bundle is signed, so the signature seals it. This holds for [code].app[/code], [code].zip[/code], [code].dmg[/code] and [code].pkg[/code] exports.
+				On iOS and visionOS, the copy is placed in the root of the app bundle. The export stages it in the [code]bundle_resources[/code] folder of the Xcode project and adds a folder or file reference per top-level item; Xcode copies it when it builds the app.
+				At runtime, the bundle resources are [code]Contents/Resources[/code] next to the executable's folder on macOS, and the executable's folder on iOS and visionOS. With streaming assets, [StreamingAssetsServer] resolves this folder for you.
+				[codeblocks]
+				[gdscript]
+				func _export_begin(features, is_debug, path, flags):
+					add_bundle_resource("res://raw_data", "GameData/Raw")
+
+				# At runtime:
+				var resources = OS.get_executable_path().get_base_dir()
+				if OS.has_feature("macos"):
+					resources = resources.path_join("../Resources").simplify_path()
+				var file = FileAccess.open(resources.path_join("GameData/Raw/levels.json"), FileAccess.READ)
+				[/gdscript]
+				[csharp]
+				public override void _ExportBegin(string[] features, bool isDebug, string path, uint flags)
+				{
+					AddBundleResource("res://raw_data", "GameData/Raw");
+				}
+
+				// At runtime:
+				string resources = OS.GetExecutablePath().GetBaseDir();
+				if (OS.HasFeature("macos"))
+				{
+					resources = resources.PathJoin("../Resources").SimplifyPath();
+				}
+				using var file = FileAccess.Open(resources.PathJoin("GameData/Raw/levels.json"), FileAccess.ModeFlags.Read);
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] Only data belongs here. Executable code (libraries, frameworks, helpers) must use [method add_shared_object] or [method add_macos_plugin_file], because it has to be signed on its own. Do not use names that the export uses itself in the bundle (for example the main [code].pck[/code], [code]Info.plist[/code] or [code]Assets.car[/code]).
+				[b]Note:[/b] Only used by macOS, iOS and visionOS exports; other platforms ignore it. The list is cleared after [method _export_end].
 			</description>
 		</method>
 		<method name="add_file">
