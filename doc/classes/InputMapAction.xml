@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapAction" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One event slot of an [InputMap] action in [InputMapSettings].
+	</brief_description>
+	<description>
+		An [InputMapAction] is one row of the settings domain [code]"input_map"[/code]: the key, mouse button, joypad button or joypad axis bound to a slot of an [InputMap] action. A slot is addressed by [member action], [member device] and [member slot], so a rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" maps every cell to one [InputMapAction].
+		The event is stored as readable text ([member event]), so the saved file can be read and edited by hand and survives JSON, INI and CSV:
+		- [code]Key:Ctrl+S[/code], [code]PhysicalKey:W[/code] and [code]KeyLabel:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.keycode], [member InputEventKey.physical_keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
+		- [code]MouseButton:Left[/code], [code]MouseButton:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
+		- [code]JoypadButton:A[/code]: an [InputEventJoypadButton] with the names of [enum JoyButton] in PascalCase ([code]LeftShoulder[/code], [code]DPadUp[/code], ...) or the button index.
+		- [code]JoypadMotion:LeftX+[/code]: an [InputEventJoypadMotion] with the axis ([code]LeftX[/code], [code]LeftY[/code], [code]RightX[/code], [code]RightY[/code], [code]TriggerLeft[/code], [code]TriggerRight[/code] or the axis index) and the direction ([code]+[/code] or [code]-[/code]).
+		An empty [member event] is a cleared slot: the project binding of that slot does not come back after a restart.
+		[codeblocks]
+		[gdscript]
+		var text = InputMapAction.event_to_text(event) # "PhysicalKey:W"
+		var same = InputMapAction.text_to_event(text)
+		$Label.text = InputMapAction.event_to_label(same) # "W", or "Z" on an AZERTY keyboard.
+		[/gdscript]
+		[csharp]
+		string text = InputMapAction.EventToText(@event); // "PhysicalKey:W"
+		InputEvent same = InputMapAction.TextToEvent(text);
+		GetNode&lt;Label&gt;("Label").Text = InputMapAction.EventToLabel(same); // "W", or "Z" on an AZERTY keyboard.
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="event_to_label" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns a short English text of [param event] for the UI, for example [code]"Ctrl+S"[/code], [code]"Left Mouse Button"[/code], [code]"Joypad A"[/code] or [code]"Left Stick Right"[/code]. A physical key shows the key of the current keyboard layout on Windows, Linux and macOS (see [method DisplayServer.keyboard_get_label_from_physical]); on the other platforms it shows the US key. Translate the text with [method Object.tr] if needed.
+			</description>
+		</method>
+		<method name="event_to_text" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the text form of [param event] (see the class description), or an empty [String] for event types that can't be bound (touch, MIDI, ...). A key the player presses has all three codes; it is written as [code]PhysicalKey[/code], so the binding stays on the same key position on every keyboard layout. A modifier key on its own (such as [code]PhysicalKey:Shift[/code]) is written without modifiers. The device of the event is not part of the text, see [member device_id].
+			</description>
+		</method>
+		<method name="get_event_device" qualifiers="static">
+			<return type="int" enum="InputMapAction.InputDevice" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the device that [param event] belongs to: [constant INPUT_DEVICE_KEYBOARD] for an [InputEventKey], [constant INPUT_DEVICE_MOUSE] for an [InputEventMouseButton], [constant INPUT_DEVICE_GAMEPAD] for an [InputEventJoypadButton] or [InputEventJoypadMotion], and [constant INPUT_DEVICE_MAX] for event types that can't be bound.
+			</description>
+		</method>
+		<method name="get_input_event" qualifiers="const">
+			<return type="InputEvent" />
+			<description>
+				Returns the event of [member event] with [member InputEvent.device] set to [member device_id], or [code]null[/code] if the slot is empty or the text is not valid.
+			</description>
+		</method>
+		<method name="is_empty" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [member event] is empty (a cleared slot).
+			</description>
+		</method>
+		<method name="set_input_event">
+			<return type="void" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Sets [member event], [member device] and [member device_id] from [param event]. [code]null[/code] clears the slot. Fails with an error for event types that can't be bound.
+			</description>
+		</method>
+		<method name="text_to_event" qualifiers="static">
+			<return type="InputEvent" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns a new event of the text form [param text] (see the class description), or [code]null[/code] if the text is not valid. Its [member InputEvent.device] is [code]-1[/code] (all devices). [code]CmdOrCtrl[/code] is resolved here: the event uses [member InputEventWithModifiers.command_or_control_autoremap].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="action" type="String" setter="set_action" getter="get_action" default="&quot;&quot;">
+			The name of the [InputMap] action.
+		</member>
+		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
+			The deadzone of the action (see [method InputMap.action_set_deadzone]), from [code]0.0[/code] to [code]1.0[/code]. All rows of one action carry the same value; [InputMapSettingsServer] applies the value of the first row.
+		</member>
+		<member name="device" type="int" setter="set_device" getter="get_device" enum="InputMapAction.InputDevice" default="0">
+			The device of the slot. [InputMapSettingsServer] numbers the slots per device, so keyboard slot 0 and gamepad slot 0 are different slots.
+		</member>
+		<member name="device_id" type="int" setter="set_device_id" getter="get_device_id" default="-1">
+			The device id the binding reacts to; [code]-1[/code] for all devices. [method InputMapSettingsServer.rebind] stores [code]-1[/code], because the id of a joypad changes when it is reconnected. Set a fixed id for local multiplayer.
+		</member>
+		<member name="event" type="String" setter="set_event" getter="get_event" default="&quot;&quot;">
+			The bound event in text form, for example [code]"Key:Ctrl+S"[/code] (see the class description). Empty for a cleared slot.
+		</member>
+		<member name="slot" type="int" setter="set_slot" getter="get_slot" default="0">
+			The index of the slot within [member device], starting at [code]0[/code].
+		</member>
+	</members>
+	<constants>
+		<constant name="INPUT_DEVICE_KEYBOARD" value="0" enum="InputDevice">
+			A key ([InputEventKey]).
+		</constant>
+		<constant name="INPUT_DEVICE_MOUSE" value="1" enum="InputDevice">
+			A mouse button or the mouse wheel ([InputEventMouseButton]).
+		</constant>
+		<constant name="INPUT_DEVICE_GAMEPAD" value="2" enum="InputDevice">
+			A joypad button or axis ([InputEventJoypadButton], [InputEventJoypadMotion]).
+		</constant>
+		<constant name="INPUT_DEVICE_MAX" value="3" enum="InputDevice">
+			The number of devices; also returned by [method get_event_device] for events that can't be bound.
+		</constant>
+	</constants>
+</class>

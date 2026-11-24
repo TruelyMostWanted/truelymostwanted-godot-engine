@@ -41,11 +41,11 @@
 static constexpr uint64_t PCK_MIN_ENTRY_SIZE = 4 + 8 + 8 + 16 + 4;
 static constexpr uint64_t PCK_MAX_DETECTED_ALIGNMENT = 4096;
 
-String PckPackage::_key_path(const String &p_path) {
+String PCKPackage::_key_path(const String &p_path) {
 	return p_path.replace_char('\\', '/').simplify_path().trim_prefix("res://").trim_prefix("/");
 }
 
-Error PckPackage::decode_key(const String &p_key, Vector<uint8_t> &r_key) {
+Error PCKPackage::decode_key(const String &p_key, Vector<uint8_t> &r_key) {
 	r_key.resize_initialized(32);
 	if (p_key.is_empty()) {
 		memcpy(r_key.ptrw(), script_encryption_key, 32);
@@ -62,7 +62,7 @@ Error PckPackage::decode_key(const String &p_key, Vector<uint8_t> &r_key) {
 	return OK;
 }
 
-Error PckPackage::set_key(const String &p_key) {
+Error PCKPackage::set_key(const String &p_key) {
 	Vector<uint8_t> new_key;
 	ERR_FAIL_COND_V_MSG(decode_key(p_key, new_key) != OK, ERR_INVALID_PARAMETER, "Invalid pack key: use 64 hexadecimal characters, or an empty string for the key compiled into the engine.");
 	key = new_key;
@@ -70,13 +70,13 @@ Error PckPackage::set_key(const String &p_key) {
 	return OK;
 }
 
-Error PckPackage::open_pack(const String &p_path, const String &p_key, uint64_t p_offset) {
+Error PCKPackage::open_pack(const String &p_path, const String &p_key, uint64_t p_offset) {
 	Vector<uint8_t> new_key;
 	ERR_FAIL_COND_V_MSG(decode_key(p_key, new_key) != OK, ERR_INVALID_PARAMETER, "Invalid pack key: use 64 hexadecimal characters, or an empty string for the key compiled into the engine.");
 	return _open_pack(p_path, new_key, p_offset);
 }
 
-Error PckPackage::_open_pack(const String &p_path, const Vector<uint8_t> &p_key, uint64_t p_offset) {
+Error PCKPackage::_open_pack(const String &p_path, const Vector<uint8_t> &p_key, uint64_t p_offset) {
 	Error err = OK;
 	Ref<FileAccess> f = FileAccess::open(p_path, FileAccess::READ, &err);
 	ERR_FAIL_COND_V_MSG(f.is_null(), err == OK ? ERR_FILE_CANT_OPEN : err, vformat("Can't open pack \"%s\".", p_path));
@@ -184,7 +184,7 @@ Error PckPackage::_open_pack(const String &p_path, const Vector<uint8_t> &p_key,
 	return OK;
 }
 
-Error PckPackage::read_entry(const String &p_path, Vector<uint8_t> &r_data) const {
+Error PCKPackage::read_entry(const String &p_path, Vector<uint8_t> &r_data) const {
 	const Entry *entry = entries.getptr(_key_path(p_path));
 	ERR_FAIL_NULL_V_MSG(entry, ERR_FILE_NOT_FOUND, vformat("The pack has no file \"%s\".", p_path));
 	ERR_FAIL_COND_V_MSG(entry->removal, ERR_FILE_NOT_FOUND, vformat("\"%s\" is a removal entry and has no data.", p_path));
@@ -208,7 +208,7 @@ Error PckPackage::read_entry(const String &p_path, Vector<uint8_t> &r_data) cons
 			if (base_key.is_empty()) {
 				decode_key(String(), base_key);
 			}
-			Ref<PckPackage> base;
+			Ref<PCKPackage> base;
 			base.instantiate();
 			const Error err = base->_open_pack(base_pack, base_key, 0);
 			if (err != OK) {
@@ -244,11 +244,11 @@ Error PckPackage::read_entry(const String &p_path, Vector<uint8_t> &r_data) cons
 	return OK;
 }
 
-void PckPackage::release_base_pack() const {
+void PCKPackage::release_base_pack() const {
 	base_cache.unref();
 }
 
-void PckPackage::set_base_pack(const String &p_base_pack) {
+void PCKPackage::set_base_pack(const String &p_base_pack) {
 	if (base_pack == p_base_pack) {
 		return;
 	}
@@ -263,44 +263,45 @@ void PckPackage::set_base_pack(const String &p_base_pack) {
 	emit_changed();
 }
 
-void PckPackage::set_alignment(int p_alignment) {
+void PCKPackage::set_alignment(int p_alignment) {
 	ERR_FAIL_COND_MSG(p_alignment <= 0, "The pack alignment must be greater than 0.");
 	alignment = p_alignment;
 	emit_changed();
 }
 
-void PckPackage::set_encrypted_directory(bool p_encrypted) {
+void PCKPackage::set_encrypted_directory(bool p_encrypted) {
 	encrypted_directory = p_encrypted;
 	emit_changed();
 }
 
-TypedArray<Dictionary> PckPackage::get_entries() const {
-	TypedArray<Dictionary> result;
+TypedArray<PCKPackageEntry> PCKPackage::get_entries() const {
+	TypedArray<PCKPackageEntry> result;
 	for (const KeyValue<String, Entry> &kv : entries) {
 		const Entry &entry = kv.value;
-		Dictionary d;
-		d["path"] = "res://" + entry.path;
-		d["size"] = entry.size;
-		d["offset"] = entry.pending ? 0 : entry.offset;
-		d["md5"] = String::md5(entry.md5);
-		d["encrypted"] = entry.encrypted;
-		d["removal"] = entry.removal;
-		d["delta"] = entry.delta;
-		d["pending"] = entry.pending;
-		d["source_type"] = int(entry.source_type);
+		Ref<PCKPackageEntry> item;
+		item.instantiate();
+		item->path = "res://" + entry.path;
+		item->size = int64_t(entry.size);
+		item->offset = entry.pending ? 0 : int64_t(entry.offset);
+		item->md5 = String::md5(entry.md5);
+		item->encrypted = entry.encrypted;
+		item->removal = entry.removal;
+		item->delta = entry.delta;
+		item->pending = entry.pending;
+		item->source_type = entry.source_type;
 		if (entry.removal || entry.source_type == SOURCE_DATA) {
-			d["source"] = String();
+			item->source = String();
 		} else if (entry.source_type == SOURCE_FILE) {
-			d["source"] = entry.source_path;
+			item->source = entry.source_path;
 		} else {
-			d["source"] = "res://" + entry.source_path;
+			item->source = "res://" + entry.source_path;
 		}
-		result.push_back(d);
+		result.push_back(item);
 	}
 	return result;
 }
 
-PackedStringArray PckPackage::get_paths() const {
+PackedStringArray PCKPackage::get_file_paths() const {
 	PackedStringArray result;
 	for (const KeyValue<String, Entry> &kv : entries) {
 		if (!kv.value.removal) {
@@ -310,15 +311,15 @@ PackedStringArray PckPackage::get_paths() const {
 	return result;
 }
 
-int PckPackage::get_file_count() const {
+int PCKPackage::get_file_count() const {
 	return entries.size();
 }
 
-bool PckPackage::has_file(const String &p_path) const {
+bool PCKPackage::has_file(const String &p_path) const {
 	return entries.has(_key_path(p_path));
 }
 
-Error PckPackage::add_file(const String &p_target_path, const String &p_source_path, bool p_encrypt) {
+Error PCKPackage::add_file(const String &p_target_path, const String &p_source_path, bool p_encrypt) {
 	const String target = _key_path(p_target_path);
 	ERR_FAIL_COND_V_MSG(target.is_empty() || target.ends_with("/"), ERR_INVALID_PARAMETER, vformat("Invalid target path \"%s\".", p_target_path));
 	ERR_FAIL_COND_V_MSG(p_source_path.is_empty(), ERR_INVALID_PARAMETER, vformat("The source path of \"%s\" is empty.", p_target_path));
@@ -335,7 +336,7 @@ Error PckPackage::add_file(const String &p_target_path, const String &p_source_p
 	return OK;
 }
 
-Error PckPackage::add_file_from_buffer(const String &p_target_path, const Vector<uint8_t> &p_data, bool p_encrypt) {
+Error PCKPackage::add_file_from_buffer(const String &p_target_path, const Vector<uint8_t> &p_data, bool p_encrypt) {
 	const String target = _key_path(p_target_path);
 	ERR_FAIL_COND_V_MSG(target.is_empty() || target.ends_with("/"), ERR_INVALID_PARAMETER, vformat("Invalid target path \"%s\".", p_target_path));
 
@@ -352,13 +353,13 @@ Error PckPackage::add_file_from_buffer(const String &p_target_path, const Vector
 	return OK;
 }
 
-Error PckPackage::remove_file(const String &p_path) {
+Error PCKPackage::remove_file(const String &p_path) {
 	ERR_FAIL_COND_V_MSG(!entries.erase(_key_path(p_path)), ERR_DOES_NOT_EXIST, vformat("The pack has no file \"%s\".", p_path));
 	emit_changed();
 	return OK;
 }
 
-Error PckPackage::rename_file(const String &p_from, const String &p_to) {
+Error PCKPackage::rename_file(const String &p_from, const String &p_to) {
 	const String from = _key_path(p_from);
 	const String to = _key_path(p_to);
 	ERR_FAIL_COND_V_MSG(to.is_empty() || to.ends_with("/"), ERR_INVALID_PARAMETER, vformat("Invalid target path \"%s\".", p_to));
@@ -376,7 +377,7 @@ Error PckPackage::rename_file(const String &p_from, const String &p_to) {
 	return OK;
 }
 
-Error PckPackage::mark_removal(const String &p_path) {
+Error PCKPackage::add_removal(const String &p_path) {
 	const String target = _key_path(p_path);
 	ERR_FAIL_COND_V_MSG(target.is_empty() || target.ends_with("/"), ERR_INVALID_PARAMETER, vformat("Invalid path \"%s\".", p_path));
 	Entry entry;
@@ -388,7 +389,7 @@ Error PckPackage::mark_removal(const String &p_path) {
 	return OK;
 }
 
-Array PckPackage::_get_files() const {
+Array PCKPackage::_get_files() const {
 	Array result;
 	for (const KeyValue<String, Entry> &kv : entries) {
 		const Entry &entry = kv.value;
@@ -416,7 +417,7 @@ Array PckPackage::_get_files() const {
 	return result;
 }
 
-void PckPackage::_set_files(const Array &p_files) {
+void PCKPackage::_set_files(const Array &p_files) {
 	HashMap<String, Entry> new_entries;
 	int invalid = 0;
 	for (int i = 0; i < p_files.size(); i++) {
@@ -473,7 +474,7 @@ void PckPackage::_set_files(const Array &p_files) {
 	}
 }
 
-PackedStringArray PckPackage::_get_removals() const {
+PackedStringArray PCKPackage::_get_removals() const {
 	PackedStringArray result;
 	for (const KeyValue<String, Entry> &kv : entries) {
 		if (kv.value.removal) {
@@ -483,7 +484,7 @@ PackedStringArray PckPackage::_get_removals() const {
 	return result;
 }
 
-void PckPackage::_set_removals(const PackedStringArray &p_removals) {
+void PCKPackage::_set_removals(const PackedStringArray &p_removals) {
 	HashMap<String, Entry> new_entries;
 	for (const KeyValue<String, Entry> &kv : entries) {
 		if (!kv.value.removal) {
@@ -509,7 +510,7 @@ void PckPackage::_set_removals(const PackedStringArray &p_removals) {
 	entries = new_entries;
 }
 
-bool PckPackage::_set(const StringName &p_name, const Variant &p_value) {
+bool PCKPackage::_set(const StringName &p_name, const Variant &p_value) {
 	if (p_name == SNAME("files")) {
 		_set_files(p_value);
 		emit_changed();
@@ -523,7 +524,7 @@ bool PckPackage::_set(const StringName &p_name, const Variant &p_value) {
 	return false;
 }
 
-bool PckPackage::_get(const StringName &p_name, Variant &r_ret) const {
+bool PCKPackage::_get(const StringName &p_name, Variant &r_ret) const {
 	if (p_name == SNAME("files")) {
 		r_ret = _get_files();
 		return true;
@@ -535,13 +536,13 @@ bool PckPackage::_get(const StringName &p_name, Variant &r_ret) const {
 	return false;
 }
 
-void PckPackage::_get_property_list(List<PropertyInfo> *p_list) const {
+void PCKPackage::_get_property_list(List<PropertyInfo> *p_list) const {
 	// Storage only: the entries are edited through the methods (and the Inspector plugin), not as raw arrays.
 	p_list->push_back(PropertyInfo(Variant::ARRAY, "files", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE));
 	p_list->push_back(PropertyInfo(Variant::PACKED_STRING_ARRAY, "removals", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE));
 }
 
-void PckPackage::_copy_state(const PckPackage &p_from, bool p_copy_key) {
+void PCKPackage::_copy_state(const PCKPackage &p_from, bool p_copy_key) {
 	pack_path = p_from.pack_path;
 	base_pack = p_from.base_pack;
 	format_version = p_from.format_version;
@@ -556,16 +557,16 @@ void PckPackage::_copy_state(const PckPackage &p_from, bool p_copy_key) {
 	base_cache.unref();
 }
 
-Ref<Resource> PckPackage::_duplicate(const DuplicateParams &p_params) const {
-	Ref<PckPackage> copy = Resource::_duplicate(p_params);
+Ref<Resource> PCKPackage::_duplicate(const DuplicateParams &p_params) const {
+	Ref<PCKPackage> copy = Resource::_duplicate(p_params);
 	ERR_FAIL_COND_V(copy.is_null(), Ref<Resource>());
 	// The storage properties only describe the files: take over the opened pack and the runtime key as well.
 	copy->_copy_state(*this, true);
 	return copy;
 }
 
-Error PckPackage::copy_from(const Ref<Resource> &p_resource) {
-	const Ref<PckPackage> other = p_resource;
+Error PCKPackage::copy_from(const Ref<Resource> &p_resource) {
+	const Ref<PCKPackage> other = p_resource;
 	ERR_FAIL_COND_V(other.is_null(), ERR_INVALID_PARAMETER);
 	// Used by `CACHE_MODE_REPLACE`, whose new object was opened with the compiled-in key: a key set on this package is kept.
 	_copy_state(**other, key.is_empty());
@@ -573,7 +574,7 @@ Error PckPackage::copy_from(const Ref<Resource> &p_resource) {
 	return OK;
 }
 
-void PckPackage::reload_from_file() {
+void PCKPackage::reload_from_file() {
 	const String resource_path = get_path();
 	if (resource_path.get_extension().to_lower() != "pck") {
 		// A description in `.tres` or `.res`: `copy_from()` takes over the stored properties.
@@ -589,29 +590,29 @@ void PckPackage::reload_from_file() {
 	}
 }
 
-void PckPackage::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_pack_path"), &PckPackage::get_pack_path);
-	ClassDB::bind_method(D_METHOD("set_base_pack", "base_pack"), &PckPackage::set_base_pack);
-	ClassDB::bind_method(D_METHOD("get_base_pack"), &PckPackage::get_base_pack);
-	ClassDB::bind_method(D_METHOD("is_description"), &PckPackage::is_description);
-	ClassDB::bind_method(D_METHOD("set_key", "key"), &PckPackage::set_key);
-	ClassDB::bind_method(D_METHOD("get_format_version"), &PckPackage::get_format_version);
-	ClassDB::bind_method(D_METHOD("get_engine_version"), &PckPackage::get_engine_version);
-	ClassDB::bind_method(D_METHOD("set_alignment", "alignment"), &PckPackage::set_alignment);
-	ClassDB::bind_method(D_METHOD("get_alignment"), &PckPackage::get_alignment);
-	ClassDB::bind_method(D_METHOD("set_encrypted_directory", "encrypted"), &PckPackage::set_encrypted_directory);
-	ClassDB::bind_method(D_METHOD("is_encrypted_directory"), &PckPackage::is_encrypted_directory);
+void PCKPackage::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_pack_path"), &PCKPackage::get_pack_path);
+	ClassDB::bind_method(D_METHOD("set_base_pack", "base_pack"), &PCKPackage::set_base_pack);
+	ClassDB::bind_method(D_METHOD("get_base_pack"), &PCKPackage::get_base_pack);
+	ClassDB::bind_method(D_METHOD("is_description"), &PCKPackage::is_description);
+	ClassDB::bind_method(D_METHOD("set_key", "key"), &PCKPackage::set_key);
+	ClassDB::bind_method(D_METHOD("get_format_version"), &PCKPackage::get_format_version);
+	ClassDB::bind_method(D_METHOD("get_engine_version"), &PCKPackage::get_engine_version);
+	ClassDB::bind_method(D_METHOD("set_alignment", "alignment"), &PCKPackage::set_alignment);
+	ClassDB::bind_method(D_METHOD("get_alignment"), &PCKPackage::get_alignment);
+	ClassDB::bind_method(D_METHOD("set_encrypted_directory", "encrypted"), &PCKPackage::set_encrypted_directory);
+	ClassDB::bind_method(D_METHOD("is_encrypted_directory"), &PCKPackage::is_encrypted_directory);
 
-	ClassDB::bind_method(D_METHOD("get_entries"), &PckPackage::get_entries);
-	ClassDB::bind_method(D_METHOD("get_paths"), &PckPackage::get_paths);
-	ClassDB::bind_method(D_METHOD("get_file_count"), &PckPackage::get_file_count);
-	ClassDB::bind_method(D_METHOD("has_file", "path"), &PckPackage::has_file);
+	ClassDB::bind_method(D_METHOD("get_entries"), &PCKPackage::get_entries);
+	ClassDB::bind_method(D_METHOD("get_file_paths"), &PCKPackage::get_file_paths);
+	ClassDB::bind_method(D_METHOD("get_file_count"), &PCKPackage::get_file_count);
+	ClassDB::bind_method(D_METHOD("has_file", "path"), &PCKPackage::has_file);
 
-	ClassDB::bind_method(D_METHOD("add_file", "target_path", "source_path", "encrypt"), &PckPackage::add_file, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("add_file_from_buffer", "target_path", "data", "encrypt"), &PckPackage::add_file_from_buffer, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("remove_file", "path"), &PckPackage::remove_file);
-	ClassDB::bind_method(D_METHOD("rename_file", "from", "to"), &PckPackage::rename_file);
-	ClassDB::bind_method(D_METHOD("mark_removal", "path"), &PckPackage::mark_removal);
+	ClassDB::bind_method(D_METHOD("add_file", "target_path", "source_path", "encrypt"), &PCKPackage::add_file, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("add_file_from_buffer", "target_path", "data", "encrypt"), &PCKPackage::add_file_from_buffer, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("remove_file", "path"), &PCKPackage::remove_file);
+	ClassDB::bind_method(D_METHOD("rename_file", "from", "to"), &PCKPackage::rename_file);
+	ClassDB::bind_method(D_METHOD("add_removal", "path"), &PCKPackage::add_removal);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "pack_path", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_pack_path");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "base_pack", PROPERTY_HINT_FILE, "*.pck"), "set_base_pack", "get_base_pack");
@@ -623,4 +624,28 @@ void PckPackage::_bind_methods() {
 	BIND_ENUM_CONSTANT(SOURCE_PACK);
 	BIND_ENUM_CONSTANT(SOURCE_FILE);
 	BIND_ENUM_CONSTANT(SOURCE_DATA);
+}
+
+void PCKPackageEntry::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_path"), &PCKPackageEntry::get_path);
+	ClassDB::bind_method(D_METHOD("get_size"), &PCKPackageEntry::get_size);
+	ClassDB::bind_method(D_METHOD("get_offset"), &PCKPackageEntry::get_offset);
+	ClassDB::bind_method(D_METHOD("get_md5"), &PCKPackageEntry::get_md5);
+	ClassDB::bind_method(D_METHOD("is_encrypted"), &PCKPackageEntry::is_encrypted);
+	ClassDB::bind_method(D_METHOD("is_removal"), &PCKPackageEntry::is_removal);
+	ClassDB::bind_method(D_METHOD("is_delta"), &PCKPackageEntry::is_delta);
+	ClassDB::bind_method(D_METHOD("is_pending"), &PCKPackageEntry::is_pending);
+	ClassDB::bind_method(D_METHOD("get_source_type"), &PCKPackageEntry::get_source_type);
+	ClassDB::bind_method(D_METHOD("get_source"), &PCKPackageEntry::get_source);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "path"), "", "get_path");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "size"), "", "get_size");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "offset"), "", "get_offset");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "md5"), "", "get_md5");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encrypted"), "", "is_encrypted");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "removal"), "", "is_removal");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "delta"), "", "is_delta");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pending"), "", "is_pending");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "source_type", PROPERTY_HINT_ENUM, "Pack,File,Data"), "", "get_source_type");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "source"), "", "get_source");
 }

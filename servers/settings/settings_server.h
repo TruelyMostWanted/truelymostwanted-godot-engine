@@ -31,11 +31,30 @@
 #pragma once
 
 #include "core/io/resource.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/object/gdvirtual.gen.h"
 #include "core/object/object.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
+#include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
+
+// SettingsServer::ApplyPhase is declared outside the class (like AudioServerEnums) so that the virtual
+// _get_apply_phase() can return it: GDVIRTUAL needs the type info of its return type before the class ends.
+namespace SettingsServerEnums {
+
+// When SettingsServerManager applies the stored settings at startup (main/main.cpp).
+enum ApplyPhase {
+	APPLY_PHASE_NONE = -1, // No phase: SettingsServerManager has not started yet.
+	APPLY_PHASE_PRE_DISPLAY, // After the servers are registered, before the DisplayServer exists.
+	APPLY_PHASE_SERVERS, // After all servers and script languages are initialized.
+	APPLY_PHASE_SCENE, // After the SceneTree and the root window exist, before the main scene is loaded.
+	APPLY_PHASE_MAX,
+};
+
+} // namespace SettingsServerEnums
+
+VARIANT_ENUM_CAST_EXT(SettingsServerEnums::ApplyPhase, SettingsServer::ApplyPhase);
 
 // Base of all settings servers (one engine singleton per domain: audio, language, video, ...).
 // Keeps three copies of the domain's settings resource: the defaults, the applied state and the
@@ -52,13 +71,12 @@ public:
 		APPLY_MODE_MANUAL,
 	};
 
-	// When SettingsServerManager applies the stored settings at startup (main/main.cpp).
-	enum ApplyPhase {
-		APPLY_PHASE_PRE_DISPLAY, // After the servers are registered, before the DisplayServer exists.
-		APPLY_PHASE_SERVERS, // After all servers and script languages are initialized.
-		APPLY_PHASE_SCENE, // After the SceneTree and the root window exist, before the main scene is loaded.
-		APPLY_PHASE_MAX,
-	};
+	using ApplyPhase = SettingsServerEnums::ApplyPhase;
+	static constexpr ApplyPhase APPLY_PHASE_NONE = SettingsServerEnums::APPLY_PHASE_NONE;
+	static constexpr ApplyPhase APPLY_PHASE_PRE_DISPLAY = SettingsServerEnums::APPLY_PHASE_PRE_DISPLAY;
+	static constexpr ApplyPhase APPLY_PHASE_SERVERS = SettingsServerEnums::APPLY_PHASE_SERVERS;
+	static constexpr ApplyPhase APPLY_PHASE_SCENE = SettingsServerEnums::APPLY_PHASE_SCENE;
+	static constexpr ApplyPhase APPLY_PHASE_MAX = SettingsServerEnums::APPLY_PHASE_MAX;
 
 	enum SettingFlags {
 		SETTING_FLAG_NONE = 0,
@@ -91,10 +109,11 @@ private:
 	Ref<Resource> settings; // Pending: what set_value() changes.
 	Ref<Resource> applied; // What the engine has now.
 	Ref<Resource> defaults;
+	Ref<Resource> restart_baseline; // The applied state at startup: what the engine read when it started.
 
 	ApplyMode apply_mode = APPLY_MODE_IMMEDIATE;
 	String file_path;
-	PackedStringArray restart_values;
+	PackedStringArray restart_required_names;
 
 	bool initialized = false;
 	bool started = false;
@@ -102,6 +121,7 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	String format_warned_path; // The last path whose extension gave no usable format (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -112,14 +132,19 @@ private:
 	Ref<Resource> _effective_settings() const;
 	bool _object_has_value(const Ref<Resource> &p_settings, const StringName &p_name) const;
 	void _push_values(const PackedStringArray &p_names);
-	void _retrieve_into(const Ref<Resource> &p_settings);
+	void _read_from_engine_into(const Ref<Resource> &p_settings);
 	Variant _validate(const StringName &p_name, const Variant &p_value) const;
 	bool _has_flag(const PackedStringArray &p_names, SettingFlags p_flag) const;
 	PackedStringArray _get_changed_names(const Ref<Resource> &p_a, const Ref<Resource> &p_b) const;
-	void _record_restart_values(const PackedStringArray &p_names);
+	void _update_restart_required_names(const PackedStringArray &p_names);
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
+	// The project setting `settings/paths/<domain>_settings_path`; empty if not set.
+	String _get_project_file_path() const;
+	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
+	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
+	void _emit_settings_changed(const PackedStringArray &p_names);
 
 protected:
 	static void _bind_methods();
@@ -127,18 +152,19 @@ protected:
 	// Overridable in C++. The default implementations call the script and GDExtension virtuals below.
 	virtual Ref<Resource> _create_default_settings() const;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names);
-	virtual void _retrieve_settings(const Ref<Resource> &p_settings);
+	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings);
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const;
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data);
-	// File extension used when no file path is set: `ini` or `json` (ListSettingsServer: also `csv`).
-	virtual String _get_default_extension();
+	// Text format of the file when no file path is set: the project setting `settings/storage/format`, or INI if
+	// the domain can't use it (CSV is only for ListSettingsServer, a format whose module is missing).
+	virtual ResourceTextSerializer::Format _get_file_format();
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)
-	GDVIRTUAL0RC(int, _get_apply_phase)
+	GDVIRTUAL0RC(ApplyPhase, _get_apply_phase)
 	GDVIRTUAL0RC(Ref<Resource>, _create_settings)
 	GDVIRTUAL2(_apply, Ref<Resource>, PackedStringArray)
-	GDVIRTUAL1(_retrieve, Ref<Resource>)
+	GDVIRTUAL1(_read_from_engine, Ref<Resource>)
 	GDVIRTUAL2RC(Variant, _validate_value, StringName, Variant)
 	GDVIRTUAL2R(Dictionary, _migrate, int, Dictionary)
 	GDVIRTUAL1RC(bool, _is_value_supported, StringName)
@@ -147,6 +173,11 @@ protected:
 	void notify_value_changed(const StringName &p_name);
 	// Pending settings without starting the lazy initialization again.
 	Ref<Resource> get_pending_settings() const;
+	// Checks a value against the range or enum hint of the property `p_name` of `p_object`. Returns the clamped
+	// value, or the current value of the property if the value is not one of the enum values.
+	Variant validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const;
+	// Called by load() after the values of the file are set on `p_settings` and validated (ListSettingsServer validates its entries).
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) {}
 
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
@@ -156,8 +187,13 @@ public:
 	static Ref<Resource> copy_settings(const Ref<Resource> &p_settings);
 
 	static void register_settings();
+	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
 	static String get_storage_folder();
-	static String get_storage_format();
+	static ResourceTextSerializer::Format get_storage_format();
+	// `settings/paths/<domain>_settings_path`: the file path of a domain set in the project settings.
+	static String get_path_setting_name(const StringName &p_domain);
+	// Defines the project setting of the domain's path (called by SettingsServerManager::register_server()).
+	static void register_path_setting(const StringName &p_domain, bool p_csv);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;
@@ -189,8 +225,8 @@ public:
 	void set_apply_mode(ApplyMode p_mode);
 	ApplyMode get_apply_mode() const;
 	bool is_dirty() const;
-	PackedStringArray get_dirty_values() const;
-	PackedStringArray get_restart_values() const;
+	PackedStringArray get_dirty_setting_names() const;
+	PackedStringArray get_restart_required_names() const;
 	void revert();
 	void reset_value(const StringName &p_name);
 	void reset_to_defaults();
@@ -203,11 +239,11 @@ public:
 	// Engine.
 	Error apply();
 	Error apply_with_confirmation(double p_timeout_sec = -1.0);
-	void confirm_pending();
-	void cancel_pending();
+	void confirm_changes();
+	void cancel_confirmation();
 	bool is_confirmation_pending() const;
 	double get_confirmation_time_left() const;
-	void retrieve();
+	void read_from_engine();
 
 	// Storage.
 	Error load();
@@ -227,5 +263,4 @@ public:
 };
 
 VARIANT_ENUM_CAST(SettingsServer::ApplyMode);
-VARIANT_ENUM_CAST(SettingsServer::ApplyPhase);
 VARIANT_BITFIELD_CAST(SettingsServer::SettingFlags);

@@ -324,7 +324,7 @@ void StreamingAssetsServer::configure(const Configuration &p_config) {
 			const String pack_path = p_config.main_pack_dir.path_join(pack_file);
 			if (FileAccess::exists(pack_path)) {
 				Error err = OK;
-				PckPackageServer *pck_server = PckPackageServer::get_singleton();
+				PCKPackageServer *pck_server = PCKPackageServer::get_singleton();
 				if (!pck_server) {
 					err = ERR_UNAVAILABLE;
 				} else if (mounted_pack != pack_path && !pck_server->is_mounted(pack_path)) {

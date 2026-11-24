@@ -6,10 +6,10 @@
 	<description>
 		[VideoWindowSettingsServer] is the settings domain [code]"video_window"[/code]: it stores the window and display options chosen by the player, loads them when the game starts and applies them to [DisplayServer] and the root window. The settings resource is a [VideoWindowSettings]. The file is [code]user://settings/video_window.ini[/code] by default.
 		The domain is applied in [constant SettingsServer.APPLY_PHASE_PRE_DISPLAY], before the display server exists: the main window is created with the stored mode, size, V-Sync mode and window flags, and it is placed on the stored screen before it is shown, so it opens without a visible jump. The content scale and the HDR values are applied as soon as the root window exists ([constant SettingsServer.APPLY_PHASE_SCENE]).
-		Changes of [member VideoWindowSettings.window_mode], [member VideoWindowSettings.window_size] and [member VideoWindowSettings.screen] go through the confirmation of [SettingsServer]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] they are applied at once, and they are reverted after [code]settings/apply/confirmation_timeout[/code] seconds unless the game calls [method SettingsServer.confirm_pending] (for example from a "Keep these settings?" dialog). Connect to [signal SettingsServer.confirmation_requested] to show the dialog.
+		Changes of [member VideoWindowSettings.window_mode], [member VideoWindowSettings.window_size] and [member VideoWindowSettings.screen] go through the confirmation of [SettingsServer]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] they are applied at once, and they are reverted after [code]settings/apply/confirmation_timeout[/code] seconds unless the game calls [method SettingsServer.confirm_changes] (for example from a "Keep these settings?" dialog). Connect to [signal SettingsServer.confirmation_requested] to show the dialog.
 		The command line wins over the stored values: [code]--fullscreen[/code], [code]--maximized[/code], [code]--windowed[/code], [code]--resolution[/code], [code]--screen[/code], [code]--position[/code], [code]--always-on-top[/code] and [code]--disable-vsync[/code] are set as session overrides (see [method SettingsServer.set_session_override]): applied but never saved. A game embedded in the editor keeps the placement of the editor.
 		Further windows (an inventory window, a second screen) are stored by node path in [member VideoWindowSettings.window_states]: call [method save_window_state] when the player moved or resized one, and the window gets its mode, size, position and screen back when it enters the scene tree again. [method restore_window_state] restores a window on demand, also before it is added to the tree (pass a key then).
-		Without free windows (Android, iOS, Web, headless) the size, position, screen and window flags are stored but not applied; see [method SettingsServer.is_value_supported]. On the headless display server all values are kept by the domain and returned by [method SettingsServer.retrieve].
+		Without free windows (Android, iOS, Web, headless) the size, position, screen and window flags are stored but not applied; see [method SettingsServer.is_value_supported]. On the headless display server all values are kept by the domain and returned by [method SettingsServer.read_from_engine].
 		[codeblocks]
 		[gdscript]
 		func _on_fullscreen_toggled(toggled_on):
@@ -22,7 +22,7 @@
 			VideoWindowSettingsServer.set_window_size(size)
 
 		func _on_keep_pressed():
-			VideoWindowSettingsServer.confirm_pending() # Saved now.
+			VideoWindowSettingsServer.confirm_changes() # Saved now.
 		[/gdscript]
 		[csharp]
 		private void OnFullscreenToggled(bool toggledOn)
@@ -37,7 +37,7 @@
 
 		private void OnKeepPressed()
 		{
-		    VideoWindowSettingsServer.Singleton.ConfirmPending(); // Saved now.
+		    VideoWindowSettingsServer.Singleton.ConfirmChanges(); // Saved now.
 		}
 		[/csharp]
 		[/codeblocks]
@@ -214,7 +214,7 @@
 			<return type="void" />
 			<param index="0" name="factor" type="float" />
 			<description>
-				Sets [member VideoWindowSettings.content_scale_factor]. Scale factor of the root window ([member Window.content_scale_factor]), for example a UI scale option. The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped.
+				Sets [member VideoWindowSettings.content_scale_factor]. Scale factor of the root window ([member Window.content_scale_factor]). The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped. The root window gets this factor times [member AccessibilitySettings.ui_scale] of [AccessibilitySettingsServer], the player's UI scale option.
 			</description>
 		</method>
 		<method name="set_content_scale_mode">
