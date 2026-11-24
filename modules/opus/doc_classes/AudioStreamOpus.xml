@@ -5,6 +5,22 @@
 	</brief_description>
 	<description>
 		The AudioStreamOpus class is a specialized [AudioStream] for handling Opus file formats. It offers functionality for loading and playing back Opus files, as well as managing looping and other playback properties. More info can be found in [ResourceImporterOpus].
+		[b]Runtime loading:[/b] Opus files without an import (for example in [code]user://[/code], in a mod folder, at an absolute path or in a PCK as raw files) are loaded with [method ResourceLoader.load] as [AudioStreamOpus], with the resource cache, [method ResourceLoader.load_threaded_request] and [method ResourceLoader.exists]. They use the default import options ([member loop] off, no [member bpm]); set the properties after loading if needed. The data stays compressed and is decoded while playing. Files that are not valid Ogg Opus data fail to load with [constant ERR_FILE_CORRUPT]. Opus files under [code]res://[/code] that have a [code].import[/code] file are still loaded through their importer, unless the import mode is "Keep File" or "Skip File".
+		[b]Note:[/b] [method ResourceSaver.save] cannot write [code].opus[/code] files, because the engine has no Opus encoder. Save the stream as [code].tres[/code] or [code].res[/code] instead.
+		[codeblocks]
+		[gdscript]
+		var voice = ResourceLoader.load("user://voices/greeting.opus") as AudioStreamOpus
+		voice.loop = false
+		$AudioStreamPlayer.stream = voice
+		$AudioStreamPlayer.play()
+		[/gdscript]
+		[csharp]
+		var voice = ResourceLoader.Load&lt;AudioStreamOpus&gt;("user://voices/greeting.opus");
+		voice.Loop = false;
+		GetNode&lt;AudioStreamPlayer&gt;("AudioStreamPlayer").Stream = voice;
+		GetNode&lt;AudioStreamPlayer&gt;("AudioStreamPlayer").Play();
+		[/csharp]
+		[/codeblocks]
 	</description>
 	<tutorials>
 		<link title="Audio streams">$DOCS_URL/tutorials/audio/audio_streams.html</link>
