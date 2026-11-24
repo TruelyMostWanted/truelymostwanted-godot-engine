@@ -79,10 +79,13 @@ public:
 	virtual void get_recognized_extensions(List<String> *p_extensions) const;
 	virtual void get_recognized_extensions_for_type(const String &p_type, List<String> *p_extensions) const;
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const;
-	// True if recognize_path() matches only the suffixes from get_recognized_extensions() and that list never changes
-	// while the loader is registered. ResourceLoader then finds the loader through its extension index;
+	// True if recognize_path() matches only the suffixes from get_recognized_extensions(). ResourceLoader then finds
+	// the loader through its extension index (the list is read when the loader is added, when
+	// `ResourceLoader::refresh_format_index()` is called, and for C++ lists when ClassDB's resource extensions change);
 	// otherwise the loader is asked for every path.
 	virtual bool recognizes_path_by_extension() const;
+	// True if the loader is implemented by a script, C# or GDExtension, so its extension list comes from script code.
+	bool has_scripted_extensions() const;
 	virtual bool handles_type(const String &p_type) const;
 	virtual void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	virtual String get_resource_type(const String &p_path) const;
@@ -108,9 +111,18 @@ typedef void (*ResourceLoadedCallback)(Ref<Resource> p_resource, const String &p
 // Immutable snapshot of the registered format loaders, in lookup order (first match wins).
 // Copying it is cheap: the list and its index are copy-on-write and shared with every copy until a change replaces them.
 struct ResourceLoaderFormatSnapshot {
-	Vector<Ref<ResourceFormatLoader>> formats;
+	// What the index knows about one loader, read by `read_entry()` outside any lock.
+	struct Entry {
+		Vector<String> keys; // Lower-case extension keys (the part after the last dot), without duplicates.
+		bool by_extension = false; // See `ResourceFormatLoader::recognizes_path_by_extension()`.
+		bool scripted = false; // The list comes from a script, C# or GDExtension; never re-read implicitly.
+	};
 
-	// Index by extension, built by `build_index()`. For each lower-case extension key (the part after the last dot
+	Vector<Ref<ResourceFormatLoader>> formats;
+	Vector<Entry> entries; // One per format, same order.
+	uint32_t class_db_version = 0; // `ClassDB::get_resource_base_extensions_version()` when the C++ lists were read.
+
+	// Index by extension, built by `build_index()` or `index_entries()`. For each lower-case extension key (the part after the last dot
 	// of a recognized extension), the positions of the loaders that recognize it, ascending.
 	Vector<String> index_extensions; // Sorted.
 	Vector<uint32_t> index_offsets; // Positions of `index_extensions[i]` are `index_positions[index_offsets[i]..index_offsets[i + 1]]`.
@@ -118,7 +130,12 @@ struct ResourceLoaderFormatSnapshot {
 	// Loaders that do not recognize paths by extension only (see `ResourceFormatLoader::recognizes_path_by_extension()`), ascending.
 	Vector<uint32_t> always_asked;
 
+	// Asks the loader for its extensions. May run script code: never call it while holding a lock.
+	static Entry read_entry(const Ref<ResourceFormatLoader> &p_format_loader);
+	// Reads the entry of every format, then builds the index.
 	void build_index();
+	// Builds the index from `entries` without calling any loader.
+	void index_entries();
 
 	// The loaders that may recognize a path, in registration order: the indexed loaders for the path's last extension
 	// and the always-asked loaders. Each candidate must still be checked with `recognize_path()`.
@@ -260,6 +277,7 @@ private:
 		ThreadLoadStatus status = THREAD_LOAD_IN_PROGRESS;
 		CacheMode cache_mode = CACHE_MODE_REUSE;
 		Error error = OK;
+		String error_message; // Errors printed while this task loaded, set only if it failed.
 		Ref<Resource> resource;
 		LocalVector<Ref<Resource>> resource_dependencies; // We need to keep these alive for as long as the task is alive at least.
 		ThreadLoadTask *parent_task = nullptr;
@@ -319,6 +337,10 @@ public:
 
 	static bool is_within_load() { return load_nesting > 0; }
 
+	// Errors printed by the last load finished on this thread (`load()`, `load_threaded_get()`),
+	// empty if it succeeded. Read right after the call; any later load on the thread replaces it.
+	static thread_local String last_load_error_message;
+
 	static void resource_changed_connect(Resource *p_source, const Callable &p_callable, uint32_t p_flags);
 	static void resource_changed_disconnect(Resource *p_source, const Callable &p_callable);
 	static void resource_changed_emit(Resource *p_source);
@@ -330,6 +352,8 @@ public:
 	static void add_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader, bool p_at_front = false);
 	// The registered loaders and their extension index, for tests and diagnostics.
 	static ResourceLoaderFormatSnapshot get_format_snapshot() { return _get_loaders(); }
+	// Reads the extension lists of all registered loaders again and rebuilds the index.
+	static void refresh_format_index();
 	static void remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader);
 	static void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	static String get_resource_type(const String &p_path);

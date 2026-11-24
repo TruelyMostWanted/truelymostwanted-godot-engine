@@ -63,10 +63,17 @@ public:
 	virtual bool is_folder() const { return true; }
 	// True if paths below this prefix are opaque IDs (`uid://`): no `.`/`..` normalization.
 	virtual bool is_opaque() const { return false; }
+	// One step of the prefix chain, used by `PathPrefixServer::resolve_engine_path()`. May return a path
+	// with another prefix. Logics that resolve their target themselves (the folder logic) override it to
+	// return the unresolved target, so that the chain can stop at `res://` or `user://`. Not bound.
+	virtual String forward_path(const String &p_prefix, const String &p_path) const { return globalize_path(p_prefix, p_path); }
 };
 
 class PathPrefixServer : public Object {
 	GDCLASS(PathPrefixServer, Object);
+
+	// Registers the locked `streaming://` prefix.
+	friend class StreamingAssetsServer;
 
 public:
 	enum OSPath {
@@ -74,6 +81,11 @@ public:
 		OS_PATH_CONFIG,
 		OS_PATH_CACHE,
 		OS_PATH_TEMP,
+	};
+
+	enum AccessMode {
+		ACCESS_READ,
+		ACCESS_WRITE,
 	};
 
 private:
@@ -120,7 +132,7 @@ public:
 	// True for the four engine prefixes that keep their hard-coded fast path in FileAccess, DirAccess and ProjectSettings.
 	static bool is_engine_fast_path(const String &p_path);
 
-	Error register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_logic, const PackedStringArray &p_platforms = PackedStringArray());
+	Error register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_path_prefix, const PackedStringArray &p_platforms = PackedStringArray());
 	Error register_prefix_callable(const String &p_prefix, const Callable &p_globalize, const PackedStringArray &p_platforms = PackedStringArray(), const Callable &p_localize = Callable(), const Callable &p_is_available = Callable());
 	Error register_prefix_folder(const String &p_prefix, const String &p_folder, const PackedStringArray &p_platforms = PackedStringArray());
 	Error unregister_prefix(const String &p_prefix, const PackedStringArray &p_platforms = PackedStringArray());
@@ -136,13 +148,17 @@ public:
 
 	String globalize(const String &p_path) const;
 	String localize(const String &p_global_path) const;
+	// Follows the prefix chain of `p_path` until it reaches `res://`, `user://` or `uid://`, so that
+	// FileAccess, DirAccess and ResourceLoader can use their engine access (including the PCK).
+	// Returns `p_path` unchanged if the chain does not reach one of them.
+	String resolve_engine_path(const String &p_path) const;
 
 	Ref<PathInfo> resolve(const String &p_path) const;
-	Ref<PathInfo> resolve_safe(const String &p_path, bool p_for_write, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;
+	Ref<PathInfo> resolve_safe(const String &p_path, AccessMode p_access, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;
 
-	Ref<PathPrefix> create_folder_logic(const String &p_folder) const;
-	Ref<PathPrefix> create_system_dir_logic(CoreBind::OS::SystemDir p_dir, bool p_shared_storage = true) const;
-	Ref<PathPrefix> create_os_path_logic(OSPath p_path) const;
+	Ref<PathPrefix> create_folder_prefix(const String &p_folder) const;
+	Ref<PathPrefix> create_system_dir_prefix(CoreBind::OS::SystemDir p_dir, bool p_shared_storage = true) const;
+	Ref<PathPrefix> create_os_path_prefix(OSPath p_path) const;
 
 	// Registers `appdata://`, `config://`, `cache://` and `temp://` if `filesystem/path_prefixes/defaults` is on.
 	// Called once after the project settings are loaded.
@@ -153,3 +169,4 @@ public:
 };
 
 VARIANT_ENUM_CAST(PathPrefixServer::OSPath);
+VARIANT_ENUM_CAST(PathPrefixServer::AccessMode);

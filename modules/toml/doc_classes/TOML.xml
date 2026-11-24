@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		[TOML] reads and writes [url=https://toml.io/en/v1.0.0]TOML 1.0[/url] documents, a configuration format that is easy for people to read and edit. A document is read into a [Dictionary] whose keys keep the order of the file; tables become nested [Dictionary]s, arrays and arrays of tables become [Array]s.
-		The module also registers a loader and a saver for the file extension [code].toml[/code], so any [Resource] can be saved and loaded as TOML with [method ResourceSaver.save] and [method ResourceLoader.load]. It uses the same property mapping as the JSON format of [ResourceTextSerializer]: the root table has the keys [code]"$type"[/code] and [code]"$format_version"[/code], followed by one key per stored property. Nested resources are sub-tables ([code][main][/code]), arrays of resources are arrays of tables ([code][[entries]][/code]).
+		The module also registers a loader and a saver for the file extension [code].toml[/code], so any [Resource] can be saved and loaded as TOML with [method ResourceSaver.save] and [method ResourceLoader.load]. It uses the same property mapping as the JSON format of [ResourceTextSerializer]: the root table has the keys [code]"$type"[/code] and [code]"$format_version"[/code], followed by one key per stored property. Nested resources are sub-tables ([code][main][/code]), arrays of resources are arrays of tables ([code][[entries]][/code]). The module also implements [constant ResourceTextSerializer.FORMAT_TOML], so [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_TOML)[/code] and [method ResourceTextSerializer.deserialize] work with TOML like with the built-in formats.
 		[codeblocks]
 		[gdscript]
 		var settings = AudioBusSettings.new() # A Resource with class_name AudioBusSettings.
@@ -60,6 +60,15 @@
 		<link title="TOML 1.0 specification">https://toml.io/en/v1.0.0</link>
 	</tutorials>
 	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a resource from TOML [param text]. The class comes from the key [code]"$type"[/code] of the root table, or from [param type_hint]. Missing keys keep the default value of the class; unknown keys are skipped with a warning. Returns [code]null[/code] and prints an error if the text can't be read. [param options] is accepted for symmetry with [method ResourceTextSerializer.deserialize]; reading TOML has no options yet. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_TOML, type_hint, options)[/code].
+			</description>
+		</method>
 		<method name="get_data" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -98,12 +107,12 @@
 				Reads the TOML document [param text] and returns it as a [Dictionary]. Returns an empty [Dictionary] and prints an error with line and column if the text is not valid TOML.
 			</description>
 		</method>
-		<method name="resource_to_toml" qualifiers="static">
+		<method name="serialize" qualifiers="static">
 			<return type="String" />
 			<param index="0" name="resource" type="Resource" />
-			<param index="1" name="options" type="Dictionary" default="{}" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Returns [param resource] as TOML text, with the same property mapping as [method ResourceTextSerializer.resource_to_json]. The option [code]"enums_as_names"[/code] ([bool]) writes enum properties as names or as numbers; the default comes from [member ProjectSettings.filesystem/resources/text_formats/enums_as_names]. Returns an empty string and prints an error if the resource can't be written, for example if it contains itself.
+				Returns [param resource] as TOML text, with the same property mapping as the JSON format of [ResourceTextSerializer]. Of [param options], [member SerializerOptions.enums_as_names], [member SerializerOptions.defaults], [member SerializerOptions.include_type_marker], [member SerializerOptions.sort_keys] and [member SerializerOptions.full_precision_floats] apply; TOML ignores [member SerializerOptions.indent]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code]. Returns an empty string and prints an error if the resource can't be written, for example if it contains itself. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_TOML, options)[/code].
 			</description>
 		</method>
 		<method name="stringify" qualifiers="static">
@@ -123,14 +132,6 @@
 				string text = Toml.Stringify(new Godot.Collections.Dictionary { { "name", "Game" }, { "window", new Godot.Collections.Dictionary { { "width", 1280 } } } });
 				[/csharp]
 				[/codeblocks]
-			</description>
-		</method>
-		<method name="toml_to_resource" qualifiers="static">
-			<return type="Resource" />
-			<param index="0" name="text" type="String" />
-			<param index="1" name="type_hint" type="String" default="&quot;&quot;" />
-			<description>
-				Creates a resource from TOML [param text]. The class comes from the key [code]"$type"[/code] of the root table, or from [param type_hint]. Missing keys keep the default value of the class; unknown keys are skipped with a warning. Returns [code]null[/code] and prints an error if the text can't be read.
 			</description>
 		</method>
 	</methods>
