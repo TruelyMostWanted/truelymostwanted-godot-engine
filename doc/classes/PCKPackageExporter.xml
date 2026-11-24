@@ -21,7 +21,7 @@
 			description.add_file("scenes/level_2.tscn", "res://scenes/level_2.tscn")
 			description.add_file("readme.txt", "user://dlc_readme.txt")
 			var plan := PCKPackageExporter.plan_description(description)
-			print(plan["export_sources"], plan["raw_files"], plan["errors"])
+			print(plan.export_sources, plan.raw_files, plan.errors)
 			var err := PCKPackageExporter.export_description(description, "Windows Desktop", "user://dlc.pck")
 			if err != OK:
 				push_error("Build failed: %s" % error_string(err))
@@ -38,7 +38,7 @@
 				description.AddFile("scenes/level_2.tscn", "res://scenes/level_2.tscn");
 				description.AddFile("readme.txt", "user://dlc_readme.txt");
 				var plan = PckPackageExporter.PlanDescription(description);
-				GD.Print(plan["export_sources"], plan["raw_files"], plan["errors"]);
+				GD.Print(plan.ExportSources, plan.RawFiles, plan.Errors);
 				Error err = PckPackageExporter.ExportDescription(description, "Windows Desktop", "user://dlc.pck");
 				if (err != Error.Ok)
 				{
@@ -147,15 +147,10 @@
 			</description>
 		</method>
 		<method name="plan_description" qualifiers="static">
-			<return type="Dictionary" />
+			<return type="PCKBuildPlan" />
 			<param index="0" name="description" type="PCKPackage" />
 			<description>
-				Returns how the entries of [param description] would be built, without building anything:
-				- [code]"export_sources"[/code]: a [PackedStringArray] of the [code]res://[/code] sources that go through the export pipeline;
-				- [code]"raw_files"[/code]: the pack paths that are copied as they are;
-				- [code]"removals"[/code]: the pack paths written as removal entries;
-				- [code]"skipped"[/code]: [code].import[/code], [code].remap[/code] and [code].uid[/code] entries that the export writes for their source anyway;
-				- [code]"errors"[/code]: one message per entry that can't be built, such as a renamed [code]res://[/code] target. Nothing is built while this array is not empty.
+				Returns how the entries of [param description] would be built, without building anything: the [code]res://[/code] sources that go through the export pipeline, the files copied as they are, the removals, the skipped [code].import[/code], [code].remap[/code] and [code].uid[/code] entries, and one error message per entry that can't be built. Nothing is built while [member PCKBuildPlan.valid] is [code]false[/code]. A null [param description] gives a plan with one error.
 			</description>
 		</method>
 		<method name="should_encrypt" qualifiers="static">

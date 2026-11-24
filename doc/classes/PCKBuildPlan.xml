@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PCKBuildPlan" inherits="RefCounted" api_type="editor" keywords="pck, pack, export, description" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The result of [method PCKPackageExporter.plan_description].
+	</brief_description>
+	<description>
+		A [PCKBuildPlan] is returned by [method PCKPackageExporter.plan_description]. It tells how [PCKPackageExporter] builds the entries of one [PCKPackage] description, without building anything: which [code]res://[/code] sources go through the export pipeline, which files are copied as they are, which paths are written as removals, which [code].import[/code], [code].remap[/code] and [code].uid[/code] entries are skipped, and which entries can't be built. It is read-only after creation.
+		[codeblocks]
+		[gdscript]
+		var plan := PCKPackageExporter.plan_description(description)
+		if not plan.valid:
+			for message in plan.errors:
+				push_error(message)
+		[/gdscript]
+		[csharp]
+		PckBuildPlan plan = PckPackageExporter.PlanDescription(description);
+		if (!plan.Valid)
+		{
+			foreach (string message in plan.Errors)
+			{
+				GD.PushError(message);
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] This class is only available in editor builds.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="errors" type="PackedStringArray" setter="" getter="get_errors" default="PackedStringArray()">
+			One message per entry that can't be built: a delta patch, a [code]res://[/code] source whose target is not its source path, or a [code].import[/code], [code].remap[/code] or [code].uid[/code] entry listed without its source. For a null description, one message that says so. Nothing is built while this array is not empty.
+		</member>
+		<member name="export_sources" type="PackedStringArray" setter="" getter="get_export_sources" default="PackedStringArray()">
+			The [code]res://[/code] sources that go through the export pipeline of the preset, in exported form for its platform. The target path of each is its source path without [code]res://[/code].
+		</member>
+		<member name="raw_files" type="PackedStringArray" setter="" getter="get_raw_files" default="PackedStringArray()">
+			The pack paths of the entries copied as they are: entries with data in memory, with a source outside [code]res://[/code], and entries read from [member PCKPackage.base_pack].
+		</member>
+		<member name="removals" type="PackedStringArray" setter="" getter="get_removals" default="PackedStringArray()">
+			The pack paths written as removal entries.
+		</member>
+		<member name="skipped" type="PackedStringArray" setter="" getter="get_skipped" default="PackedStringArray()">
+			The pack paths of [code].import[/code], [code].remap[/code] and [code].uid[/code] entries that are not written from the description, because the export writes them for their source in [member export_sources].
+		</member>
+		<member name="valid" type="bool" setter="" getter="is_valid" default="true">
+			[code]true[/code] if [member errors] is empty, so the description can be built.
+		</member>
+	</members>
+</class>
