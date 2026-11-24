@@ -1,9 +1,16 @@
 name: 📦 Truely Release
 # truely-godot-engine: builds the editors (standard and Mono) and the export templates of all desktop
-# platforms and the Web, packs them and publishes a GitHub release. Started by hand only.
+# platforms and the Web, packs them and publishes a GitHub release.
+# Starts by itself after a green "🔗 GHA" run on truely-godot-engine, built from the exact commit that
+# run tested, but only if files other than Markdown and .agents/ changed since the last release tag
+# (truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
 # Names: Truely_Godot<version>-<status>_<hash>_<platform>, tag truely-godot<version>-<status>-<hash>.
 # The status of the Godot base (e.g. beta5) comes from truely/godot-status.txt.
 on:
+  workflow_run:
+    workflows: ["🔗 GHA"]
+    types: [completed]
+    branches: [truely-godot-engine]
   workflow_dispatch:
     inputs:
       draft:
@@ -21,6 +28,8 @@ concurrency:
 # Release builds never restore the shared SCons cache: cached objects of version-dependent files
 # carried old version strings into new builds.
 env:
+  # The commit to release: the one the CI run tested, or the selected commit when started by hand.
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
   BUILD_NAME: truely
   SCONS_FLAGS: production=yes debug_symbols=no
   PYTHONIOENCODING: utf8
@@ -30,8 +39,10 @@ env:
 jobs:
   setup:
     name: 🏷️ Names
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     outputs:
+      release: ${{ steps.check.outputs.release }}
       status: ${{ steps.names.outputs.status }}
       config: ${{ steps.names.outputs.config }}
       name: ${{ steps.names.outputs.name }}
@@ -40,6 +51,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      # Skip releases that would only change documentation: Markdown files and .agents/.
+      # Class reference changes (doc/classes/*.xml) are API docs and do count.
+      - name: Check for changes since the last release
+        id: check
+        run: |
+          prev=""
+          for t in $(git tag --merged "$SHA" --sort=-committerdate --list 'truely-godot*'); do
+            if [ "$(git rev-parse "$t^{commit}")" != "$SHA" ]; then prev="$t"; break; fi
+          done
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            release=true
+          elif [ -n "$(git tag --points-at "$SHA" --list 'truely-godot*')" ]; then
+            echo "$SHA is already released."
+            release=false
+          elif [ -z "$prev" ]; then
+            echo "No previous release tag."
+            release=true
+          elif changed="$(git diff --name-only "$prev" "$SHA" | grep -vE '\.md$|^\.agents/' || true)" && [ -n "$changed" ]; then
+            echo "Changes since $prev:"
+            echo "$changed"
+            release=true
+          else
+            echo "Only documentation changed since $prev."
+            release=false
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "release=$release"
 
       - name: Compute names
         id: names
@@ -49,7 +91,7 @@ jobs:
           v = runpy.run_path("version.py")
           status = open("truely/godot-status.txt", encoding="utf-8").read().strip()
           number = f"{v['major']}.{v['minor']}" + (f".{v['patch']}" if v["patch"] else "")
-          sha = os.environ["GITHUB_SHA"][:7]
+          sha = os.environ["SHA"][:7]
           base = f"{number}-{status}"
           m = re.fullmatch(r"([a-z]+)(\d*)", status)
           pretty = f"{number} {m.group(1)} {m.group(2)}".strip() if m else f"{number} {status}"
@@ -69,6 +111,7 @@ jobs:
   linux:
     name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
     needs: setup
+    if: needs.setup.outputs.release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     env:
@@ -82,6 +125,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ env.SHA }}
           submodules: recursive
 
       - name: Setup dependencies
@@ -141,6 +185,7 @@ jobs:
   windows:
     name: 🏁 Windows ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
     needs: setup
+    if: needs.setup.outputs.release == 'true'
     runs-on: windows-latest
     timeout-minutes: 240
     env:
@@ -154,6 +199,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ env.SHA }}
           submodules: recursive
 
       - name: Setup Python and SCons
@@ -187,6 +233,7 @@ jobs:
   macos:
     name: 🍎 macOS ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
     needs: setup
+    if: needs.setup.outputs.release == 'true'
     runs-on: macos-26
     timeout-minutes: 240
     env:
@@ -200,6 +247,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ env.SHA }}
           submodules: recursive
 
       - name: Setup Python and SCons
@@ -238,6 +286,7 @@ jobs:
   web:
     name: 🌐 Web ${{ matrix.target }}${{ matrix.threads == 'no' && ' (no threads)' || '' }}
     needs: setup
+    if: needs.setup.outputs.release == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 120
     env:
@@ -252,6 +301,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ env.SHA }}
           submodules: recursive
 
       - name: Set up Emscripten
@@ -290,6 +340,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -301,7 +354,7 @@ jobs:
       - name: Check the version string
         run: |
           chmod +x artifacts/godot.linuxbsd.*
-          expected="$CONFIG.truely.${GITHUB_SHA:0:9}"
+          expected="$CONFIG.truely.${SHA:0:9}"
           actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --version | tail -n 1)"
           echo "expected $expected, got $actual"
           [ "$actual" = "$expected" ]
@@ -311,22 +364,13 @@ jobs:
 
       - name: Release notes
         run: |
-          cat > notes.md <<EOF
-          Truely Godot Engine at commit $GITHUB_SHA, based on Godot $CONFIG. Version string: \`$CONFIG.truely.${GITHUB_SHA:0:9}\` (Mono: \`$CONFIG.mono.truely.${GITHUB_SHA:0:9}\`).
-
-          **Editors:** \`*_win64.zip\`, \`*_linux.x86_64.zip\`, \`*_macos.universal.zip\` and the same with \`mono_\` for C#.
-          **Export templates:** \`*_export_templates.tpz\` and \`*_mono_export_templates.tpz\` (Windows, Linux, macOS, Web with and without threads). Install them in the editor: Editor > Manage Export Templates > Install from File.
-
-          - **Self-contained mode:** every editor zip contains a \`._sc_\` file next to the editor. Settings, caches and export templates stay in that folder, so this build and the official Godot of the same version never overwrite each other's templates. Keep the folder together.
-          - **macOS:** the builds are not signed or notarized. First start: right-click Godot.app > Open. For the self-contained mode, run \`xattr -dr com.apple.quarantine <folder>\` once, otherwise macOS starts the app from a random path and the \`._sc_\` file is not found.
-          - **Mono (C#):** needs the .NET SDK 10 or newer. The editor brings its own Godot NuGet packages (GodotSharp/Tools/nupkgs).
-          - **Web:** no C# support.
-          EOF
+          bash .github/truely/release-notes.sh "$SHA" "$TAG" "$CONFIG" > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create release
         run: |
-          prerelease=""
-          if [ "$(cat truely/godot-status.txt)" != "stable" ]; then prerelease="--prerelease"; fi
-          draft=""
-          if [ "${{ inputs.draft }}" = "true" ]; then draft="--draft"; fi
-          gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "$TITLE" --notes-file notes.md $prerelease $draft
+          # Only stable releases become "Latest"; everything else is a pre-release.
+          flags="--prerelease --latest=false"
+          if [ "$(tr -d '[:space:]' < truely/godot-status.txt)" = "stable" ]; then flags="--latest"; fi
+          if [ "${{ inputs.draft }}" = "true" ]; then flags="$flags --draft"; fi
+          gh release create "$TAG" release/* --target "$SHA" --title "$TITLE" --notes-file notes.md $flags
