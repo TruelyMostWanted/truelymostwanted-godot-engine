@@ -3724,8 +3724,8 @@
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>
-		<member name="settings/key_bindings/include_builtin_actions" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [KeyBindingSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
+		<member name="settings/input_map/include_builtin_actions" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [InputMapSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
 		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.

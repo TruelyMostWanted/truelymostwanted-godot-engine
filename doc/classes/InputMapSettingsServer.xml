@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="KeyBindingSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="InputMapSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings server for the player's key bindings of the [InputMap] actions.
+		Settings server for the player's events of the [InputMap] actions, mirrored as [InputMapSettings].
 	</brief_description>
 	<description>
-		[KeyBindingSettingsServer] is the settings domain [code]"key_bindings"[/code]: it stores the keys, mouse buttons and joypad inputs the player bound to the actions of the project, loads them when the game starts and applies them to [InputMap] (in [constant SettingsServer.APPLY_PHASE_SERVERS], before the [SceneTree] exists).
-		A binding is addressed by action, device ([enum KeyBinding.InputDevice]: keyboard, mouse or gamepad) and slot. A rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" waits for the next input of the player and calls [method rebind] with the slot of the column; the device follows from the event. [method find_conflicts] tells which other actions use the event already, so the game can swap, clear or refuse. [method get_event_label] gives the text for the buttons of the menu.
-		The settings resource is a [KeyBindingList] with one [KeyBinding] row per slot. The defaults are the [InputMap] of the project settings when the game starts, so [method reset_action] and [method reset_all] give back the bindings of the project. Built-in [code]ui_*[/code] actions are left out unless [member ProjectSettings.settings/key_bindings/include_builtin_actions] is [code]true[/code].
+		[InputMapSettingsServer] is the settings domain [code]"input_map"[/code]: it stores the keys, mouse buttons and joypad inputs the player bound to the actions of the project, loads them when the game starts and applies them to [InputMap] (in [constant SettingsServer.APPLY_PHASE_SERVERS], before the [SceneTree] exists). Sensitivity, inversion, vibration and the global deadzone are a separate domain, see [InputSettingsServer].
+		An event slot is addressed by action, device ([enum InputMapAction.InputDevice]: keyboard, mouse or gamepad) and slot. A rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" waits for the next input of the player and calls [method rebind] with the slot of the column; the device follows from the event. [method find_conflicts] tells which other actions use the event already, so the game can swap, clear or refuse. [method get_event_label] gives the text for the buttons of the menu.
+		The settings resource is an [InputMapSettings] with one [InputMapAction] row per slot. The defaults are the [InputMap] of the project settings when the game starts, so [method reset_action] and [method reset_all] give back the bindings of the project. Built-in [code]ui_*[/code] actions are left out unless [member ProjectSettings.settings/input_map/include_builtin_actions] is [code]true[/code].
 		When the file is loaded, the saved rows replace the bindings of their action. Actions added to the project since the file was saved keep their project bindings; saved actions that the project no longer has are skipped with a warning. Applying replaces the key, mouse button and joypad events of each action; other event types (touch, MIDI, ...) stay.
-		The file is [code]user://settings/key_bindings.ini[/code] by default and stores every event as readable text such as [code]Key:Ctrl+S[/code] or [code]JoypadMotion:LeftX+[/code] (see [KeyBinding]). It can also be stored as JSON or as CSV with one row per event ([member ProjectSettings.settings/storage/format]).
+		The file is [code]user://settings/input_map.ini[/code] by default and stores every event as readable text such as [code]Key:Ctrl+S[/code] or [code]JoypadMotion:LeftX+[/code] (see [InputMapAction]). It can also be stored as JSON or as CSV with one row per event ([member ProjectSettings.settings/storage/format]).
 		All methods below change the pending settings: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change reaches [InputMap] at once and is saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
 		[codeblocks]
 		[gdscript]
@@ -22,13 +22,13 @@
 		func _input(event):
 			if waiting_action.is_empty() or not event.is_pressed():
 				return
-			if KeyBinding.get_event_device(event) == KeyBinding.INPUT_DEVICE_MAX:
+			if InputMapAction.get_event_device(event) == InputMapAction.INPUT_DEVICE_MAX:
 				return # Mouse motion, touch, ...
 			get_viewport().set_input_as_handled()
-			for other in KeyBindingSettingsServer.find_conflicts(event, waiting_action):
-				KeyBindingSettingsServer.clear_binding(other, KeyBinding.get_event_device(event), 0)
-			KeyBindingSettingsServer.rebind(waiting_action, event, waiting_slot)
-			$JumpKeyButton.text = KeyBindingSettingsServer.get_event_label(event)
+			for other in InputMapSettingsServer.find_conflicts(event, waiting_action):
+				InputMapSettingsServer.clear_event(other, InputMapAction.get_event_device(event), 0)
+			InputMapSettingsServer.rebind(waiting_action, event, waiting_slot)
+			$JumpKeyButton.text = InputMapSettingsServer.get_event_label(event)
 			waiting_action = &amp;""
 		[/gdscript]
 		[csharp]
@@ -47,17 +47,17 @@
 		    {
 		        return;
 		    }
-		    if (KeyBinding.GetEventDevice(@event) == KeyBinding.InputDevice.Max)
+		    if (InputMapAction.GetEventDevice(@event) == InputMapAction.InputDevice.Max)
 		    {
 		        return; // Mouse motion, touch, ...
 		    }
 		    GetViewport().SetInputAsHandled();
-		    foreach (string other in KeyBindingSettingsServer.FindConflicts(@event, _waitingAction))
+		    foreach (string other in InputMapSettingsServer.FindConflicts(@event, _waitingAction))
 		    {
-		        KeyBindingSettingsServer.ClearBinding(other, KeyBinding.GetEventDevice(@event), 0);
+		        InputMapSettingsServer.ClearEvent(other, InputMapAction.GetEventDevice(@event), 0);
 		    }
-		    KeyBindingSettingsServer.Rebind(_waitingAction, @event, _waitingSlot);
-		    GetNode&lt;Button&gt;("JumpKeyButton").Text = KeyBindingSettingsServer.GetEventLabel(@event);
+		    InputMapSettingsServer.Rebind(_waitingAction, @event, _waitingSlot);
+		    GetNode&lt;Button&gt;("JumpKeyButton").Text = InputMapSettingsServer.GetEventLabel(@event);
 		    _waitingAction = "";
 		}
 		[/csharp]
@@ -66,10 +66,10 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="clear_binding">
+		<method name="clear_event">
 			<return type="void" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="KeyBinding.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
 				Clears the slot [param slot] of [param device] of [param action]: the action no longer reacts to that input. The empty slot is stored, so the project binding does not come back after a restart; use [method reset_action] for that.
@@ -80,14 +80,14 @@
 			<param index="0" name="event" type="InputEvent" />
 			<param index="1" name="ignore_action" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Returns the actions (except [param ignore_action]) that already have a binding for [param event] in the pending settings. A pressed key matches a binding by keycode, physical keycode or key label. Bindings for a fixed [member KeyBinding.device_id] only conflict with events of that device or of all devices ([code]-1[/code]).
+				Returns the actions (except [param ignore_action]) that already have a binding for [param event] in the pending settings. A pressed key matches a binding by keycode, physical keycode or key label. Bindings for a fixed [member InputMapAction.device_id] only conflict with events of that device or of all devices ([code]-1[/code]).
 			</description>
 		</method>
 		<method name="get_action_deadzone" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="action" type="StringName" />
 			<description>
-				Returns the deadzone of [param action] (see [member KeyBinding.deadzone]).
+				Returns the deadzone of [param action] (see [member InputMapAction.deadzone]).
 			</description>
 		</method>
 		<method name="get_action_names" qualifiers="const">
@@ -96,10 +96,10 @@
 				Returns the actions this server manages, in the order of the project settings.
 			</description>
 		</method>
-		<method name="get_binding" qualifiers="const">
+		<method name="get_event" qualifiers="const">
 			<return type="InputEvent" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="KeyBinding.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
 				Returns the event in the slot [param slot] of [param device] of [param action], or [code]null[/code] if the slot is empty.
@@ -109,7 +109,7 @@
 			<return type="String" />
 			<param index="0" name="event" type="InputEvent" />
 			<description>
-				Returns a short text of [param event] for the UI, such as [code]"Ctrl+S"[/code] or [code]"Joypad A"[/code]. Same as [method KeyBinding.event_to_label].
+				Returns a short text of [param event] for the UI, such as [code]"Ctrl+S"[/code] or [code]"Joypad A"[/code]. Same as [method InputMapAction.event_to_label].
 			</description>
 		</method>
 		<method name="get_events" qualifiers="const">
@@ -122,7 +122,7 @@
 		<method name="get_slot_count" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="KeyBinding.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
 			<description>
 				Returns the number of slots of [param device] that [param action] uses: the highest bound slot plus one, or [code]0[/code] if no slot of the device is bound.
 			</description>
@@ -140,7 +140,7 @@
 			<param index="1" name="event" type="InputEvent" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
-				Binds [param event] to the slot [param slot] of [param action]; the device follows from the event (see [method KeyBinding.get_event_device]). A pressed key is stored by its physical keycode, and the binding reacts to all devices (see [member KeyBinding.device_id]). Other actions that use the same event keep it; check [method find_conflicts] first.
+				Binds [param event] to the slot [param slot] of [param action]; the device follows from the event (see [method InputMapAction.get_event_device]). A pressed key is stored by its physical keycode, and the binding reacts to all devices (see [member InputMapAction.device_id]). Other actions that use the same event keep it; check [method find_conflicts] first.
 				Returns [constant ERR_DOES_NOT_EXIST] if this server does not manage [param action], and [constant ERR_INVALID_PARAMETER] for event types that can't be bound or a negative slot.
 			</description>
 		</method>

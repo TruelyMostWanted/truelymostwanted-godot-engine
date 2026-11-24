@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  key_binding_settings_server.cpp                                       */
+/*  input_map_settings_server.cpp                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,56 +28,56 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "key_binding_settings_server.h"
+#include "input_map_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/input/input_map.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 
-static constexpr const char *SETTING_INCLUDE_BUILTIN_ACTIONS = "settings/key_bindings/include_builtin_actions";
+static constexpr const char *SETTING_INCLUDE_BUILTIN_ACTIONS = "settings/input_map/include_builtin_actions";
 
-KeyBindingSettingsServer *KeyBindingSettingsServer::singleton = nullptr;
+InputMapSettingsServer *InputMapSettingsServer::singleton = nullptr;
 
-KeyBindingSettingsServer *KeyBindingSettingsServer::get_singleton() {
+InputMapSettingsServer *InputMapSettingsServer::get_singleton() {
 	return singleton;
 }
 
-void KeyBindingSettingsServer::register_settings() {
+void InputMapSettingsServer::register_settings() {
 	GLOBAL_DEF(SETTING_INCLUDE_BUILTIN_ACTIONS, false);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName KeyBindingSettingsServer::get_domain() const {
-	return SNAME("key_bindings");
+StringName InputMapSettingsServer::get_domain() const {
+	return SNAME("input_map");
 }
 
-SettingsServer::ApplyPhase KeyBindingSettingsServer::get_apply_phase() const {
+SettingsServer::ApplyPhase InputMapSettingsServer::get_apply_phase() const {
 	// InputMap is loaded from the project settings in Main::setup(), long before this phase.
 	return APPLY_PHASE_SERVERS;
 }
 
-StringName KeyBindingSettingsServer::get_list_property() const {
-	return SNAME("bindings");
+StringName InputMapSettingsServer::get_list_property() const {
+	return SNAME("actions");
 }
 
-StringName KeyBindingSettingsServer::get_entry_key() const {
+StringName InputMapSettingsServer::get_entry_key() const {
 	return SNAME("action");
 }
 
-Ref<Resource> KeyBindingSettingsServer::_create_default_settings() const {
-	Ref<KeyBindingList> default_settings;
+Ref<Resource> InputMapSettingsServer::_create_default_settings() const {
+	Ref<InputMapSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-bool KeyBindingSettingsServer::_is_managed_event(const Ref<InputEvent> &p_event) {
-	return p_event.is_valid() && KeyBinding::get_event_device(p_event) != KeyBinding::INPUT_DEVICE_MAX;
+bool InputMapSettingsServer::_is_managed_event(const Ref<InputEvent> &p_event) {
+	return p_event.is_valid() && InputMapAction::get_event_device(p_event) != InputMapAction::INPUT_DEVICE_MAX;
 }
 
-bool KeyBindingSettingsServer::_is_managed_action(const StringName &p_action) const {
+bool InputMapSettingsServer::_is_managed_action(const StringName &p_action) const {
 	if (include_builtin_actions) {
 		return true;
 	}
@@ -85,10 +85,10 @@ bool KeyBindingSettingsServer::_is_managed_action(const StringName &p_action) co
 	return input_map == nullptr || !input_map->get_builtins().has(String(p_action));
 }
 
-void KeyBindingSettingsServer::_add_action_rows(const StringName &p_action, TypedArray<KeyBinding> &r_rows) {
+void InputMapSettingsServer::_add_action_rows(const StringName &p_action, TypedArray<InputMapAction> &r_rows) {
 	InputMap *input_map = InputMap::get_singleton();
 	const float deadzone = input_map->action_get_deadzone(p_action);
-	int slots[KeyBinding::INPUT_DEVICE_MAX] = {};
+	int slots[InputMapAction::INPUT_DEVICE_MAX] = {};
 	bool any = false;
 	const List<Ref<InputEvent>> *events = input_map->action_get_events(p_action);
 	if (events != nullptr) {
@@ -96,7 +96,7 @@ void KeyBindingSettingsServer::_add_action_rows(const StringName &p_action, Type
 			if (!_is_managed_event(event)) {
 				continue;
 			}
-			Ref<KeyBinding> row;
+			Ref<InputMapAction> row;
 			row.instantiate();
 			row->set_action(p_action);
 			row->set_deadzone(deadzone);
@@ -108,7 +108,7 @@ void KeyBindingSettingsServer::_add_action_rows(const StringName &p_action, Type
 	}
 	if (!any) {
 		// An action without bindings keeps one empty row for its deadzone.
-		Ref<KeyBinding> row;
+		Ref<InputMapAction> row;
 		row.instantiate();
 		row->set_action(p_action);
 		row->set_deadzone(deadzone);
@@ -116,12 +116,12 @@ void KeyBindingSettingsServer::_add_action_rows(const StringName &p_action, Type
 	}
 }
 
-void KeyBindingSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+void InputMapSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	InputMap *input_map = InputMap::get_singleton();
 	if (input_map == nullptr) {
 		return;
 	}
-	TypedArray<KeyBinding> rows;
+	TypedArray<InputMapAction> rows;
 	const TypedArray<StringName> actions = input_map->get_actions();
 	for (int i = 0; i < actions.size(); i++) {
 		const StringName action = actions[i];
@@ -132,7 +132,7 @@ void KeyBindingSettingsServer::_read_settings_from_engine(const Ref<Resource> &p
 	p_settings->set(get_list_property(), rows);
 }
 
-void KeyBindingSettingsServer::_apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) {
+void InputMapSettingsServer::_apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) {
 	const StringName property = get_list_property();
 	InputMap *input_map = InputMap::get_singleton();
 	if (input_map == nullptr || !p_names.has(String(property))) {
@@ -142,15 +142,15 @@ void KeyBindingSettingsServer::_apply_settings(const Ref<Resource> &p_settings, 
 
 	// Rows grouped per action, in the order of the list.
 	Vector<String> order;
-	HashMap<String, Vector<Ref<KeyBinding>>> grouped;
+	HashMap<String, Vector<Ref<InputMapAction>>> grouped;
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_null() || row->get_action().is_empty()) {
 			continue;
 		}
 		if (!grouped.has(row->get_action())) {
 			order.push_back(row->get_action());
-			grouped.insert(row->get_action(), Vector<Ref<KeyBinding>>());
+			grouped.insert(row->get_action(), Vector<Ref<InputMapAction>>());
 		}
 		grouped[row->get_action()].push_back(row);
 	}
@@ -166,7 +166,7 @@ void KeyBindingSettingsServer::_apply_settings(const Ref<Resource> &p_settings, 
 			}
 			continue;
 		}
-		const Vector<Ref<KeyBinding>> &action_rows = grouped[action];
+		const Vector<Ref<InputMapAction>> &action_rows = grouped[action];
 		input_map->action_set_deadzone(action, action_rows[0]->get_deadzone());
 
 		// Touch, MIDI and other events are not managed and stay.
@@ -185,15 +185,15 @@ void KeyBindingSettingsServer::_apply_settings(const Ref<Resource> &p_settings, 
 		}
 
 		// Keyboard, mouse, gamepad; each by slot.
-		for (int device = 0; device < KeyBinding::INPUT_DEVICE_MAX; device++) {
+		for (int device = 0; device < InputMapAction::INPUT_DEVICE_MAX; device++) {
 			int max_slot = -1;
-			for (const Ref<KeyBinding> &row : action_rows) {
+			for (const Ref<InputMapAction> &row : action_rows) {
 				if (row->get_device() == device) {
 					max_slot = MAX(max_slot, row->get_slot());
 				}
 			}
 			for (int slot = 0; slot <= max_slot; slot++) {
-				for (const Ref<KeyBinding> &row : action_rows) {
+				for (const Ref<InputMapAction> &row : action_rows) {
 					if (row->get_device() != device || row->get_slot() != slot || row->is_empty()) {
 						continue;
 					}
@@ -208,14 +208,14 @@ void KeyBindingSettingsServer::_apply_settings(const Ref<Resource> &p_settings, 
 		}
 	}
 	if (!missing.is_empty()) {
-		WARN_PRINT(vformat("Key bindings: the project has no action %s; the saved bindings are skipped.", String(", ").join(missing)));
+		WARN_PRINT(vformat("Input map settings: the project has no action %s; the saved bindings are skipped.", String(", ").join(missing)));
 	}
 	if (!invalid.is_empty()) {
-		WARN_PRINT(vformat("Key bindings: can't read the binding %s; it is skipped.", String(", ").join(invalid)));
+		WARN_PRINT(vformat("Input map settings: can't read the binding %s; it is skipped.", String(", ").join(invalid)));
 	}
 }
 
-void KeyBindingSettingsServer::_merge_project_actions() {
+void InputMapSettingsServer::_merge_project_actions() {
 	// The saved rows replace the project bindings action by action. Actions added to the project since
 	// the file was saved keep their project bindings; actions that no longer exist are dropped.
 	const StringName property = get_list_property();
@@ -225,7 +225,7 @@ void KeyBindingSettingsServer::_merge_project_actions() {
 
 	HashSet<String> project_actions;
 	for (int i = 0; i < project_rows.size(); i++) {
-		const Ref<KeyBinding> row = project_rows[i];
+		const Ref<InputMapAction> row = project_rows[i];
 		if (row.is_valid()) {
 			project_actions.insert(row->get_action());
 		}
@@ -233,7 +233,7 @@ void KeyBindingSettingsServer::_merge_project_actions() {
 	HashSet<String> saved_actions;
 	PackedStringArray dropped;
 	for (int i = 0; i < saved_rows.size(); i++) {
-		const Ref<KeyBinding> row = saved_rows[i];
+		const Ref<InputMapAction> row = saved_rows[i];
 		if (row.is_null()) {
 			continue;
 		}
@@ -245,10 +245,10 @@ void KeyBindingSettingsServer::_merge_project_actions() {
 		}
 	}
 
-	TypedArray<KeyBinding> merged;
+	TypedArray<InputMapAction> merged;
 	HashSet<String> done;
 	for (int i = 0; i < project_rows.size(); i++) {
-		const Ref<KeyBinding> project_row = project_rows[i];
+		const Ref<InputMapAction> project_row = project_rows[i];
 		if (project_row.is_null()) {
 			continue;
 		}
@@ -262,7 +262,7 @@ void KeyBindingSettingsServer::_merge_project_actions() {
 		}
 		done.insert(action);
 		for (int j = 0; j < saved_rows.size(); j++) {
-			const Ref<KeyBinding> saved_row = saved_rows[j];
+			const Ref<InputMapAction> saved_row = saved_rows[j];
 			if (saved_row.is_valid() && saved_row->get_action() == action) {
 				merged.push_back(saved_row);
 			}
@@ -272,21 +272,21 @@ void KeyBindingSettingsServer::_merge_project_actions() {
 		pending->set(property, merged);
 	}
 	if (!dropped.is_empty()) {
-		WARN_PRINT(vformat("Key bindings: the project has no action %s; the saved bindings are skipped.", String(", ").join(dropped)));
+		WARN_PRINT(vformat("Input map settings: the project has no action %s; the saved bindings are skipped.", String(", ").join(dropped)));
 	}
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-Array KeyBindingSettingsServer::_get_rows() const {
+Array InputMapSettingsServer::_get_rows() const {
 	return get_pending_settings()->get(get_list_property());
 }
 
-int KeyBindingSettingsServer::_find_row(const String &p_action, KeyBinding::InputDevice p_device, int p_slot) const {
+int InputMapSettingsServer::_find_row(const String &p_action, InputMapAction::InputDevice p_device, int p_slot) const {
 	const Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && row->get_action() == p_action && row->get_device() == p_device && row->get_slot() == p_slot) {
 			return i;
 		}
@@ -294,22 +294,22 @@ int KeyBindingSettingsServer::_find_row(const String &p_action, KeyBinding::Inpu
 	return -1;
 }
 
-float KeyBindingSettingsServer::_get_default_deadzone(const String &p_action) const {
+float InputMapSettingsServer::_get_default_deadzone(const String &p_action) const {
 	const Array rows = get_default_settings()->get(get_list_property());
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && row->get_action() == p_action) {
 			return row->get_deadzone();
 		}
 	}
-	return KeyBinding::DEFAULT_DEADZONE;
+	return InputMapAction::DEFAULT_DEADZONE;
 }
 
-PackedStringArray KeyBindingSettingsServer::get_action_names() const {
+PackedStringArray InputMapSettingsServer::get_action_names() const {
 	PackedStringArray names;
 	const Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && !names.has(row->get_action())) {
 			names.push_back(row->get_action());
 		}
@@ -317,16 +317,16 @@ PackedStringArray KeyBindingSettingsServer::get_action_names() const {
 	return names;
 }
 
-bool KeyBindingSettingsServer::has_action(const StringName &p_action) const {
+bool InputMapSettingsServer::has_action(const StringName &p_action) const {
 	return find_entry(String(p_action)) >= 0;
 }
 
-TypedArray<InputEvent> KeyBindingSettingsServer::get_events(const StringName &p_action) const {
+TypedArray<InputEvent> InputMapSettingsServer::get_events(const StringName &p_action) const {
 	TypedArray<InputEvent> events;
-	for (int device = 0; device < KeyBinding::INPUT_DEVICE_MAX; device++) {
-		const int count = get_slot_count(p_action, KeyBinding::InputDevice(device));
+	for (int device = 0; device < InputMapAction::INPUT_DEVICE_MAX; device++) {
+		const int count = get_slot_count(p_action, InputMapAction::InputDevice(device));
 		for (int slot = 0; slot < count; slot++) {
-			const Ref<InputEvent> event = get_binding(p_action, KeyBinding::InputDevice(device), slot);
+			const Ref<InputEvent> event = get_event(p_action, InputMapAction::InputDevice(device), slot);
 			if (event.is_valid()) {
 				events.push_back(event);
 			}
@@ -335,13 +335,13 @@ TypedArray<InputEvent> KeyBindingSettingsServer::get_events(const StringName &p_
 	return events;
 }
 
-void KeyBindingSettingsServer::set_action_deadzone(const StringName &p_action, float p_deadzone) {
-	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Key bindings: there is no action \"%s\".", p_action));
+void InputMapSettingsServer::set_action_deadzone(const StringName &p_action, float p_deadzone) {
+	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Input map settings: there is no action \"%s\".", p_action));
 	const float deadzone = CLAMP(p_deadzone, 0.0f, 1.0f);
 	const Array rows = _get_rows();
 	bool changed = false;
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && row->get_action() == String(p_action) && row->get_deadzone() != deadzone) {
 			row->set_deadzone(deadzone);
 			changed = true;
@@ -352,27 +352,27 @@ void KeyBindingSettingsServer::set_action_deadzone(const StringName &p_action, f
 	}
 }
 
-float KeyBindingSettingsServer::get_action_deadzone(const StringName &p_action) const {
+float InputMapSettingsServer::get_action_deadzone(const StringName &p_action) const {
 	const int index = find_entry(String(p_action));
-	ERR_FAIL_COND_V_MSG(index < 0, KeyBinding::DEFAULT_DEADZONE, vformat("Key bindings: there is no action \"%s\".", p_action));
-	const Ref<KeyBinding> row = get_entry(index);
-	return row.is_valid() ? row->get_deadzone() : KeyBinding::DEFAULT_DEADZONE;
+	ERR_FAIL_COND_V_MSG(index < 0, InputMapAction::DEFAULT_DEADZONE, vformat("Input map settings: there is no action \"%s\".", p_action));
+	const Ref<InputMapAction> row = get_entry(index);
+	return row.is_valid() ? row->get_deadzone() : InputMapAction::DEFAULT_DEADZONE;
 }
 
-Ref<InputEvent> KeyBindingSettingsServer::get_binding(const StringName &p_action, KeyBinding::InputDevice p_device, int p_slot) const {
+Ref<InputEvent> InputMapSettingsServer::get_event(const StringName &p_action, InputMapAction::InputDevice p_device, int p_slot) const {
 	const int index = _find_row(p_action, p_device, p_slot);
 	if (index < 0) {
 		return Ref<InputEvent>();
 	}
-	const Ref<KeyBinding> row = get_entry(index);
+	const Ref<InputMapAction> row = get_entry(index);
 	return row.is_valid() ? row->get_input_event() : Ref<InputEvent>();
 }
 
-int KeyBindingSettingsServer::get_slot_count(const StringName &p_action, KeyBinding::InputDevice p_device) const {
+int InputMapSettingsServer::get_slot_count(const StringName &p_action, InputMapAction::InputDevice p_device) const {
 	int count = 0;
 	const Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && row->get_action() == String(p_action) && row->get_device() == p_device && !row->is_empty()) {
 			count = MAX(count, row->get_slot() + 1);
 		}
@@ -380,18 +380,18 @@ int KeyBindingSettingsServer::get_slot_count(const StringName &p_action, KeyBind
 	return count;
 }
 
-Error KeyBindingSettingsServer::rebind(const StringName &p_action, const Ref<InputEvent> &p_event, int p_slot) {
+Error InputMapSettingsServer::rebind(const StringName &p_action, const Ref<InputEvent> &p_event, int p_slot) {
 	ERR_FAIL_COND_V(p_event.is_null(), ERR_INVALID_PARAMETER);
-	ERR_FAIL_COND_V_MSG(p_slot < 0, ERR_INVALID_PARAMETER, "Key bindings: the slot must be 0 or greater.");
-	ERR_FAIL_COND_V_MSG(!has_action(p_action), ERR_DOES_NOT_EXIST, vformat("Key bindings: there is no action \"%s\".", p_action));
-	const KeyBinding::InputDevice device = KeyBinding::get_event_device(p_event);
-	ERR_FAIL_COND_V_MSG(device == KeyBinding::INPUT_DEVICE_MAX, ERR_INVALID_PARAMETER, vformat("Key bindings: a %s can't be bound; use a key, mouse button, joypad button or joypad axis.", p_event->get_class()));
-	const String text = KeyBinding::event_to_text(p_event);
-	ERR_FAIL_COND_V_MSG(text.is_empty(), ERR_INVALID_PARAMETER, vformat("Key bindings: the event \"%s\" has no key, button or axis.", p_event->as_text()));
+	ERR_FAIL_COND_V_MSG(p_slot < 0, ERR_INVALID_PARAMETER, "Input map settings: the slot must be 0 or greater.");
+	ERR_FAIL_COND_V_MSG(!has_action(p_action), ERR_DOES_NOT_EXIST, vformat("Input map settings: there is no action \"%s\".", p_action));
+	const InputMapAction::InputDevice device = InputMapAction::get_event_device(p_event);
+	ERR_FAIL_COND_V_MSG(device == InputMapAction::INPUT_DEVICE_MAX, ERR_INVALID_PARAMETER, vformat("Input map settings: a %s can't be bound; use a key, mouse button, joypad button or joypad axis.", p_event->get_class()));
+	const String text = InputMapAction::event_to_text(p_event);
+	ERR_FAIL_COND_V_MSG(text.is_empty(), ERR_INVALID_PARAMETER, vformat("Input map settings: the event \"%s\" has no key, button or axis.", p_event->as_text()));
 
 	const int index = _find_row(p_action, device, p_slot);
 	if (index >= 0) {
-		const Ref<KeyBinding> row = get_entry(index);
+		const Ref<InputMapAction> row = get_entry(index);
 		if (row->get_event() == text && row->get_device_id() == -1) {
 			return OK;
 		}
@@ -401,7 +401,7 @@ Error KeyBindingSettingsServer::rebind(const StringName &p_action, const Ref<Inp
 		notify_value_changed(get_list_property());
 		return OK;
 	}
-	Ref<KeyBinding> row;
+	Ref<InputMapAction> row;
 	row.instantiate();
 	row->set_action(p_action);
 	row->set_device(device);
@@ -413,7 +413,7 @@ Error KeyBindingSettingsServer::rebind(const StringName &p_action, const Ref<Inp
 	const Array rows = _get_rows();
 	int at_index = -1;
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> other = rows[i];
+		const Ref<InputMapAction> other = rows[i];
 		if (other.is_valid() && other->get_action() == String(p_action)) {
 			at_index = i + 1;
 		}
@@ -422,13 +422,13 @@ Error KeyBindingSettingsServer::rebind(const StringName &p_action, const Ref<Inp
 	return OK;
 }
 
-void KeyBindingSettingsServer::clear_binding(const StringName &p_action, KeyBinding::InputDevice p_device, int p_slot) {
-	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Key bindings: there is no action \"%s\".", p_action));
+void InputMapSettingsServer::clear_event(const StringName &p_action, InputMapAction::InputDevice p_device, int p_slot) {
+	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Input map settings: there is no action \"%s\".", p_action));
 	const int index = _find_row(p_action, p_device, p_slot);
 	if (index < 0) {
 		return;
 	}
-	const Ref<KeyBinding> row = get_entry(index);
+	const Ref<InputMapAction> row = get_entry(index);
 	if (row->is_empty()) {
 		return;
 	}
@@ -437,17 +437,17 @@ void KeyBindingSettingsServer::clear_binding(const StringName &p_action, KeyBind
 	notify_value_changed(get_list_property());
 }
 
-PackedStringArray KeyBindingSettingsServer::find_conflicts(const Ref<InputEvent> &p_event, const StringName &p_ignore_action) const {
+PackedStringArray InputMapSettingsServer::find_conflicts(const Ref<InputEvent> &p_event, const StringName &p_ignore_action) const {
 	PackedStringArray actions;
 	ERR_FAIL_COND_V(p_event.is_null(), actions);
-	const String text = KeyBinding::event_to_text(p_event);
+	const String text = InputMapAction::event_to_text(p_event);
 	if (text.is_empty()) {
 		return actions;
 	}
 	const int device_id = p_event->get_device();
 	const Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_null() || row->is_empty() || row->get_action() == String(p_ignore_action) || actions.has(row->get_action())) {
 			continue;
 		}
@@ -467,20 +467,20 @@ PackedStringArray KeyBindingSettingsServer::find_conflicts(const Ref<InputEvent>
 	return actions;
 }
 
-void KeyBindingSettingsServer::reset_action(const StringName &p_action) {
-	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Key bindings: there is no action \"%s\".", p_action));
+void InputMapSettingsServer::reset_action(const StringName &p_action) {
+	ERR_FAIL_COND_MSG(!has_action(p_action), vformat("Input map settings: there is no action \"%s\".", p_action));
 	const String action = p_action;
 	const Array project_rows = get_default_settings()->get(get_list_property());
 	const Array rows = _get_rows();
-	TypedArray<KeyBinding> result;
+	TypedArray<InputMapAction> result;
 	bool inserted = false;
 	for (int i = 0; i < rows.size(); i++) {
-		const Ref<KeyBinding> row = rows[i];
+		const Ref<InputMapAction> row = rows[i];
 		if (row.is_valid() && row->get_action() == action) {
 			if (!inserted) {
 				inserted = true;
 				for (int j = 0; j < project_rows.size(); j++) {
-					const Ref<KeyBinding> project_row = project_rows[j];
+					const Ref<InputMapAction> project_row = project_rows[j];
 					if (project_row.is_valid() && project_row->get_action() == action) {
 						result.push_back(copy_value(project_row));
 					}
@@ -497,31 +497,31 @@ void KeyBindingSettingsServer::reset_action(const StringName &p_action) {
 	notify_value_changed(get_list_property());
 }
 
-void KeyBindingSettingsServer::reset_all() {
+void InputMapSettingsServer::reset_all() {
 	reset_to_defaults();
 }
 
-String KeyBindingSettingsServer::get_event_label(const Ref<InputEvent> &p_event) const {
-	return KeyBinding::event_to_label(p_event);
+String InputMapSettingsServer::get_event_label(const Ref<InputEvent> &p_event) const {
+	return InputMapAction::event_to_label(p_event);
 }
 
-void KeyBindingSettingsServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_action_names"), &KeyBindingSettingsServer::get_action_names);
-	ClassDB::bind_method(D_METHOD("has_action", "action"), &KeyBindingSettingsServer::has_action);
-	ClassDB::bind_method(D_METHOD("get_events", "action"), &KeyBindingSettingsServer::get_events);
-	ClassDB::bind_method(D_METHOD("set_action_deadzone", "action", "deadzone"), &KeyBindingSettingsServer::set_action_deadzone);
-	ClassDB::bind_method(D_METHOD("get_action_deadzone", "action"), &KeyBindingSettingsServer::get_action_deadzone);
-	ClassDB::bind_method(D_METHOD("get_binding", "action", "device", "slot"), &KeyBindingSettingsServer::get_binding, DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("get_slot_count", "action", "device"), &KeyBindingSettingsServer::get_slot_count);
-	ClassDB::bind_method(D_METHOD("rebind", "action", "event", "slot"), &KeyBindingSettingsServer::rebind, DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("clear_binding", "action", "device", "slot"), &KeyBindingSettingsServer::clear_binding, DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("find_conflicts", "event", "ignore_action"), &KeyBindingSettingsServer::find_conflicts, DEFVAL(StringName()));
-	ClassDB::bind_method(D_METHOD("reset_action", "action"), &KeyBindingSettingsServer::reset_action);
-	ClassDB::bind_method(D_METHOD("reset_all"), &KeyBindingSettingsServer::reset_all);
-	ClassDB::bind_method(D_METHOD("get_event_label", "event"), &KeyBindingSettingsServer::get_event_label);
+void InputMapSettingsServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_action_names"), &InputMapSettingsServer::get_action_names);
+	ClassDB::bind_method(D_METHOD("has_action", "action"), &InputMapSettingsServer::has_action);
+	ClassDB::bind_method(D_METHOD("get_events", "action"), &InputMapSettingsServer::get_events);
+	ClassDB::bind_method(D_METHOD("set_action_deadzone", "action", "deadzone"), &InputMapSettingsServer::set_action_deadzone);
+	ClassDB::bind_method(D_METHOD("get_action_deadzone", "action"), &InputMapSettingsServer::get_action_deadzone);
+	ClassDB::bind_method(D_METHOD("get_event", "action", "device", "slot"), &InputMapSettingsServer::get_event, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("get_slot_count", "action", "device"), &InputMapSettingsServer::get_slot_count);
+	ClassDB::bind_method(D_METHOD("rebind", "action", "event", "slot"), &InputMapSettingsServer::rebind, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("clear_event", "action", "device", "slot"), &InputMapSettingsServer::clear_event, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("find_conflicts", "event", "ignore_action"), &InputMapSettingsServer::find_conflicts, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("reset_action", "action"), &InputMapSettingsServer::reset_action);
+	ClassDB::bind_method(D_METHOD("reset_all"), &InputMapSettingsServer::reset_all);
+	ClassDB::bind_method(D_METHOD("get_event_label", "event"), &InputMapSettingsServer::get_event_label);
 }
 
-KeyBindingSettingsServer::KeyBindingSettingsServer() {
+InputMapSettingsServer::InputMapSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
@@ -530,10 +530,10 @@ KeyBindingSettingsServer::KeyBindingSettingsServer() {
 	if (project_settings != nullptr && project_settings->has_setting(SETTING_INCLUDE_BUILTIN_ACTIONS)) {
 		include_builtin_actions = project_settings->get_setting_with_override(SETTING_INCLUDE_BUILTIN_ACTIONS);
 	}
-	connect(SNAME("loaded"), callable_mp(this, &KeyBindingSettingsServer::_merge_project_actions));
+	connect(SNAME("loaded"), callable_mp(this, &InputMapSettingsServer::_merge_project_actions));
 }
 
-KeyBindingSettingsServer::~KeyBindingSettingsServer() {
+InputMapSettingsServer::~InputMapSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}
