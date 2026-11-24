@@ -172,6 +172,12 @@ protected:
 	// as input events) returns a resource with the same value names and plain values, and converts it back.
 	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const { return p_settings; }
 	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const { return p_storage; }
+	// The storage form for one text format (#193): a domain whose list does not fit CSV as it is (nested records)
+	// returns flat rows for FORMAT_CSV. By default _settings_to_storage() for every format.
+	virtual Ref<Resource> _settings_to_storage_for_format(const Ref<Resource> &p_settings, ResourceTextSerializer::Format p_format) const { return _settings_to_storage(p_settings); }
+	// The type name of the storage form that a file with this text is read as (a CSV header of an older layout can
+	// name another type). By default the type of _settings_to_storage_for_format() of the defaults.
+	virtual String _get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const;
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)

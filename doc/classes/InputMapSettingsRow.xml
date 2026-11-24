@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="InputMapSettingsRow" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		One action as stored in the file of [InputMapSettingsServer].
+		One action as stored in a version 2 file of [InputMapSettingsServer].
 	</brief_description>
 	<description>
-		The file form of an [InputAction] in the settings file of [InputMapSettingsServer]: the events are written as one text cell ([member bindings]), so a CSV file has one row per action. [InputMapSettingsServer] converts between [InputActions] and these rows when it saves and loads; games do not need this class.
+		The file form of an [InputAction] in the settings files of [InputMapSettingsServer] before format version 3: the events are one text cell ([member bindings]). The server only reads it, to load old files; it writes [InputMapSettingsAction] and [InputMapSettingsEventRow]. Games do not need this class.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -13,7 +13,7 @@
 			The name of the action.
 		</member>
 		<member name="bindings" type="String" setter="set_bindings" getter="get_bindings" default="&quot;&quot;">
-			The events of the action as text, as written by [method InputMapSettingsServer.events_to_text], for example [code]Key:Ctrl+J; JoypadButton:A[/code].
+			The events of the action as text, as written by [method InputMapSettingsServer.events_to_text], for example [code]Key:Ctrl+J; JoypadButton:A[/code]. The names of version 2 are read by [method InputMapSettingsServer.text_to_events].
 		</member>
 		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
 			The deadzone of the action.
