@@ -35,7 +35,11 @@ Feature-Branches tragen als Präfix die Nummer ihres Issues, mindestens zweistel
 ## Täglicher Ablauf
 
 ```powershell
-# Upstream holen und in die eigene Engine mergen
+# Upstream und die mitgeführten Godot-PRs in fester Reihenfolge mergen
+./truely/merge-chain.ps1 -Check     # nur prüfen
+./truely/merge-chain.ps1 -Push
+
+# nur master und Engine (ohne mitgeführte PRs)
 ./truely/sync-upstream.ps1 -MergeIntoEngine -Push
 
 # Feature nur für die eigene Engine
@@ -55,6 +59,18 @@ git switch truely-godot-engine; git merge mein-beitrag          # sofort in der 
 ```
 
 Wird ein PR in Godot gemergt, kommt er über `master` ohnehin in die eigene Engine. Den PR-Branch kann man danach löschen.
+
+## Mitgeführte Godot-PRs
+
+Offene PRs von Godot, die die eigene Engine schon vor dem Merge in Godot enthält, stehen in [`upstream-prs.tsv`](upstream-prs.tsv) (Branch, PR-Nummer, Issue). `merge-chain.ps1` macht in dieser Reihenfolge:
+
+1. `fetch` von `origin` und `upstream`
+2. `master` ← `upstream/master` (nur Fast-forward)
+3. `truely-godot-engine` ← `master`
+4. je Zeile der Liste: Branch ← `refs/pull/<pr>/head` (Fast-forward; bei einem Rebase des PRs ein Merge-Commit, nie `--force`), dann `truely-godot-engine` ← Branch
+5. mit `-Push`: alles nach `origin`
+
+Bei einem Konflikt hält das Skript an; lösen, committen, erneut starten (erledigte Schritte laufen leer). Ein PR, der auf einem anderen aufbaut, steht in der Liste danach. Ist ein PR in Godot gemergt, die Zeile entfernen; `master` bringt ihn dann mit.
 
 ## Wichtig
 
