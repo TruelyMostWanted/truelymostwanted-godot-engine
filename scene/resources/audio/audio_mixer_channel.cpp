@@ -136,6 +136,34 @@ bool AudioMixerChannel::is_preload_next() const {
 	return preload_next;
 }
 
+void AudioMixerChannel::set_duck_on_tts(bool p_enabled) {
+	duck_on_tts = p_enabled;
+	emit_changed();
+}
+
+bool AudioMixerChannel::is_duck_on_tts() const {
+	return duck_on_tts;
+}
+
+void AudioMixerChannel::set_duck_volume_db(float p_volume_db) {
+	// Ducking only lowers the volume.
+	duck_volume_db = CLAMP(p_volume_db, -80.0f, 0.0f);
+	emit_changed();
+}
+
+float AudioMixerChannel::get_duck_volume_db() const {
+	return duck_volume_db;
+}
+
+void AudioMixerChannel::set_duck_fade_time(float p_time) {
+	duck_fade_time = MAX(0.0f, p_time);
+	emit_changed();
+}
+
+float AudioMixerChannel::get_duck_fade_time() const {
+	return duck_fade_time;
+}
+
 void AudioMixerChannel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_channel_name", "name"), &AudioMixerChannel::set_channel_name);
 	ClassDB::bind_method(D_METHOD("get_channel_name"), &AudioMixerChannel::get_channel_name);
@@ -159,6 +187,12 @@ void AudioMixerChannel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_stop_on_scene_change"), &AudioMixerChannel::is_stop_on_scene_change);
 	ClassDB::bind_method(D_METHOD("set_preload_next", "enabled"), &AudioMixerChannel::set_preload_next);
 	ClassDB::bind_method(D_METHOD("is_preload_next"), &AudioMixerChannel::is_preload_next);
+	ClassDB::bind_method(D_METHOD("set_duck_on_tts", "enabled"), &AudioMixerChannel::set_duck_on_tts);
+	ClassDB::bind_method(D_METHOD("is_duck_on_tts"), &AudioMixerChannel::is_duck_on_tts);
+	ClassDB::bind_method(D_METHOD("set_duck_volume_db", "volume_db"), &AudioMixerChannel::set_duck_volume_db);
+	ClassDB::bind_method(D_METHOD("get_duck_volume_db"), &AudioMixerChannel::get_duck_volume_db);
+	ClassDB::bind_method(D_METHOD("set_duck_fade_time", "time"), &AudioMixerChannel::set_duck_fade_time);
+	ClassDB::bind_method(D_METHOD("get_duck_fade_time"), &AudioMixerChannel::get_duck_fade_time);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "channel_name"), "set_channel_name", "get_channel_name");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "bus", PROPERTY_HINT_AUDIO_BUS), "set_bus", "get_bus");
@@ -171,6 +205,11 @@ void AudioMixerChannel::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_with_tree"), "set_pause_with_tree", "is_pause_with_tree");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_on_scene_change"), "set_stop_on_scene_change", "is_stop_on_scene_change");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preload_next"), "set_preload_next", "is_preload_next");
+
+	ADD_GROUP("Ducking", "duck_");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "duck_on_tts"), "set_duck_on_tts", "is_duck_on_tts");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "duck_volume_db", PROPERTY_HINT_RANGE, "-80,0,0.01,suffix:dB"), "set_duck_volume_db", "get_duck_volume_db");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "duck_fade_time", PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s"), "set_duck_fade_time", "get_duck_fade_time");
 
 	BIND_ENUM_CONSTANT(QUEUE_MODE_STOP);
 	BIND_ENUM_CONSTANT(QUEUE_MODE_LOOP_QUEUE);
