@@ -52,14 +52,20 @@ Ref<FileAccess> FileAccess::create(AccessType p_access) {
 	return ret;
 }
 
+// A registered prefix that resolves into `res://`, `user://` or `uid://` uses the engine access, including the PCK.
+static String _resolve_prefixed_path(const String &p_path) {
+	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
+}
+
 bool FileAccess::exists(const String &p_name) {
-	if (PackedData::get_singleton() && !PackedData::get_singleton()->is_disabled() && PackedData::get_singleton()->has_path(p_name)) {
+	const String name = _resolve_prefixed_path(p_name);
+	if (PackedData::get_singleton() && !PackedData::get_singleton()->is_disabled() && PackedData::get_singleton()->has_path(name)) {
 		return true;
 	}
 
 	// Using file_exists because it's faster than trying to open the file.
-	Ref<FileAccess> ret = create_for_path(p_name);
-	return ret->file_exists(p_name);
+	Ref<FileAccess> ret = create_for_path(name);
+	return ret->file_exists(name);
 }
 
 void FileAccess::_set_access_type(AccessType p_access) {
@@ -159,11 +165,13 @@ Error FileAccess::reopen(const String &p_path, int p_mode_flags) {
 }
 
 Ref<FileAccess> FileAccess::open(const String &p_path, int p_mode_flags, Error *r_error) {
+	const String path = _resolve_prefixed_path(p_path);
+
 	//try packed data first
 
 	Ref<FileAccess> ret;
 	if (!(p_mode_flags & WRITE) && !(p_mode_flags & SKIP_PACK) && PackedData::get_singleton() && !PackedData::get_singleton()->is_disabled()) {
-		ret = PackedData::get_singleton()->try_open_path(p_path);
+		ret = PackedData::get_singleton()->try_open_path(path);
 		if (ret.is_valid()) {
 			if (r_error) {
 				*r_error = OK;
@@ -172,8 +180,8 @@ Ref<FileAccess> FileAccess::open(const String &p_path, int p_mode_flags, Error *
 		}
 	}
 
-	ret = create_for_path(p_path);
-	Error err = ret->open_internal(p_path, p_mode_flags & ~SKIP_PACK);
+	ret = create_for_path(path);
+	Error err = ret->open_internal(path, p_mode_flags & ~SKIP_PACK);
 
 	if (r_error) {
 		*r_error = err;

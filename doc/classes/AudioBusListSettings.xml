@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioBusListSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [AudioBusSettingsServer]: the stored values of all audio buses.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"audio_buses"[/code]: one [AudioBusSettings] per bus. It holds nothing but the list, so [AudioBusSettingsServer] can store it as CSV with one row per bus. [AudioBusSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [AudioBusSettingsServer] and [ListSettingsServer] to change the entries.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="buses" type="AudioBusSettings[]" setter="set_buses" getter="get_buses" default="[]">
+			The entries, one per bus, identified by [member AudioBusSettings.bus_name].
+		</member>
+	</members>
+</class>

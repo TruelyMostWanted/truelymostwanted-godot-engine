@@ -277,6 +277,7 @@ private:
 		ThreadLoadStatus status = THREAD_LOAD_IN_PROGRESS;
 		CacheMode cache_mode = CACHE_MODE_REUSE;
 		Error error = OK;
+		String error_message; // Errors printed while this task loaded, set only if it failed.
 		Ref<Resource> resource;
 		LocalVector<Ref<Resource>> resource_dependencies; // We need to keep these alive for as long as the task is alive at least.
 		ThreadLoadTask *parent_task = nullptr;
@@ -335,6 +336,10 @@ public:
 	static Ref<Resource> load_threaded_get(const String &p_path, Error *r_error = nullptr);
 
 	static bool is_within_load() { return load_nesting > 0; }
+
+	// Errors printed by the last load finished on this thread (`load()`, `load_threaded_get()`),
+	// empty if it succeeded. Read right after the call; any later load on the thread replaces it.
+	static thread_local String last_load_error_message;
 
 	static void resource_changed_connect(Resource *p_source, const Callable &p_callable, uint32_t p_flags);
 	static void resource_changed_disconnect(Resource *p_source, const Callable &p_callable);
