@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ResourceSaveResult" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The result of a resource save: the error code and the saver's message.
+	</brief_description>
+	<description>
+		A [ResourceSaveResult] is returned by [method ResourceSaver.save_result]. Unlike [method ResourceSaver.save], which returns only an [enum Error] code, it also holds the message the saver printed, so the caller can show or log [i]why[/i] a save failed. It is read-only after creation.
+		[codeblocks]
+		[gdscript]
+		var result := ResourceSaver.save_result(save_game, "user://save_1.tres")
+		if not result.ok:
+			push_error("Saving failed: %s" % result.error_message)
+		[/gdscript]
+		[csharp]
+		ResourceSaveResult result = ResourceSaver.SaveResult(saveGame, "user://save_1.tres");
+		if (!result.Ok)
+		{
+		    GD.PushError($"Saving failed: {result.ErrorMessage}");
+		}
+		[/csharp]
+		[/codeblocks]
+		In C#, [code]ResourceSaver.TrySave(resource, path, out Error error)[/code] offers the usual [code]Try[/code] pattern.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="error" type="int" setter="" getter="get_error" enum="Error" default="3">
+			[constant OK] if the save succeeded. Otherwise the code of the saver, for example [constant ERR_CANT_CREATE] or [constant ERR_FILE_CANT_WRITE] for a path that cannot be written, [constant ERR_FILE_UNRECOGNIZED] if no saver handles the resource or the extension, or [constant ERR_INVALID_PARAMETER] for a [code]null[/code] resource or an empty path.
+		</member>
+		<member name="error_message" type="String" setter="" getter="get_error_message" default="&quot;&quot;">
+			Empty if the save succeeded. Otherwise the errors printed while saving, one per line and oldest first (at most 16 lines). If nothing was printed, it is the name of [member error] followed by the path.
+		</member>
+		<member name="ok" type="bool" setter="" getter="is_ok" default="false">
+			[code]true[/code] if the save succeeded; the same as [code]error == OK[/code].
+		</member>
+		<member name="path" type="String" setter="" getter="get_path" default="&quot;&quot;">
+			The path the resource was saved to: the path given to [method ResourceSaver.save_result], or [member Resource.resource_path] if that was empty.
+		</member>
+	</members>
+</class>

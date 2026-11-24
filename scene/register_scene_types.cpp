@@ -102,6 +102,7 @@
 #include "scene/main/canvas_item.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/http_request.h"
+#include "scene/main/http_response.h"
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
@@ -490,6 +491,8 @@ void register_scene_types() {
 	GDREGISTER_VIRTUAL_CLASS(MultiplayerAPIExtension);
 
 	GDREGISTER_CLASS(HTTPRequest);
+	GDREGISTER_CLASS(HTTPRequestTarget);
+	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);

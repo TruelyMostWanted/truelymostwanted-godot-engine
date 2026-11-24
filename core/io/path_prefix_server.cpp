@@ -150,9 +150,23 @@ public:
 		String root;
 		switch (mode) {
 			case MODE_FOLDER: {
+				// Folders that point at each other (`a://` -> `b://` -> `a://`) would recurse without end:
+				// a folder logic that is already resolving its root on this thread has no root.
+				static thread_local const PathPrefixFolder *resolving[8] = {};
+				static thread_local int resolving_count = 0;
+				for (int i = 0; i < resolving_count; i++) {
+					if (resolving[i] == this) {
+						return String();
+					}
+				}
+				if (resolving_count >= 8) {
+					return String();
+				}
 				root = folder;
 				if (PathPrefixServer::get_singleton()) {
+					resolving[resolving_count++] = this;
 					root = PathPrefixServer::get_singleton()->globalize(folder);
+					resolving_count--;
 				}
 			} break;
 			case MODE_OS_PATH: {
@@ -186,6 +200,19 @@ public:
 		const String root = get_root();
 		if (root.is_empty()) {
 			return String();
+		}
+		const String rest = p_path.substr(p_prefix.length());
+		return rest.is_empty() ? root : root.path_join(rest);
+	}
+
+	virtual String forward_path(const String &p_prefix, const String &p_path) const override {
+		if (mode != MODE_FOLDER) {
+			return globalize_path(p_prefix, p_path);
+		}
+		// The folder as written (`res://streaming_assets`), not globalized: the server follows the chain.
+		String root = folder;
+		while (root.length() > 1 && root.ends_with("/") && !root.ends_with("://") && !root.ends_with(":/")) {
+			root = root.substr(0, root.length() - 1);
 		}
 		const String rest = p_path.substr(p_prefix.length());
 		return rest.is_empty() ? root : root.path_join(rest);
@@ -646,6 +673,42 @@ String PathPrefixServer::globalize(const String &p_path) const {
 	return ret;
 }
 
+String PathPrefixServer::resolve_engine_path(const String &p_path) const {
+	if (is_engine_fast_path(p_path)) {
+		return p_path;
+	}
+	String prefix;
+	String rest;
+	if (!split_prefix(p_path, prefix, rest)) {
+		return p_path;
+	}
+	String path = prefix + rest.replace_char('\\', '/');
+	// The same limits as in `globalize()`: at most 8 steps, and a step must change the prefix.
+	// Nothing is printed and no lock is held while a logic runs.
+	for (int depth = 0; depth < 8; depth++) {
+		Ref<PathPrefix> logic = _get_active(prefix);
+		if (logic.is_null() || !logic->is_available()) {
+			return p_path;
+		}
+		const String next = logic->forward_path(prefix, path);
+		if (next.begins_with("res://") || next.begins_with("user://")) {
+			return next.simplify_path();
+		}
+		if (next.begins_with("uid://")) {
+			return next;
+		}
+		String next_prefix;
+		String next_rest;
+		if (!split_prefix(next, next_prefix, next_rest) || next_prefix == prefix || is_engine_fast_path(next)) {
+			// An OS path, the same prefix again or `pipe://`: not an engine path.
+			return p_path;
+		}
+		prefix = next_prefix;
+		path = next_prefix + next_rest;
+	}
+	return p_path;
+}
+
 String PathPrefixServer::localize(const String &p_global_path) const {
 	const String path = p_global_path.replace_char('\\', '/').simplify_path();
 
@@ -888,6 +951,7 @@ void PathPrefixServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("globalize", "path"), &PathPrefixServer::globalize);
 	ClassDB::bind_method(D_METHOD("localize", "global_path"), &PathPrefixServer::localize);
+	ClassDB::bind_method(D_METHOD("resolve_engine_path", "path"), &PathPrefixServer::resolve_engine_path);
 	ClassDB::bind_method(D_METHOD("resolve", "path"), &PathPrefixServer::resolve);
 	ClassDB::bind_method(D_METHOD("resolve_safe", "path", "for_write", "allowed_roots"), &PathPrefixServer::resolve_safe, DEFVAL(PackedStringArray()));
 

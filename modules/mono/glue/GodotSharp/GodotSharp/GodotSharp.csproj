@@ -100,6 +100,8 @@
     <Compile Include="Core\Extensions\NodeExtensions.cs" />
     <Compile Include="Core\Extensions\PackedSceneExtensions.cs" />
     <Compile Include="Core\Extensions\ResourceLoaderExtensions.cs" />
+    <Compile Include="Core\Extensions\ResourceLoaderTryLoadExtensions.cs" />
+    <Compile Include="Core\Extensions\ResourceSaverExtensions.cs" />
     <Compile Include="Core\GD.cs" />
     <Compile Include="Core\GodotObject.base.cs" />
     <Compile Include="Core\GodotObject.exceptions.cs" />

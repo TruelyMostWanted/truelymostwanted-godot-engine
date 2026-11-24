@@ -74,7 +74,7 @@ TEST_CASE("[PckPackageServer] Open, list, read and verify without mounting") {
 
 	Ref<PckPackage> package = server->open(pack_path);
 	REQUIRE(package.is_valid());
-	CHECK(package->get_path() == pack_path);
+	CHECK(package->get_pack_path() == pack_path);
 	CHECK(package->get_format_version() == PACK_FORMAT_VERSION);
 	CHECK_FALSE(package->get_engine_version().is_empty());
 	CHECK(package->get_alignment() >= 32);
@@ -139,7 +139,7 @@ TEST_CASE("[PckPackageServer] Edit in memory and build") {
 	// Building over the pack of the package replaces it and re-reads it.
 	CHECK(built->add_file_from_buffer("res://d.txt", _bytes("Delta")) == OK);
 	CHECK(server->build(built, built_path) == OK);
-	CHECK(built->get_path() == built_path);
+	CHECK(built->get_pack_path() == built_path);
 	const Dictionary rebuilt_first = built->get_entries()[0];
 	CHECK_FALSE(bool(rebuilt_first["pending"]));
 	CHECK(_text(server->read_file(built, "res://d.txt")) == "Delta");
