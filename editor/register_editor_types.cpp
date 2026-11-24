@@ -124,8 +124,8 @@
 #include "editor/scene/sprite_frames_editor_plugin.h"
 #include "editor/scene/texture/bit_map_editor_plugin.h"
 #include "editor/scene/texture/gradient_texture_2d_editor_plugin.h"
+#include "editor/scene/texture/sprite_sheet_editor_plugin.h"
 #include "editor/scene/texture/texture_3d_editor_plugin.h"
-#include "editor/scene/texture/texture_atlas_editor_plugin.h"
 #include "editor/scene/texture/texture_editor_plugin.h"
 #include "editor/scene/texture/texture_layered_editor_plugin.h"
 #include "editor/scene/texture/texture_region_editor_plugin.h"
@@ -258,7 +258,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<TextureEditorPlugin>();
 	EditorPlugins::add_by_type<TextureLayeredEditorPlugin>();
 	EditorPlugins::add_by_type<TextureRegionEditorPlugin>();
-	EditorPlugins::add_by_type<TextureAtlasEditorPlugin>();
+	EditorPlugins::add_by_type<SpriteSheetEditorPlugin>();
 	EditorPlugins::add_by_type<ThemeEditorPlugin>();
 	EditorPlugins::add_by_type<ToolButtonEditorPlugin>();
 	EditorPlugins::add_by_type<VirtualJoystickEditorPlugin>();

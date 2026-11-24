@@ -12,8 +12,8 @@
 		- [constant COMMAND_TOGGLE]: stops like [constant COMMAND_STOP] if the channel is playing (also when paused), otherwise plays like [constant COMMAND_PLAY].
 		- [constant COMMAND_ENQUEUE]: [member stream_path] (required), [member queue_index] ([code]-1[/code]: at the end).
 		- [constant COMMAND_DEQUEUE]: [member queue_index] ([code]-1[/code]: the last entry).
-		- [constant COMMAND_CHANGE_INDEX]: [member queue_index], [member fade_time], [member loop_mode].
-		- [constant COMMAND_NEXT], [constant COMMAND_PREVIOUS]: [member fade_time], [member loop_mode].
+		- [constant COMMAND_SET_QUEUE_INDEX]: [member queue_index], [member fade_time], [member loop_mode].
+		- [constant COMMAND_PLAY_NEXT], [constant COMMAND_PLAY_PREVIOUS]: [member fade_time], [member loop_mode].
 		- [constant COMMAND_FADE_IN]: [member fade_time], [member fade_curve], [member loop_mode], and optionally [member stream_path] (cross-fades to that stream).
 		- [constant COMMAND_FADE_OUT]: [member fade_time], [member fade_curve].
 		- [constant COMMAND_CROSS_FADE]: [member stream_path] (required), [member fade_time], [member fade_curve], [member loop_mode].
@@ -21,7 +21,7 @@
 		- [constant COMMAND_SET_PITCH]: [member pitch_scale].
 		- [constant COMMAND_SEEK]: [member position].
 		- [constant COMMAND_PLAY_ONE_SHOT]: [member stream_path] (required), [member volume_db], [member pitch_scale].
-		- [constant COMMAND_SWITCH_CLIP]: [member clip_name].
+		- [constant COMMAND_SWITCH_TO_CLIP]: [member clip_name].
 		- [constant COMMAND_STOP_ALL]: [member fade_time]; needs no [member channel].
 		[codeblocks]
 		[gdscript]
@@ -55,7 +55,7 @@
 			The name of the [AudioMixerServer] channel the command acts on (see [member AudioMixerChannel.channel_name]). Required by every command except [constant COMMAND_STOP_ALL].
 		</member>
 		<member name="clip_name" type="StringName" setter="set_clip_name" getter="get_clip_name" default="&amp;&quot;&quot;">
-			The clip that [constant COMMAND_SWITCH_CLIP] switches to, in the [AudioStreamInteractive] that the channel plays.
+			The clip that [constant COMMAND_SWITCH_TO_CLIP] switches to, in the [AudioStreamInteractive] that the channel plays.
 		</member>
 		<member name="command" type="int" setter="set_command" getter="get_command" enum="AudioCommand.Command" default="0">
 			The action to run.
@@ -73,7 +73,7 @@
 			A group name, so [method AudioMixerServer.execute_group] runs all registered commands of the group at once, for example all ambience of a level.
 		</member>
 		<member name="loop_mode" type="int" setter="set_loop_mode" getter="get_loop_mode" enum="AudioCommand.LoopMode" default="-1">
-			Whether the channel loops its current entry. With [constant LOOP_MODE_ON] or [constant LOOP_MODE_OFF], a command that starts playback ([constant COMMAND_PLAY], [constant COMMAND_TOGGLE], [constant COMMAND_FADE_IN], [constant COMMAND_CROSS_FADE], [constant COMMAND_CHANGE_INDEX], [constant COMMAND_NEXT], [constant COMMAND_PREVIOUS]) sets [member AudioMixerChannel.loop_entry] of the channel first; the channel keeps that setting.
+			Whether the channel loops its current entry. With [constant LOOP_MODE_ON] or [constant LOOP_MODE_OFF], a command that starts playback ([constant COMMAND_PLAY], [constant COMMAND_TOGGLE], [constant COMMAND_FADE_IN], [constant COMMAND_CROSS_FADE], [constant COMMAND_SET_QUEUE_INDEX], [constant COMMAND_PLAY_NEXT], [constant COMMAND_PLAY_PREVIOUS]) sets [member AudioMixerChannel.loop_current_entry] of the channel first; the channel keeps that setting.
 		</member>
 		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
 			The channel pitch for [constant COMMAND_SET_PITCH], or the extra pitch of a [constant COMMAND_PLAY_ONE_SHOT]. Must be greater than [code]0[/code] for these commands.
@@ -82,7 +82,7 @@
 			The position in seconds where [constant COMMAND_PLAY] and [constant COMMAND_TOGGLE] start, and where [constant COMMAND_SEEK] jumps to.
 		</member>
 		<member name="queue_index" type="int" setter="set_queue_index" getter="get_queue_index" default="-1">
-			The queue entry for [constant COMMAND_CHANGE_INDEX] and [constant COMMAND_DEQUEUE], or the insert position of [constant COMMAND_ENQUEUE]. [code]-1[/code] means the end of the queue (enqueue) or the last entry (dequeue).
+			The queue entry for [constant COMMAND_SET_QUEUE_INDEX] and [constant COMMAND_DEQUEUE], or the insert position of [constant COMMAND_ENQUEUE]. [code]-1[/code] means the end of the queue (enqueue) or the last entry (dequeue).
 		</member>
 		<member name="stream_path" type="String" setter="set_stream_path" getter="get_stream_path" default="&quot;&quot;">
 			The path of the [AudioStream] to play, cross-fade to or enqueue. The stream is loaded on the first [method AudioMixerServer.execute] (see [method AudioCommandList.preload_streams] to load it earlier) and freed when nothing plays it any more.
@@ -116,14 +116,14 @@
 		<constant name="COMMAND_CLEAR" value="7" enum="Command">
 			Removes all queue entries. See [method AudioMixerServer.clear_queue].
 		</constant>
-		<constant name="COMMAND_CHANGE_INDEX" value="8" enum="Command">
-			Moves the queue cursor to [member queue_index]. See [method AudioMixerServer.change_index].
+		<constant name="COMMAND_SET_QUEUE_INDEX" value="8" enum="Command">
+			Moves the queue cursor to [member queue_index]. See [method AudioMixerServer.set_queue_index].
 		</constant>
-		<constant name="COMMAND_NEXT" value="9" enum="Command">
-			Moves to the next queue entry. See [method AudioMixerServer.next].
+		<constant name="COMMAND_PLAY_NEXT" value="9" enum="Command">
+			Moves to the next queue entry. See [method AudioMixerServer.play_next].
 		</constant>
-		<constant name="COMMAND_PREVIOUS" value="10" enum="Command">
-			Moves to the previous queue entry. See [method AudioMixerServer.previous].
+		<constant name="COMMAND_PLAY_PREVIOUS" value="10" enum="Command">
+			Moves to the previous queue entry. See [method AudioMixerServer.play_previous].
 		</constant>
 		<constant name="COMMAND_FADE_IN" value="11" enum="Command">
 			Fades the channel in. With a [member stream_path], cross-fades to that stream instead (on a silent channel this fades the new stream in). See [method AudioMixerServer.fade_in].
@@ -144,22 +144,22 @@
 			Jumps to [member position] in the current stream of the channel. See [method AudioMixerServer.seek].
 		</constant>
 		<constant name="COMMAND_PLAY_ONE_SHOT" value="17" enum="Command">
-			Plays [member stream_path] once on top of the channel (fire and forget, limited by [member AudioMixerChannel.polyphony]). See [method AudioMixerServer.play_one_shot].
+			Plays [member stream_path] once on top of the channel (fire and forget, limited by [member AudioMixerChannel.max_polyphony]). See [method AudioMixerServer.play_one_shot].
 		</constant>
-		<constant name="COMMAND_SWITCH_CLIP" value="18" enum="Command">
-			Switches the [AudioStreamInteractive] of the channel to [member clip_name]. See [method AudioMixerServer.switch_clip].
+		<constant name="COMMAND_SWITCH_TO_CLIP" value="18" enum="Command">
+			Switches the [AudioStreamInteractive] of the channel to [member clip_name]. See [method AudioMixerServer.switch_to_clip].
 		</constant>
 		<constant name="COMMAND_STOP_ALL" value="19" enum="Command">
 			Stops all channels. See [method AudioMixerServer.stop_all].
 		</constant>
 		<constant name="LOOP_MODE_CHANNEL" value="-1" enum="LoopMode">
-			Keeps the [member AudioMixerChannel.loop_entry] setting of the channel.
+			Keeps the [member AudioMixerChannel.loop_current_entry] setting of the channel.
 		</constant>
 		<constant name="LOOP_MODE_OFF" value="0" enum="LoopMode">
-			Turns [member AudioMixerChannel.loop_entry] of the channel off.
+			Turns [member AudioMixerChannel.loop_current_entry] of the channel off.
 		</constant>
 		<constant name="LOOP_MODE_ON" value="1" enum="LoopMode">
-			Turns [member AudioMixerChannel.loop_entry] of the channel on, so the current entry repeats.
+			Turns [member AudioMixerChannel.loop_current_entry] of the channel on, so the current entry repeats.
 		</constant>
 	</constants>
 </class>
