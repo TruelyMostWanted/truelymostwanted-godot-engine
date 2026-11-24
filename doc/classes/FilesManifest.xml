@@ -47,7 +47,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="create_non_existing_folders" type="bool" setter="set_create_non_existing_folders" getter="is_create_non_existing_folders" default="false">
+		<member name="create_missing_folders" type="bool" setter="set_create_missing_folders" getter="is_create_missing_folders" default="false">
 			If [code]true[/code], folders of [member folder_paths] that do not exist are created (with their parent folders) instead of reporting an error. Folders on read-only paths, such as [code]res://[/code] in an exported project, cannot be created and still report an error.
 		</member>
 		<member name="extensions" type="PackedStringArray" setter="set_extensions" getter="get_extensions" default="PackedStringArray()">
@@ -57,7 +57,7 @@
 			Single files that belong to the manifest. They are always included, regardless of [member extensions] and [member type_hint]. Files that do not exist report an error and are skipped.
 		</member>
 		<member name="folder_paths" type="PackedStringArray" setter="set_folder_paths" getter="get_folder_paths" default="PackedStringArray()">
-			The folders to take files from. Folders that do not exist report an error, unless [member create_non_existing_folders] is [code]true[/code].
+			The folders to take files from. Folders that do not exist report an error, unless [member create_missing_folders] is [code]true[/code].
 		</member>
 		<member name="recursive" type="bool" setter="set_recursive" getter="is_recursive" default="true">
 			If [code]true[/code], the subfolders of [member folder_paths] are searched too. Hidden folders are skipped.
