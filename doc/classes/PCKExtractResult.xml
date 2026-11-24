@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="PckExtractResult" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="PCKExtractResult" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		The result of [method PckPackageServer.extract].
+		The result of [method PCKPackageServer.extract].
 	</brief_description>
 	<description>
-		Lists what [method PckPackageServer.extract] did with each selected file of a pack: written (in [member written], under a new name also in [member renamed]), skipped ([member skipped]) or left out because it can't be edited as a source ([member not_editable]). [member dropped_uids] lists UIDs that were already used by other files, and [member errors] the files that could not be read or written. The result is read-only.
+		Lists what [method PCKPackageServer.extract] did with each selected file of a pack: written (in [member written], under a new name also in [member renamed]), skipped ([member skipped]) or left out because it can't be edited as a source ([member not_editable]). [member dropped_uids] lists UIDs that were already used by other files, and [member errors] the files that could not be read or written. The result is read-only.
 		[codeblocks]
 		[gdscript]
-		var result := PckPackageServer.extract(PckPackageServer.open("user://mod.pck"), "user://mods/mod")
+		var result := PCKPackageServer.extract(PCKPackageServer.open("user://mod.pck"), "user://mods/mod")
 		for path in result.written:
 		    print("written: ", path)
 		for path in result.renamed:
@@ -59,7 +59,7 @@
 			For each file that was written under a new name: its path in the pack ([code]res://…[/code]) as key, the written path as value. These files are also listed in [member written].
 		</member>
 		<member name="skipped" type="PackedStringArray" setter="" getter="get_skipped" default="PackedStringArray()">
-			Paths ([code]res://…[/code]) of selected files that were not written: files that already exist (with [constant PckPackageServer.EXTRACT_SKIP]), engine files below [code].godot/[/code], [code].import[/code] and [code].uid[/code] files without their source, removal entries, and [code].uid[/code] files whose UID was dropped.
+			Paths ([code]res://…[/code]) of selected files that were not written: files that already exist (with [constant PCKPackageServer.EXTRACT_SKIP]), engine files below [code].godot/[/code], [code].import[/code] and [code].uid[/code] files without their source, removal entries, and [code].uid[/code] files whose UID was dropped.
 		</member>
 		<member name="written" type="PackedStringArray" setter="" getter="get_written" default="PackedStringArray()">
 			The paths of the written files in the target folder, in pack order. Its size is the number of extracted files.

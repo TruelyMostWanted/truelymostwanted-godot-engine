@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PCKPackageEntry" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One file entry of a [PCKPackage].
+	</brief_description>
+	<description>
+		Describes one entry of a [PCKPackage], as returned by [method PCKPackage.get_entries]: a file of the pack, a file that is added to it in memory or by a description, or a removal entry. All properties are read-only. An entry is a snapshot of the package at the time [method PCKPackage.get_entries] was called.
+		[codeblocks]
+		[gdscript]
+		var package := PCKPackageServer.open("user://mods/level_pack.pck")
+		for entry in package.get_entries():
+			if not entry.removal:
+				print(entry.path, " ", entry.size, " bytes, MD5 ", entry.md5)
+		[/gdscript]
+		[csharp]
+		PckPackage package = PckPackageServer.Open("user://mods/level_pack.pck");
+		foreach (PckPackageEntry entry in package.GetEntries())
+		{
+		    if (!entry.Removal)
+		    {
+		        GD.Print(entry.Path, " ", entry.Size, " bytes, MD5 ", entry.Md5);
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="delta" type="bool" setter="" getter="is_delta" default="false">
+			If [code]true[/code], the entry is a delta patch of a file in an earlier pack.
+		</member>
+		<member name="encrypted" type="bool" setter="" getter="is_encrypted" default="false">
+			If [code]true[/code], the file data is encrypted.
+		</member>
+		<member name="md5" type="String" setter="" getter="get_md5" default="&quot;&quot;">
+			The MD5 sum of the file data as a hexadecimal [String].
+		</member>
+		<member name="offset" type="int" setter="" getter="get_offset" default="0">
+			The position of the data in the pack file at [member PCKPackage.pack_path], or [code]0[/code] for pending entries.
+		</member>
+		<member name="path" type="String" setter="" getter="get_path" default="&quot;&quot;">
+			The path of the file, with [code]res://[/code].
+		</member>
+		<member name="pending" type="bool" setter="" getter="is_pending" default="false">
+			If [code]true[/code], the entry is not in the pack file at [member PCKPackage.pack_path]: it was added in memory, or it is part of a pack description.
+		</member>
+		<member name="removal" type="bool" setter="" getter="is_removal" default="false">
+			If [code]true[/code], the entry is a removal entry (see [method PCKPackage.add_removal]): when the pack is mounted, [member path] disappears from [code]res://[/code].
+		</member>
+		<member name="size" type="int" setter="" getter="get_size" default="0">
+			The size of the file data in bytes (before encryption), or [code]0[/code] while it is not known.
+		</member>
+		<member name="source" type="String" setter="" getter="get_source" default="&quot;&quot;">
+			Where the data comes from: the source file for [constant PCKPackage.SOURCE_FILE], the path in the pack with [code]res://[/code] for [constant PCKPackage.SOURCE_PACK], or an empty [String] for data in memory and removal entries.
+		</member>
+		<member name="source_type" type="int" setter="" getter="get_source_type" enum="PCKPackage.SourceType" default="0">
+			Where the data comes from, one of the [enum PCKPackage.SourceType] constants.
+		</member>
+	</members>
+</class>

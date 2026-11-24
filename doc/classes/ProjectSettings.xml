@@ -176,7 +176,7 @@
 				[b]Note:[/b] If a file from [param pack] shares the same path as a file already in the resource filesystem, any attempts to load that file will use the file from [param pack] unless [param replace_files] is set to [code]false[/code].
 				[b]Note:[/b] The optional [param offset] parameter can be used to specify the offset in bytes to the start of the resource pack. This is only supported for .pck files.
 				[b]Note:[/b] [DirAccess] will not show changes made to the contents of [code]res://[/code] after calling this function.
-				[b]Note:[/b] This method calls [method PckPackageServer.mount], so the pack is listed by [method PckPackageServer.get_mounted], can be unmounted with [method PckPackageServer.unmount], and [signal PckPackageServer.pack_mounted] is emitted.
+				[b]Note:[/b] This method calls [method PCKPackageServer.mount], so the pack is listed by [method PCKPackageServer.get_mounted_packs], can be unmounted with [method PCKPackageServer.unmount], and [signal PCKPackageServer.pack_mounted] is emitted.
 			</description>
 		</method>
 		<method name="localize_path" qualifiers="const">

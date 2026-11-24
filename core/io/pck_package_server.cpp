@@ -43,9 +43,9 @@
 #include "core/os/thread.h"
 #include "core/templates/hash_set.h"
 
-PckPackageServer *PckPackageServer::singleton = nullptr;
+PCKPackageServer *PCKPackageServer::singleton = nullptr;
 
-PckPackageServer *PckPackageServer::get_singleton() {
+PCKPackageServer *PCKPackageServer::get_singleton() {
 	return singleton;
 }
 
@@ -58,7 +58,7 @@ static bool _same_pack_path(const String &p_a, const String &p_b) {
 	return project_settings && project_settings->globalize_path(p_a).simplify_path() == project_settings->globalize_path(p_b).simplify_path();
 }
 
-void PckPackageServer::_emit_deferred(const StringName &p_signal, const String &p_path) {
+void PCKPackageServer::_emit_deferred(const StringName &p_signal, const String &p_path) {
 	if (Thread::is_main_thread()) {
 		emit_signal(p_signal, p_path);
 	} else {
@@ -66,16 +66,16 @@ void PckPackageServer::_emit_deferred(const StringName &p_signal, const String &
 	}
 }
 
-Ref<PckPackage> PckPackageServer::open(const String &p_path, const String &p_key, uint64_t p_offset) {
-	Ref<PckPackage> package;
+Ref<PCKPackage> PCKPackageServer::open(const String &p_path, const String &p_key, uint64_t p_offset) {
+	Ref<PCKPackage> package;
 	package.instantiate();
 	if (package->open_pack(p_path, p_key, p_offset) != OK) {
-		return Ref<PckPackage>();
+		return Ref<PCKPackage>();
 	}
 	return package;
 }
 
-Vector<uint8_t> PckPackageServer::read_file(const Ref<PckPackage> &p_package, const String &p_path) {
+Vector<uint8_t> PCKPackageServer::read_file(const Ref<PCKPackage> &p_package, const String &p_path) {
 	ERR_FAIL_COND_V_MSG(p_package.is_null(), Vector<uint8_t>(), "The package is null.");
 	Vector<uint8_t> data;
 	if (p_package->read_entry(p_path, data) != OK) {
@@ -84,11 +84,11 @@ Vector<uint8_t> PckPackageServer::read_file(const Ref<PckPackage> &p_package, co
 	return data;
 }
 
-Error PckPackageServer::verify(const Ref<PckPackage> &p_package) {
+Error PCKPackageServer::verify(const Ref<PCKPackage> &p_package) {
 	ERR_FAIL_COND_V_MSG(p_package.is_null(), ERR_INVALID_PARAMETER, "The package is null.");
 	ERR_FAIL_COND_V_MSG(p_package->is_sparse_bundle(), ERR_UNAVAILABLE, vformat("Pack \"%s\" is a sparse bundle: its files are stored next to the pack and can't be verified here.", p_package->get_pack_path()));
-	for (const KeyValue<String, PckPackage::Entry> &kv : p_package->get_entry_map()) {
-		const PckPackage::Entry &entry = kv.value;
+	for (const KeyValue<String, PCKPackage::Entry> &kv : p_package->get_entry_map()) {
+		const PCKPackage::Entry &entry = kv.value;
 		// Removal entries have no data, delta entries store a patch, and pending entries are not in the pack yet.
 		if (entry.removal || entry.delta || entry.pending) {
 			continue;
@@ -105,7 +105,7 @@ Error PckPackageServer::verify(const Ref<PckPackage> &p_package) {
 	return OK;
 }
 
-Error PckPackageServer::build(const Ref<PckPackage> &p_package, const String &p_target_path, const String &p_key) {
+Error PCKPackageServer::build(const Ref<PCKPackage> &p_package, const String &p_target_path, const String &p_key) {
 	ERR_FAIL_COND_V_MSG(p_package.is_null(), ERR_INVALID_PARAMETER, "The package is null.");
 	ERR_FAIL_COND_V_MSG(p_target_path.is_empty(), ERR_INVALID_PARAMETER, "The target path of the pack is empty.");
 	ERR_FAIL_COND_V_MSG(is_mounted(p_target_path), ERR_BUSY, vformat("Pack \"%s\" is mounted: unmount it before building over it.", p_target_path));
@@ -114,14 +114,14 @@ Error PckPackageServer::build(const Ref<PckPackage> &p_package, const String &p_
 	if (p_key.is_empty() && !p_package->get_key().is_empty()) {
 		key = p_package->get_key();
 	} else {
-		ERR_FAIL_COND_V_MSG(PckPackage::decode_key(p_key, key) != OK, ERR_INVALID_PARAMETER, "Invalid pack key: use 64 hexadecimal characters, or an empty string for the key of the package.");
+		ERR_FAIL_COND_V_MSG(PCKPackage::decode_key(p_key, key) != OK, ERR_INVALID_PARAMETER, "Invalid pack key: use 64 hexadecimal characters, or an empty string for the key of the package.");
 	}
 	const String key_hex = String::hex_encode_buffer(key.ptr(), key.size());
 
 	PackedStringArray missing_sources;
-	for (const KeyValue<String, PckPackage::Entry> &kv : p_package->get_entry_map()) {
+	for (const KeyValue<String, PCKPackage::Entry> &kv : p_package->get_entry_map()) {
 		ERR_FAIL_COND_V_MSG(kv.value.delta, ERR_UNAVAILABLE, vformat("\"res://%s\" is a delta patch: packs with delta patches can't be rebuilt.", kv.key));
-		if (!kv.value.removal && kv.value.source_type == PckPackage::SOURCE_FILE && !FileAccess::exists(kv.value.source_path)) {
+		if (!kv.value.removal && kv.value.source_type == PCKPackage::SOURCE_FILE && !FileAccess::exists(kv.value.source_path)) {
 			missing_sources.push_back(kv.value.source_path);
 		}
 	}
@@ -139,7 +139,7 @@ Error PckPackageServer::build(const Ref<PckPackage> &p_package, const String &p_
 	if (err != OK) {
 		return err;
 	}
-	for (const KeyValue<String, PckPackage::Entry> &kv : p_package->get_entry_map()) {
+	for (const KeyValue<String, PCKPackage::Entry> &kv : p_package->get_entry_map()) {
 		if (kv.value.removal) {
 			err = packer->add_file_removal(kv.key);
 		} else {
@@ -271,7 +271,7 @@ static String _extract_find_uid(const String &p_text, bool p_import_file, int &r
 	return p_text.substr(pos + 6, end - pos - 6);
 }
 
-void PckPackageServer::_emit_extract_progress(const String &p_path, int p_done, int p_total) {
+void PCKPackageServer::_emit_extract_progress(const String &p_path, int p_done, int p_total) {
 	if (Thread::is_main_thread()) {
 		emit_signal(SNAME("extract_progress"), p_path, p_done, p_total);
 	} else {
@@ -279,8 +279,8 @@ void PckPackageServer::_emit_extract_progress(const String &p_path, int p_done, 
 	}
 }
 
-Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package, const String &p_target_dir, const PackedStringArray &p_paths, ExtractPolicy p_policy, bool p_skip_engine_files) {
-	Ref<PckExtractResult> result;
+Ref<PCKExtractResult> PCKPackageServer::extract(const Ref<PCKPackage> &p_package, const String &p_target_dir, const PackedStringArray &p_paths, ExtractPolicy p_policy, bool p_skip_engine_files) {
+	Ref<PCKExtractResult> result;
 	result.instantiate();
 	if (p_package.is_null()) {
 		result->_add_error(ERR_INVALID_PARAMETER, "The package is null.");
@@ -305,11 +305,11 @@ Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package
 		filters.push_back(_extract_key(path));
 	}
 
-	const HashMap<String, PckPackage::Entry> &entries = p_package->get_entry_map();
+	const HashMap<String, PCKPackage::Entry> &entries = p_package->get_entry_map();
 
 	// 1. Select and classify. Main files first decide where they go; sidecars follow them in step 2.
 	HashSet<String> matched;
-	for (const KeyValue<String, PckPackage::Entry> &kv : entries) {
+	for (const KeyValue<String, PCKPackage::Entry> &kv : entries) {
 		if (_extract_filter_matches(kv.key, filters)) {
 			matched.insert(kv.key);
 		}
@@ -317,7 +317,7 @@ Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package
 	// A selected file brings its `.import` and `.uid` files along.
 	Vector<String> selected;
 	HashSet<String> selected_set;
-	for (const KeyValue<String, PckPackage::Entry> &kv : entries) {
+	for (const KeyValue<String, PCKPackage::Entry> &kv : entries) {
 		if (matched.has(kv.key) || matched.has(_extract_sidecar_source(kv.key))) {
 			selected.push_back(kv.key);
 			selected_set.insert(kv.key);
@@ -350,7 +350,7 @@ Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package
 	};
 
 	for (const String &key : selected) {
-		const PckPackage::Entry &entry = entries[key];
+		const PCKPackage::Entry &entry = entries[key];
 		Plan plan;
 		if (entry.removal) {
 			plan.action = ACTION_SKIP;
@@ -521,7 +521,7 @@ Ref<PckExtractResult> PckPackageServer::extract(const Ref<PckPackage> &p_package
 	return result;
 }
 
-Error PckPackageServer::mount(const String &p_path, bool p_replace_files, uint64_t p_offset) {
+Error PCKPackageServer::mount(const String &p_path, bool p_replace_files, uint64_t p_offset) {
 	PackedData *packed_data = PackedData::get_singleton();
 	if (!packed_data || packed_data->is_disabled()) {
 		return ERR_UNAVAILABLE;
@@ -536,7 +536,7 @@ Error PckPackageServer::mount(const String &p_path, bool p_replace_files, uint64
 		// A pack inside `res://` that lists its own path would replace itself and recurse on every open.
 		const String local_path = project_settings->localize_path(p_path);
 		if (local_path.begins_with("res://") && FileAccess::exists(p_path)) {
-			Ref<PckPackage> probe;
+			Ref<PCKPackage> probe;
 			probe.instantiate();
 			if (probe->open_pack(p_path, String(), p_offset) == OK && probe->has_file(local_path)) {
 				ERR_FAIL_V_MSG(ERR_CYCLIC_LINK, vformat("Pack \"%s\" contains its own path: mounting it with replace_files would make it replace itself.", p_path));
@@ -556,8 +556,8 @@ Error PckPackageServer::mount(const String &p_path, bool p_replace_files, uint64
 	return OK;
 }
 
-Error PckPackageServer::unmount(const String &p_path) {
-	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), ERR_UNAVAILABLE, "PckPackageServer.unmount() must be called on the main thread.");
+Error PCKPackageServer::unmount(const String &p_path) {
+	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), ERR_UNAVAILABLE, "PCKPackageServer.unmount() must be called on the main thread.");
 	PackedData *packed_data = PackedData::get_singleton();
 	ERR_FAIL_NULL_V(packed_data, ERR_UNAVAILABLE);
 
@@ -594,7 +594,7 @@ Error PckPackageServer::unmount(const String &p_path) {
 	return OK;
 }
 
-bool PckPackageServer::is_mounted(const String &p_path) const {
+bool PCKPackageServer::is_mounted(const String &p_path) const {
 	const PackedData *packed_data = PackedData::get_singleton();
 	if (!packed_data) {
 		return false;
@@ -607,7 +607,7 @@ bool PckPackageServer::is_mounted(const String &p_path) const {
 	return false;
 }
 
-bool PckPackageServer::is_main_pack(const String &p_path) const {
+bool PCKPackageServer::is_main_pack(const String &p_path) const {
 	const PackedData *packed_data = PackedData::get_singleton();
 	if (!packed_data) {
 		return false;
@@ -620,7 +620,7 @@ bool PckPackageServer::is_main_pack(const String &p_path) const {
 	return false;
 }
 
-PackedStringArray PckPackageServer::get_mounted() const {
+PackedStringArray PCKPackageServer::get_mounted_packs() const {
 	PackedStringArray result;
 	const PackedData *packed_data = PackedData::get_singleton();
 	if (!packed_data) {
@@ -634,7 +634,7 @@ PackedStringArray PckPackageServer::get_mounted() const {
 	return result;
 }
 
-String PckPackageServer::get_pack_of(const String &p_res_path) const {
+String PCKPackageServer::get_providing_pack(const String &p_res_path) const {
 	PackedData *packed_data = PackedData::get_singleton();
 	if (!packed_data || packed_data->is_disabled()) {
 		return String();
@@ -644,19 +644,19 @@ String PckPackageServer::get_pack_of(const String &p_res_path) const {
 	return pack == "res://" ? String() : pack;
 }
 
-void PckPackageServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("open", "path", "key", "offset"), &PckPackageServer::open, DEFVAL(String()), DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("read_file", "package", "path"), &PckPackageServer::read_file);
-	ClassDB::bind_method(D_METHOD("verify", "package"), &PckPackageServer::verify);
-	ClassDB::bind_method(D_METHOD("build", "package", "target_path", "key"), &PckPackageServer::build, DEFVAL(String()));
-	ClassDB::bind_method(D_METHOD("extract", "package", "target_dir", "paths", "policy", "skip_engine_files"), &PckPackageServer::extract, DEFVAL(PackedStringArray()), DEFVAL(EXTRACT_SKIP), DEFVAL(true));
+void PCKPackageServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("open", "path", "key", "offset"), &PCKPackageServer::open, DEFVAL(String()), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("read_file", "package", "path"), &PCKPackageServer::read_file);
+	ClassDB::bind_method(D_METHOD("verify", "package"), &PCKPackageServer::verify);
+	ClassDB::bind_method(D_METHOD("build", "package", "target_path", "key"), &PCKPackageServer::build, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("extract", "package", "target_dir", "paths", "policy", "skip_engine_files"), &PCKPackageServer::extract, DEFVAL(PackedStringArray()), DEFVAL(EXTRACT_SKIP), DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("mount", "path", "replace_files", "offset"), &PckPackageServer::mount, DEFVAL(true), DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("unmount", "path"), &PckPackageServer::unmount);
-	ClassDB::bind_method(D_METHOD("is_mounted", "path"), &PckPackageServer::is_mounted);
-	ClassDB::bind_method(D_METHOD("is_main_pack", "path"), &PckPackageServer::is_main_pack);
-	ClassDB::bind_method(D_METHOD("get_mounted"), &PckPackageServer::get_mounted);
-	ClassDB::bind_method(D_METHOD("get_pack_of", "res_path"), &PckPackageServer::get_pack_of);
+	ClassDB::bind_method(D_METHOD("mount", "path", "replace_files", "offset"), &PCKPackageServer::mount, DEFVAL(true), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("unmount", "path"), &PCKPackageServer::unmount);
+	ClassDB::bind_method(D_METHOD("is_mounted", "path"), &PCKPackageServer::is_mounted);
+	ClassDB::bind_method(D_METHOD("is_main_pack", "path"), &PCKPackageServer::is_main_pack);
+	ClassDB::bind_method(D_METHOD("get_mounted_packs"), &PCKPackageServer::get_mounted_packs);
+	ClassDB::bind_method(D_METHOD("get_providing_pack", "res_path"), &PCKPackageServer::get_providing_pack);
 
 	ADD_SIGNAL(MethodInfo("pack_mounted", PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("pack_unmounted", PropertyInfo(Variant::STRING, "path")));
@@ -667,11 +667,11 @@ void PckPackageServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(EXTRACT_RENAME);
 }
 
-PckPackageServer::PckPackageServer() {
+PCKPackageServer::PCKPackageServer() {
 	singleton = this;
 }
 
-PckPackageServer::~PckPackageServer() {
+PCKPackageServer::~PCKPackageServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}
