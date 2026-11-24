@@ -108,7 +108,7 @@ bool AudioDeviceSettingsServer::is_device_selection_supported() {
 // Domain.
 
 StringName AudioDeviceSettingsServer::get_domain() const {
-	return SNAME("audio");
+	return SNAME("audio_device");
 }
 
 SettingsServer::ApplyPhase AudioDeviceSettingsServer::get_apply_phase() const {

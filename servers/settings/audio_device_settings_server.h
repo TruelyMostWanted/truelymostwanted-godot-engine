@@ -32,7 +32,7 @@
 
 #include "servers/settings/settings_server.h"
 
-// Settings domain `audio`: the output and the input device of AudioServer (AudioDeviceSettings).
+// Settings domain `audio_device`: the output and the input device of AudioServer (AudioDeviceSettings).
 // The bus values are a separate list domain (AudioBusSettingsServer), so that list can be stored as CSV.
 class AudioDeviceSettingsServer : public SettingsServer {
 	GDCLASS(AudioDeviceSettingsServer, SettingsServer);
