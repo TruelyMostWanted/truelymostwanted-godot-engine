@@ -133,7 +133,7 @@
 			<param index="0" name="manifest" type="FilesManifest" />
 			<description>
 				Returns all paths described by [param manifest]: the files in its [member FilesManifest.folder_paths] that match [member FilesManifest.extensions] and [member FilesManifest.type_hint], then its [member FilesManifest.file_paths], without duplicates. The paths are in their canonical form (see [method PathPrefixServer.resolve]); use them as keys for [method load_threaded_get_status] and [method load_threaded_get].
-				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_non_existing_folders] is [code]true[/code] and the folder is writable.
+				Folders are listed with [method list_directory], so imported files are returned by their original names and the result is the same in the editor and in exported projects. Missing folders and files print an error and are skipped; missing folders are created if [member FilesManifest.create_missing_folders] is [code]true[/code] and the folder is writable.
 			</description>
 		</method>
 		<method name="get_recognized_extensions_for_type">

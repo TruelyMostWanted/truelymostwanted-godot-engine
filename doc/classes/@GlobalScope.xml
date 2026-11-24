@@ -1617,6 +1617,9 @@
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
 		</member>
+		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
+			The [KeyBindingSettingsServer] singleton.
+		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
 		</member>
