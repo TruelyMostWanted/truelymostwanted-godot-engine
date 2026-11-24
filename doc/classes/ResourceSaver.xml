@@ -6,6 +6,7 @@
 	<description>
 		A singleton for saving resource types to the filesystem.
 		It uses the many [ResourceFormatSaver] classes registered in the engine (either built-in or from a plugin) to save resource data to text-based (e.g. [code].tres[/code] or [code].tscn[/code]) or binary files (e.g. [code].res[/code] or [code].scn[/code]).
+		A [PackedScene] can also be saved as [code].gltf[/code] (JSON with an external [code].bin[/code] buffer and image files) or [code].glb[/code] (one binary file), for example to [code]user://[/code]. In the editor these extensions are not offered in [method get_recognized_extensions].
 	</description>
 	<tutorials>
 	</tutorials>
