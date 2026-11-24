@@ -363,7 +363,7 @@ void RendererEnvironmentStorage::environment_set_fog(RID p_env, bool p_enable, c
 bool RendererEnvironmentStorage::environment_get_fog_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->fog_enabled;
+	return env->fog_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_FOG);
 }
 
 RSE::EnvironmentFogMode RendererEnvironmentStorage::environment_get_fog_mode(RID p_env) const {
@@ -476,7 +476,7 @@ void RendererEnvironmentStorage::environment_set_volumetric_fog(RID p_env, bool 
 bool RendererEnvironmentStorage::environment_get_volumetric_fog_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->volumetric_fog_enabled;
+	return env->volumetric_fog_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_VOLUMETRIC_FOG);
 }
 
 float RendererEnvironmentStorage::environment_get_volumetric_fog_density(RID p_env) const {
@@ -574,7 +574,7 @@ void RendererEnvironmentStorage::environment_set_glow(RID p_env, bool p_enable, 
 bool RendererEnvironmentStorage::environment_get_glow_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->glow_enabled;
+	return env->glow_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_GLOW);
 }
 
 Vector<float> RendererEnvironmentStorage::environment_get_glow_levels(RID p_env) const {
@@ -663,7 +663,7 @@ void RendererEnvironmentStorage::environment_set_ssr(RID p_env, bool p_enable, i
 bool RendererEnvironmentStorage::environment_get_ssr_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->ssr_enabled;
+	return env->ssr_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_SSR);
 }
 
 int RendererEnvironmentStorage::environment_get_ssr_max_steps(RID p_env) const {
@@ -714,7 +714,7 @@ void RendererEnvironmentStorage::environment_set_ssao(RID p_env, bool p_enable, 
 bool RendererEnvironmentStorage::environment_get_ssao_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->ssao_enabled;
+	return env->ssao_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_SSAO);
 }
 
 float RendererEnvironmentStorage::environment_get_ssao_radius(RID p_env) const {
@@ -785,7 +785,7 @@ void RendererEnvironmentStorage::environment_set_ssil(RID p_env, bool p_enable, 
 bool RendererEnvironmentStorage::environment_get_ssil_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->ssil_enabled;
+	return env->ssil_enabled && !_is_effect_overridden(env, RSE::ENV_EFFECT_SSIL);
 }
 
 float RendererEnvironmentStorage::environment_get_ssil_radius(RID p_env) const {
@@ -913,25 +913,32 @@ void RendererEnvironmentStorage::environment_set_adjustment(RID p_env, bool p_en
 bool RendererEnvironmentStorage::environment_get_adjustments_enabled(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, false);
-	return env->adjustments_enabled;
+	// The global adjustment turns the pass on even if the author did not.
+	return env->adjustments_enabled || _has_global_adjustment(env);
 }
 
 float RendererEnvironmentStorage::environment_get_adjustments_brightness(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 1.0);
-	return env->adjustments_brightness;
+	// The authored value counts as 1.0 while the author's adjustment is off.
+	const float authored = env->adjustments_enabled ? env->adjustments_brightness : 1.0f;
+	return env->ignore_global_overrides ? authored : authored * global_adjustment_brightness;
 }
 
 float RendererEnvironmentStorage::environment_get_adjustments_contrast(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 1.0);
-	return env->adjustments_contrast;
+	// The authored value counts as 1.0 while the author's adjustment is off.
+	const float authored = env->adjustments_enabled ? env->adjustments_contrast : 1.0f;
+	return env->ignore_global_overrides ? authored : authored * global_adjustment_contrast;
 }
 
 float RendererEnvironmentStorage::environment_get_adjustments_saturation(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 1.0);
-	return env->adjustments_saturation;
+	// The authored value counts as 1.0 while the author's adjustment is off.
+	const float authored = env->adjustments_enabled ? env->adjustments_saturation : 1.0f;
+	return env->ignore_global_overrides ? authored : authored * global_adjustment_saturation;
 }
 
 bool RendererEnvironmentStorage::environment_get_use_1d_color_correction(RID p_env) const {
@@ -943,5 +950,30 @@ bool RendererEnvironmentStorage::environment_get_use_1d_color_correction(RID p_e
 RID RendererEnvironmentStorage::environment_get_color_correction(RID p_env) const {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, RID());
-	return env->color_correction;
+	// Part of the author's adjustment: not used when only the global adjustment turned the pass on.
+	return env->adjustments_enabled ? env->color_correction : RID();
+}
+
+// Global overrides
+
+void RendererEnvironmentStorage::environment_set_global_effect_disabled(RSE::EnvironmentEffect p_effect, bool p_disabled) {
+	ERR_FAIL_INDEX(int(p_effect), int(RSE::ENV_EFFECT_MAX));
+	const uint32_t bit = 1u << uint32_t(p_effect);
+	if (p_disabled) {
+		global_disabled_effects |= bit;
+	} else {
+		global_disabled_effects &= ~bit;
+	}
+}
+
+void RendererEnvironmentStorage::environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation) {
+	global_adjustment_brightness = p_brightness;
+	global_adjustment_contrast = p_contrast;
+	global_adjustment_saturation = p_saturation;
+}
+
+void RendererEnvironmentStorage::environment_set_ignore_global_overrides(RID p_env, bool p_ignore) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->ignore_global_overrides = p_ignore;
 }
