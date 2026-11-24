@@ -41,23 +41,6 @@ PackedStringArray VideoPreset::get_domains() {
 	return domains;
 }
 
-Dictionary *VideoPreset::_get_domain_dictionary(const StringName &p_domain) {
-	if (p_domain == SNAME("video_quality")) {
-		return &video_quality;
-	} else if (p_domain == SNAME("video_texture")) {
-		return &video_texture;
-	} else if (p_domain == SNAME("video_shadow")) {
-		return &video_shadow;
-	} else if (p_domain == SNAME("video_effect")) {
-		return &video_effect;
-	}
-	return nullptr;
-}
-
-const Dictionary *VideoPreset::_get_domain_dictionary(const StringName &p_domain) const {
-	return const_cast<VideoPreset *>(this)->_get_domain_dictionary(p_domain);
-}
-
 void VideoPreset::set_preset_name(const String &p_name) {
 	preset_name = p_name;
 	emit_changed();
@@ -67,94 +50,82 @@ String VideoPreset::get_preset_name() const {
 	return preset_name;
 }
 
-void VideoPreset::set_video_quality(const Dictionary &p_values) {
-	video_quality = p_values;
+void VideoPreset::set_video_quality(const Ref<VideoQualitySettings> &p_settings) {
+	video_quality = p_settings;
 	emit_changed();
 }
 
-Dictionary VideoPreset::get_video_quality() const {
+Ref<VideoQualitySettings> VideoPreset::get_video_quality() const {
 	return video_quality;
 }
 
-void VideoPreset::set_video_texture(const Dictionary &p_values) {
-	video_texture = p_values;
+void VideoPreset::set_video_texture(const Ref<VideoTextureSettings> &p_settings) {
+	video_texture = p_settings;
 	emit_changed();
 }
 
-Dictionary VideoPreset::get_video_texture() const {
+Ref<VideoTextureSettings> VideoPreset::get_video_texture() const {
 	return video_texture;
 }
 
-void VideoPreset::set_video_shadow(const Dictionary &p_values) {
-	video_shadow = p_values;
+void VideoPreset::set_video_shadow(const Ref<VideoShadowSettings> &p_settings) {
+	video_shadow = p_settings;
 	emit_changed();
 }
 
-Dictionary VideoPreset::get_video_shadow() const {
+Ref<VideoShadowSettings> VideoPreset::get_video_shadow() const {
 	return video_shadow;
 }
 
-void VideoPreset::set_video_effect(const Dictionary &p_values) {
-	video_effect = p_values;
+void VideoPreset::set_video_effect(const Ref<VideoEffectSettings> &p_settings) {
+	video_effect = p_settings;
 	emit_changed();
 }
 
-Dictionary VideoPreset::get_video_effect() const {
+Ref<VideoEffectSettings> VideoPreset::get_video_effect() const {
 	return video_effect;
 }
 
-void VideoPreset::set_domain_values(const StringName &p_domain, const Dictionary &p_values) {
-	Dictionary *values = _get_domain_dictionary(p_domain);
-	ERR_FAIL_NULL_MSG(values, vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
-	*values = p_values;
-	emit_changed();
-}
-
-Dictionary VideoPreset::get_domain_values(const StringName &p_domain) const {
-	const Dictionary *values = _get_domain_dictionary(p_domain);
-	ERR_FAIL_NULL_V_MSG(values, Dictionary(), vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
-	return *values;
-}
-
-void VideoPreset::set_value(const StringName &p_domain, const StringName &p_name, const Variant &p_value) {
-	Dictionary *values = _get_domain_dictionary(p_domain);
-	ERR_FAIL_NULL_MSG(values, vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
-	// One key type (String), whatever the caller passes: keys from `.tres` files are Strings too.
-	(*values)[String(p_name)] = p_value;
-	emit_changed();
-}
-
-Variant VideoPreset::get_value(const StringName &p_domain, const StringName &p_name, const Variant &p_default) const {
-	const Dictionary *values = _get_domain_dictionary(p_domain);
-	ERR_FAIL_NULL_V_MSG(values, p_default, vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
-	const String key = p_name;
-	if (values->has(key)) {
-		return values->get(key, p_default);
-	}
-	return values->get(p_name, p_default);
-}
-
-bool VideoPreset::has_value(const StringName &p_domain, const StringName &p_name) const {
-	const Dictionary *values = _get_domain_dictionary(p_domain);
-	return values != nullptr && (values->has(String(p_name)) || values->has(p_name));
-}
-
-void VideoPreset::erase_value(const StringName &p_domain, const StringName &p_name) {
-	Dictionary *values = _get_domain_dictionary(p_domain);
-	ERR_FAIL_NULL_MSG(values, vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
-	const bool erased_string = values->erase(String(p_name));
-	const bool erased_name = values->erase(p_name);
-	if (erased_string || erased_name) {
-		emit_changed();
+void VideoPreset::set_domain_settings(const StringName &p_domain, const Ref<Resource> &p_settings) {
+	if (p_domain == SNAME("video_quality")) {
+		const Ref<VideoQualitySettings> typed = p_settings;
+		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_quality\" must be a VideoQualitySettings resource.");
+		set_video_quality(typed);
+	} else if (p_domain == SNAME("video_texture")) {
+		const Ref<VideoTextureSettings> typed = p_settings;
+		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_texture\" must be a VideoTextureSettings resource.");
+		set_video_texture(typed);
+	} else if (p_domain == SNAME("video_shadow")) {
+		const Ref<VideoShadowSettings> typed = p_settings;
+		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_shadow\" must be a VideoShadowSettings resource.");
+		set_video_shadow(typed);
+	} else if (p_domain == SNAME("video_effect")) {
+		const Ref<VideoEffectSettings> typed = p_settings;
+		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_effect\" must be a VideoEffectSettings resource.");
+		set_video_effect(typed);
+	} else {
+		ERR_FAIL_MSG(vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
 	}
 }
 
-void VideoPreset::clear() {
-	video_quality.clear();
-	video_texture.clear();
-	video_shadow.clear();
-	video_effect.clear();
-	emit_changed();
+Ref<Resource> VideoPreset::get_domain_settings(const StringName &p_domain) const {
+	if (p_domain == SNAME("video_quality")) {
+		return video_quality;
+	} else if (p_domain == SNAME("video_texture")) {
+		return video_texture;
+	} else if (p_domain == SNAME("video_shadow")) {
+		return video_shadow;
+	} else if (p_domain == SNAME("video_effect")) {
+		return video_effect;
+	}
+	ERR_FAIL_V_MSG(Ref<Resource>(), vformat("VideoPreset: \"%s\" is not a video settings domain of a preset (%s).", p_domain, String(", ").join(get_domains())));
+}
+
+bool VideoPreset::has_domain_settings(const StringName &p_domain) const {
+	if (!get_domains().has(p_domain)) {
+		return false;
+	}
+	return get_domain_settings(p_domain).is_valid();
 }
 
 void VideoPreset::_bind_methods() {
@@ -162,27 +133,23 @@ void VideoPreset::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_preset_name", "name"), &VideoPreset::set_preset_name);
 	ClassDB::bind_method(D_METHOD("get_preset_name"), &VideoPreset::get_preset_name);
-	ClassDB::bind_method(D_METHOD("set_video_quality", "values"), &VideoPreset::set_video_quality);
+	ClassDB::bind_method(D_METHOD("set_video_quality", "settings"), &VideoPreset::set_video_quality);
 	ClassDB::bind_method(D_METHOD("get_video_quality"), &VideoPreset::get_video_quality);
-	ClassDB::bind_method(D_METHOD("set_video_texture", "values"), &VideoPreset::set_video_texture);
+	ClassDB::bind_method(D_METHOD("set_video_texture", "settings"), &VideoPreset::set_video_texture);
 	ClassDB::bind_method(D_METHOD("get_video_texture"), &VideoPreset::get_video_texture);
-	ClassDB::bind_method(D_METHOD("set_video_shadow", "values"), &VideoPreset::set_video_shadow);
+	ClassDB::bind_method(D_METHOD("set_video_shadow", "settings"), &VideoPreset::set_video_shadow);
 	ClassDB::bind_method(D_METHOD("get_video_shadow"), &VideoPreset::get_video_shadow);
-	ClassDB::bind_method(D_METHOD("set_video_effect", "values"), &VideoPreset::set_video_effect);
+	ClassDB::bind_method(D_METHOD("set_video_effect", "settings"), &VideoPreset::set_video_effect);
 	ClassDB::bind_method(D_METHOD("get_video_effect"), &VideoPreset::get_video_effect);
 
-	ClassDB::bind_method(D_METHOD("set_domain_values", "domain", "values"), &VideoPreset::set_domain_values);
-	ClassDB::bind_method(D_METHOD("get_domain_values", "domain"), &VideoPreset::get_domain_values);
-	ClassDB::bind_method(D_METHOD("set_value", "domain", "name", "value"), &VideoPreset::set_value);
-	ClassDB::bind_method(D_METHOD("get_value", "domain", "name", "default"), &VideoPreset::get_value, DEFVAL(Variant()));
-	ClassDB::bind_method(D_METHOD("has_value", "domain", "name"), &VideoPreset::has_value);
-	ClassDB::bind_method(D_METHOD("erase_value", "domain", "name"), &VideoPreset::erase_value);
-	ClassDB::bind_method(D_METHOD("clear"), &VideoPreset::clear);
+	ClassDB::bind_method(D_METHOD("set_domain_settings", "domain", "settings"), &VideoPreset::set_domain_settings);
+	ClassDB::bind_method(D_METHOD("get_domain_settings", "domain"), &VideoPreset::get_domain_settings);
+	ClassDB::bind_method(D_METHOD("has_domain_settings", "domain"), &VideoPreset::has_domain_settings);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "preset_name"), "set_preset_name", "get_preset_name");
 	ADD_GROUP("Domains", "");
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "video_quality"), "set_video_quality", "get_video_quality");
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "video_texture"), "set_video_texture", "get_video_texture");
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "video_shadow"), "set_video_shadow", "get_video_shadow");
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "video_effect"), "set_video_effect", "get_video_effect");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_quality", PROPERTY_HINT_RESOURCE_TYPE, VideoQualitySettings::get_class_static()), "set_video_quality", "get_video_quality");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_texture", PROPERTY_HINT_RESOURCE_TYPE, VideoTextureSettings::get_class_static()), "set_video_texture", "get_video_texture");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_shadow", PROPERTY_HINT_RESOURCE_TYPE, VideoShadowSettings::get_class_static()), "set_video_shadow", "get_video_shadow");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_effect", PROPERTY_HINT_RESOURCE_TYPE, VideoEffectSettings::get_class_static()), "set_video_effect", "get_video_effect");
 }

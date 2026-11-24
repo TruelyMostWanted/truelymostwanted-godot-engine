@@ -120,14 +120,32 @@ static bool preset_value_equal(const Variant &p_a, const Variant &p_b) {
 	return p_a == p_b;
 }
 
+// The stored value names of a domain resource of a preset (empty for a null resource).
+static PackedStringArray preset_value_names(const Ref<VideoPreset> &p_preset, const String &p_domain) {
+	PackedStringArray names;
+	const Ref<Resource> domain_settings = p_preset->get_domain_settings(p_domain);
+	if (domain_settings.is_null()) {
+		return names;
+	}
+	LocalVector<PropertyInfo> infos;
+	SettingsServer::get_value_infos(domain_settings.ptr(), infos);
+	for (const PropertyInfo &info : infos) {
+		names.push_back(info.name);
+	}
+	return names;
+}
+
+static Variant preset_value(const Ref<VideoPreset> &p_preset, const String &p_domain, const StringName &p_name) {
+	const Ref<Resource> domain_settings = p_preset->get_domain_settings(p_domain);
+	return domain_settings.is_valid() ? domain_settings->get(p_name) : Variant();
+}
+
 // True if every supported value of `p_preset` is set in the domains of `p_servers`.
 static bool domains_have_preset(const Servers &p_servers, const Ref<VideoPreset> &p_preset) {
 	for (const String &domain : VideoPreset::get_domains()) {
 		const SettingsServer *server = p_servers.get(domain);
-		const Dictionary values = p_preset->get_domain_values(domain);
-		for (const KeyValue<Variant, Variant> &kv : values) {
-			const StringName setting_name = kv.key;
-			if (server->is_value_supported(setting_name) && !preset_value_equal(server->get_value(setting_name), kv.value)) {
+		for (const String &setting_name : preset_value_names(p_preset, domain)) {
+			if (server->is_value_supported(setting_name) && !preset_value_equal(server->get_value(setting_name), preset_value(p_preset, domain, setting_name))) {
 				return false;
 			}
 		}
@@ -173,19 +191,23 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 	REQUIRE(low.is_valid());
 	REQUIRE(ultra.is_valid());
 	CHECK(low->get_preset_name() == "Low");
-	// Every domain gets values; the values grow from Low to Ultra.
+	// Every domain gets a typed resource; the values grow from Low to Ultra.
 	for (const String &domain : VideoPreset::get_domains()) {
-		CHECK_FALSE(low->get_domain_values(domain).is_empty());
+		CHECK(low->has_domain_settings(domain));
+		CHECK(low->get_domain_settings(domain) != ultra->get_domain_settings(domain));
 	}
-	CHECK(int(low->get_value("video_texture", "anisotropic_filtering_level")) < int(ultra->get_value("video_texture", "anisotropic_filtering_level")));
-	CHECK(int(low->get_value("video_shadow", "directional_shadow_atlas_size")) < int(ultra->get_value("video_shadow", "directional_shadow_atlas_size")));
-	CHECK(int(low->get_value("video_effect", "ssao_quality")) < int(ultra->get_value("video_effect", "ssao_quality")));
+	REQUIRE(low->get_video_quality().is_valid());
+	REQUIRE(ultra->get_video_texture().is_valid());
+	CHECK(int(low->get_video_texture()->get_anisotropic_filtering_level()) < int(ultra->get_video_texture()->get_anisotropic_filtering_level()));
+	CHECK(low->get_video_shadow()->get_directional_shadow_atlas_size() < ultra->get_video_shadow()->get_directional_shadow_atlas_size());
+	CHECK(int(low->get_video_effect()->get_ssao_quality()) < int(ultra->get_video_effect()->get_ssao_quality()));
+	CHECK(low->get_video_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
 
 	// Every value of a built-in preset exists in its domain.
 	for (const String &domain : VideoPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
-		for (const KeyValue<Variant, Variant> &kv : ultra->get_domain_values(domain)) {
-			CHECK_MESSAGE(domain_server->has_setting(kv.key), vformat("%s/%s", domain, kv.key));
+		for (const String &setting_name : preset_value_names(ultra, domain)) {
+			CHECK_MESSAGE(domain_server->has_setting(setting_name), vformat("%s/%s", domain, setting_name));
 		}
 	}
 
@@ -248,8 +270,8 @@ TEST_CASE("[VideoPresetSettingsServer] Values the renderer does not support keep
 	HashMap<String, Variant> before;
 	for (const String &domain : VideoPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
-		for (const KeyValue<Variant, Variant> &kv : low->get_domain_values(domain)) {
-			before[domain + "/" + String(kv.key)] = domain_server->get_value(kv.key);
+		for (const String &setting_name : preset_value_names(low, domain)) {
+			before[domain + "/" + setting_name] = domain_server->get_value(setting_name);
 		}
 	}
 	ERR_PRINT_OFF;
@@ -257,12 +279,12 @@ TEST_CASE("[VideoPresetSettingsServer] Values the renderer does not support keep
 	ERR_PRINT_ON;
 	for (const String &domain : VideoPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
-		for (const KeyValue<Variant, Variant> &kv : low->get_domain_values(domain)) {
-			const Variant value = domain_server->get_value(kv.key);
-			if (domain_server->is_value_supported(kv.key)) {
-				CHECK_MESSAGE(preset_value_equal(value, kv.value), vformat("%s/%s", domain, kv.key));
+		for (const String &setting_name : preset_value_names(low, domain)) {
+			const Variant value = domain_server->get_value(setting_name);
+			if (domain_server->is_value_supported(setting_name)) {
+				CHECK_MESSAGE(preset_value_equal(value, preset_value(low, domain, setting_name)), vformat("%s/%s", domain, setting_name));
 			} else {
-				CHECK_MESSAGE(preset_value_equal(value, before[domain + "/" + String(kv.key)]), vformat("%s/%s", domain, kv.key));
+				CHECK_MESSAGE(preset_value_equal(value, before[domain + "/" + setting_name]), vformat("%s/%s", domain, setting_name));
 			}
 		}
 	}
@@ -276,12 +298,6 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 		SettingsServer *shadow = servers.get("video_shadow");
 		ERR_PRINT_OFF;
 		CHECK(server->apply_preset("High") == OK);
-		ERR_PRINT_ON;
-		CHECK(server->get_current_preset() == "High");
-
-		// A value the preset doesn't set changes nothing.
-		ERR_PRINT_OFF;
-		shadow->set_value("positional_shadow_atlas_quad_0", int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_16));
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "High");
 
@@ -301,6 +317,7 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 
 		ERR_PRINT_OFF;
 		shadow->set_value("directional_shadow_atlas_size", 2048);
+		shadow->set_value("positional_shadow_atlas_quad_0", int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_16));
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "Custom");
 
@@ -335,8 +352,8 @@ TEST_CASE("[VideoPresetSettingsServer] Without a picked preset, the values decid
 	ERR_PRINT_OFF;
 	for (const String &domain : VideoPreset::get_domains()) {
 		SettingsServer *domain_server = servers.get(domain);
-		for (const KeyValue<Variant, Variant> &kv : medium->get_domain_values(domain)) {
-			domain_server->set_value(kv.key, kv.value);
+		for (const String &setting_name : preset_value_names(medium, domain)) {
+			domain_server->set_value(setting_name, preset_value(medium, domain, setting_name));
 		}
 	}
 	ERR_PRINT_ON;
@@ -353,14 +370,23 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	Ref<VideoPreset> high;
 	high.instantiate();
 	high->set_preset_name("High");
-	high->set_value("video_shadow", "directional_shadow_atlas_size", 16384);
+	Ref<VideoShadowSettings> high_shadow;
+	high_shadow.instantiate();
+	high_shadow->set_directional_shadow_atlas_size(16384);
+	high->set_video_shadow(high_shadow);
 	CHECK(ResourceSaver::save(high, high_path) == OK);
 
 	Ref<VideoPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
-	potato->set_value("video_texture", "anisotropic_filtering_level", 0);
-	potato->set_value("video_quality", "scaling_3d_scale", 0.5);
+	Ref<VideoTextureSettings> potato_texture;
+	potato_texture.instantiate();
+	potato_texture->set_anisotropic_filtering_level(Viewport::ANISOTROPY_DISABLED);
+	potato->set_video_texture(potato_texture);
+	Ref<VideoQualitySettings> potato_quality;
+	potato_quality.instantiate();
+	potato_quality->set_scaling_3d_scale(0.5);
+	potato->set_video_quality(potato_quality);
 	CHECK(ResourceSaver::save(potato, potato_path) == OK);
 
 	PackedStringArray paths;
@@ -375,15 +401,34 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		REQUIRE(names.size() == 5);
 		CHECK(names[2] == "High"); // Replaced in place.
 		CHECK(names[4] == "Potato");
-		CHECK(int(server->get_preset("High")->get_value("video_shadow", "directional_shadow_atlas_size")) == 16384);
-		CHECK_FALSE(server->get_preset("High")->has_value("video_effect", "ssao_quality"));
+		// The domain resources are loaded from the `.tres` file (sub-resources) with their types.
+		const Ref<VideoPreset> loaded_high = server->get_preset("High");
+		REQUIRE(loaded_high->get_video_shadow().is_valid());
+		CHECK(loaded_high->get_video_shadow()->get_directional_shadow_atlas_size() == 16384);
+		CHECK_FALSE(loaded_high->has_domain_settings("video_effect"));
+		CHECK(loaded_high->get_video_effect().is_null());
 
+		// Potato leaves `video_shadow` and `video_effect` as they are.
+		SettingsServer *shadow = servers.get("video_shadow");
 		ERR_PRINT_OFF;
+		shadow->set_value("directional_shadow_atlas_size", 1024);
 		CHECK(server->apply_preset("Potato") == OK);
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "Potato");
 		CHECK(int(servers.get("video_texture")->get_value("anisotropic_filtering_level")) == 0);
 		CHECK(float(servers.get("video_quality")->get_value("scaling_3d_scale")) == doctest::Approx(0.5));
+		CHECK(int(shadow->get_value("directional_shadow_atlas_size")) == 1024);
+
+		// A change in a domain the preset doesn't touch keeps the preset.
+		ERR_PRINT_OFF;
+		shadow->set_value("directional_shadow_atlas_size", 2048);
+		ERR_PRINT_ON;
+		CHECK(server->get_current_preset() == "Potato");
+		// A change in a domain the preset sets: "Custom".
+		ERR_PRINT_OFF;
+		servers.get("video_texture")->set_value("anisotropic_filtering_level", int(Viewport::ANISOTROPY_16X));
+		ERR_PRINT_ON;
+		CHECK(server->get_current_preset() == "Custom");
 	}
 
 	ProjectSettings::get_singleton()->set_setting("settings/video_preset/use_builtin_presets", false);
@@ -404,7 +449,10 @@ TEST_CASE("[VideoPresetSettingsServer] Presets are added and removed at runtime"
 	Ref<VideoPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
-	potato->set_value("video_effect", "allow_glow", false);
+	Ref<VideoEffectSettings> potato_effect;
+	potato_effect.instantiate();
+	potato_effect->set_allow_glow(false);
+	potato->set_video_effect(potato_effect);
 	server->add_preset(potato);
 	CHECK(server->has_preset("Potato"));
 	CHECK(server->get_preset("Potato") == potato);
@@ -436,30 +484,40 @@ TEST_CASE("[VideoPresetSettingsServer] suggest_preset() names an existing preset
 	CHECK(suggestion != "Ultra");
 }
 
-TEST_CASE("[VideoPreset] Values per domain") {
+TEST_CASE("[VideoPreset] Typed settings per domain") {
 	Ref<VideoPreset> preset;
 	preset.instantiate();
 	CHECK(VideoPreset::get_domains().size() == 4);
-	preset->set_value("video_quality", "msaa_3d", 2);
-	CHECK(preset->has_value("video_quality", "msaa_3d"));
-	CHECK(int(preset->get_value("video_quality", "msaa_3d")) == 2);
-	CHECK(preset->get_value("video_quality", "use_taa", true) == Variant(true));
-	CHECK(preset->get_video_quality().size() == 1);
-	preset->erase_value("video_quality", "msaa_3d");
-	CHECK_FALSE(preset->has_value("video_quality", "msaa_3d"));
+	// A new preset touches no domain.
+	for (const String &domain : VideoPreset::get_domains()) {
+		CHECK_FALSE(preset->has_domain_settings(domain));
+		CHECK(preset->get_domain_settings(domain).is_null());
+	}
 
-	Dictionary values;
-	values["ssao_quality"] = 1;
-	preset->set_domain_values("video_effect", values);
-	CHECK(preset->get_video_effect().size() == 1);
-	preset->clear();
-	CHECK(preset->get_video_effect().is_empty());
+	Ref<VideoQualitySettings> quality;
+	quality.instantiate();
+	quality->set_msaa_3d(Viewport::MSAA_4X);
+	preset->set_video_quality(quality);
+	CHECK(preset->has_domain_settings("video_quality"));
+	CHECK(preset->get_domain_settings("video_quality") == Ref<Resource>(quality));
+	CHECK(preset->get_video_quality()->get_msaa_3d() == Viewport::MSAA_4X);
 
+	// Generic access checks the class of the domain.
+	Ref<VideoEffectSettings> effect;
+	effect.instantiate();
+	preset->set_domain_settings("video_effect", effect);
+	CHECK(preset->get_video_effect() == effect);
 	ERR_PRINT_OFF;
-	preset->set_value("video_window", "mode", 0);
-	CHECK(preset->get_domain_values("video_window").is_empty());
+	preset->set_domain_settings("video_shadow", effect);
+	CHECK(preset->get_video_shadow().is_null());
+	preset->set_domain_settings("video_window", effect);
+	CHECK(preset->get_domain_settings("video_window").is_null());
 	ERR_PRINT_ON;
-	CHECK_FALSE(preset->has_value("video_window", "mode"));
+	CHECK_FALSE(preset->has_domain_settings("video_window"));
+
+	// Null: the preset leaves the domain as it is again.
+	preset->set_domain_settings("video_effect", Ref<Resource>());
+	CHECK_FALSE(preset->has_domain_settings("video_effect"));
 }
 
 } // namespace TestVideoPresetSettingsServer

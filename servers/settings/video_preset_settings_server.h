@@ -38,8 +38,9 @@
 
 // Settings domain `video_preset` (#25): graphics presets ("Low", "Medium", "High", "Ultra" or the project's own)
 // over the video domains `video_quality`, `video_texture`, `video_shadow` and `video_effect`.
-// apply_preset() sets the values of a preset on each domain in one step (one apply() and at most one confirmation
-// per domain); values a domain does not support on the current renderer keep their value. The domain stores only
+// apply_preset() sets all values of each domain resource of a preset (VideoQualitySettings, ...) in one step (one
+// apply() and at most one confirmation per domain); a null resource leaves its domain as it is, and values a
+// domain does not support on the current renderer keep their value. The domain stores only
 // the name of the chosen preset (VideoPresetSettings); the values stay in the files of the video domains.
 // A change of a single value in a video domain makes the current preset "Custom" (unless the values then match
 // another preset). Window settings (#20) are not part of a preset.
@@ -90,7 +91,8 @@ public:
 	// The name of the current preset after a single change: "Custom". Reserved; no preset can have it.
 	static String get_custom_preset_name();
 	static PackedStringArray get_builtin_preset_names();
-	// A new preset with the values of the built-in preset `p_name` ("Low", "Medium", "High" or "Ultra").
+	// A new preset with the values of the built-in preset `p_name` ("Low", "Medium", "High" or "Ultra"): all four
+	// domains, based on the domains' defaults (project settings) with the preset's quality values.
 	static Ref<VideoPreset> create_builtin_preset(const String &p_name);
 
 	virtual StringName get_domain() const override;

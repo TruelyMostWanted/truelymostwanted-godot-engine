@@ -124,6 +124,49 @@ static bool video_preset_values_equal(const Variant &p_a, const Variant &p_b) {
 	return SettingsServer::values_equal(p_a, p_b);
 }
 
+// A new settings resource of `p_domain` for a built-in preset: a copy of the domain's defaults (the project
+// settings), so the values a built-in preset does not define keep the project's choice; the class defaults
+// if the domain is not registered.
+static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
+	Ref<Resource> base;
+	if (p_domain == "video_quality") {
+		base = Ref<Resource>(memnew(VideoQualitySettings));
+	} else if (p_domain == "video_texture") {
+		base = Ref<Resource>(memnew(VideoTextureSettings));
+	} else if (p_domain == "video_shadow") {
+		base = Ref<Resource>(memnew(VideoShadowSettings));
+	} else if (p_domain == "video_effect") {
+		base = Ref<Resource>(memnew(VideoEffectSettings));
+	}
+	ERR_FAIL_COND_V(base.is_null(), base);
+
+	const SettingsServerManager *manager = SettingsServerManager::get_singleton();
+	const SettingsServer *server = manager != nullptr ? manager->get_server(p_domain) : nullptr;
+	if (server != nullptr) {
+		const Ref<Resource> domain_defaults = server->get_default_settings();
+		if (domain_defaults.is_valid() && domain_defaults->get_class_name() == base->get_class_name()) {
+			return SettingsServer::copy_settings(domain_defaults);
+		}
+	}
+	return base;
+}
+
+// Compares the stored values of a preset's domain resource with the values of the domain server. Values the
+// domain doesn't have or support are not applied, so they don't count either.
+static bool video_preset_domain_matches(const SettingsServer *p_server, const Ref<Resource> &p_settings) {
+	LocalVector<PropertyInfo> infos;
+	SettingsServer::get_value_infos(p_settings.ptr(), infos);
+	for (const PropertyInfo &info : infos) {
+		if (!p_server->has_setting(info.name) || !p_server->is_value_supported(info.name)) {
+			continue;
+		}
+		if (!video_preset_values_equal(p_server->get_value(info.name), p_settings->get(info.name))) {
+			return false;
+		}
+	}
+	return true;
+}
+
 VideoPresetSettingsServer *VideoPresetSettingsServer::singleton = nullptr;
 
 VideoPresetSettingsServer *VideoPresetSettingsServer::get_singleton() {
@@ -160,8 +203,13 @@ Ref<VideoPreset> VideoPresetSettingsServer::create_builtin_preset(const String &
 	Ref<VideoPreset> preset;
 	preset.instantiate();
 	preset->set_preset_name(p_name);
+	for (const String &domain : VideoPreset::get_domains()) {
+		preset->set_domain_settings(domain, video_preset_builtin_base(domain));
+	}
 	for (const VideoPresetBuiltinValue &value : video_preset_builtin_values) {
-		preset->set_value(value.domain, value.name, video_preset_builtin_value(value, level));
+		const Ref<Resource> domain_settings = preset->get_domain_settings(value.domain);
+		ERR_CONTINUE(domain_settings.is_null());
+		domain_settings->set(value.name, video_preset_builtin_value(value, level));
 	}
 	return preset;
 }
@@ -367,20 +415,17 @@ void VideoPresetSettingsServer::reload_presets() {
 
 bool VideoPresetSettingsServer::_matches(const Ref<VideoPreset> &p_preset) const {
 	for (const String &domain : VideoPreset::get_domains()) {
+		// A domain the preset doesn't touch (null resource) doesn't count.
+		const Ref<Resource> domain_settings = p_preset->get_domain_settings(domain);
+		if (domain_settings.is_null()) {
+			continue;
+		}
 		const SettingsServer *server = _get_domain_server(domain);
 		if (server == nullptr) {
 			continue;
 		}
-		const Dictionary values = p_preset->get_domain_values(domain);
-		for (const KeyValue<Variant, Variant> &kv : values) {
-			const StringName setting_name = kv.key;
-			// Values the domain doesn't have or support are not applied, so they don't count either.
-			if (!server->has_setting(setting_name) || !server->is_value_supported(setting_name)) {
-				continue;
-			}
-			if (!video_preset_values_equal(server->get_value(setting_name), kv.value)) {
-				return false;
-			}
+		if (!video_preset_domain_matches(server, domain_settings)) {
+			return false;
 		}
 	}
 	return true;
@@ -446,11 +491,11 @@ Error VideoPresetSettingsServer::apply_preset(const String &p_name) {
 
 	Error result = OK;
 	PackedStringArray missing_domains;
-	PackedStringArray unknown_names;
 	applying_preset = true;
 	for (const String &domain : VideoPreset::get_domains()) {
-		const Dictionary values = preset->get_domain_values(domain);
-		if (values.is_empty()) {
+		// A null resource: the preset doesn't touch the domain.
+		const Ref<Resource> domain_settings = preset->get_domain_settings(domain);
+		if (domain_settings.is_null()) {
 			continue;
 		}
 		SettingsServer *server = _get_domain_server(domain);
@@ -461,16 +506,13 @@ Error VideoPresetSettingsServer::apply_preset(const String &p_name) {
 		// All values of the domain first, then one apply(): one `applied` signal, one autosave, one confirmation.
 		const ApplyMode mode = server->get_apply_mode();
 		server->set_apply_mode(APPLY_MODE_MANUAL);
-		for (const KeyValue<Variant, Variant> &kv : values) {
-			const StringName setting_name = kv.key;
-			if (!server->has_setting(setting_name)) {
-				unknown_names.push_back(domain + "/" + String(setting_name));
-				continue;
-			}
-			if (!server->is_value_supported(setting_name)) {
+		LocalVector<PropertyInfo> infos;
+		SettingsServer::get_value_infos(domain_settings.ptr(), infos);
+		for (const PropertyInfo &info : infos) {
+			if (!server->has_setting(info.name) || !server->is_value_supported(info.name)) {
 				continue; // Not used by the current renderer: the domain keeps its value.
 			}
-			server->set_value(setting_name, kv.value);
+			server->set_value(info.name, domain_settings->get(info.name));
 		}
 		server->set_apply_mode(mode);
 		if (mode == APPLY_MODE_IMMEDIATE) {
@@ -485,9 +527,6 @@ Error VideoPresetSettingsServer::apply_preset(const String &p_name) {
 
 	if (!missing_domains.is_empty()) {
 		WARN_PRINT(vformat("VideoPresetSettingsServer: the settings domains %s are not registered; the values of preset \"%s\" for them are skipped.", String(", ").join(missing_domains), p_name));
-	}
-	if (!unknown_names.is_empty()) {
-		WARN_PRINT(vformat("VideoPresetSettingsServer: preset \"%s\" has values the domains don't have: %s.", p_name, String(", ").join(unknown_names)));
 	}
 	return result;
 }
