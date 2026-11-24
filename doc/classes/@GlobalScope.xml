@@ -1726,6 +1726,9 @@
 		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
 			The [VideoQualitySettingsServer] singleton.
 		</member>
+		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
+			The [VideoShadowSettingsServer] singleton.
+		</member>
 		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
 			The [VideoTextureSettingsServer] singleton.
 		</member>
