@@ -353,7 +353,7 @@ TEST_CASE("[SettingsServer] Files hold float values without noise (INI, JSON, CS
 		memdelete(server);
 	}
 	const String csv = FileAccess::get_file_as_string(csv_path);
-	CHECK(csv.contains("Music,-6.0,0.33") || csv.contains("Music,-6,0.33"));
+	CHECK((csv.contains("Music,-6.0,0.33") || csv.contains("Music,-6,0.33")));
 	check_no_float_noise(csv);
 }
 
