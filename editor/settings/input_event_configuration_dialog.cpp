@@ -321,7 +321,8 @@ void InputEventConfigurationDialog::_update_input_list() {
 	String search_term = input_list_search->get_text();
 
 	bool collapse = input_list_search->get_text().is_empty();
-	const int icon_size = get_theme_constant(SNAME("class_icon_size"), EditorStringName(Editor));
+	// The editor's class icon size; the list is also built before the theme is available.
+	const int icon_size = 16 * EDSCALE;
 
 	if (allowed_input_types & INPUT_KEY) {
 		TreeItem *kb_root = input_list_tree->create_item(root);
