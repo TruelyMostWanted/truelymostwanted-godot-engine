@@ -1270,6 +1270,11 @@ public:
 	PASS2(environment_set_volumetric_fog_volume_size, int, int)
 	PASS1(environment_set_volumetric_fog_filter_active, bool)
 
+	// Global overrides
+	PASS2(environment_set_global_effect_disabled, RSE::EnvironmentEffect, bool)
+	PASS3(environment_set_global_adjustment, float, float, float)
+	PASS2(environment_set_ignore_global_overrides, RID, bool)
+
 	// Depth Fog
 	PASS4(environment_set_fog_depth, RID, float, float, float)
 	PASS1RC(float, environment_get_fog_depth_curve, RID)

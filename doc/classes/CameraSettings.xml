@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="CameraSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [CameraSettingsServer]: field of view, clip planes and motion values.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"camera"[/code]. [CameraSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/camera.ini[/code]. Change the values through the methods of [CameraSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		[member enabled], [member field_of_view], [member keep_aspect], [member near] and [member far] go to the [Camera3D] nodes that [CameraSettingsServer] manages. [member shake_intensity], [member head_bob_intensity] and [member motion_blur_intensity] are game-side values ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): the engine has no camera shake, head bob or motion blur, so the game reads them.
+		The setters store values as they are; [CameraSettingsServer] clamps values out of range with a warning when they are set or loaded.
+		It can also be used as the project defaults of the domain: save a [CameraSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/camera[/code].
+		[b]Note:[/b] This class does not exist when the engine is built with [code]disable_3d=yes[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="true">
+			If [code]true[/code], the managed cameras use [member field_of_view], [member keep_aspect], [member near] and [member far]. If [code]false[/code], they get their authored values back (the values they had before they got the settings); the stored values are kept. Takes effect at once.
+		</member>
+		<member name="far" type="float" setter="set_far" getter="get_far" default="4000.0">
+			The distance of the far clip plane in meters, pushed to [member Camera3D.far]. A camera always gets at least [member near] + [code]0.01[/code]. Valid range: [code]0.01[/code] to [code]1000000[/code]. Takes effect at once.
+		</member>
+		<member name="field_of_view" type="float" setter="set_field_of_view" getter="get_field_of_view" default="75.0">
+			The field of view in degrees, pushed to [member Camera3D.fov]. Vertical or horizontal depending on [member keep_aspect]. Valid range: [code]1[/code] to [code]179[/code]. Takes effect at once.
+		</member>
+		<member name="head_bob_intensity" type="float" setter="set_head_bob_intensity" getter="get_head_bob_intensity" default="1.0">
+			Game-side value: how strongly the camera bobs while the player walks, [code]0[/code] (off) to [code]1[/code] (full). The game multiplies its head bob with it. Never pushed to the engine.
+		</member>
+		<member name="keep_aspect" type="int" setter="set_keep_aspect" getter="get_keep_aspect" enum="Camera3D.KeepAspect" default="1">
+			Which axis [member field_of_view] is measured on, pushed to [member Camera3D.keep_aspect]. [constant Camera3D.KEEP_HEIGHT] (default): vertical FOV, the view gets wider on wide screens. [constant Camera3D.KEEP_WIDTH]: horizontal FOV, as many PC games show it. Takes effect at once.
+		</member>
+		<member name="motion_blur_intensity" type="float" setter="set_motion_blur_intensity" getter="get_motion_blur_intensity" default="1.0">
+			Game-side value: the strength of the game's motion blur effect, [code]0[/code] (off) to [code]1[/code] (full). Never pushed to the engine.
+		</member>
+		<member name="near" type="float" setter="set_near" getter="get_near" default="0.05">
+			The distance of the near clip plane in meters, pushed to [member Camera3D.near]. Valid range: [code]0.001[/code] to [code]10[/code]. Takes effect at once.
+		</member>
+		<member name="shake_intensity" type="float" setter="set_shake_intensity" getter="get_shake_intensity" default="1.0">
+			Game-side value: how strongly the camera shakes (hits, explosions), [code]0[/code] (off) to [code]1[/code] (full). The game multiplies its shake with it. Never pushed to the engine.
+		</member>
+	</members>
+</class>

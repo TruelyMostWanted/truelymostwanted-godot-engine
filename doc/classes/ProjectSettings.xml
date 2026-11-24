@@ -3709,11 +3709,65 @@
 		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
 		</member>
+		<member name="settings/camera/far" type="float" setter="" getter="" default="4000.0">
+			The default of [member CameraSettings.far]: the far clip plane distance in meters that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera/field_of_view" type="float" setter="" getter="" default="75.0">
+			The default of [member CameraSettings.field_of_view]: the field of view in degrees that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera/keep_aspect" type="int" setter="" getter="" default="1">
+			The default of [member CameraSettings.keep_aspect]: whether the field of view is horizontal ([code]0[/code], Keep Width) or vertical ([code]1[/code], Keep Height). See [enum Camera3D.KeepAspect].
+		</member>
+		<member name="settings/camera/near" type="float" setter="" getter="" default="0.05">
+			The default of [member CameraSettings.near]: the near clip plane distance in meters that [CameraSettingsServer] gives the player cameras until the player changes it.
+		</member>
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>
-		<member name="settings/key_bindings/include_builtin_actions" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [KeyBindingSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
+		<member name="settings/input_map/include_builtin_actions" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [InputMapSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
+		</member>
+		<member name="settings/paths/accessibility_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"accessibility"[/code] settings domain ([AccessibilitySettingsServer]), for example [code]user://settings/accessibility.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/accessibility.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/audio_buses_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"audio_buses"[/code] settings domain ([AudioBusSettingsServer]), for example [code]user://settings/audio_buses.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/audio_buses.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/audio_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"audio"[/code] settings domain ([AudioDeviceSettingsServer]), for example [code]user://settings/audio.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/audio.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/camera_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"camera"[/code] settings domain ([CameraSettingsServer]), for example [code]user://settings/camera.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/camera.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/engine_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"engine"[/code] settings domain ([EngineSettingsServer]), for example [code]user://settings/engine.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/engine.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/input_map_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"input_map"[/code] settings domain ([InputMapSettingsServer]), for example [code]user://settings/input_map.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/input_map.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/input_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"input"[/code] settings domain ([InputSettingsServer]), for example [code]user://settings/input.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/input.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/language_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"language"[/code] settings domain ([LanguageSettingsServer]), for example [code]user://settings/language.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/language.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_effect_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_effect"[/code] settings domain ([VideoEffectSettingsServer]), for example [code]user://settings/video_effect.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_effect.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_quality_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_quality"[/code] settings domain ([VideoQualitySettingsServer]), for example [code]user://settings/video_quality.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_quality.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_shadow_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_shadow"[/code] settings domain ([VideoShadowSettingsServer]), for example [code]user://settings/video_shadow.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_shadow.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_texture_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_texture"[/code] settings domain ([VideoTextureSettingsServer]), for example [code]user://settings/video_texture.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_texture.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_texture_streaming_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_texture_streaming"[/code] settings domain ([VideoTextureStreamingSettingsServer]), for example [code]user://settings/video_texture_streaming.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_texture_streaming.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_window_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_window"[/code] settings domain ([VideoWindowSettingsServer]), for example [code]user://settings/video_window.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_window.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
