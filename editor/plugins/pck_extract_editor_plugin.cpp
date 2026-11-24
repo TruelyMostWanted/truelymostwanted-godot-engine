@@ -67,7 +67,11 @@ bool EditorInspectorPluginPCKExtract::can_handle(Object *p_object) {
 	return package && !package->is_description();
 }
 
-void EditorInspectorPluginPCKExtract::parse_begin(Object *p_object) {
+void EditorInspectorPluginPCKExtract::parse_category(Object *p_object, const String &p_category) {
+	// Below the class header of PCKPackage, like the class's own properties.
+	if (p_category != "PCKPackage") {
+		return;
+	}
 	Button *button = memnew(Button(TTR("Extract...")));
 	button->set_tooltip_text(TTR("Write the files of this pack into a folder of the project."));
 	button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginPCKExtract::_extract_pressed).bind(p_object));

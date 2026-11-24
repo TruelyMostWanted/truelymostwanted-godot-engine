@@ -42,6 +42,7 @@ TEST_FORCE_LINK(test_video_shadow_settings_server)
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_shadow_settings.h"
 #include "servers/settings/video_shadow_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestVideoShadowSettingsServer {
@@ -49,10 +50,10 @@ namespace TestVideoShadowSettingsServer {
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 
@@ -308,6 +309,40 @@ TEST_CASE("[SceneTree][VideoShadowSettingsServer] Added viewports and viewports 
 	memdelete(grouped);
 	memdelete(added);
 	server->reset_to_defaults();
+	memdelete(server);
+}
+
+TEST_CASE("[VideoShadowSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "directional_shadow_atlas_size_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("directional_shadow_atlas_size", 2048);
+	SIGNAL_CHECK_FALSE("directional_shadow_atlas_size_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 2048 } };
+	SIGNAL_CHECK("directional_shadow_atlas_size_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("directional_shadow_atlas_size_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("directional_shadow_atlas_size");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("directional_shadow_atlas_size_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("directional_shadow_atlas_size_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "directional_shadow_atlas_size_changed");
 	memdelete(server);
 }
 

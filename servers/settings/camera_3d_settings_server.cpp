@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  camera_settings_server.cpp                                            */
+/*  camera_3d_settings_server.cpp                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "camera_settings_server.h"
+#include "camera_3d_settings_server.h"
 
 #ifndef _3D_DISABLED
 
@@ -38,17 +38,17 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "scene/main/scene_tree.h"
-#include "servers/settings/camera_settings.h"
+#include "servers/settings/camera_3d_settings.h"
 #include "servers/settings/settings_server_manager.h"
 
-static constexpr const char *SETTING_CAMERA_FIELD_OF_VIEW = "settings/camera/field_of_view";
-static constexpr const char *SETTING_CAMERA_KEEP_ASPECT = "settings/camera/keep_aspect";
-static constexpr const char *SETTING_CAMERA_NEAR = "settings/camera/near";
-static constexpr const char *SETTING_CAMERA_FAR = "settings/camera/far";
+static constexpr const char *SETTING_CAMERA_FIELD_OF_VIEW = "settings/camera_3d/field_of_view";
+static constexpr const char *SETTING_CAMERA_KEEP_ASPECT = "settings/camera_3d/keep_aspect";
+static constexpr const char *SETTING_CAMERA_NEAR = "settings/camera_3d/near";
+static constexpr const char *SETTING_CAMERA_FAR = "settings/camera_3d/far";
 
-static constexpr const char *CAMERA_SETTINGS_GROUP = "camera_settings";
+static constexpr const char *CAMERA_SETTINGS_GROUP = "camera_3d_settings";
 
-// The values pushed to the cameras, in the order of CameraSettings.
+// The values pushed to the cameras, in the order of Camera3DSettings.
 static const char *camera_setting_names[] = {
 	"enabled",
 	"field_of_view",
@@ -95,27 +95,27 @@ static bool camera_range(const StringName &p_name, double &r_min, double &r_max)
 	return true;
 }
 
-CameraSettingsServer *CameraSettingsServer::singleton = nullptr;
+Camera3DSettingsServer *Camera3DSettingsServer::singleton = nullptr;
 
-CameraSettingsServer *CameraSettingsServer::get_singleton() {
+Camera3DSettingsServer *Camera3DSettingsServer::get_singleton() {
 	return singleton;
 }
 
-void CameraSettingsServer::register_settings() {
+void Camera3DSettingsServer::register_settings() {
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CAMERA_FIELD_OF_VIEW, PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), 75.0);
 	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_CAMERA_KEEP_ASPECT, PROPERTY_HINT_ENUM, "Keep Width,Keep Height"), int(Camera3D::KEEP_HEIGHT));
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CAMERA_NEAR, PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), 0.05);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CAMERA_FAR, PROPERTY_HINT_RANGE, "0.01,4000,0.01,or_greater,exp,suffix:m"), 4000.0);
 }
 
-StringName CameraSettingsServer::get_camera_group() {
+StringName Camera3DSettingsServer::get_camera_group() {
 	return StringName(CAMERA_SETTINGS_GROUP);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Engine targets.
 
-Variant CameraSettingsServer::_get_project_value(const StringName &p_name) {
+Variant Camera3DSettingsServer::_get_project_value(const StringName &p_name) {
 	if (p_name == SNAME("enabled")) {
 		return true;
 	} else if (p_name == SNAME("field_of_view")) {
@@ -130,16 +130,16 @@ Variant CameraSettingsServer::_get_project_value(const StringName &p_name) {
 	return Variant();
 }
 
-Variant CameraSettingsServer::_get_current(const StringName &p_name) const {
+Variant Camera3DSettingsServer::_get_current(const StringName &p_name) const {
 	const Variant *value = pushed_values.getptr(p_name);
 	return value != nullptr ? *value : _get_project_value(p_name);
 }
 
-bool CameraSettingsServer::_is_applying() const {
+bool Camera3DSettingsServer::_is_applying() const {
 	return bool(_get_current(SNAME("enabled")));
 }
 
-void CameraSettingsServer::_remember_camera(Camera3D *p_camera) {
+void Camera3DSettingsServer::_remember_camera(Camera3D *p_camera) {
 	const ObjectID id = p_camera->get_instance_id();
 	if (authored_values.has(id)) {
 		return;
@@ -152,7 +152,7 @@ void CameraSettingsServer::_remember_camera(Camera3D *p_camera) {
 	authored_values.insert(id, values);
 }
 
-void CameraSettingsServer::_apply_to_camera(Camera3D *p_camera) {
+void Camera3DSettingsServer::_apply_to_camera(Camera3D *p_camera) {
 	_remember_camera(p_camera);
 	if (!_is_applying()) {
 		_restore_camera(p_camera);
@@ -166,7 +166,7 @@ void CameraSettingsServer::_apply_to_camera(Camera3D *p_camera) {
 	p_camera->set_far(real_t(far_distance));
 }
 
-void CameraSettingsServer::_restore_camera(Camera3D *p_camera) {
+void Camera3DSettingsServer::_restore_camera(Camera3D *p_camera) {
 	const AuthoredValues *values = authored_values.getptr(p_camera->get_instance_id());
 	if (values == nullptr) {
 		return;
@@ -177,7 +177,7 @@ void CameraSettingsServer::_restore_camera(Camera3D *p_camera) {
 	p_camera->set_far(values->far_distance);
 }
 
-void CameraSettingsServer::_deliver_all() {
+void Camera3DSettingsServer::_deliver_all() {
 	// Cameras that got the settings before; freed ones are forgotten.
 	LocalVector<ObjectID> freed;
 	for (const KeyValue<ObjectID, AuthoredValues> &kv : authored_values) {
@@ -205,13 +205,13 @@ void CameraSettingsServer::_deliver_all() {
 	}
 }
 
-void CameraSettingsServer::_push_camera_value(const Variant &p_value, const StringName &p_name) {
+void Camera3DSettingsServer::_push_camera_value(const Variant &p_value, const StringName &p_name) {
 	pushed_values[p_name] = p_value;
 	_deliver_all();
 	_connect_tree();
 }
 
-Variant CameraSettingsServer::_pull_camera_value(const StringName &p_name) {
+Variant Camera3DSettingsServer::_pull_camera_value(const StringName &p_name) {
 	if (!defaults_captured) {
 		// The defaults: the project values, not the cameras (which have their own authored values).
 		return _get_project_value(p_name);
@@ -224,19 +224,19 @@ Variant CameraSettingsServer::_pull_camera_value(const StringName &p_name) {
 	return _get_current(p_name);
 }
 
-void CameraSettingsServer::_connect_tree() {
+void Camera3DSettingsServer::_connect_tree() {
 	SceneTree *tree = SceneTree::get_singleton();
 	if (tree == nullptr || (Engine::get_singleton() != nullptr && Engine::get_singleton()->is_editor_hint())) {
 		// Never change the cameras of a scene open in the editor (it would save the values into the scene).
 		return;
 	}
-	const Callable callback = callable_mp(this, &CameraSettingsServer::_on_node_added);
+	const Callable callback = callable_mp(this, &Camera3DSettingsServer::_on_node_added);
 	if (!tree->is_connected(SNAME("node_added"), callback)) {
 		tree->connect(SNAME("node_added"), callback);
 	}
 }
 
-void CameraSettingsServer::_on_node_added(Node *p_node) {
+void Camera3DSettingsServer::_on_node_added(Node *p_node) {
 	Camera3D *camera = Object::cast_to<Camera3D>(p_node);
 	if (camera == nullptr || !camera->is_in_group(get_camera_group())) {
 		return;
@@ -256,7 +256,7 @@ void CameraSettingsServer::_on_node_added(Node *p_node) {
 	_apply_to_camera(camera);
 }
 
-void CameraSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
+void Camera3DSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		// The SceneTree exists; the main scene is loaded after this phase and its cameras get the values.
 		_connect_tree();
@@ -267,28 +267,28 @@ void CameraSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName CameraSettingsServer::get_domain() const {
-	return SNAME("camera");
+StringName Camera3DSettingsServer::get_domain() const {
+	return SNAME("camera_3d");
 }
 
-SettingsServer::ApplyPhase CameraSettingsServer::get_apply_phase() const {
+SettingsServer::ApplyPhase Camera3DSettingsServer::get_apply_phase() const {
 	// The SceneTree exists; the main scene is not loaded yet.
 	return APPLY_PHASE_SCENE;
 }
 
-Ref<Resource> CameraSettingsServer::_create_default_settings() const {
-	Ref<CameraSettings> default_settings;
+Ref<Resource> Camera3DSettingsServer::_create_default_settings() const {
+	Ref<Camera3DSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-void CameraSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+void Camera3DSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	SettingsServer::_read_settings_from_engine(p_settings);
 	// The first read fills the defaults; later ones read the engine.
 	defaults_captured = true;
 }
 
-Variant CameraSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant Camera3DSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (value.get_type() != Variant::INT && value.get_type() != Variant::FLOAT) {
 		return value;
@@ -313,22 +313,22 @@ Variant CameraSettingsServer::_validate_setting(const StringName &p_name, const 
 /////////////////////////////////////////////////////////////////////////////
 // Cameras.
 
-void CameraSettingsServer::add_camera(Camera3D *p_camera) {
+void Camera3DSettingsServer::add_camera(Camera3D *p_camera) {
 	ERR_FAIL_NULL(p_camera);
 	_apply_to_camera(p_camera);
 }
 
-void CameraSettingsServer::remove_camera(Camera3D *p_camera) {
+void Camera3DSettingsServer::remove_camera(Camera3D *p_camera) {
 	ERR_FAIL_NULL(p_camera);
 	_restore_camera(p_camera);
 	authored_values.erase(p_camera->get_instance_id());
 }
 
-bool CameraSettingsServer::has_camera(Camera3D *p_camera) const {
+bool Camera3DSettingsServer::has_camera(Camera3D *p_camera) const {
 	return p_camera != nullptr && authored_values.has(p_camera->get_instance_id());
 }
 
-TypedArray<Camera3D> CameraSettingsServer::get_managed_cameras() const {
+TypedArray<Camera3D> Camera3DSettingsServer::get_managed_cameras() const {
 	TypedArray<Camera3D> cameras;
 	for (const KeyValue<ObjectID, AuthoredValues> &kv : authored_values) {
 		Camera3D *camera = ObjectDB::get_instance<Camera3D>(kv.key);
@@ -339,7 +339,7 @@ TypedArray<Camera3D> CameraSettingsServer::get_managed_cameras() const {
 	return cameras;
 }
 
-void CameraSettingsServer::apply_to_cameras() {
+void Camera3DSettingsServer::apply_to_cameras() {
 	_deliver_all();
 	_connect_tree();
 }
@@ -347,116 +347,144 @@ void CameraSettingsServer::apply_to_cameras() {
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-void CameraSettingsServer::set_enabled(bool p_enabled) {
+void Camera3DSettingsServer::set_enabled(bool p_enabled) {
 	set_value(SNAME("enabled"), p_enabled);
 }
 
-bool CameraSettingsServer::is_enabled() const {
+bool Camera3DSettingsServer::is_enabled() const {
 	return get_value(SNAME("enabled"));
 }
 
-void CameraSettingsServer::set_field_of_view(float p_degrees) {
+void Camera3DSettingsServer::set_field_of_view(float p_degrees) {
 	set_value(SNAME("field_of_view"), p_degrees);
 }
 
-float CameraSettingsServer::get_field_of_view() const {
+float Camera3DSettingsServer::get_field_of_view() const {
 	return get_value(SNAME("field_of_view"));
 }
 
-void CameraSettingsServer::set_keep_aspect(Camera3D::KeepAspect p_keep_aspect) {
+void Camera3DSettingsServer::set_keep_aspect(Camera3D::KeepAspect p_keep_aspect) {
 	set_value(SNAME("keep_aspect"), int(p_keep_aspect));
 }
 
-Camera3D::KeepAspect CameraSettingsServer::get_keep_aspect() const {
+Camera3D::KeepAspect Camera3DSettingsServer::get_keep_aspect() const {
 	return Camera3D::KeepAspect(int(get_value(SNAME("keep_aspect"))));
 }
 
-void CameraSettingsServer::set_near(float p_near) {
+void Camera3DSettingsServer::set_near(float p_near) {
 	set_value(SNAME("near"), p_near);
 }
 
-float CameraSettingsServer::get_near() const {
+float Camera3DSettingsServer::get_near() const {
 	return get_value(SNAME("near"));
 }
 
-void CameraSettingsServer::set_far(float p_far) {
+void Camera3DSettingsServer::set_far(float p_far) {
 	set_value(SNAME("far"), p_far);
 }
 
-float CameraSettingsServer::get_far() const {
+float Camera3DSettingsServer::get_far() const {
 	return get_value(SNAME("far"));
 }
 
-void CameraSettingsServer::set_shake_intensity(float p_intensity) {
+void Camera3DSettingsServer::set_shake_intensity(float p_intensity) {
 	set_value(SNAME("shake_intensity"), p_intensity);
 }
 
-float CameraSettingsServer::get_shake_intensity() const {
+float Camera3DSettingsServer::get_shake_intensity() const {
 	return get_value(SNAME("shake_intensity"));
 }
 
-void CameraSettingsServer::set_head_bob_intensity(float p_intensity) {
+void Camera3DSettingsServer::set_head_bob_intensity(float p_intensity) {
 	set_value(SNAME("head_bob_intensity"), p_intensity);
 }
 
-float CameraSettingsServer::get_head_bob_intensity() const {
+float Camera3DSettingsServer::get_head_bob_intensity() const {
 	return get_value(SNAME("head_bob_intensity"));
 }
 
-void CameraSettingsServer::set_motion_blur_intensity(float p_intensity) {
+void Camera3DSettingsServer::set_motion_blur_intensity(float p_intensity) {
 	set_value(SNAME("motion_blur_intensity"), p_intensity);
 }
 
-float CameraSettingsServer::get_motion_blur_intensity() const {
+float Camera3DSettingsServer::get_motion_blur_intensity() const {
 	return get_value(SNAME("motion_blur_intensity"));
 }
 
-void CameraSettingsServer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &CameraSettingsServer::set_enabled);
-	ClassDB::bind_method(D_METHOD("is_enabled"), &CameraSettingsServer::is_enabled);
-	ClassDB::bind_method(D_METHOD("set_field_of_view", "degrees"), &CameraSettingsServer::set_field_of_view);
-	ClassDB::bind_method(D_METHOD("get_field_of_view"), &CameraSettingsServer::get_field_of_view);
-	ClassDB::bind_method(D_METHOD("set_keep_aspect", "keep_aspect"), &CameraSettingsServer::set_keep_aspect);
-	ClassDB::bind_method(D_METHOD("get_keep_aspect"), &CameraSettingsServer::get_keep_aspect);
-	ClassDB::bind_method(D_METHOD("set_near", "near"), &CameraSettingsServer::set_near);
-	ClassDB::bind_method(D_METHOD("get_near"), &CameraSettingsServer::get_near);
-	ClassDB::bind_method(D_METHOD("set_far", "far"), &CameraSettingsServer::set_far);
-	ClassDB::bind_method(D_METHOD("get_far"), &CameraSettingsServer::get_far);
-	ClassDB::bind_method(D_METHOD("set_shake_intensity", "intensity"), &CameraSettingsServer::set_shake_intensity);
-	ClassDB::bind_method(D_METHOD("get_shake_intensity"), &CameraSettingsServer::get_shake_intensity);
-	ClassDB::bind_method(D_METHOD("set_head_bob_intensity", "intensity"), &CameraSettingsServer::set_head_bob_intensity);
-	ClassDB::bind_method(D_METHOD("get_head_bob_intensity"), &CameraSettingsServer::get_head_bob_intensity);
-	ClassDB::bind_method(D_METHOD("set_motion_blur_intensity", "intensity"), &CameraSettingsServer::set_motion_blur_intensity);
-	ClassDB::bind_method(D_METHOD("get_motion_blur_intensity"), &CameraSettingsServer::get_motion_blur_intensity);
-
-	ClassDB::bind_method(D_METHOD("add_camera", "camera"), &CameraSettingsServer::add_camera);
-	ClassDB::bind_method(D_METHOD("remove_camera", "camera"), &CameraSettingsServer::remove_camera);
-	ClassDB::bind_method(D_METHOD("has_camera", "camera"), &CameraSettingsServer::has_camera);
-	ClassDB::bind_method(D_METHOD("get_managed_cameras"), &CameraSettingsServer::get_managed_cameras);
-	ClassDB::bind_method(D_METHOD("apply_to_cameras"), &CameraSettingsServer::apply_to_cameras);
-
-	ClassDB::bind_static_method("CameraSettingsServer", D_METHOD("get_camera_group"), &CameraSettingsServer::get_camera_group);
+void Camera3DSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"field_of_view",
+		"keep_aspect",
+		"near",
+		"far",
+		"shake_intensity",
+		"head_bob_intensity",
+		"motion_blur_intensity",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
 }
 
-CameraSettingsServer::CameraSettingsServer() {
+void Camera3DSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("field_of_view_changed", PropertyInfo(Variant::FLOAT, "fov")));
+	ADD_SIGNAL(MethodInfo("keep_aspect_changed", PropertyInfo(Variant::INT, "keep_aspect", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Camera3D.KeepAspect")));
+	ADD_SIGNAL(MethodInfo("near_changed", PropertyInfo(Variant::FLOAT, "near")));
+	ADD_SIGNAL(MethodInfo("far_changed", PropertyInfo(Variant::FLOAT, "far")));
+	ADD_SIGNAL(MethodInfo("shake_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+	ADD_SIGNAL(MethodInfo("head_bob_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+	ADD_SIGNAL(MethodInfo("motion_blur_intensity_changed", PropertyInfo(Variant::FLOAT, "intensity")));
+
+	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &Camera3DSettingsServer::set_enabled);
+	ClassDB::bind_method(D_METHOD("is_enabled"), &Camera3DSettingsServer::is_enabled);
+	ClassDB::bind_method(D_METHOD("set_field_of_view", "degrees"), &Camera3DSettingsServer::set_field_of_view);
+	ClassDB::bind_method(D_METHOD("get_field_of_view"), &Camera3DSettingsServer::get_field_of_view);
+	ClassDB::bind_method(D_METHOD("set_keep_aspect", "keep_aspect"), &Camera3DSettingsServer::set_keep_aspect);
+	ClassDB::bind_method(D_METHOD("get_keep_aspect"), &Camera3DSettingsServer::get_keep_aspect);
+	ClassDB::bind_method(D_METHOD("set_near", "near"), &Camera3DSettingsServer::set_near);
+	ClassDB::bind_method(D_METHOD("get_near"), &Camera3DSettingsServer::get_near);
+	ClassDB::bind_method(D_METHOD("set_far", "far"), &Camera3DSettingsServer::set_far);
+	ClassDB::bind_method(D_METHOD("get_far"), &Camera3DSettingsServer::get_far);
+	ClassDB::bind_method(D_METHOD("set_shake_intensity", "intensity"), &Camera3DSettingsServer::set_shake_intensity);
+	ClassDB::bind_method(D_METHOD("get_shake_intensity"), &Camera3DSettingsServer::get_shake_intensity);
+	ClassDB::bind_method(D_METHOD("set_head_bob_intensity", "intensity"), &Camera3DSettingsServer::set_head_bob_intensity);
+	ClassDB::bind_method(D_METHOD("get_head_bob_intensity"), &Camera3DSettingsServer::get_head_bob_intensity);
+	ClassDB::bind_method(D_METHOD("set_motion_blur_intensity", "intensity"), &Camera3DSettingsServer::set_motion_blur_intensity);
+	ClassDB::bind_method(D_METHOD("get_motion_blur_intensity"), &Camera3DSettingsServer::get_motion_blur_intensity);
+
+	ClassDB::bind_method(D_METHOD("add_camera", "camera"), &Camera3DSettingsServer::add_camera);
+	ClassDB::bind_method(D_METHOD("remove_camera", "camera"), &Camera3DSettingsServer::remove_camera);
+	ClassDB::bind_method(D_METHOD("has_camera", "camera"), &Camera3DSettingsServer::has_camera);
+	ClassDB::bind_method(D_METHOD("get_managed_cameras"), &Camera3DSettingsServer::get_managed_cameras);
+	ClassDB::bind_method(D_METHOD("apply_to_cameras"), &Camera3DSettingsServer::apply_to_cameras);
+
+	ClassDB::bind_static_method("Camera3DSettingsServer", D_METHOD("get_camera_group"), &Camera3DSettingsServer::get_camera_group);
+}
+
+Camera3DSettingsServer::Camera3DSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
 	register_settings();
 	for (const char *setting_name : camera_setting_names) {
 		const StringName bound_name = setting_name;
-		bind_setting_callbacks(bound_name, callable_mp(this, &CameraSettingsServer::_push_camera_value).bind(bound_name), callable_mp(this, &CameraSettingsServer::_pull_camera_value).bind(bound_name));
+		bind_setting_callbacks(bound_name, callable_mp(this, &Camera3DSettingsServer::_push_camera_value).bind(bound_name), callable_mp(this, &Camera3DSettingsServer::_pull_camera_value).bind(bound_name));
 	}
 	for (const char *setting_name : camera_game_setting_names) {
 		set_setting_flags(StringName(setting_name), SETTING_FLAG_NO_ENGINE_TARGET);
 	}
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	if (manager != nullptr) {
-		manager->connect(SNAME("startup_applied"), callable_mp(this, &CameraSettingsServer::_on_startup_applied));
+		manager->connect(SNAME("startup_applied"), callable_mp(this, &Camera3DSettingsServer::_on_startup_applied));
 	}
 }
 
-CameraSettingsServer::~CameraSettingsServer() {
+Camera3DSettingsServer::~Camera3DSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}

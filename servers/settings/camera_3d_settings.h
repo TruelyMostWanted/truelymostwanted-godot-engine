@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_settings.cpp                                                */
+/*  camera_3d_settings.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,22 +28,48 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "input_map_settings.h"
+#pragma once
 
-#include "core/object/class_db.h"
+#ifndef _3D_DISABLED
 
-void InputMapSettings::set_actions(const TypedArray<InputMapAction> &p_actions) {
-	actions = p_actions;
-	emit_changed();
-}
+#include "core/io/resource.h"
+#include "scene/3d/camera_3d.h"
 
-TypedArray<InputMapAction> InputMapSettings::get_actions() const {
-	return actions;
-}
+// Data of the `camera` settings domain (#28): field of view (and whether it is vertical or horizontal), near and far
+// clip plane, and the game-side motion values (camera shake, head bob, motion blur).
+// Camera3DSettingsServer pushes the camera values to the Camera3D nodes in its group and to the cameras added to it.
+class Camera3DSettings : public Resource {
+	GDCLASS(Camera3DSettings, Resource);
 
-void InputMapSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_actions", "actions"), &InputMapSettings::set_actions);
-	ClassDB::bind_method(D_METHOD("get_actions"), &InputMapSettings::get_actions);
+	bool enabled = true;
+	float field_of_view = 75.0;
+	Camera3D::KeepAspect keep_aspect = Camera3D::KEEP_HEIGHT;
+	float near_distance = 0.05;
+	float far_distance = 4000.0;
+	float shake_intensity = 1.0;
+	float head_bob_intensity = 1.0;
+	float motion_blur_intensity = 1.0;
 
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "actions", PROPERTY_HINT_ARRAY_TYPE, "InputMapAction"), "set_actions", "get_actions");
-}
+protected:
+	static void _bind_methods();
+
+public:
+	void set_enabled(bool p_enabled);
+	bool is_enabled() const;
+	void set_field_of_view(float p_degrees);
+	float get_field_of_view() const;
+	void set_keep_aspect(Camera3D::KeepAspect p_keep_aspect);
+	Camera3D::KeepAspect get_keep_aspect() const;
+	void set_near(float p_near);
+	float get_near() const;
+	void set_far(float p_far);
+	float get_far() const;
+	void set_shake_intensity(float p_intensity);
+	float get_shake_intensity() const;
+	void set_head_bob_intensity(float p_intensity);
+	float get_head_bob_intensity() const;
+	void set_motion_blur_intensity(float p_intensity);
+	float get_motion_blur_intensity() const;
+};
+
+#endif // _3D_DISABLED

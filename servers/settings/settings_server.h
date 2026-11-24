@@ -78,6 +78,9 @@ public:
 	static constexpr ApplyPhase APPLY_PHASE_SCENE = SettingsServerEnums::APPLY_PHASE_SCENE;
 	static constexpr ApplyPhase APPLY_PHASE_MAX = SettingsServerEnums::APPLY_PHASE_MAX;
 
+	// The finest step of a [float] setting: at most three decimals.
+	static constexpr double FLOAT_STEP = 0.001;
+
 	enum SettingFlags {
 		SETTING_FLAG_NONE = 0,
 		SETTING_FLAG_RESTART_REQUIRED = 1, // The engine reads the value only at startup.
@@ -122,6 +125,7 @@ private:
 	bool unsaved = false;
 	bool format_warned = false;
 	String format_warned_path; // The last path whose extension gave no usable format (warned once).
+	mutable String file_name_warned; // The last invalid `settings/<domain>/file_name` (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -131,7 +135,10 @@ private:
 	void _initialize();
 	Ref<Resource> _effective_settings() const;
 	bool _object_has_value(const Ref<Resource> &p_settings, const StringName &p_name) const;
-	void _push_values(const PackedStringArray &p_names);
+	// Pushes the values to the engine. Returns the effective values that were pushed (pending values with the session overrides).
+	Ref<Resource> _push_values(const PackedStringArray &p_names);
+	// Calls _notify_value_applied() once per name with its value in `p_effective`.
+	void _notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective);
 	void _read_from_engine_into(const Ref<Resource> &p_settings);
 	Variant _validate(const StringName &p_name, const Variant &p_value) const;
 	bool _has_flag(const PackedStringArray &p_names, SettingFlags p_flag) const;
@@ -140,8 +147,8 @@ private:
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
-	// The project setting `settings/paths/<domain>_settings_path`; empty if not set.
-	String _get_project_file_path() const;
+	// `settings/<domain>/file_name` (a relative path without extension); the domain name if empty or invalid.
+	String _get_file_name() const;
 	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
 	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
 	void _emit_settings_changed(const PackedStringArray &p_names);
@@ -155,9 +162,16 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings);
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const;
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data);
-	// Text format of the file when no file path is set: the project setting `settings/storage/format`, or INI if
-	// the domain can't use it (CSV is only for ListSettingsServer, a format whose module is missing).
+	// Text format of the file when no file path is set: _get_configured_format(), or INI if the domain can't use it
+	// (CSV is only for ListSettingsServer, a format whose module is missing).
 	virtual ResourceTextSerializer::Format _get_file_format();
+	// `settings/<domain>/format` with `settings/<domain>/override_format`, otherwise `settings/general/default_format`.
+	ResourceTextSerializer::Format _get_configured_format() const;
+	// Storage form (#172): the resource that is written to the settings file and read back from it. By default the
+	// settings resource itself. A domain whose settings hold values without a readable text form (sub-resources such
+	// as input events) returns a resource with the same value names and plain values, and converts it back.
+	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const { return p_settings; }
+	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const { return p_storage; }
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)
@@ -168,6 +182,13 @@ protected:
 	GDVIRTUAL2RC(Variant, _validate_value, StringName, Variant)
 	GDVIRTUAL2R(Dictionary, _migrate, int, Dictionary)
 	GDVIRTUAL1RC(bool, _is_value_supported, StringName)
+	GDVIRTUAL2(_value_applied, StringName, Variant)
+
+	// Called once per value after it reached the engine and the applied state is updated: on apply() (also at startup
+	// after the file is loaded, and after reset_to_defaults() in APPLY_MODE_IMMEDIATE), apply_with_confirmation(),
+	// cancel_confirmation() (the restored values) and when a session override is set or cleared. Not called for pending
+	// changes in APPLY_MODE_MANUAL. Domains emit their typed signals here. The default calls the script virtual _value_applied().
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value);
 
 	// For ListSettingsServer: the pending value was changed in place; emits `value_changed` and applies it in APPLY_MODE_IMMEDIATE.
 	void notify_value_changed(const StringName &p_name);
@@ -186,14 +207,27 @@ public:
 	static bool values_equal(const Variant &p_a, const Variant &p_b);
 	static Ref<Resource> copy_settings(const Ref<Resource> &p_settings);
 
+	// Float values have at most three decimals: snapped to `p_step` (at least 0.001) relative to `p_offset`, then to
+	// 0.001; -0.0 becomes 0.0. Non-finite values are returned unchanged.
+	static double snap_float(double p_value, double p_step = FLOAT_STEP, double p_offset = 0.0);
+	// The step and offset (range minimum) of a [float] property: the step of its PROPERTY_HINT_RANGE if it is at
+	// least FLOAT_STEP, else FLOAT_STEP and no offset.
+	static void get_float_step(const PropertyInfo &p_info, double &r_step, double &r_offset);
+	// `p_value` of the property `p_name` of `p_object`, a [float] property snapped to its step (other values unchanged).
+	static Variant snap_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value);
+	// Snaps every [float] value of a settings resource and of the resources in its Array values (list entries).
+	static void snap_resource_floats(const Ref<Resource> &p_resource);
+
 	static void register_settings();
-	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
+	// The project settings `settings/general/folder` and `settings/general/default_format`. Bound on SettingsServerManager.
 	static String get_storage_folder();
 	static ResourceTextSerializer::Format get_storage_format();
-	// `settings/paths/<domain>_settings_path`: the file path of a domain set in the project settings.
-	static String get_path_setting_name(const StringName &p_domain);
-	// Defines the project setting of the domain's path (called by SettingsServerManager::register_server()).
-	static void register_path_setting(const StringName &p_domain, bool p_csv);
+	// `settings/<domain>/<key>`: a project setting of one domain (`file_name`, `override_format`, `format`).
+	static String get_domain_setting_name(const StringName &p_domain, const String &p_key);
+	// Defines `settings/<domain>/file_name`, `override_format` and `format` (called by SettingsServerManager::register_server()).
+	static void register_domain_settings(const StringName &p_domain, bool p_csv);
+	// A relative file name for `settings/<domain>/file_name`: not empty, not absolute, no `..`, `.` or empty folder name.
+	static bool is_valid_file_name(const String &p_file_name);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;
