@@ -158,6 +158,77 @@ TEST_CASE("[TTSServer] Persona list and default persona") {
 	CHECK(server->get_personas().is_empty());
 }
 
+TEST_CASE("[TTSServer] The player's persona overrides come before the personas of the game") {
+	TTSServer *server = TTSServer::get_singleton();
+	REQUIRE(server != nullptr);
+	server->clear_personas();
+	server->clear_persona_overrides();
+
+	Ref<TTSPersona> narrator = make_persona("narrator", "", "en");
+	Ref<TTSPersona> guard = make_persona("guard", "", "de");
+	server->add_persona(narrator);
+	server->add_persona(guard);
+	server->set_default_persona("narrator");
+
+	// The player's narrator replaces the game's narrator; the game's one stays the base persona.
+	Ref<TTSPersona> player_narrator = make_persona("narrator", "Player Voice", "en");
+	server->set_persona_override(player_narrator);
+	CHECK(server->has_persona_override("narrator"));
+	CHECK_FALSE(server->has_persona_override("guard"));
+	CHECK(server->get_persona("narrator") == player_narrator);
+	CHECK(server->get_persona_override("narrator") == player_narrator);
+	CHECK(server->get_base_persona("narrator") == narrator);
+	CHECK(server->get_default_persona() == player_narrator);
+
+	// A persona only the player has.
+	Ref<TTSPersona> helper = make_persona("helper", "", "fr");
+	server->set_persona_override(helper);
+	CHECK(server->has_persona("helper"));
+	CHECK(server->get_base_persona("helper").is_null());
+	CHECK(server->get_persona_names() == PackedStringArray({ "narrator", "guard", "helper" }));
+	const TypedArray<TTSPersona> personas = server->get_personas();
+	REQUIRE(personas.size() == 3);
+	CHECK(Ref<TTSPersona>(personas[0]) == player_narrator);
+	CHECK(Ref<TTSPersona>(personas[2]) == helper);
+	CHECK(server->get_persona_overrides().size() == 2);
+
+	// The game adding its persona again (for example in _ready()) does not hide the player's version.
+	server->add_persona(make_persona("narrator", "", "en"));
+	CHECK(server->get_persona("narrator") == player_narrator);
+
+	// The player's default persona wins over the game's; a missing one falls back to the game's.
+	server->set_default_persona_override("helper");
+	CHECK(server->get_default_persona_override() == StringName("helper"));
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+	CHECK(server->get_default_persona() == helper);
+	server->set_default_persona("guard");
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+	server->set_default_persona_override("not_there");
+	CHECK(server->get_default_persona_name() == StringName("guard"));
+	// The game may choose a persona only the player has.
+	server->set_default_persona("helper");
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+
+	// Removing the override brings the game's persona back.
+	server->remove_persona_override("narrator");
+	CHECK(server->get_persona("narrator").is_valid());
+	CHECK(server->get_persona("narrator") != player_narrator);
+	CHECK_FALSE(server->has_persona_override("narrator"));
+
+	// Speaking with an unknown persona name warns and uses the default persona (TTS is off in tests: -1).
+	ERR_PRINT_OFF;
+	CHECK(server->speak_with_persona("Hello", "nobody") == -1);
+	CHECK(server->speak_with_persona("Hello", "helper") == -1);
+	ERR_PRINT_ON;
+
+	server->clear_persona_overrides();
+	CHECK(server->get_persona_overrides().is_empty());
+	CHECK(server->get_default_persona_override().is_empty());
+	CHECK_FALSE(server->has_persona("helper"));
+	server->clear_personas();
+	CHECK(server->get_personas().is_empty());
+}
+
 TEST_CASE("[TTSServer] Graceful behavior without text to speech") {
 	TTSServer *server = TTSServer::get_singleton();
 	REQUIRE(server != nullptr);

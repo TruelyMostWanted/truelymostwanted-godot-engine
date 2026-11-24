@@ -144,4 +144,33 @@
 			If [code]true[/code], a stored bus that the bus layout does not have is added to [AudioServer] at the end of the layout when the values are applied. If [code]false[/code], it is skipped with one warning per bus and session; its entry stays in the settings and in the file. Initialized from [member ProjectSettings.settings/audio/create_missing_buses] when the server is created, so the startup uses the project setting.
 		</member>
 	</members>
+	<signals>
+		<signal name="bus_layout_changed">
+			<description>
+				Emitted when the list of buses changed: after [AudioServer] got a new bus layout ([method AudioServer.set_bus_layout], [method AudioServer.add_bus], [method AudioServer.remove_bus], ...) and the stored values were pushed to it again, or when applied settings name other buses than before (for example a loaded file from another game version). Use it to rebuild an audio options menu with one slider per bus ([method get_bus_names]).
+			</description>
+		</signal>
+		<signal name="bus_mute_changed">
+			<param index="0" name="bus_name" type="StringName" />
+			<param index="1" name="muted" type="bool" />
+			<description>
+				Emitted when the mute state of the bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+			</description>
+		</signal>
+		<signal name="bus_solo_changed">
+			<param index="0" name="bus_name" type="StringName" />
+			<param index="1" name="solo" type="bool" />
+			<description>
+				Emitted when the solo state of the bus [param bus_name] reached [AudioServer]. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+			</description>
+		</signal>
+		<signal name="bus_volume_changed">
+			<param index="0" name="bus_name" type="StringName" />
+			<param index="1" name="volume_db" type="float" />
+			<description>
+				Emitted when the volume of the bus [param bus_name] reached [AudioServer], in decibels. It fires once per change that reached [AudioServer]: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation] and [method SettingsServer.cancel_confirmation] (with the restored value). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL], nor for buses that the bus layout does not have (see [member create_missing_buses]).
+				Use it to update a volume label or to play a short sound at the new volume, for example on the [code]"Master"[/code] bus.
+			</description>
+		</signal>
+	</signals>
 </class>

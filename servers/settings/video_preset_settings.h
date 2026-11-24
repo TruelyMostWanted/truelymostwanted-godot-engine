@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  camera_settings.h                                                     */
+/*  video_preset_settings.h                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,46 +30,20 @@
 
 #pragma once
 
-#ifndef _3D_DISABLED
-
 #include "core/io/resource.h"
-#include "scene/3d/camera_3d.h"
 
-// Data of the `camera` settings domain (#28): field of view (and whether it is vertical or horizontal), near and far
-// clip plane, and the game-side motion values (camera shake, head bob, motion blur).
-// CameraSettingsServer pushes the camera values to the Camera3D nodes in its group and to the cameras added to it.
-class CameraSettings : public Resource {
-	GDCLASS(CameraSettings, Resource);
+// Data of the `video_preset` settings domain (#25): the name of the graphics preset the player picked
+// ("Custom" after a change of a single value, empty if none was picked yet). The values of the preset are stored
+// by the video domains themselves. VideoPresetSettingsServer keeps it up to date.
+class VideoPresetSettings : public Resource {
+	GDCLASS(VideoPresetSettings, Resource);
 
-	bool enabled = true;
-	float field_of_view = 75.0;
-	Camera3D::KeepAspect keep_aspect = Camera3D::KEEP_HEIGHT;
-	float near_distance = 0.05;
-	float far_distance = 4000.0;
-	float shake_intensity = 1.0;
-	float head_bob_intensity = 1.0;
-	float motion_blur_intensity = 1.0;
+	String preset;
 
 protected:
 	static void _bind_methods();
 
 public:
-	void set_enabled(bool p_enabled);
-	bool is_enabled() const;
-	void set_field_of_view(float p_degrees);
-	float get_field_of_view() const;
-	void set_keep_aspect(Camera3D::KeepAspect p_keep_aspect);
-	Camera3D::KeepAspect get_keep_aspect() const;
-	void set_near(float p_near);
-	float get_near() const;
-	void set_far(float p_far);
-	float get_far() const;
-	void set_shake_intensity(float p_intensity);
-	float get_shake_intensity() const;
-	void set_head_bob_intensity(float p_intensity);
-	float get_head_bob_intensity() const;
-	void set_motion_blur_intensity(float p_intensity);
-	float get_motion_blur_intensity() const;
+	void set_preset(const String &p_preset);
+	String get_preset() const;
 };
-
-#endif // _3D_DISABLED

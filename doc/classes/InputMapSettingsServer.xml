@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="InputMapSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings server for the player's events of the [InputMap] actions, mirrored as [InputMapSettings].
+		Settings server for the player's events of the [InputMap] actions, mirrored as [InputActions].
 	</brief_description>
 	<description>
 		[InputMapSettingsServer] is the settings domain [code]"input_map"[/code]: it stores the keys, mouse buttons and joypad inputs the player bound to the actions of the project, loads them when the game starts and applies them to [InputMap] (in [constant SettingsServer.APPLY_PHASE_SERVERS], before the [SceneTree] exists). Sensitivity, inversion, vibration and the global deadzone are a separate domain, see [InputSettingsServer].
-		An event slot is addressed by action, device ([enum InputMapAction.InputDevice]: keyboard, mouse or gamepad) and slot. A rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" waits for the next input of the player and calls [method rebind] with the slot of the column; the device follows from the event. [method find_conflicts] tells which other actions use the event already, so the game can swap, clear or refuse. [method get_event_label] gives the text for the buttons of the menu.
-		The settings resource is an [InputMapSettings] with one [InputMapAction] row per slot. The defaults are the [InputMap] of the project settings when the game starts, so [method reset_action] and [method reset_all] give back the bindings of the project. Built-in [code]ui_*[/code] actions are left out unless [member ProjectSettings.settings/input_map/include_builtin_actions] is [code]true[/code].
-		When the file is loaded, the saved rows replace the bindings of their action. Actions added to the project since the file was saved keep their project bindings; saved actions that the project no longer has are skipped with a warning. Applying replaces the key, mouse button and joypad events of each action; other event types (touch, MIDI, ...) stay.
-		The file is [code]user://settings/input_map.ini[/code] by default and stores every event as readable text such as [code]Key:Ctrl+S[/code] or [code]JoypadMotion:LeftX+[/code] (see [InputMapAction]). It can also be stored as JSON or as CSV with one row per event ([member ProjectSettings.settings/storage/format]).
+		An event slot is addressed by action, device ([enum InputAction.InputDevice]: keyboard, mouse or gamepad) and slot. Slot [code]n[/code] of a device is the [code]n[/code]-th event of that device in the action. A rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" waits for the next input of the player and calls [method rebind] with the slot of the column; the device follows from the event. [method clear_event] removes the event of a slot, and the later slots of that device move up. [method find_conflicts] tells which other actions use the event already, so the game can swap, clear or refuse. [method get_event_label] gives the text for the buttons of the menu.
+		The settings resource is an [InputActions] with one [InputAction] per action; the key of an entry is [member InputAction.action]. The defaults are the [InputMap] of the project settings when the game starts, so [method reset_action] and [method reset_all] give back the bindings of the project. [member save_mode] decides which actions are managed: only the custom actions of the project by default, or the built-in [code]ui_*[/code] actions too (see [constant InputMap.INPUT_ACTION_LAYER_CUSTOM]).
+		When the file is loaded, the saved actions replace the bindings of their action. Actions added to the project since the file was saved keep their project bindings; saved actions that the project no longer has are skipped with a warning. Applying replaces the key, mouse button and joypad events of each action; other event types (touch, MIDI, ...) stay. An action that the player cleared is saved with its remaining events, so the project binding does not come back.
+		The file is [code]user://settings/input_map.ini[/code] by default and stores the events of every action as one readable text such as [code]Key:Ctrl+S; JoypadMotion:LeftX+[/code] (see [method events_to_text]), not as [InputEvent] sub-resources. Every format of [member ProjectSettings.settings/storage/format] keeps this layout; CSV has one row per action with the columns [code]action[/code], [code]deadzone[/code] and [code]bindings[/code]. The events of the settings are always in this text form (one key code, all devices or one joypad), so an action read back from the file equals the action that was saved. Files of the first layout of this server (version 1, [InputActions] with a [code]bindings[/code] property) are still read in JSON, INI and CSV; in XML, TOML and YAML their actions get the project bindings until the next save.
 		All methods below change the pending settings: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change reaches [InputMap] at once and is saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
 		[codeblocks]
 		[gdscript]
@@ -22,11 +22,11 @@
 		func _input(event):
 			if waiting_action.is_empty() or not event.is_pressed():
 				return
-			if InputMapAction.get_event_device(event) == InputMapAction.INPUT_DEVICE_MAX:
+			if InputAction.get_event_device(event) == InputAction.INPUT_DEVICE_MAX:
 				return # Mouse motion, touch, ...
 			get_viewport().set_input_as_handled()
 			for other in InputMapSettingsServer.find_conflicts(event, waiting_action):
-				InputMapSettingsServer.clear_event(other, InputMapAction.get_event_device(event), 0)
+				InputMapSettingsServer.remove_event(other, event)
 			InputMapSettingsServer.rebind(waiting_action, event, waiting_slot)
 			$JumpKeyButton.text = InputMapSettingsServer.get_event_label(event)
 			waiting_action = &amp;""
@@ -47,14 +47,14 @@
 		    {
 		        return;
 		    }
-		    if (InputMapAction.GetEventDevice(@event) == InputMapAction.InputDevice.Max)
+		    if (InputAction.GetEventDevice(@event) == InputAction.InputDevice.Max)
 		    {
 		        return; // Mouse motion, touch, ...
 		    }
 		    GetViewport().SetInputAsHandled();
 		    foreach (string other in InputMapSettingsServer.FindConflicts(@event, _waitingAction))
 		    {
-		        InputMapSettingsServer.ClearEvent(other, InputMapAction.GetEventDevice(@event), 0);
+		        InputMapSettingsServer.RemoveEvent(other, @event);
 		    }
 		    InputMapSettingsServer.Rebind(_waitingAction, @event, _waitingSlot);
 		    GetNode&lt;Button&gt;("JumpKeyButton").Text = InputMapSettingsServer.GetEventLabel(@event);
@@ -66,13 +66,29 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="add_event">
+			<return type="int" enum="Error" />
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event" type="InputEvent" />
+			<description>
+				Adds [param event] to [param action] as a new binding at the end of its events, without replacing a slot. Does nothing if the action already has the event. The device follows from the event, and the binding reacts to all devices.
+				Returns [constant ERR_DOES_NOT_EXIST] if this server does not manage [param action], and [constant ERR_INVALID_PARAMETER] for event types that can't be bound.
+			</description>
+		</method>
 		<method name="clear_event">
 			<return type="void" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputAction.InputDevice" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
-				Clears the slot [param slot] of [param device] of [param action]: the action no longer reacts to that input. The empty slot is stored, so the project binding does not come back after a restart; use [method reset_action] for that.
+				Removes the event in the slot [param slot] of [param device] of [param action]: the action no longer reacts to that input, and the later slots of the device move up. The action stays in the settings with its remaining events, so the project binding does not come back after a restart; use [method reset_action] for that. Does nothing if the slot is empty.
+			</description>
+		</method>
+		<method name="events_to_text" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="events" type="InputEvent[]" />
+			<description>
+				Returns the stored text form of [param events]: the text of each event (see [method InputAction.event_to_text]), separated by [code]"; "[/code], for example [code]"Key:Ctrl+S; JoypadButton:A"[/code]. A joypad event that is bound to one pad ends with [code]@[/code] and the device id, for example [code]JoypadButton:A@1[/code]. Events without a text form (touch, MIDI, ...) are left out. This is the [code]bindings[/code] value of an action in the settings file.
 			</description>
 		</method>
 		<method name="find_conflicts" qualifiers="const">
@@ -80,14 +96,14 @@
 			<param index="0" name="event" type="InputEvent" />
 			<param index="1" name="ignore_action" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Returns the actions (except [param ignore_action]) that already have a binding for [param event] in the pending settings. A pressed key matches a binding by keycode, physical keycode or key label. Bindings for a fixed [member InputMapAction.device_id] only conflict with events of that device or of all devices ([code]-1[/code]).
+				Returns the actions (except [param ignore_action]) that already have a binding for [param event] in the pending settings. A pressed key matches a binding by keycode, physical keycode or key label. Bindings for a fixed device id only conflict with events of that device or of all devices ([code]-1[/code]).
 			</description>
 		</method>
 		<method name="get_action_deadzone" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="action" type="StringName" />
 			<description>
-				Returns the deadzone of [param action] (see [member InputMapAction.deadzone]).
+				Returns the deadzone of [param action] (see [member InputAction.deadzone]).
 			</description>
 		</method>
 		<method name="get_action_names" qualifiers="const">
@@ -99,7 +115,7 @@
 		<method name="get_event" qualifiers="const">
 			<return type="InputEvent" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputAction.InputDevice" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
 				Returns the event in the slot [param slot] of [param device] of [param action], or [code]null[/code] if the slot is empty.
@@ -109,22 +125,29 @@
 			<return type="String" />
 			<param index="0" name="event" type="InputEvent" />
 			<description>
-				Returns a short text of [param event] for the UI, such as [code]"Ctrl+S"[/code] or [code]"Joypad A"[/code]. Same as [method InputMapAction.event_to_label].
+				Returns a short English text of [param event] for the UI, for example [code]"Ctrl+S"[/code], [code]"Left Mouse Button"[/code], [code]"Joypad A"[/code] or [code]"Left Stick Right"[/code]. A physical key shows the key of the current keyboard layout on Windows, Linux and macOS (see [method DisplayServer.keyboard_get_label_from_physical]); on the other platforms it shows the US key. Translate the text with [method Object.tr] if needed.
 			</description>
 		</method>
 		<method name="get_events" qualifiers="const">
 			<return type="InputEvent[]" />
 			<param index="0" name="action" type="StringName" />
 			<description>
-				Returns all bound events of [param action] in the pending settings: keyboard, mouse and gamepad, each by slot.
+				Returns all bound events of [param action] in the pending settings: keyboard, mouse and gamepad.
+			</description>
+		</method>
+		<method name="get_input_action" qualifiers="const">
+			<return type="InputAction" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns a copy of [param action] in the pending settings as an [InputAction], or [code]null[/code] if this server does not manage it. Changing the copy does not change the settings; use the methods of this class for that.
 			</description>
 		</method>
 		<method name="get_slot_count" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="action" type="StringName" />
-			<param index="1" name="device" type="int" enum="InputMapAction.InputDevice" />
+			<param index="1" name="device" type="int" enum="InputAction.InputDevice" />
 			<description>
-				Returns the number of slots of [param device] that [param action] uses: the highest bound slot plus one, or [code]0[/code] if no slot of the device is bound.
+				Returns the number of events of [param device] that [param action] has, which is the number of slots in use. It is [code]0[/code] if no event of the device is bound.
 			</description>
 		</method>
 		<method name="has_action" qualifiers="const">
@@ -140,8 +163,17 @@
 			<param index="1" name="event" type="InputEvent" />
 			<param index="2" name="slot" type="int" default="0" />
 			<description>
-				Binds [param event] to the slot [param slot] of [param action]; the device follows from the event (see [method InputMapAction.get_event_device]). A pressed key is stored by its physical keycode, and the binding reacts to all devices (see [member InputMapAction.device_id]). Other actions that use the same event keep it; check [method find_conflicts] first.
+				Binds [param event] to the slot [param slot] of [param action]; the device follows from the event (see [method InputAction.get_event_device]). If the slot is in use, its event is replaced; if [param slot] is behind the last one of the device, the event is added at the end. A pressed key is stored by its physical keycode, and the binding reacts to all devices, because the id of a joypad changes when it is reconnected. Other actions that use the same event keep it; check [method find_conflicts] first.
 				Returns [constant ERR_DOES_NOT_EXIST] if this server does not manage [param action], and [constant ERR_INVALID_PARAMETER] for event types that can't be bound or a negative slot.
+			</description>
+		</method>
+		<method name="remove_event">
+			<return type="int" enum="Error" />
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event" type="InputEvent" />
+			<description>
+				Removes the binding of [param event] from [param action]; the later slots of the device move up. The first binding that matches [param event] is removed (a stored [code]Key:W[/code] matches a pressed W key); if none matches, the binding with the same text form as [param event] is removed.
+				Returns [constant ERR_DOES_NOT_EXIST] if this server does not manage [param action] or the action has no such binding, and [constant ERR_INVALID_PARAMETER] for event types that can't be bound.
 			</description>
 		</method>
 		<method name="reset_action">
@@ -165,5 +197,25 @@
 				Sets the deadzone of [param action], from [code]0.0[/code] to [code]1.0[/code] (see [method InputMap.action_set_deadzone]).
 			</description>
 		</method>
+		<method name="text_to_events" qualifiers="static">
+			<return type="InputEvent[]" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns new events of the text form [param text] written by [method events_to_text]. Items that are not valid are skipped. The events react to all devices ([member InputEvent.device] [code]-1[/code]), joypad events with [code]@[/code] and a device id only to that pad.
+			</description>
+		</method>
 	</methods>
+	<members>
+		<member name="save_mode" type="int" setter="set_save_mode" getter="get_save_mode" enum="InputMapSettingsServer.SaveMode">
+			Which actions this server manages and stores. The default is the project setting [member ProjectSettings.settings/input_map/save_mode], read when the server is created.
+		</member>
+	</members>
+	<constants>
+		<constant name="SAVE_MODE_CUSTOM_ONLY" value="0" enum="SaveMode">
+			Only the custom actions of the project are managed and stored; the built-in [code]ui_*[/code] actions are left out.
+		</constant>
+		<constant name="SAVE_MODE_ALL" value="1" enum="SaveMode">
+			All actions are managed and stored, including the built-in [code]ui_*[/code] actions, so players can rebind the keys of the GUI.
+		</constant>
+	</constants>
 </class>

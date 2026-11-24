@@ -1564,11 +1564,11 @@
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
 		</member>
+		<member name="Camera3DSettingsServer" type="Camera3DSettingsServer" setter="" getter="">
+			The [Camera3DSettingsServer] singleton.
+		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
-		</member>
-		<member name="CameraSettingsServer" type="CameraSettingsServer" setter="" getter="">
-			The [CameraSettingsServer] singleton.
 		</member>
 		<member name="ClassDB" type="ClassDB" setter="" getter="">
 			The [ClassDB] singleton.
@@ -1710,6 +1710,9 @@
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
 		</member>
+		<member name="TTSPersonaSettingsServer" type="TTSPersonaSettingsServer" setter="" getter="">
+			The [TTSPersonaSettingsServer] singleton.
+		</member>
 		<member name="TTSServer" type="TTSServer" setter="" getter="">
 			The [TTSServer] singleton.
 		</member>
@@ -1731,6 +1734,9 @@
 		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
 			The [VideoEffectSettingsServer] singleton.
 		</member>
+		<member name="VideoPresetSettingsServer" type="VideoPresetSettingsServer" setter="" getter="">
+			The [VideoPresetSettingsServer] singleton.
+		</member>
 		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
 			The [VideoQualitySettingsServer] singleton.
 		</member>
@@ -1751,6 +1757,9 @@
 		</member>
 		<member name="XRServer" type="XRServer" setter="" getter="">
 			The [XRServer] singleton.
+		</member>
+		<member name="XRSettingsServer" type="XRSettingsServer" setter="" getter="">
+			The [XRSettingsServer] singleton.
 		</member>
 	</members>
 	<constants>
