@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceBudget" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A list of performance limits that a recorded run must stay within.
+	</brief_description>
+	<description>
+		A [PerformanceBudget] is a list of [PerformanceBudgetRule]s. Create it in the Inspector and save it as a [code].tres[/code] file, then check a run with [method PerformanceRecorder.check_budget], or pass it on the command line with [code]--performance-budget &lt;file&gt;[/code] (or [member ProjectSettings.debug/performance_recording/budget]) to make an automated run exit with code [code]1[/code] when a rule fails.
+		[codeblocks]
+		[gdscript]
+		var budget = PerformanceBudget.new()
+		var rule = PerformanceBudgetRule.new()
+		rule.column = "frame_time"
+		rule.statistic = PerformanceBudgetRule.STATISTIC_PERCENTILE
+		rule.percentile = 99.0
+		rule.limit = 33333.0 # 30 FPS
+		budget.add_rule(rule)
+
+		var result = PerformanceRecorder.check_budget(budget)
+		print(result.to_text())
+		[/gdscript]
+		[csharp]
+		var budget = new PerformanceBudget();
+		budget.AddRule(new PerformanceBudgetRule
+		{
+			Column = "frame_time",
+			Statistic = PerformanceBudgetRule.StatisticEnum.Percentile,
+			Percentile = 99.0,
+			Limit = 33333.0, // 30 FPS
+		});
+
+		var result = PerformanceRecorder.CheckBudget(budget);
+		GD.Print(result.ToText());
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_rule">
+			<param index="0" name="rule" type="PerformanceBudgetRule" />
+			<description>
+				Appends [param rule] to [member rules].
+			</description>
+		</method>
+		<method name="check_summary" qualifiers="const">
+			<return type="PerformanceBudgetResult" />
+			<param index="0" name="summary" type="PerformanceSummary" />
+			<description>
+				Checks every rule against [param summary] and returns the failures. A rule fails if its statistic is greater than [member PerformanceBudgetRule.limit], if its column was not recorded, or if the column has no samples. Empty entries of [member rules] are skipped.
+			</description>
+		</method>
+		<method name="get_rule_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of entries in [member rules], including empty ones.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="rules" type="PerformanceBudgetRule[]" setter="set_rules" getter="get_rules" default="[]">
+			The limits of the budget.
+		</member>
+	</members>
+</class>
