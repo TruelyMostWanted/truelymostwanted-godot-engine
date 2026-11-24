@@ -1614,6 +1614,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputMapSettingsServer" type="InputMapSettingsServer" setter="" getter="">
+			The [InputMapSettingsServer] singleton.
+		</member>
 		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
 			The [InputSettingsServer] singleton.
 		</member>
@@ -1624,9 +1627,6 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
-		</member>
-		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
-			The [KeyBindingSettingsServer] singleton.
 		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
