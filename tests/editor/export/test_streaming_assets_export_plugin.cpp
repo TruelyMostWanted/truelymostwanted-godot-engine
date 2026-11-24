@@ -36,6 +36,7 @@ TEST_FORCE_LINK(test_streaming_assets_export_plugin)
 
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/streaming_assets_server.h"
 #include "editor/export/streaming_assets_export_plugin.h"
 #include "tests/test_utils.h"
 
@@ -55,7 +56,9 @@ TEST_CASE("[StreamingAssetsExportPlugin] expand_template") {
 	CHECK(Plugin::expand_template("{exe_name}/{exe_name}.data", "a") == "a/a.data");
 	CHECK(Plugin::expand_template("Assets", "MyGame") == "Assets");
 	// Unknown placeholders stay unchanged.
-	CHECK(Plugin::expand_template("{app_name}/x", "MyGame") == "{app_name}/x");
+	CHECK(Plugin::expand_template("{unknown}/x", "MyGame") == "{unknown}/x");
+	// The plugin and the runtime share StreamingAssetsServer::expand_template().
+	CHECK(Plugin::expand_template("{app_name}/{exe_name}", "MyGame") == StreamingAssetsServer::expand_template("{app_name}/{exe_name}", "MyGame"));
 }
 
 TEST_CASE("[StreamingAssetsExportPlugin] is_valid_target_folder") {

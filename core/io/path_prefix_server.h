@@ -72,6 +72,9 @@ public:
 class PathPrefixServer : public Object {
 	GDCLASS(PathPrefixServer, Object);
 
+	// Registers the locked `streaming://` prefix.
+	friend class StreamingAssetsServer;
+
 public:
 	enum OSPath {
 		OS_PATH_DATA,
