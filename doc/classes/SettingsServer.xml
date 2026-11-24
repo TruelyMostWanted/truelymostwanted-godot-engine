@@ -105,6 +105,7 @@
 			<return type="int" enum="SettingsServer.ApplyPhase" />
 			<description>
 				Returns the [enum ApplyPhase] in which [SettingsServerManager] starts this server while the game starts. The default is [constant APPLY_PHASE_SERVERS]. [constant APPLY_PHASE_NONE] and values outside the range of [enum ApplyPhase] are clamped to the first or the last phase.
+				[b]Note:[/b] A script domain listed in [member ProjectSettings.settings/startup/custom_servers] is created in [constant APPLY_PHASE_SCENE], the latest phase, and is started at once, whatever this method returns: scripts can't run before the [DisplayServer] exists. Only a domain written in C++ (an engine module or a GDExtension registered at the servers level) can start in [constant APPLY_PHASE_PRE_DISPLAY] or [constant APPLY_PHASE_SERVERS]. A domain registered after its phase (for example by an autoload) is started when it is registered.
 			</description>
 		</method>
 		<method name="_get_domain" qualifiers="virtual const">
@@ -154,6 +155,7 @@
 			<description>
 				Pushes all values that differ between the pending and the applied copy to the engine, makes the pending copy the applied one, emits [signal applied] and queues an autosave. Returns [constant OK] when there is nothing to apply.
 				If one of the changed values has [constant SETTING_FLAG_CONFIRM] (and the server is not starting), [method apply_with_confirmation] is called instead and its result is returned. Values with [constant SETTING_FLAG_RESTART_REQUIRED] are listed in [method get_restart_required_names] and reported with [signal restart_required].
+				If a confirmation is pending ([method is_confirmation_pending]), it is kept first ([method confirm_changes]: [signal confirmation_finished] with [code]true[/code]): the player changed more settings while the confirmation dialog was open, so the pending values work. A later [method cancel_confirmation] only reverts the values of a new confirmation.
 			</description>
 		</method>
 		<method name="apply_with_confirmation">
@@ -161,7 +163,7 @@
 			<param index="0" name="timeout_sec" type="float" default="-1.0" />
 			<description>
 				Applies the pending changes like [method apply], keeps a backup of the previous applied state and waits for [method confirm_changes]. If it is not called within [param timeout_sec] seconds, [method cancel_confirmation] restores the backup. A negative [param timeout_sec] uses [member ProjectSettings.settings/apply/confirmation_timeout]. Emits [signal confirmation_requested].
-				The changes are not saved until they are confirmed. Returns [constant OK] when there is nothing to apply and [constant ERR_BUSY] if a confirmation is already pending.
+				The changes are not saved until they are confirmed. Returns [constant OK] when there is nothing to apply. If a confirmation is already pending, it is kept first ([method confirm_changes]), then the new confirmation starts with its own backup and timeout.
 			</description>
 		</method>
 		<method name="bind_setting_callbacks">
@@ -272,7 +274,7 @@
 		<method name="get_restart_required_names" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the names of the settings with [constant SETTING_FLAG_RESTART_REQUIRED] that were applied since the game started. Their new values take effect after a restart.
+				Returns the names of the settings with [constant SETTING_FLAG_RESTART_REQUIRED] whose applied value differs from the value the engine started with. Their new values take effect after a restart. A name is removed when its value is applied back to the value of the start (also by [method cancel_confirmation] or [method reset_to_defaults]), and the list is cleared when [SettingsServerManager] starts the server. Before the server is started, the defaults are the values of the start.
 			</description>
 		</method>
 		<method name="get_setting_flags" qualifiers="const">
@@ -388,7 +390,7 @@
 		<method name="save">
 			<return type="int" enum="Error" />
 			<description>
-				Writes the applied state to the settings file and creates the folder if needed. While a confirmation is pending, the state from before the confirmation is written. With [member ProjectSettings.settings/storage/only_changed_values], only values that differ from the defaults are written (INI and JSON). Emits [signal saved]. Returns an error code and prints an error if the file can't be written.
+				Writes the applied state to the settings file and creates the folder if needed. While a confirmation is pending, the state from before the confirmation is written. With [member ProjectSettings.settings/storage/only_changed_values], only values that differ from the defaults are written (INI and JSON). Values are compared by their stored properties, like [method is_dirty]: the list of a [ListSettingsServer] is not written while its entries have the values of the default entries, even though they are other resources. Emits [signal saved]. Returns an error code and prints an error if the file can't be written.
 				[b]Note:[/b] Pending values that are not applied are not saved. A save that was queued by autosave is cleared.
 			</description>
 		</method>
@@ -469,7 +471,7 @@
 		<signal name="restart_required">
 			<param index="0" name="names" type="PackedStringArray" />
 			<description>
-				Emitted when values with [constant SETTING_FLAG_RESTART_REQUIRED] were applied. They take effect after a restart. Not emitted while the server starts.
+				Emitted when the list of [method get_restart_required_names] changes: a value with [constant SETTING_FLAG_RESTART_REQUIRED] was applied and differs from the value the engine started with, or was applied back to it. [param names] is the whole list after the change; an empty list means that no restart is needed any more. Not emitted while the server starts.
 			</description>
 		</signal>
 		<signal name="saved">

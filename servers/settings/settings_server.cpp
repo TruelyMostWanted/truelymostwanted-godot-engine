@@ -314,6 +314,7 @@ void SettingsServer::_initialize() {
 
 	settings = copy_settings(defaults);
 	applied = copy_settings(defaults);
+	restart_baseline = copy_settings(defaults);
 }
 
 Ref<Resource> SettingsServer::get_pending_settings() const {
@@ -381,9 +382,14 @@ bool SettingsServer::has_setting(const StringName &p_name) const {
 }
 
 Variant SettingsServer::_validate(const StringName &p_name, const Variant &p_value) const {
+	return _validate_setting(p_name, validate_property_value(settings.ptr(), p_name, p_value));
+}
+
+Variant SettingsServer::validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const {
+	ERR_FAIL_NULL_V(p_object, p_value);
 	Variant value = p_value;
 	List<PropertyInfo> list;
-	settings->get_property_list(&list);
+	p_object->get_property_list(&list);
 	for (const PropertyInfo &info : list) {
 		if (info.name != p_name) {
 			continue;
@@ -419,18 +425,18 @@ Variant SettingsServer::_validate(const StringName &p_name, const Variant &p_val
 			}
 			if (!known && !entries.is_empty()) {
 				ERR_PRINT(vformat("Settings domain \"%s\": %d is not a valid value for \"%s\"; the value is kept.", get_domain(), int64_t(value), p_name));
-				return settings->get(p_name);
+				return p_object->get(p_name);
 			}
 		} else if (info.hint == PROPERTY_HINT_ENUM && info.type == Variant::STRING && value.get_type() == Variant::STRING) {
 			const Vector<String> entries = info.hint_string.split(",");
 			if (!entries.is_empty() && !entries.has(String(value))) {
 				ERR_PRINT(vformat("Settings domain \"%s\": \"%s\" is not a valid value for \"%s\"; the value is kept.", get_domain(), value, p_name));
-				return settings->get(p_name);
+				return p_object->get(p_name);
 			}
 		}
 		break;
 	}
-	return _validate_setting(p_name, value);
+	return value;
 }
 
 void SettingsServer::set_value(const StringName &p_name, const Variant &p_value) {
@@ -729,21 +735,28 @@ bool SettingsServer::has_session_override(const StringName &p_name) const {
 /////////////////////////////////////////////////////////////////////////////
 // Engine.
 
-void SettingsServer::_record_restart_required_names(const PackedStringArray &p_names) {
+void SettingsServer::_update_restart_required_names(const PackedStringArray &p_names) {
 	if (in_startup) {
 		return;
 	}
-	PackedStringArray restart;
+	bool changed = false;
 	for (const String &name : p_names) {
-		if (get_setting_flags(name).has_flag(SETTING_FLAG_RESTART_REQUIRED)) {
-			restart.push_back(name);
-			if (!restart_required_names.has(name)) {
-				restart_required_names.push_back(name);
-			}
+		if (!get_setting_flags(name).has_flag(SETTING_FLAG_RESTART_REQUIRED)) {
+			continue;
+		}
+		// A value set back to the one the engine started with needs no restart any more.
+		const bool needs_restart = restart_baseline.is_null() || !values_equal(applied->get(name), restart_baseline->get(name));
+		const int64_t index = restart_required_names.find(name);
+		if (needs_restart && index < 0) {
+			restart_required_names.push_back(name);
+			changed = true;
+		} else if (!needs_restart && index >= 0) {
+			restart_required_names.remove_at(index);
+			changed = true;
 		}
 	}
-	if (!restart.is_empty()) {
-		emit_signal(SNAME("restart_required"), restart);
+	if (changed) {
+		emit_signal(SNAME("restart_required"), restart_required_names);
 	}
 }
 
@@ -753,12 +766,17 @@ Error SettingsServer::apply() {
 	if (names.is_empty()) {
 		return OK;
 	}
+	if (!in_startup && confirmation_active) {
+		// The player changed more while the confirmation dialog is open: the pending values are kept first, so a
+		// later cancel only reverts what this call applies.
+		confirm_changes();
+	}
 	if (!in_startup && !confirmation_active && _has_flag(names, SETTING_FLAG_CONFIRM)) {
 		return apply_with_confirmation();
 	}
 	_push_values(names);
 	applied = copy_settings(settings);
-	_record_restart_required_names(names);
+	_update_restart_required_names(names);
 	emit_signal(SNAME("applied"), names);
 	if (!in_startup && !confirmation_active) {
 		unsaved = true;
@@ -773,10 +791,13 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 		// The stored state needs no confirmation.
 		return apply();
 	}
-	ERR_FAIL_COND_V_MSG(confirmation_active, ERR_BUSY, vformat("Settings domain \"%s\" already waits for a confirmation.", get_domain()));
 	const PackedStringArray names = _get_changed_names(settings, applied);
 	if (names.is_empty()) {
 		return OK;
+	}
+	if (confirmation_active) {
+		// Like apply(): the pending confirmation is kept, then this one starts with its own backup and timeout.
+		confirm_changes();
 	}
 	double timeout = p_timeout_sec;
 	if (timeout < 0.0) {
@@ -787,7 +808,7 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	confirmation_deadline_msec = OS::get_singleton()->get_ticks_msec() + uint64_t(MAX(timeout, 0.0) * 1000.0);
 	_push_values(names);
 	applied = copy_settings(settings);
-	_record_restart_required_names(names);
+	_update_restart_required_names(names);
 	emit_signal(SNAME("applied"), names);
 	_set_confirmation_processing(true);
 	emit_signal(SNAME("confirmation_requested"), timeout);
@@ -818,6 +839,7 @@ void SettingsServer::cancel_confirmation() {
 	_push_values(names);
 	applied = copy_settings(settings);
 	confirmation_active = false;
+	_update_restart_required_names(names);
 	for (const String &name : names) {
 		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
 	}
@@ -994,6 +1016,7 @@ Error SettingsServer::load() {
 			settings->set(name, _validate(name, settings->get(name)));
 		}
 	}
+	_validate_loaded_settings(settings);
 	emit_signal(SNAME("loaded"));
 	return OK;
 }
@@ -1020,7 +1043,19 @@ Error SettingsServer::save() {
 		const bool tree_format = format == ResourceTextSerializer::FORMAT_JSON || format == ResourceTextSerializer::FORMAT_INI || format == ResourceTextSerializer::FORMAT_MAX;
 		// Only JSON and INI are read back as a tree with the missing values taken from the defaults.
 		if (tree_format && bool(_get_project_setting(SETTING_ONLY_CHANGED, true))) {
-			options.defaults = defaults;
+			// The serializer compares a value with its default by `==`, which compares the resources of a list by
+			// identity. A value equal to its default by its stored properties (values_equal()) is put into the
+			// compared defaults as the very same value, so it is skipped like an unchanged single value.
+			Ref<Resource> compared_defaults = defaults->duplicate(false);
+			LocalVector<PropertyInfo> infos;
+			get_value_infos(data.ptr(), infos);
+			for (const PropertyInfo &info : infos) {
+				const Variant value = data->get(info.name);
+				if (values_equal(value, defaults->get(info.name))) {
+					compared_defaults->set(info.name, value);
+				}
+			}
+			options.defaults = compared_defaults;
 		}
 		if (format == ResourceTextSerializer::FORMAT_JSON) {
 			err = ResourceTextSerializer::write_json(copy, options, text, error);
@@ -1078,6 +1113,9 @@ void SettingsServer::startup() {
 	_initialize();
 	load();
 	apply();
+	// The engine runs with these values now: nothing waits for a restart.
+	restart_baseline = copy_settings(applied);
+	restart_required_names.clear();
 	in_startup = false;
 }
 
