@@ -1550,6 +1550,8 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AccessibilitySettingsServer" type="AccessibilitySettingsServer" setter="" getter="">
+		</member>
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
 		</member>
