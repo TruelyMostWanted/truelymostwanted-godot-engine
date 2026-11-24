@@ -37,7 +37,7 @@
 #include "core/object/object.h"
 #include "servers/settings/input_map_settings_server.h"
 
-static bool _is_modifier_key(Key p_key) {
+static bool _rebinder_is_modifier_key(Key p_key) {
 	return p_key == Key::SHIFT || p_key == Key::CTRL || p_key == Key::ALT || p_key == Key::META;
 }
 
@@ -250,7 +250,7 @@ bool InputActionRebinder::update(const Ref<InputEvent> &p_event) {
 			return false;
 		}
 		const Key code = key_event->get_physical_keycode() != Key::NONE ? key_event->get_physical_keycode() : key_event->get_keycode();
-		if (_is_modifier_key(code)) {
+		if (_rebinder_is_modifier_key(code)) {
 			if (key_event->is_pressed()) {
 				// Maybe the start of a combination such as Ctrl+S: bound only if it is released alone.
 				pending_modifier = code;

@@ -32,6 +32,9 @@
 
 TEST_FORCE_LINK(test_video_quality_settings_server)
 
+// The tested values are 3D viewport settings, which do not exist without 3D.
+#ifndef _3D_DISABLED
+
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
@@ -411,3 +414,5 @@ TEST_CASE("[VideoQualitySettingsServer] Typed signals fire once per applied chan
 }
 
 } // namespace TestVideoQualitySettingsServer
+
+#endif // _3D_DISABLED
