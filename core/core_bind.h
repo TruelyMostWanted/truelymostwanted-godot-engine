@@ -80,13 +80,13 @@ public:
 	Vector<String> get_recognized_extensions_for_type(const String &p_type);
 	void add_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader, bool p_at_front);
 	void remove_resource_format_loader(RequiredParam<ResourceFormatLoader> p_format_loader);
-	void refresh_format_index();
+	void rebuild_extension_index();
 	void set_abort_on_missing_resources(bool p_abort);
 	PackedStringArray get_dependencies(const String &p_path);
 	bool has_cached(const String &p_path);
 	Ref<Resource> get_cached_ref(const String &p_path);
 	PackedStringArray get_cached_paths();
-	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact = false);
+	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact_type = false);
 	PackedStringArray get_cached_paths_with_extension(const String &p_extension);
 	PackedStringArray get_cached_paths_in_directory(const String &p_directory, bool p_recursive = true);
 	bool exists(const String &p_path, const String &p_type_hint = "");
@@ -99,9 +99,9 @@ public:
 	Dictionary load_manifest(const Ref<FilesManifest> &p_manifest, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Error load_threaded_request_manifest(const Ref<FilesManifest> &p_manifest, bool p_use_sub_threads = false, CacheMode p_cache_mode = CACHE_MODE_REUSE);
 
-	Error register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type = "Resource", bool p_at_front = false);
-	Error unregister_extension(const String &p_extension);
-	bool is_extension_registered(const String &p_extension);
+	Error register_extension_loader(const String &p_extension, const Callable &p_loader, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension_loader(const String &p_extension);
+	bool has_extension_loader(const String &p_extension);
 
 	Ref<ResourceLoadResult> load_result(const String &p_path, const String &p_type_hint = "", CacheMode p_cache_mode = CACHE_MODE_REUSE);
 	Ref<ResourceLoadResult> load_threaded_get_result(const String &p_path);
@@ -138,9 +138,9 @@ public:
 
 	ResourceUID::ID get_resource_id_for_path(const String &p_path, bool p_generate = false);
 
-	Error register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type = "Resource", bool p_at_front = false);
-	Error unregister_extension(const String &p_extension);
-	bool is_extension_registered(const String &p_extension);
+	Error register_extension_saver(const String &p_extension, const Callable &p_saver, const StringName &p_type = "Resource", bool p_at_front = false);
+	Error unregister_extension_saver(const String &p_extension);
+	bool has_extension_saver(const String &p_extension);
 
 	Ref<ResourceSaveResult> save_result(const Ref<Resource> &p_resource, const String &p_path, BitField<SaverFlags> p_flags);
 

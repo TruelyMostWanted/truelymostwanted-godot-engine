@@ -55,21 +55,20 @@ StringName ListSettingsServer::get_entry_key() const {
 	return ret;
 }
 
-String ListSettingsServer::_get_default_extension() {
-	const String format = get_storage_format();
-	if (format != "csv") {
-		return format;
+ResourceTextSerializer::Format ListSettingsServer::_get_file_format() {
+	if (get_storage_format() != ResourceTextSerializer::FORMAT_CSV) {
+		return SettingsServer::_get_file_format();
 	}
 	String error;
 	const Ref<Resource> default_settings = get_default_settings();
 	if (default_settings.is_valid() && ResourceTextSerializer::check_csv(default_settings, error) == OK) {
-		return "csv";
+		return ResourceTextSerializer::FORMAT_CSV;
 	}
 	if (!format_warned_csv) {
 		format_warned_csv = true;
 		WARN_PRINT(vformat("Settings domain \"%s\" can't be stored as CSV (%s); INI is used.", get_domain(), error));
 	}
-	return "ini";
+	return ResourceTextSerializer::FORMAT_INI;
 }
 
 Array ListSettingsServer::_get_list() const {
