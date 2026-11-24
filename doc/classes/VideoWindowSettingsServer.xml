@@ -37,7 +37,7 @@
 
 		private void OnKeepPressed()
 		{
-		    VideoWindowSettingsServer.ConfirmPending(); // Saved now.
+		    VideoWindowSettingsServer.Singleton.ConfirmPending(); // Saved now.
 		}
 		[/csharp]
 		[/codeblocks]
