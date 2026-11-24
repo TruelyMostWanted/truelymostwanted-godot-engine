@@ -57,8 +57,8 @@ void initialize_toml_module(ModuleInitializationLevel p_level) {
 	resource_saver_toml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_toml);
 
-	// ResourceTextSerializer.serialize(resource, &"toml") and deserialize(text, &"toml").
-	ResourceTextSerializer::register_format("toml", &TOML::write_resource, &_parse_toml_format);
+	// ResourceTextSerializer.serialize(resource, FORMAT_TOML) and deserialize(text, FORMAT_TOML).
+	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_TOML, &TOML::write_resource, &_parse_toml_format);
 }
 
 void uninitialize_toml_module(ModuleInitializationLevel p_level) {
@@ -66,7 +66,7 @@ void uninitialize_toml_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	ResourceTextSerializer::unregister_format("toml");
+	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_TOML);
 	ResourceLoader::remove_resource_format_loader(resource_loader_toml);
 	resource_loader_toml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_toml);

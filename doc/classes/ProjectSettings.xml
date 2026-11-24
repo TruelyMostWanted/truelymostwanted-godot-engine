@@ -1262,16 +1262,28 @@
 			Paths of [PreloadList] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
 		</member>
 		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
-			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. See [ResourceTextSerializer].
+			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_delimiter].
+		</member>
+		<member name="filesystem/resources/text_formats/csv_headers" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].csv[/code] resource files start with a header row of property names. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_headers].
 		</member>
 		<member name="filesystem/resources/text_formats/enums_as_names" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], enum properties are written as their names into [code].json[/code], [code].ini[/code] and [code].csv[/code] resource files. If [code]false[/code], they are written as numbers. Both are read. See [ResourceTextSerializer].
 		</member>
+		<member name="filesystem/resources/text_formats/full_precision_floats" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the 32-bit floats of vectors, rectangles, transforms and colors are written with all digits into text resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.full_precision_floats].
+		</member>
+		<member name="filesystem/resources/text_formats/indent" type="String" setter="" getter="" default="&quot;  &quot;">
+			The indentation of [code].json[/code] and [code].xml[/code] resource files. An empty string writes each file on one line. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.indent].
+		</member>
 		<member name="filesystem/resources/text_formats/ini_plain_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [code].ini[/code] resource files are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. See [ResourceTextSerializer].
 		</member>
-		<member name="filesystem/resources/text_formats/json_indent" type="String" setter="" getter="" default="&quot;  &quot;">
-			The indentation of [code].json[/code] resource files. An empty string writes each file on one line. See [ResourceTextSerializer].
+		<member name="filesystem/resources/text_formats/sort_keys" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], keys are written in alphabetical order into [code].json[/code], [code].ini[/code], [code].xml[/code] and [code].toml[/code] resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.sort_keys].
+		</member>
+		<member name="filesystem/resources/text_formats/xml_declaration" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].xml[/code] resource files start with [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.xml_declaration].
 		</member>
 		<member name="filesystem/scene_formats/animation_fps" type="float" setter="" getter="" default="30.0">
 			The frame rate used to bake animations when [ResourceLoader] loads a [code].gltf[/code], [code].glb[/code] or [code].fbx[/code] file that is not imported by the editor (for example from [code]user://[/code]). Same as the [code]bake_fps[/code] parameter of [method GLTFDocument.generate_scene]. Read on every load.
@@ -3689,7 +3701,7 @@
 			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
 		</member>
 		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
-			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_save_as_csv]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_serialize]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
 		</member>
 		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
