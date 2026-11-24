@@ -60,8 +60,22 @@ Ref<InputMapSettingsEvent> InputMapSettingsEvent::from_event(const Ref<InputEven
 	if (colon <= 0) {
 		return Ref<InputMapSettingsEvent>();
 	}
-	const String type = text.substr(0, colon);
+	String type = text.substr(0, colon);
 	const String value = text.substr(colon + 1);
+	// InputAction::event_to_text() writes the names of #193; map them to the cases below.
+	if (type == "Keyboard") {
+		type = "PhysicalKey";
+	} else if (type == "KeyboardLabel") {
+		type = "Key";
+	} else if (type == "KeyboardPrinted") {
+		type = "KeyLabel";
+	} else if (type == "Mouse") {
+		type = "MouseButton";
+	} else if (type == "Gamepad") {
+		type = "JoypadButton";
+	} else if (type == "GamepadAxis") {
+		type = "JoypadMotion";
+	}
 
 	Ref<InputMapSettingsEvent> record;
 	record.instantiate();

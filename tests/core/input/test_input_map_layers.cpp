@@ -213,7 +213,7 @@ TEST_CASE("[InputAction] Text form and events") {
 	Ref<InputAction> action;
 	action.instantiate();
 	action->set_action("jump");
-	const char *texts[] = { "Key:Ctrl+S", "PhysicalKey:W", "MouseButton:Left", "JoypadButton:A", "JoypadMotion:LeftX-" };
+	const char *texts[] = { "KeyboardLabel:Ctrl+S", "Keyboard:W", "Mouse:Left", "Gamepad:A", "GamepadAxis:LeftX-" };
 	for (const char *text : texts) {
 		const Ref<InputEvent> event = InputAction::text_to_event(text);
 		REQUIRE(event.is_valid());
@@ -443,7 +443,7 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	CHECK(action == custom_layer->get_action("layers_keycode"));
 	CHECK(action->get_deadzone() == doctest::Approx(0.4f));
 	REQUIRE(action->get_event_count() == 1);
-	CHECK(InputAction::event_to_text(action->get_event_list()[0]) == "Key:W");
+	CHECK(InputAction::event_to_text(action->get_event_list()[0]) == "KeyboardLabel:W");
 	CHECK(input_map->event_is_action(make_key(Key::W, Key::W, Key::W), "layers_keycode"));
 	action->clear_events();
 	action->add_event(InputEventKey::create_reference(Key::E));
@@ -468,7 +468,7 @@ TEST_CASE("[SceneTree][InputMap] Layers: built-in and custom actions") {
 	CHECK(replacement->get_event_count() == 2);
 	input_map->action_erase_event("layers_keycode", InputEventKey::create_reference(Key::R));
 	REQUIRE(replacement->get_event_count() == 1);
-	CHECK(InputAction::event_to_text(replacement->get_event_list()[0]) == "Key:T");
+	CHECK(InputAction::event_to_text(replacement->get_event_list()[0]) == "KeyboardLabel:T");
 	input_map->action_set_deadzone("layers_keycode", 0.7f);
 	CHECK(replacement->get_deadzone() == doctest::Approx(0.7f));
 	CHECK(builtin_layer->has_action("ui_accept"));
