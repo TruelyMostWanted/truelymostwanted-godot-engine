@@ -56,7 +56,7 @@ class FloatPrecisionSettings : public Resource {
 	float volume_db = 0.0f;
 	float deadzone = 0.2f;
 	float factor = 1.0f;
-	float near = 0.05f;
+	float near_value = 0.05f;
 
 protected:
 	static void _bind_methods() {
@@ -83,8 +83,8 @@ public:
 	float get_deadzone() const { return deadzone; }
 	void set_factor(float p_value) { factor = p_value; }
 	float get_factor() const { return factor; }
-	void set_near(float p_value) { near = p_value; }
-	float get_near() const { return near; }
+	void set_near(float p_value) { near_value = p_value; }
+	float get_near() const { return near_value; }
 };
 
 // The "engine" of the test domain: a linear volume, read back as dB.
