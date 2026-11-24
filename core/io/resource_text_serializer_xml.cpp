@@ -370,7 +370,9 @@ Error ResourceTextSerializer::write_xml(const Ref<Resource> &p_resource, const O
 	Ref<XMLWriter> writer;
 	writer.instantiate();
 	writer->set_indent(p_options.indent);
-	writer->write_declaration();
+	if (p_options.xml_declaration) {
+		writer->write_declaration();
+	}
 	writer->begin_element(XML_ROOT);
 	_xml_write_map(writer.ptr(), tree);
 	writer->end_all();
@@ -409,70 +411,43 @@ Error ResourceTextSerializer::parse_xml(const String &p_text, const String &p_ty
 namespace {
 
 struct TextFormat {
-	String name;
 	ResourceTextSerializer::FormatWriteFunction write = nullptr;
 	ResourceTextSerializer::FormatParseFunction parse = nullptr;
 };
 
 } // namespace
 
+// One slot per Format value; a slot without functions is a format no module implements.
 static Mutex text_formats_mutex;
-static LocalVector<TextFormat> text_formats;
+static TextFormat text_formats[ResourceTextSerializer::FORMAT_MAX];
 
-// Format names are lower-case, without a leading dot: "json", not ".JSON".
-static String _format_key(const StringName &p_name) {
-	return String(p_name).strip_edges().trim_prefix(".").to_lower();
+static bool _get_text_format(ResourceTextSerializer::Format p_format, TextFormat &r_format) {
+	if (int(p_format) < 0 || p_format >= ResourceTextSerializer::FORMAT_MAX) {
+		return false;
+	}
+	MutexLock lock(text_formats_mutex);
+	r_format = text_formats[p_format];
+	return r_format.write != nullptr && r_format.parse != nullptr;
 }
 
-static bool _get_text_format(const StringName &p_name, TextFormat &r_format) {
-	const String key = _format_key(p_name);
+void ResourceTextSerializer::register_format(Format p_format, FormatWriteFunction p_write, FormatParseFunction p_parse) {
+	ERR_FAIL_INDEX_MSG(p_format, FORMAT_MAX, "A text format needs a value of ResourceTextSerializer::Format.");
+	ERR_FAIL_COND_MSG(p_write == nullptr || p_parse == nullptr, "A text format needs a write function and a parse function.");
 	MutexLock lock(text_formats_mutex);
-	for (const TextFormat &format : text_formats) {
-		if (format.name == key) {
-			r_format = format;
-			return true;
-		}
-	}
-	return false;
+	// The last registration wins, so a module can replace a format.
+	text_formats[p_format].write = p_write;
+	text_formats[p_format].parse = p_parse;
 }
 
-static PackedStringArray _get_text_format_names() {
-	PackedStringArray names;
+void ResourceTextSerializer::unregister_format(Format p_format) {
+	ERR_FAIL_INDEX(p_format, FORMAT_MAX);
 	MutexLock lock(text_formats_mutex);
-	for (const TextFormat &format : text_formats) {
-		names.push_back(format.name);
-	}
-	return names;
+	text_formats[p_format] = TextFormat();
 }
 
-void ResourceTextSerializer::register_format(const StringName &p_name, FormatWriteFunction p_write, FormatParseFunction p_parse) {
-	const String key = _format_key(p_name);
-	ERR_FAIL_COND_MSG(key.is_empty() || p_write == nullptr || p_parse == nullptr, "A text format needs a name, a write function and a parse function.");
-	MutexLock lock(text_formats_mutex);
-	for (TextFormat &format : text_formats) {
-		if (format.name == key) {
-			// The last registration wins, so a module can replace a format.
-			format.write = p_write;
-			format.parse = p_parse;
-			return;
-		}
-	}
+bool ResourceTextSerializer::has_format_implementation(Format p_format) {
 	TextFormat format;
-	format.name = key;
-	format.write = p_write;
-	format.parse = p_parse;
-	text_formats.push_back(format);
-}
-
-void ResourceTextSerializer::unregister_format(const StringName &p_name) {
-	const String key = _format_key(p_name);
-	MutexLock lock(text_formats_mutex);
-	for (uint32_t i = 0; i < text_formats.size(); i++) {
-		if (text_formats[i].name == key) {
-			text_formats.remove_at(i);
-			return;
-		}
-	}
+	return _get_text_format(p_format, format);
 }
 
 static Error _parse_json_format(const String &p_text, const String &p_type_hint, const ResourceTextSerializer::Options &p_options, Ref<Resource> &r_resource, String &r_error) {
@@ -488,31 +463,82 @@ static Error _parse_xml_format(const String &p_text, const String &p_type_hint, 
 }
 
 void ResourceTextSerializer::register_builtin_formats() {
-	register_format("json", &ResourceTextSerializer::write_json, &_parse_json_format);
-	register_format("ini", &ResourceTextSerializer::write_ini, &_parse_ini_format);
-	register_format("csv", &ResourceTextSerializer::write_csv, &ResourceTextSerializer::parse_csv);
-	register_format("xml", &ResourceTextSerializer::write_xml, &_parse_xml_format);
+	register_format(FORMAT_JSON, &ResourceTextSerializer::write_json, &_parse_json_format);
+	register_format(FORMAT_INI, &ResourceTextSerializer::write_ini, &_parse_ini_format);
+	register_format(FORMAT_CSV, &ResourceTextSerializer::write_csv, &ResourceTextSerializer::parse_csv);
+	register_format(FORMAT_XML, &ResourceTextSerializer::write_xml, &_parse_xml_format);
 }
 
 void ResourceTextSerializer::clear_formats() {
 	MutexLock lock(text_formats_mutex);
-	text_formats.clear();
+	for (TextFormat &format : text_formats) {
+		format = TextFormat();
+	}
 }
 
-Error ResourceTextSerializer::write_format(const StringName &p_format, const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error) {
+String ResourceTextSerializer::get_format_display_name(Format p_format) {
+	switch (p_format) {
+		case FORMAT_JSON:
+			return "JSON";
+		case FORMAT_INI:
+			return "INI";
+		case FORMAT_CSV:
+			return "CSV";
+		case FORMAT_XML:
+			return "XML";
+		case FORMAT_TOML:
+			return "TOML";
+		case FORMAT_YAML:
+			return "YAML";
+		default:
+			return itos(p_format);
+	}
+}
+
+String ResourceTextSerializer::get_format_file_extension(Format p_format) {
+	if (int(p_format) < 0 || p_format >= FORMAT_MAX) {
+		return String();
+	}
+	return get_format_display_name(p_format).to_lower();
+}
+
+ResourceTextSerializer::Format ResourceTextSerializer::get_format_for_extension(const String &p_extension) {
+	String extension = p_extension.strip_edges().to_lower();
+	if (extension.begins_with(".")) {
+		extension = extension.substr(1);
+	}
+	if (extension == "yml") {
+		return FORMAT_YAML;
+	}
+	for (int i = 0; i < FORMAT_MAX; i++) {
+		if (extension == get_format_file_extension(Format(i))) {
+			return Format(i);
+		}
+	}
+	return FORMAT_MAX;
+}
+
+static String _format_unavailable_message(ResourceTextSerializer::Format p_format) {
+	if (int(p_format) < 0 || p_format >= ResourceTextSerializer::FORMAT_MAX) {
+		return vformat("%d is not a value of ResourceTextSerializer.Format.", int(p_format));
+	}
+	return vformat("Text format %s is not available (no module implements it, or the module is disabled).", ResourceTextSerializer::get_format_display_name(p_format));
+}
+
+Error ResourceTextSerializer::write_format(Format p_format, const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error) {
 	TextFormat format;
 	if (!_get_text_format(p_format, format)) {
-		r_error = vformat("Unknown text format \"%s\". Known formats: %s.", p_format, String(", ").join(_get_text_format_names()));
+		r_error = _format_unavailable_message(p_format);
 		return ERR_UNAVAILABLE;
 	}
 	// Called without the lock: a format may print or load other resources.
 	return format.write(p_resource, p_options, r_text, r_error);
 }
 
-Error ResourceTextSerializer::parse_format(const StringName &p_format, const String &p_text, const String &p_type_hint, const Options &p_options, Ref<Resource> &r_resource, String &r_error) {
+Error ResourceTextSerializer::parse_format(Format p_format, const String &p_text, const String &p_type_hint, const Options &p_options, Ref<Resource> &r_resource, String &r_error) {
 	TextFormat format;
 	if (!_get_text_format(p_format, format)) {
-		r_error = vformat("Unknown text format \"%s\". Known formats: %s.", p_format, String(", ").join(_get_text_format_names()));
+		r_error = _format_unavailable_message(p_format);
 		return ERR_UNAVAILABLE;
 	}
 	return format.parse(p_text, p_type_hint, p_options, r_resource, r_error);
@@ -521,7 +547,7 @@ Error ResourceTextSerializer::parse_format(const StringName &p_format, const Str
 /////////////////////////////////////////////////////////////////////////////
 // Bound API.
 
-String ResourceTextSerializer::serialize(const Ref<Resource> &p_resource, const StringName &p_format, const Dictionary &p_options) const {
+String ResourceTextSerializer::serialize(const Ref<Resource> &p_resource, Format p_format, const Ref<SerializerOptions> &p_options) const {
 	String text;
 	String error;
 	if (write_format(p_format, p_resource, get_options(p_options), text, error) != OK) {
@@ -531,7 +557,7 @@ String ResourceTextSerializer::serialize(const Ref<Resource> &p_resource, const 
 	return text;
 }
 
-Ref<Resource> ResourceTextSerializer::deserialize(const String &p_text, const StringName &p_format, const String &p_type_hint, const Dictionary &p_options) const {
+Ref<Resource> ResourceTextSerializer::deserialize(const String &p_text, Format p_format, const StringName &p_type_hint, const Ref<SerializerOptions> &p_options) const {
 	Ref<Resource> resource;
 	String error;
 	if (parse_format(p_format, p_text, p_type_hint, get_options(p_options), resource, error) != OK) {
@@ -541,11 +567,24 @@ Ref<Resource> ResourceTextSerializer::deserialize(const String &p_text, const St
 	return resource;
 }
 
-PackedStringArray ResourceTextSerializer::get_formats() const {
-	return _get_text_format_names();
+bool ResourceTextSerializer::is_format_available(Format p_format) const {
+	return has_format_implementation(p_format);
 }
 
-bool ResourceTextSerializer::has_format(const StringName &p_format) const {
-	TextFormat format;
-	return _get_text_format(p_format, format);
+PackedInt32Array ResourceTextSerializer::get_available_formats() const {
+	PackedInt32Array formats;
+	for (int i = 0; i < FORMAT_MAX; i++) {
+		if (has_format_implementation(Format(i))) {
+			formats.push_back(i);
+		}
+	}
+	return formats;
+}
+
+String ResourceTextSerializer::get_format_extension(Format p_format) const {
+	return get_format_file_extension(p_format);
+}
+
+ResourceTextSerializer::Format ResourceTextSerializer::get_format_from_extension(const String &p_extension) const {
+	return get_format_for_extension(p_extension);
 }

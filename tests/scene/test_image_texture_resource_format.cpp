@@ -52,7 +52,7 @@ static String _temp_dir() {
 	return dir;
 }
 
-static void _write_file(const String &p_path, const Vector<uint8_t> &p_data) {
+[[maybe_unused]] static void _write_file(const String &p_path, const Vector<uint8_t> &p_data) {
 	Ref<FileAccess> f = FileAccess::open(p_path, FileAccess::WRITE);
 	REQUIRE(f.is_valid());
 	f->store_buffer(p_data.ptr(), p_data.size());
@@ -97,7 +97,7 @@ static Ref<Image> _make_pattern_image() {
 }
 
 // Uncompressed 2x2 BMP, 24 bits, bottom-up: bottom row green, top row red.
-static Vector<uint8_t> _make_bmp() {
+[[maybe_unused]] static Vector<uint8_t> _make_bmp() {
 	Vector<uint8_t> data;
 	data.push_back('B');
 	data.push_back('M');
@@ -129,7 +129,7 @@ static Vector<uint8_t> _make_bmp() {
 }
 
 // Uncompressed true-color 2x2 TGA, 32 bits, top-left origin, all pixels red.
-static Vector<uint8_t> _make_tga() {
+[[maybe_unused]] static Vector<uint8_t> _make_tga() {
 	Vector<uint8_t> data;
 	data.push_back(0); // ID length.
 	data.push_back(0); // No color map.
@@ -154,7 +154,7 @@ static Vector<uint8_t> _make_tga() {
 }
 
 // Flat (not run-length encoded) 2x2 Radiance HDR, all pixels (1, 0, 0).
-static Vector<uint8_t> _make_hdr() {
+[[maybe_unused]] static Vector<uint8_t> _make_hdr() {
 	const CharString header = String("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 2 +X 2\n").ascii();
 	Vector<uint8_t> data;
 	for (int i = 0; i < header.length(); i++) {
@@ -170,7 +170,7 @@ static Vector<uint8_t> _make_hdr() {
 }
 
 // KTX 1.1, 2x2 GL_RGBA8, one level, all pixels red.
-static Vector<uint8_t> _make_ktx() {
+[[maybe_unused]] static Vector<uint8_t> _make_ktx() {
 	const uint8_t identifier[] = { 0xAB, 'K', 'T', 'X', ' ', '1', '1', 0xBB, '\r', '\n', 0x1A, '\n' };
 	Vector<uint8_t> data;
 	for (uint8_t b : identifier) {
@@ -355,7 +355,7 @@ TEST_CASE("[SceneTree][ImageTextureResourceFormat] Save with encoders and option
 }
 
 TEST_CASE("[SceneTree][ImageTextureResourceFormat] Load formats without an encoder") {
-	const String dir = _temp_dir();
+	[[maybe_unused]] const String dir = _temp_dir();
 
 #ifdef MODULE_BMP_ENABLED
 	{
