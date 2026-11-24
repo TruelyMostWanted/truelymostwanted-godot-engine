@@ -967,7 +967,8 @@ void RendererEnvironmentStorage::environment_set_global_effect_disabled(RSE::Env
 }
 
 void RendererEnvironmentStorage::environment_set_global_adjustment(float p_brightness, float p_contrast, float p_saturation) {
-	global_adjustment_brightness = p_brightness;
+	// The same sRGB transfer as the authored brightness, so both multiply in the same space (1.0 stays 1.0).
+	global_adjustment_brightness = p_brightness < 0.04045f ? p_brightness * (1.0f / 12.92f) : Math::pow(float((p_brightness + 0.055f) * (1.0f / (1.055f))), 2.4f);
 	global_adjustment_contrast = p_contrast;
 	global_adjustment_saturation = p_saturation;
 }

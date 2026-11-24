@@ -201,6 +201,10 @@ TEST_CASE("[VideoEffectSettingsServer] Values are saved and loaded") {
 		server->set_allow_ssr(false);
 		server->set_allow_volumetric_fog(false);
 		server->set_brightness(1.2);
+		// save() writes the applied values.
+		ERR_PRINT_OFF;
+		CHECK(server->apply() == OK);
+		ERR_PRINT_ON;
 		CHECK(server->save() == OK);
 		memdelete(server);
 	}
@@ -323,15 +327,19 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] Brightness, contrast and satur
 	adjusted->set_adjustment_enabled(true);
 	adjusted->set_adjustment_brightness(2.0);
 	CHECK_FALSE(RSG::scene->environment_get_adjustments_enabled(plain->get_rid()));
+	// The renderer keeps brightness after the sRGB transfer; the player's factor goes through the same transfer.
+	const auto to_linear = [](float p_value) { return p_value < 0.04045f ? p_value * (1.0f / 12.92f) : Math::pow(float((p_value + 0.055f) * (1.0f / 1.055f)), 2.4f); };
+	const float authored = RSG::scene->environment_get_adjustments_brightness(adjusted->get_rid());
+	CHECK(authored == doctest::Approx(to_linear(2.0f)));
 
 	server->set_brightness(1.5);
 	server->set_saturation(0.5);
 	// The pass is turned on for the plain environment, with 1.0 as its own values.
 	CHECK(RSG::scene->environment_get_adjustments_enabled(plain->get_rid()));
-	CHECK(RSG::scene->environment_get_adjustments_brightness(plain->get_rid()) == doctest::Approx(1.5));
+	CHECK(RSG::scene->environment_get_adjustments_brightness(plain->get_rid()) == doctest::Approx(to_linear(1.5f)));
 	CHECK(RSG::scene->environment_get_adjustments_saturation(plain->get_rid()) == doctest::Approx(0.5));
 	CHECK(RSG::scene->environment_get_adjustments_contrast(plain->get_rid()) == doctest::Approx(1.0));
-	CHECK(RSG::scene->environment_get_adjustments_brightness(adjusted->get_rid()) == doctest::Approx(3.0));
+	CHECK(RSG::scene->environment_get_adjustments_brightness(adjusted->get_rid()) == doctest::Approx(authored * to_linear(1.5f)));
 	CHECK(adjusted->get_adjustment_brightness() == doctest::Approx(2.0));
 
 	// Back to 1.0: no extra pass, the authored values again.
@@ -339,7 +347,7 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] Brightness, contrast and satur
 	server->set_saturation(1.0);
 	CHECK_FALSE(RSG::scene->environment_get_adjustments_enabled(plain->get_rid()));
 	CHECK(RSG::scene->environment_get_adjustments_enabled(adjusted->get_rid()));
-	CHECK(RSG::scene->environment_get_adjustments_brightness(adjusted->get_rid()) == doctest::Approx(2.0));
+	CHECK(RSG::scene->environment_get_adjustments_brightness(adjusted->get_rid()) == doctest::Approx(authored));
 	memdelete(server);
 }
 
