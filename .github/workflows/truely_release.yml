@@ -1,7 +1,8 @@
 name: 📦 Truely Release
 # truely-godot-engine: builds the editors (standard and Mono) and the export templates of all desktop
 # platforms and the Web, packs them and publishes a GitHub release.
-# Starts by itself after a green "🔗 GHA" run on truely-godot-engine, built from the exact commit that
+# Starts by itself after a green "🔗 GHA" run on the release branch truely-godot-engine-releases
+# (fast-forwarded from truely-godot-engine by truely/release.ps1), built from the exact commit that
 # run tested, but only if files other than Markdown and .agents/ changed since the last release tag
 # (truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
 # Names: Truely_Godot<version>-<status>_<hash>_<platform>, tag truely-godot<version>-<status>-<hash>.
@@ -10,7 +11,7 @@ on:
   workflow_run:
     workflows: ["🔗 GHA"]
     types: [completed]
-    branches: [truely-godot-engine]
+    branches: [truely-godot-engine-releases]
   workflow_dispatch:
     inputs:
       draft:
