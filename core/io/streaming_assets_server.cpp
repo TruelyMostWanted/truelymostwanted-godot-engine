@@ -145,6 +145,15 @@ Variant _get_setting(const char *p_name, const Variant &p_default) {
 	return value.get_type() == Variant::NIL ? p_default : value;
 }
 
+// The enum settings store `0` or `1`. Names (`"pack"`, `"none"`) written by hand or by scripts are accepted too,
+// like the export plugin does.
+bool _is_second_enum_value(const Variant &p_value, const char *p_second_name) {
+	if (p_value.get_type() == Variant::STRING || p_value.get_type() == Variant::STRING_NAME) {
+		return String(p_value).strip_edges().to_lower() == p_second_name;
+	}
+	return p_value.get_type() == Variant::INT && int(p_value) == 1;
+}
+
 } // namespace
 
 StreamingAssetsServer *StreamingAssetsServer::singleton = nullptr;
@@ -211,8 +220,8 @@ String StreamingAssetsServer::_sanitize_source_folder(const String &p_folder) {
 void StreamingAssetsServer::setup() {
 	Configuration config;
 	config.enabled = bool(_get_setting(SETTING_ENABLED, false));
-	config.mode = int(_get_setting(SETTING_MODE, int(MODE_RAW))) == MODE_PACK ? MODE_PACK : MODE_RAW;
-	config.fallback = int(_get_setting(SETTING_FALLBACK, int(FALLBACK_EMBED))) == FALLBACK_NONE ? FALLBACK_NONE : FALLBACK_EMBED;
+	config.mode = _is_second_enum_value(_get_setting(SETTING_MODE, int(MODE_RAW)), "pack") ? MODE_PACK : MODE_RAW;
+	config.fallback = _is_second_enum_value(_get_setting(SETTING_FALLBACK, int(FALLBACK_EMBED)), "none") ? FALLBACK_NONE : FALLBACK_EMBED;
 	config.source_folder = String(_get_setting(SETTING_SOURCE_FOLDER, DEFAULT_SOURCE_FOLDER));
 
 	const String exe_name = get_exe_name();
