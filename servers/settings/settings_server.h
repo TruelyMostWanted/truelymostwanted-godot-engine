@@ -121,6 +121,7 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	String format_warned_path; // The last path whose extension gave no usable format (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -130,7 +131,10 @@ private:
 	void _initialize();
 	Ref<Resource> _effective_settings() const;
 	bool _object_has_value(const Ref<Resource> &p_settings, const StringName &p_name) const;
-	void _push_values(const PackedStringArray &p_names);
+	// Pushes the values to the engine. Returns the effective values that were pushed (pending values with the session overrides).
+	Ref<Resource> _push_values(const PackedStringArray &p_names);
+	// Calls _notify_value_applied() once per name with its value in `p_effective`.
+	void _notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective);
 	void _read_from_engine_into(const Ref<Resource> &p_settings);
 	Variant _validate(const StringName &p_name, const Variant &p_value) const;
 	bool _has_flag(const PackedStringArray &p_names, SettingFlags p_flag) const;
@@ -139,6 +143,11 @@ private:
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
+	// The project setting `settings/paths/<domain>_settings_path`; empty if not set.
+	String _get_project_file_path() const;
+	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
+	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
+	void _emit_settings_changed(const PackedStringArray &p_names);
 
 protected:
 	static void _bind_methods();
@@ -162,6 +171,13 @@ protected:
 	GDVIRTUAL2RC(Variant, _validate_value, StringName, Variant)
 	GDVIRTUAL2R(Dictionary, _migrate, int, Dictionary)
 	GDVIRTUAL1RC(bool, _is_value_supported, StringName)
+	GDVIRTUAL2(_value_applied, StringName, Variant)
+
+	// Called once per value after it reached the engine and the applied state is updated: on apply() (also at startup
+	// after the file is loaded, and after reset_to_defaults() in APPLY_MODE_IMMEDIATE), apply_with_confirmation(),
+	// cancel_confirmation() (the restored values) and when a session override is set or cleared. Not called for pending
+	// changes in APPLY_MODE_MANUAL. Domains emit their typed signals here. The default calls the script virtual _value_applied().
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value);
 
 	// For ListSettingsServer: the pending value was changed in place; emits `value_changed` and applies it in APPLY_MODE_IMMEDIATE.
 	void notify_value_changed(const StringName &p_name);
@@ -184,6 +200,10 @@ public:
 	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
 	static String get_storage_folder();
 	static ResourceTextSerializer::Format get_storage_format();
+	// `settings/paths/<domain>_settings_path`: the file path of a domain set in the project settings.
+	static String get_path_setting_name(const StringName &p_domain);
+	// Defines the project setting of the domain's path (called by SettingsServerManager::register_server()).
+	static void register_path_setting(const StringName &p_domain, bool p_csv);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  key_binding.h                                                         */
+/*  input_action.h                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -32,14 +32,15 @@
 
 #include "core/input/input_event.h"
 #include "core/io/resource.h"
+#include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
 
-// Data of the `key_bindings` settings domain (#18). One KeyBinding is one slot of an action: the key,
-// mouse button or joypad input in a readable text form (`Key:Ctrl+S`, `MouseButton:Left`,
-// `JoypadButton:A`, `JoypadMotion:LeftX+`). The text form is stable and English, so the saved file can
-// be read and edited by hand and survives JSON, INI and CSV.
-class KeyBinding : public Resource {
-	GDCLASS(KeyBinding, Resource);
+// One input action of InputMap as a resource (#172): its name, deadzone and events.
+// `events` is the list for scripts and the Inspector; `bindings` is its stored text form
+// (`Key:Ctrl+S; JoypadButton:A`), so the resource can be saved as JSON, INI, CSV and `.tres`.
+// Only keys, mouse buttons, joypad buttons and joypad axes have a text form.
+class InputAction : public Resource {
+	GDCLASS(InputAction, Resource);
 
 public:
 	enum InputDevice {
@@ -52,60 +53,45 @@ public:
 	static constexpr float DEFAULT_DEADZONE = 0.2f;
 
 private:
-	String action;
-	InputDevice device = INPUT_DEVICE_KEYBOARD;
-	int slot = 0;
-	String event;
-	int device_id = -1;
+	StringName action;
 	float deadzone = DEFAULT_DEADZONE;
+	Vector<Ref<InputEvent>> events;
 
 protected:
 	static void _bind_methods();
 
 public:
-	// Text form of an event; empty for event types that are not bindable (touch, MIDI, ...).
+	// Text form of an event (`Key:Ctrl+S`, `PhysicalKey:W`, `MouseButton:Left`, `JoypadButton:A`,
+	// `JoypadMotion:LeftX+`); empty for event types without a text form (touch, MIDI, ...).
 	static String event_to_text(const Ref<InputEvent> &p_event);
 	// Event of a text form; null if the text is not valid. The device of the event is -1 (all devices).
 	static Ref<InputEvent> text_to_event(const String &p_text);
 	// Device of a bindable event; INPUT_DEVICE_MAX for event types that are not bindable.
 	static InputDevice get_event_device(const Ref<InputEvent> &p_event);
-	// Short text for the UI in English: "Ctrl+S", "Left Mouse Button", "Joypad A", "Left Stick Right".
-	// Physical keys show the key of the current keyboard layout where the platform reports it.
-	static String event_to_label(const Ref<InputEvent> &p_event);
 
-	void set_action(const String &p_action);
-	String get_action() const;
-	void set_device(InputDevice p_device);
-	InputDevice get_device() const;
-	void set_slot(int p_slot);
-	int get_slot() const;
-	void set_event(const String &p_event);
-	String get_event() const;
-	void set_device_id(int p_device_id);
-	int get_device_id() const;
+	void set_action(const StringName &p_action);
+	StringName get_action() const;
+
 	void set_deadzone(float p_deadzone);
 	float get_deadzone() const;
 
-	// The event of `event` with `device_id`; null if the slot is empty or the text is not valid.
-	Ref<InputEvent> get_input_event() const;
-	// Sets `event`, `device` and `device_id` from an event.
-	void set_input_event(const Ref<InputEvent> &p_event);
-	bool is_empty() const;
+	void set_events(const TypedArray<InputEvent> &p_events);
+	TypedArray<InputEvent> get_events() const;
+	const Vector<Ref<InputEvent>> &get_event_list() const { return events; }
+
+	void set_bindings(const String &p_bindings);
+	String get_bindings() const;
+
+	void add_event(const Ref<InputEvent> &p_event);
+	bool has_event(const Ref<InputEvent> &p_event) const;
+	bool remove_event(const Ref<InputEvent> &p_event);
+	void clear_events();
+	int get_event_count() const;
+
+	TypedArray<InputEvent> get_device_events(InputDevice p_device) const;
+
+	InputAction() {}
+	InputAction(const StringName &p_action, float p_deadzone = DEFAULT_DEADZONE);
 };
 
-// Settings of the `key_bindings` domain: one KeyBinding per bound slot of all actions. It holds
-// nothing but the list, so it can be stored as CSV (one row per event).
-class KeyBindingList : public Resource {
-	GDCLASS(KeyBindingList, Resource);
-
-	TypedArray<KeyBinding> bindings;
-
-protected:
-	static void _bind_methods();
-
-public:
-	void set_bindings(const TypedArray<KeyBinding> &p_bindings);
-	TypedArray<KeyBinding> get_bindings() const;
-};
-
-VARIANT_ENUM_CAST(KeyBinding::InputDevice);
+VARIANT_ENUM_CAST(InputAction::InputDevice);

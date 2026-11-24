@@ -49,6 +49,8 @@ static constexpr const char *SETTING_ONLY_CHANGED = "settings/storage/only_chang
 static constexpr const char *SETTING_AUTOSAVE = "settings/storage/autosave";
 static constexpr const char *SETTING_CONFIRMATION_TIMEOUT = "settings/apply/confirmation_timeout";
 static constexpr const char *SETTING_DEFAULTS_PREFIX = "settings/defaults/";
+static constexpr const char *SETTING_PATHS_PREFIX = "settings/paths/";
+static constexpr const char *SETTING_PATH_SUFFIX = "_settings_path";
 
 // Metadata key in the settings file (INI and JSON) with the format version of the domain.
 static constexpr const char *META_SETTINGS_VERSION = "settings_version";
@@ -172,6 +174,20 @@ String SettingsServer::get_storage_folder() {
 	return folder.is_empty() ? String("user://settings") : folder;
 }
 
+String SettingsServer::get_path_setting_name(const StringName &p_domain) {
+	return String(SETTING_PATHS_PREFIX) + String(p_domain) + SETTING_PATH_SUFFIX;
+}
+
+void SettingsServer::register_path_setting(const StringName &p_domain, bool p_csv) {
+	ERR_FAIL_COND(p_domain == StringName());
+	if (ProjectSettings::get_singleton() == nullptr) {
+		return;
+	}
+	// The extension of the path picks the text format. CSV only for list domains.
+	const String extensions = p_csv ? "*.json,*.ini,*.csv,*.xml,*.toml,*.yaml,*.yml" : "*.json,*.ini,*.xml,*.toml,*.yaml,*.yml";
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, get_path_setting_name(p_domain), PROPERTY_HINT_SAVE_FILE, extensions), String());
+}
+
 ResourceTextSerializer::Format SettingsServer::get_storage_format() {
 	const Variant value = _get_project_setting(SETTING_STORAGE_FORMAT, ResourceTextSerializer::FORMAT_INI);
 	int format = ResourceTextSerializer::FORMAT_INI;
@@ -226,6 +242,10 @@ void SettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings)
 	GDVIRTUAL_CALL(_read_from_engine, p_settings);
 }
 
+void SettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	GDVIRTUAL_CALL(_value_applied, p_name, p_value);
+}
+
 Variant SettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant ret;
 	if (GDVIRTUAL_CALL(_validate_value, p_name, p_value, ret)) {
@@ -259,6 +279,29 @@ ResourceTextSerializer::Format SettingsServer::_get_file_format() {
 		return ResourceTextSerializer::FORMAT_INI;
 	}
 	return format;
+}
+
+ResourceTextSerializer::Format SettingsServer::_get_format_for_path(const String &p_path) {
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(p_path.get_extension());
+	if (format != ResourceTextSerializer::FORMAT_MAX && ResourceTextSerializer::has_format_implementation(format)) {
+		return format;
+	}
+	const ResourceTextSerializer::Format fallback = _get_file_format();
+	if (format_warned_path != p_path) {
+		format_warned_path = p_path;
+		if (format == ResourceTextSerializer::FORMAT_MAX) {
+			ERR_PRINT(vformat("Settings domain \"%s\": the extension of \"%s\" belongs to no text format (use .json, .ini, .csv, .xml, .toml, .yaml or .yml); the file is read and written as %s, the format of \"%s\".", get_domain(), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+		} else {
+			ERR_PRINT(vformat("Settings domain \"%s\": the text format %s of \"%s\" is not available (module disabled); the file is read and written as %s, the format of \"%s\".", get_domain(), ResourceTextSerializer::get_format_display_name(format), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+		}
+	}
+	return fallback;
+}
+
+void SettingsServer::_emit_settings_changed(const PackedStringArray &p_names) {
+	if (!p_names.is_empty()) {
+		emit_signal(SNAME("settings_changed"), p_names);
+	}
 }
 
 bool SettingsServer::is_value_supported(const StringName &p_name) const {
@@ -451,7 +494,7 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 		if (had_override) {
 			PackedStringArray names;
 			names.push_back(p_name);
-			_push_values(names);
+			_notify_values_applied(names, _push_values(names));
 		}
 		return;
 	}
@@ -463,6 +506,9 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 
 void SettingsServer::notify_value_changed(const StringName &p_name) {
 	emit_signal(SNAME("value_changed"), p_name, settings->get(p_name));
+	PackedStringArray names;
+	names.push_back(p_name);
+	_emit_settings_changed(names);
 	if (apply_mode == APPLY_MODE_IMMEDIATE) {
 		apply();
 	}
@@ -559,7 +605,7 @@ bool SettingsServer::_has_flag(const PackedStringArray &p_names, SettingFlags p_
 	return false;
 }
 
-void SettingsServer::_push_values(const PackedStringArray &p_names) {
+Ref<Resource> SettingsServer::_push_values(const PackedStringArray &p_names) {
 	const Ref<Resource> effective = _effective_settings();
 	PackedStringArray unbound;
 	for (const String &name : p_names) {
@@ -598,6 +644,13 @@ void SettingsServer::_push_values(const PackedStringArray &p_names) {
 	}
 	if (!unbound.is_empty()) {
 		_apply_settings(effective, unbound);
+	}
+	return effective;
+}
+
+void SettingsServer::_notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective) {
+	for (const String &name : p_names) {
+		_notify_value_applied(name, p_effective->get(name));
 	}
 }
 
@@ -681,6 +734,7 @@ void SettingsServer::revert() {
 	for (const String &name : names) {
 		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
 	}
+	_emit_settings_changed(names);
 }
 
 void SettingsServer::reset_value(const StringName &p_name) {
@@ -697,6 +751,7 @@ void SettingsServer::reset_to_defaults() {
 		session_overrides.erase(name);
 		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
 	}
+	_emit_settings_changed(names);
 	emit_signal(SNAME("reset"));
 	if (apply_mode == APPLY_MODE_IMMEDIATE) {
 		apply();
@@ -712,7 +767,7 @@ void SettingsServer::set_session_override(const StringName &p_name, const Varian
 	session_overrides[p_name] = _validate(p_name, p_value);
 	PackedStringArray names;
 	names.push_back(p_name);
-	_push_values(names);
+	_notify_values_applied(names, _push_values(names));
 }
 
 void SettingsServer::clear_session_override(const StringName &p_name) {
@@ -724,8 +779,9 @@ void SettingsServer::clear_session_override(const StringName &p_name) {
 	names.push_back(p_name);
 	const Ref<Resource> pending = settings;
 	settings = applied;
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	settings = pending;
+	_notify_values_applied(names, effective);
 }
 
 bool SettingsServer::has_session_override(const StringName &p_name) const {
@@ -774,9 +830,10 @@ Error SettingsServer::apply() {
 	if (!in_startup && !confirmation_active && _has_flag(names, SETTING_FLAG_CONFIRM)) {
 		return apply_with_confirmation();
 	}
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	if (!in_startup && !confirmation_active) {
 		unsaved = true;
@@ -806,9 +863,10 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	confirmation_backup = copy_settings(applied);
 	confirmation_active = true;
 	confirmation_deadline_msec = OS::get_singleton()->get_ticks_msec() + uint64_t(MAX(timeout, 0.0) * 1000.0);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	_set_confirmation_processing(true);
 	emit_signal(SNAME("confirmation_requested"), timeout);
@@ -836,13 +894,15 @@ void SettingsServer::cancel_confirmation() {
 	confirmation_backup.unref();
 	const PackedStringArray names = _get_changed_names(backup, applied);
 	settings = copy_settings(backup);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	confirmation_active = false;
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	for (const String &name : names) {
 		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
 	}
+	_emit_settings_changed(names);
 	if (!names.is_empty()) {
 		emit_signal(SNAME("applied"), names);
 	}
@@ -884,8 +944,10 @@ void SettingsServer::_on_process_frame() {
 
 void SettingsServer::read_from_engine() {
 	_ensure_initialized();
+	const Ref<Resource> previous = copy_settings(settings);
 	_read_from_engine_into(settings);
 	applied = copy_settings(settings);
+	_emit_settings_changed(_get_changed_names(previous, settings));
 	emit_signal(SNAME("read_from_engine_finished"));
 }
 
@@ -900,9 +962,22 @@ String SettingsServer::get_file_path() const {
 	if (!file_path.is_empty()) {
 		return file_path;
 	}
+	const String project_path = _get_project_file_path();
+	if (!project_path.is_empty()) {
+		return project_path;
+	}
 	const StringName domain = get_domain();
 	ERR_FAIL_COND_V_MSG(domain == StringName(), String(), "A settings server needs a domain name: implement _get_domain().");
 	return get_storage_folder().path_join(String(domain) + "." + ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format()));
+}
+
+String SettingsServer::_get_project_file_path() const {
+	const StringName domain = get_domain();
+	if (domain == StringName()) {
+		return String();
+	}
+	const String path = _get_project_setting(get_path_setting_name(domain), String());
+	return path.strip_edges();
 }
 
 bool SettingsServer::has_unsaved_changes() const {
@@ -912,13 +987,20 @@ bool SettingsServer::has_unsaved_changes() const {
 Error SettingsServer::load() {
 	_ensure_initialized();
 	const String path = get_file_path();
-	ERR_FAIL_COND_V(path.is_empty(), ERR_FILE_BAD_PATH);
+	if (path.is_empty()) {
+		ERR_PRINT(vformat("Settings domain \"%s\": no file path to load from.", get_domain()));
+		emit_signal(SNAME("load_failed"), int(ERR_FILE_BAD_PATH), path);
+		return ERR_FILE_BAD_PATH;
+	}
 	const StringName domain = get_domain();
+	// The pending values before the load: settings_changed() names the values the load changed.
+	const Ref<Resource> previous = settings;
 
 	if (!FileAccess::exists(path)) {
-		// The normal first start: the defaults stay.
+		// The normal first start: the defaults stay. Not a failure.
 		print_verbose(vformat("Settings domain \"%s\": no file at \"%s\" yet; the defaults are used.", domain, path));
 		settings = copy_settings(defaults);
+		_emit_settings_changed(_get_changed_names(previous, settings));
 		emit_signal(SNAME("loaded"));
 		return ERR_FILE_NOT_FOUND;
 	}
@@ -929,8 +1011,8 @@ Error SettingsServer::load() {
 	Ref<Resource> loaded;
 	PackedStringArray present;
 	const String type_name = ResourceTextSerializer::get_type_name(defaults.ptr());
-	// The extension decides; an unknown extension (set_file_path()) is read as INI.
-	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(path.get_extension());
+	// The extension decides; an unknown extension is read in the format of `settings/storage/format`.
+	const ResourceTextSerializer::Format format = _get_format_for_path(path);
 
 	if (err != OK) {
 		error = vformat("can't read the file (%s)", error_names[err]);
@@ -998,9 +1080,12 @@ Error SettingsServer::load() {
 	if (err != OK || loaded.is_null()) {
 		// The file is kept as it is until the next save().
 		WARN_PRINT(vformat("Settings domain \"%s\": can't load \"%s\" (%s); the defaults are used and the file is not overwritten until the next save.", domain, path, error));
+		const Error result_error = err != OK ? err : ERR_FILE_CORRUPT;
 		settings = copy_settings(defaults);
+		emit_signal(SNAME("load_failed"), int(result_error), path);
+		_emit_settings_changed(_get_changed_names(previous, settings));
 		emit_signal(SNAME("loaded"));
-		return err != OK ? err : ERR_FILE_CORRUPT;
+		return result_error;
 	}
 
 	Ref<Resource> result = copy_settings(defaults);
@@ -1017,6 +1102,7 @@ Error SettingsServer::load() {
 		}
 	}
 	_validate_loaded_settings(settings);
+	_emit_settings_changed(_get_changed_names(previous, settings));
 	emit_signal(SNAME("loaded"));
 	return OK;
 }
@@ -1025,13 +1111,17 @@ Error SettingsServer::save() {
 	_ensure_initialized();
 	save_queued = false;
 	const String path = get_file_path();
-	ERR_FAIL_COND_V(path.is_empty(), ERR_FILE_BAD_PATH);
+	if (path.is_empty()) {
+		ERR_PRINT(vformat("Settings domain \"%s\": no file path to save to.", get_domain()));
+		emit_signal(SNAME("save_failed"), int(ERR_FILE_BAD_PATH), path);
+		return ERR_FILE_BAD_PATH;
+	}
 	const StringName domain = get_domain();
 	// While a confirmation is pending, the confirmed state is saved.
 	const Ref<Resource> data = confirmation_active ? confirmation_backup : applied;
 
 	ResourceTextSerializer::Options options = ResourceTextSerializer::get_default_options();
-	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(path.get_extension());
+	const ResourceTextSerializer::Format format = _get_format_for_path(path);
 	String text;
 	String error;
 	Error err = OK;
@@ -1067,19 +1157,35 @@ Error SettingsServer::save() {
 			err = ResourceTextSerializer::write_format(format, copy, options, text, error);
 		}
 	}
-	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Settings domain \"%s\": can't write \"%s\": %s", domain, path, error));
-
-	const String folder = path.get_base_dir();
-	if (!folder.is_empty() && !DirAccess::dir_exists_absolute(folder)) {
-		err = DirAccess::make_dir_recursive_absolute(folder);
-		ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Settings domain \"%s\": can't create the folder \"%s\".", domain, folder));
+	String message;
+	if (err != OK) {
+		message = vformat("can't write \"%s\": %s", path, error);
+	} else {
+		const String folder = path.get_base_dir();
+		if (!folder.is_empty() && !DirAccess::dir_exists_absolute(folder)) {
+			err = DirAccess::make_dir_recursive_absolute(folder);
+			if (err != OK) {
+				message = vformat("can't create the folder \"%s\"", folder);
+			}
+		}
 	}
-	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE, &err);
-	ERR_FAIL_COND_V_MSG(file.is_null(), err, vformat("Settings domain \"%s\": can't open \"%s\" for writing.", domain, path));
-	if (!file->store_string(text)) {
-		ERR_FAIL_V_MSG(ERR_FILE_CANT_WRITE, vformat("Settings domain \"%s\": can't write \"%s\".", domain, path));
+	if (err == OK) {
+		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE, &err);
+		if (file.is_null()) {
+			if (err == OK) {
+				err = ERR_FILE_CANT_OPEN;
+			}
+			message = vformat("can't open \"%s\" for writing", path);
+		} else if (!file->store_string(text)) {
+			err = ERR_FILE_CANT_WRITE;
+			message = vformat("can't write \"%s\"", path);
+		}
 	}
-	file.unref();
+	if (err != OK) {
+		ERR_PRINT(vformat("Settings domain \"%s\": %s.", domain, message));
+		emit_signal(SNAME("save_failed"), int(err), path);
+		return err;
+	}
 	unsaved = false;
 	emit_signal(SNAME("saved"));
 	return OK;
@@ -1182,10 +1288,13 @@ void SettingsServer::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "file_path", PROPERTY_HINT_NONE, ""), "set_file_path", "get_file_path");
 
 	ADD_SIGNAL(MethodInfo("value_changed", PropertyInfo(Variant::STRING_NAME, "name"), PropertyInfo(Variant::NIL, "value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NIL_IS_VARIANT)));
+	ADD_SIGNAL(MethodInfo("settings_changed", PropertyInfo(Variant::PACKED_STRING_ARRAY, "names")));
 	ADD_SIGNAL(MethodInfo("applied", PropertyInfo(Variant::PACKED_STRING_ARRAY, "names")));
 	ADD_SIGNAL(MethodInfo("read_from_engine_finished"));
 	ADD_SIGNAL(MethodInfo("loaded"));
 	ADD_SIGNAL(MethodInfo("saved"));
+	ADD_SIGNAL(MethodInfo("load_failed", PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error"), PropertyInfo(Variant::STRING, "path")));
+	ADD_SIGNAL(MethodInfo("save_failed", PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error"), PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("reset"));
 	ADD_SIGNAL(MethodInfo("confirmation_requested", PropertyInfo(Variant::FLOAT, "timeout_sec")));
 	ADD_SIGNAL(MethodInfo("confirmation_finished", PropertyInfo(Variant::BOOL, "kept")));
@@ -1214,6 +1323,7 @@ void SettingsServer::_bind_methods() {
 	GDVIRTUAL_BIND(_validate_value, "name", "value");
 	GDVIRTUAL_BIND(_migrate, "from_version", "data");
 	GDVIRTUAL_BIND(_is_value_supported, "name");
+	GDVIRTUAL_BIND(_value_applied, "name", "value");
 }
 
 SettingsServer::SettingsServer() {

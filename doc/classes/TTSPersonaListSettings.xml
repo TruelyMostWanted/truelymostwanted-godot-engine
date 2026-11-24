@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TTSPersonaListSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [TTSPersonaSettingsServer]: the player's text-to-speech personas.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"tts_personas"[/code]: one [TTSPersonaSettings] per persona the player created or changed. The player's default persona is the entry with [member TTSPersonaSettings.default] set, so the resource holds nothing but the list and [TTSPersonaSettingsServer] can store it as CSV with one row per persona. [TTSPersonaSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [TTSPersonaSettingsServer] and [ListSettingsServer] to change the entries.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="personas" type="TTSPersonaSettings[]" setter="set_personas" getter="get_personas" default="[]">
+			The entries, one per persona, identified by [member TTSPersonaSettings.persona_name].
+		</member>
+	</members>
+</class>

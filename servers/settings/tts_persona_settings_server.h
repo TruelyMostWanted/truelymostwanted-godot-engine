@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  key_binding_settings_server.h                                         */
+/*  tts_persona_settings_server.h                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -31,65 +31,49 @@
 #pragma once
 
 #include "core/templates/hash_set.h"
-#include "servers/settings/key_binding.h"
 #include "servers/settings/list_settings_server.h"
+#include "servers/settings/tts_persona_settings.h"
 
-// Settings domain `key_bindings` (#18): the player's key bindings of the InputMap actions (KeyBindingList).
-// A binding is addressed by action, device (keyboard, mouse, gamepad) and slot. Applying replaces the key,
-// mouse button and joypad events of each action in InputMap; other event types stay. The defaults are the
-// InputMap of the project settings at startup, so reset_action() and reset_all() give back the project bindings.
-class KeyBindingSettingsServer : public ListSettingsServer {
-	GDCLASS(KeyBindingSettingsServer, ListSettingsServer);
+// Settings domain `tts_personas`: the personas the player created or changed, and the player's default persona
+// (TTSPersonaListSettings, one row per persona). Applied to TTSServer as persona overrides, so the personas of
+// the game stay unchanged and come back when the player's version is removed.
+class TTSPersonaSettingsServer : public ListSettingsServer {
+	GDCLASS(TTSPersonaSettingsServer, ListSettingsServer);
 
-	static KeyBindingSettingsServer *singleton;
+	static TTSPersonaSettingsServer *singleton;
 
-	bool include_builtin_actions = false; // Project setting `settings/key_bindings/include_builtin_actions`.
-	HashSet<String> warned_actions; // Saved actions missing in the project that were reported once.
+	HashSet<String> warned_voices; // "<persona>/<voice>" pairs reported once as missing.
 
-	static bool _is_managed_event(const Ref<InputEvent> &p_event);
-	bool _is_managed_action(const StringName &p_action) const;
-	static void _add_action_rows(const StringName &p_action, TypedArray<KeyBinding> &r_rows);
-	Array _get_rows() const;
-	int _find_row(const String &p_action, KeyBinding::InputDevice p_device, int p_slot) const;
-	float _get_default_deadzone(const String &p_action) const;
-	void _merge_project_actions();
+	Ref<TTSPersonaSettings> _get_entry_by_name(const StringName &p_name) const;
+	static PackedInt32Array _find_missing_voices(const Array &p_entries);
 
 protected:
 	static void _bind_methods();
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;
-	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 
 public:
-	static KeyBindingSettingsServer *get_singleton();
-	static void register_settings();
+	static TTSPersonaSettingsServer *get_singleton();
 
 	virtual StringName get_domain() const override;
 	virtual ApplyPhase get_apply_phase() const override;
 	virtual StringName get_list_property() const override;
 	virtual StringName get_entry_key() const override;
 
-	// Actions.
-	PackedStringArray get_action_names() const;
-	bool has_action(const StringName &p_action) const;
-	TypedArray<InputEvent> get_events(const StringName &p_action) const;
-	void set_action_deadzone(const StringName &p_action, float p_deadzone);
-	float get_action_deadzone(const StringName &p_action) const;
+	PackedStringArray get_persona_names() const;
+	bool has_persona(const StringName &p_name) const;
+	void add_persona(const Ref<TTSPersona> &p_persona);
+	Ref<TTSPersona> get_persona(const StringName &p_name) const;
+	void remove_persona(const StringName &p_name);
+	void set_persona_value(const StringName &p_name, const StringName &p_property, const Variant &p_value);
+	Variant get_persona_value(const StringName &p_name, const StringName &p_property) const;
 
-	// Slots.
-	Ref<InputEvent> get_binding(const StringName &p_action, KeyBinding::InputDevice p_device, int p_slot = 0) const;
-	int get_slot_count(const StringName &p_action, KeyBinding::InputDevice p_device) const;
-	Error rebind(const StringName &p_action, const Ref<InputEvent> &p_event, int p_slot = 0);
-	void clear_binding(const StringName &p_action, KeyBinding::InputDevice p_device, int p_slot = 0);
-	PackedStringArray find_conflicts(const Ref<InputEvent> &p_event, const StringName &p_ignore_action = StringName()) const;
+	void set_default_persona(const StringName &p_name);
+	StringName get_default_persona() const;
 
-	// Reset to the project bindings.
-	void reset_action(const StringName &p_action);
-	void reset_all();
+	PackedStringArray get_missing_voice_personas() const;
 
-	String get_event_label(const Ref<InputEvent> &p_event) const;
-
-	KeyBindingSettingsServer();
-	~KeyBindingSettingsServer();
+	TTSPersonaSettingsServer();
+	~TTSPersonaSettingsServer();
 };

@@ -167,7 +167,25 @@ String AudioDeviceSettingsServer::get_input_device() const {
 	return get_value(SNAME("input_device"));
 }
 
+void AudioDeviceSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"output_device",
+		"input_device",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void AudioDeviceSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("output_device_changed", PropertyInfo(Variant::STRING, "device")));
+	ADD_SIGNAL(MethodInfo("input_device_changed", PropertyInfo(Variant::STRING, "device")));
+
 	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioDeviceSettingsServer::set_output_device);
 	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioDeviceSettingsServer::get_output_device);
 	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioDeviceSettingsServer::set_input_device);

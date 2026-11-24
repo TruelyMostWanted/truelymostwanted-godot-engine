@@ -43,6 +43,7 @@ TEST_FORCE_LINK(test_audio_settings_server)
 #include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestAudioSettingsServer {
@@ -389,6 +390,49 @@ TEST_CASE("[Audio][AudioDeviceSettingsServer] Devices: unknown names fall back t
 	CHECK(server->load() == OK);
 	CHECK(server->get_output_device() == "Default");
 	CHECK(server->get_input_device() == "Default");
+	memdelete(server);
+}
+
+TEST_CASE("[Audio][AudioBusSettingsServer] Typed bus signals fire once per applied change") {
+	TestSetup setup;
+	AudioServer *audio_server = AudioServer::get_singleton();
+	AudioBusSettingsServer *server = memnew(AudioBusSettingsServer);
+	server->set_file_path(temp_file("signals.ini"));
+	server->startup();
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "bus_volume_changed");
+	SIGNAL_WATCH(server, "bus_mute_changed");
+	SIGNAL_WATCH(server, "bus_layout_changed");
+
+	// Pending changes do not reach AudioServer: no signal.
+	server->set_bus_volume_db("Music", -12.0);
+	server->set_bus_mute("Master", true);
+	SIGNAL_CHECK_FALSE("bus_volume_changed");
+	SIGNAL_CHECK_FALSE("bus_mute_changed");
+
+	// apply(): one signal per changed bus value.
+	CHECK(server->apply() == OK);
+	const Array volume_args = { { StringName("Music"), -12.0 } };
+	SIGNAL_CHECK("bus_volume_changed", volume_args);
+	const Array mute_args = { { StringName("Master"), true } };
+	SIGNAL_CHECK("bus_mute_changed", mute_args);
+	SIGNAL_CHECK_FALSE("bus_layout_changed");
+
+	// Nothing changed: nothing emitted.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("bus_volume_changed");
+	SIGNAL_CHECK_FALSE("bus_mute_changed");
+
+	// A new bus in the layout: the values are pushed again and the layout signal fires.
+	audio_server->add_bus();
+	// One call without arguments. Built explicitly, `Array({ Array() })` collapses to one level.
+	Array layout_calls;
+	layout_calls.push_back(Array());
+	SIGNAL_CHECK("bus_layout_changed", layout_calls);
+
+	SIGNAL_UNWATCH(server, "bus_volume_changed");
+	SIGNAL_UNWATCH(server, "bus_mute_changed");
+	SIGNAL_UNWATCH(server, "bus_layout_changed");
 	memdelete(server);
 }
 

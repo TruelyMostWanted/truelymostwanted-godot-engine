@@ -139,6 +139,7 @@ void AudioBusSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_s
 		buses.push_back(_make_entry_from_engine(i));
 	}
 	p_settings->set(get_list_property(), buses);
+	signaled_buses = Array(copy_value(buses));
 }
 
 void AudioBusSettingsServer::_merge_layout_buses() {
@@ -207,6 +208,7 @@ void AudioBusSettingsServer::_on_bus_layout_changed() {
 	PackedStringArray names;
 	names.push_back(get_list_property());
 	_apply_settings(applied_settings, names);
+	emit_signal(SNAME("bus_layout_changed"));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -307,7 +309,65 @@ bool AudioBusSettingsServer::is_bus_solo(const StringName &p_bus) const {
 	return value.get_type() != Variant::NIL && bool(value);
 }
 
+void AudioBusSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	ListSettingsServer::_notify_value_applied(p_name, p_value);
+	if (p_name != get_list_property()) {
+		return;
+	}
+	const AudioServer *audio_server = AudioServer::get_singleton();
+	const Array buses = p_value;
+	const Array previous = signaled_buses;
+	signaled_buses = Array(copy_value(buses));
+	PackedStringArray previous_names;
+	Array previous_entries;
+	for (int j = 0; j < previous.size(); j++) {
+		const Ref<Resource> entry = previous[j];
+		if (entry.is_valid()) {
+			previous_names.push_back(entry->get(SNAME("bus_name")));
+			previous_entries.push_back(entry);
+		}
+	}
+	PackedStringArray bus_names;
+	for (int i = 0; i < buses.size(); i++) {
+		const Ref<Resource> entry = buses[i];
+		if (entry.is_null()) {
+			continue;
+		}
+		const String bus_name = entry->get(SNAME("bus_name"));
+		bus_names.push_back(bus_name);
+		// Values of buses that the layout does not have did not reach AudioServer.
+		if (bus_name.is_empty() || (audio_server != nullptr && audio_server->get_bus_index(bus_name) < 0)) {
+			continue;
+		}
+		Ref<Resource> old_entry;
+		const int64_t old_index = previous_names.find(bus_name);
+		if (old_index >= 0) {
+			old_entry = previous_entries[old_index];
+		}
+		const float volume_db = entry->get(SNAME("volume_db"));
+		const bool mute = entry->get(SNAME("mute"));
+		const bool solo = entry->get(SNAME("solo"));
+		if (old_entry.is_null() || !Math::is_equal_approx(float(old_entry->get(SNAME("volume_db"))), volume_db)) {
+			emit_signal(SNAME("bus_volume_changed"), StringName(bus_name), volume_db);
+		}
+		if (old_entry.is_null() || bool(old_entry->get(SNAME("mute"))) != mute) {
+			emit_signal(SNAME("bus_mute_changed"), StringName(bus_name), mute);
+		}
+		if (old_entry.is_null() || bool(old_entry->get(SNAME("solo"))) != solo) {
+			emit_signal(SNAME("bus_solo_changed"), StringName(bus_name), solo);
+		}
+	}
+	if (!(bus_names == previous_names)) {
+		emit_signal(SNAME("bus_layout_changed"));
+	}
+}
+
 void AudioBusSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("bus_volume_changed", PropertyInfo(Variant::STRING_NAME, "bus_name"), PropertyInfo(Variant::FLOAT, "volume_db")));
+	ADD_SIGNAL(MethodInfo("bus_mute_changed", PropertyInfo(Variant::STRING_NAME, "bus_name"), PropertyInfo(Variant::BOOL, "muted")));
+	ADD_SIGNAL(MethodInfo("bus_solo_changed", PropertyInfo(Variant::STRING_NAME, "bus_name"), PropertyInfo(Variant::BOOL, "solo")));
+	ADD_SIGNAL(MethodInfo("bus_layout_changed"));
+
 	ClassDB::bind_method(D_METHOD("set_create_missing_buses", "enabled"), &AudioBusSettingsServer::set_create_missing_buses);
 	ClassDB::bind_method(D_METHOD("is_create_missing_buses_enabled"), &AudioBusSettingsServer::is_create_missing_buses_enabled);
 	ClassDB::bind_method(D_METHOD("get_bus_names"), &AudioBusSettingsServer::get_bus_names);

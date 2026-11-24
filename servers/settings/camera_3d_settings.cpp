@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  camera_settings.cpp                                                   */
+/*  camera_3d_settings.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,103 +28,103 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "camera_settings.h"
+#include "camera_3d_settings.h"
 
 #ifndef _3D_DISABLED
 
 #include "core/object/class_db.h"
 
-void CameraSettings::set_enabled(bool p_enabled) {
+void Camera3DSettings::set_enabled(bool p_enabled) {
 	enabled = p_enabled;
 	emit_changed();
 }
 
-bool CameraSettings::is_enabled() const {
+bool Camera3DSettings::is_enabled() const {
 	return enabled;
 }
 
-void CameraSettings::set_field_of_view(float p_degrees) {
+void Camera3DSettings::set_field_of_view(float p_degrees) {
 	field_of_view = p_degrees;
 	emit_changed();
 }
 
-float CameraSettings::get_field_of_view() const {
+float Camera3DSettings::get_field_of_view() const {
 	return field_of_view;
 }
 
-void CameraSettings::set_keep_aspect(Camera3D::KeepAspect p_keep_aspect) {
+void Camera3DSettings::set_keep_aspect(Camera3D::KeepAspect p_keep_aspect) {
 	keep_aspect = p_keep_aspect;
 	emit_changed();
 }
 
-Camera3D::KeepAspect CameraSettings::get_keep_aspect() const {
+Camera3D::KeepAspect Camera3DSettings::get_keep_aspect() const {
 	return keep_aspect;
 }
 
-void CameraSettings::set_near(float p_near) {
+void Camera3DSettings::set_near(float p_near) {
 	near_distance = p_near;
 	emit_changed();
 }
 
-float CameraSettings::get_near() const {
+float Camera3DSettings::get_near() const {
 	return near_distance;
 }
 
-void CameraSettings::set_far(float p_far) {
+void Camera3DSettings::set_far(float p_far) {
 	far_distance = p_far;
 	emit_changed();
 }
 
-float CameraSettings::get_far() const {
+float Camera3DSettings::get_far() const {
 	return far_distance;
 }
 
-void CameraSettings::set_shake_intensity(float p_intensity) {
+void Camera3DSettings::set_shake_intensity(float p_intensity) {
 	shake_intensity = p_intensity;
 	emit_changed();
 }
 
-float CameraSettings::get_shake_intensity() const {
+float Camera3DSettings::get_shake_intensity() const {
 	return shake_intensity;
 }
 
-void CameraSettings::set_head_bob_intensity(float p_intensity) {
+void Camera3DSettings::set_head_bob_intensity(float p_intensity) {
 	head_bob_intensity = p_intensity;
 	emit_changed();
 }
 
-float CameraSettings::get_head_bob_intensity() const {
+float Camera3DSettings::get_head_bob_intensity() const {
 	return head_bob_intensity;
 }
 
-void CameraSettings::set_motion_blur_intensity(float p_intensity) {
+void Camera3DSettings::set_motion_blur_intensity(float p_intensity) {
 	motion_blur_intensity = p_intensity;
 	emit_changed();
 }
 
-float CameraSettings::get_motion_blur_intensity() const {
+float Camera3DSettings::get_motion_blur_intensity() const {
 	return motion_blur_intensity;
 }
 
-void CameraSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &CameraSettings::set_enabled);
-	ClassDB::bind_method(D_METHOD("is_enabled"), &CameraSettings::is_enabled);
-	ClassDB::bind_method(D_METHOD("set_field_of_view", "degrees"), &CameraSettings::set_field_of_view);
-	ClassDB::bind_method(D_METHOD("get_field_of_view"), &CameraSettings::get_field_of_view);
-	ClassDB::bind_method(D_METHOD("set_keep_aspect", "keep_aspect"), &CameraSettings::set_keep_aspect);
-	ClassDB::bind_method(D_METHOD("get_keep_aspect"), &CameraSettings::get_keep_aspect);
-	ClassDB::bind_method(D_METHOD("set_near", "near"), &CameraSettings::set_near);
-	ClassDB::bind_method(D_METHOD("get_near"), &CameraSettings::get_near);
-	ClassDB::bind_method(D_METHOD("set_far", "far"), &CameraSettings::set_far);
-	ClassDB::bind_method(D_METHOD("get_far"), &CameraSettings::get_far);
-	ClassDB::bind_method(D_METHOD("set_shake_intensity", "intensity"), &CameraSettings::set_shake_intensity);
-	ClassDB::bind_method(D_METHOD("get_shake_intensity"), &CameraSettings::get_shake_intensity);
-	ClassDB::bind_method(D_METHOD("set_head_bob_intensity", "intensity"), &CameraSettings::set_head_bob_intensity);
-	ClassDB::bind_method(D_METHOD("get_head_bob_intensity"), &CameraSettings::get_head_bob_intensity);
-	ClassDB::bind_method(D_METHOD("set_motion_blur_intensity", "intensity"), &CameraSettings::set_motion_blur_intensity);
-	ClassDB::bind_method(D_METHOD("get_motion_blur_intensity"), &CameraSettings::get_motion_blur_intensity);
+void Camera3DSettings::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &Camera3DSettings::set_enabled);
+	ClassDB::bind_method(D_METHOD("is_enabled"), &Camera3DSettings::is_enabled);
+	ClassDB::bind_method(D_METHOD("set_field_of_view", "degrees"), &Camera3DSettings::set_field_of_view);
+	ClassDB::bind_method(D_METHOD("get_field_of_view"), &Camera3DSettings::get_field_of_view);
+	ClassDB::bind_method(D_METHOD("set_keep_aspect", "keep_aspect"), &Camera3DSettings::set_keep_aspect);
+	ClassDB::bind_method(D_METHOD("get_keep_aspect"), &Camera3DSettings::get_keep_aspect);
+	ClassDB::bind_method(D_METHOD("set_near", "near"), &Camera3DSettings::set_near);
+	ClassDB::bind_method(D_METHOD("get_near"), &Camera3DSettings::get_near);
+	ClassDB::bind_method(D_METHOD("set_far", "far"), &Camera3DSettings::set_far);
+	ClassDB::bind_method(D_METHOD("get_far"), &Camera3DSettings::get_far);
+	ClassDB::bind_method(D_METHOD("set_shake_intensity", "intensity"), &Camera3DSettings::set_shake_intensity);
+	ClassDB::bind_method(D_METHOD("get_shake_intensity"), &Camera3DSettings::get_shake_intensity);
+	ClassDB::bind_method(D_METHOD("set_head_bob_intensity", "intensity"), &Camera3DSettings::set_head_bob_intensity);
+	ClassDB::bind_method(D_METHOD("get_head_bob_intensity"), &Camera3DSettings::get_head_bob_intensity);
+	ClassDB::bind_method(D_METHOD("set_motion_blur_intensity", "intensity"), &Camera3DSettings::set_motion_blur_intensity);
+	ClassDB::bind_method(D_METHOD("get_motion_blur_intensity"), &Camera3DSettings::get_motion_blur_intensity);
 
-	// `or_less`/`or_greater`: the Inspector shows the usual range, CameraSettingsServer clamps with a warning.
+	// `or_less`/`or_greater`: the Inspector shows the usual range, Camera3DSettingsServer clamps with a warning.
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "field_of_view", PROPERTY_HINT_RANGE, "1,179,0.1,or_greater,or_less,degrees"), "set_field_of_view", "get_field_of_view");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "keep_aspect", PROPERTY_HINT_ENUM, "Keep Width,Keep Height"), "set_keep_aspect", "get_keep_aspect");

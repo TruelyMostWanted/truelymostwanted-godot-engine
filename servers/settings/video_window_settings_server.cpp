@@ -859,7 +859,39 @@ void VideoWindowSettingsServer::place_main_window() {
 	_place_main_window();
 }
 
+void VideoWindowSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"window_mode",
+		"window_size",
+		"screen",
+		"borderless",
+		"vsync_mode",
+		"content_scale_mode",
+		"content_scale_aspect",
+		"content_scale_factor",
+		"hdr_output_requested",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoWindowSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("window_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "DisplayServer.WindowMode")));
+	ADD_SIGNAL(MethodInfo("window_size_changed", PropertyInfo(Variant::VECTOR2I, "size")));
+	ADD_SIGNAL(MethodInfo("screen_changed", PropertyInfo(Variant::INT, "screen")));
+	ADD_SIGNAL(MethodInfo("borderless_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("vsync_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "DisplayServer.VSyncMode")));
+	ADD_SIGNAL(MethodInfo("content_scale_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.ContentScaleMode")));
+	ADD_SIGNAL(MethodInfo("content_scale_aspect_changed", PropertyInfo(Variant::INT, "aspect", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.ContentScaleAspect")));
+	ADD_SIGNAL(MethodInfo("content_scale_factor_changed", PropertyInfo(Variant::FLOAT, "factor")));
+	ADD_SIGNAL(MethodInfo("hdr_output_requested_changed", PropertyInfo(Variant::BOOL, "requested")));
+
 	ClassDB::bind_method(D_METHOD("set_window_mode", "mode"), &VideoWindowSettingsServer::set_window_mode);
 	ClassDB::bind_method(D_METHOD("get_window_mode"), &VideoWindowSettingsServer::get_window_mode);
 	ClassDB::bind_method(D_METHOD("set_window_size", "size"), &VideoWindowSettingsServer::set_window_size);

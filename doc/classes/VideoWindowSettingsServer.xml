@@ -309,4 +309,62 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="borderless_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.borderless] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="content_scale_aspect_changed">
+			<param index="0" name="aspect" type="int" enum="Window.ContentScaleAspect" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.content_scale_aspect] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="content_scale_factor_changed">
+			<param index="0" name="factor" type="float" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.content_scale_factor] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for UI that is not under the root window.
+			</description>
+		</signal>
+		<signal name="content_scale_mode_changed">
+			<param index="0" name="mode" type="int" enum="Window.ContentScaleMode" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.content_scale_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="hdr_output_requested_changed">
+			<param index="0" name="requested" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.hdr_output_requested] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="screen_changed">
+			<param index="0" name="screen" type="int" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.screen] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="vsync_mode_changed">
+			<param index="0" name="mode" type="int" enum="DisplayServer.VSyncMode" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.vsync_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="window_mode_changed">
+			<param index="0" name="mode" type="int" enum="DisplayServer.WindowMode" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.window_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to update the options menu or the mouse mode. A mode that needs a confirmation fires when it is applied and again with the old mode if the confirmation is canceled.
+			</description>
+		</signal>
+		<signal name="window_size_changed">
+			<param index="0" name="size" type="Vector2i" />
+			<description>
+				Emitted once when a changed [member VideoWindowSettings.window_size] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>

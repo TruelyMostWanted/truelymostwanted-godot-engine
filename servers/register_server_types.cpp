@@ -84,21 +84,25 @@
 #include "servers/settings/audio_bus_settings_server.h"
 #include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
-#include "servers/settings/camera_settings.h"
-#include "servers/settings/camera_settings_server.h"
+#include "servers/settings/camera_3d_settings.h"
+#include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
+#include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
-#include "servers/settings/key_binding.h"
-#include "servers/settings/key_binding_settings_server.h"
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/tts_persona_settings.h"
+#include "servers/settings/tts_persona_settings_server.h"
 #include "servers/settings/video_effect_settings.h"
 #include "servers/settings/video_effect_settings_server.h"
+#include "servers/settings/video_preset.h"
+#include "servers/settings/video_preset_settings.h"
+#include "servers/settings/video_preset_settings_server.h"
 #include "servers/settings/video_quality_settings.h"
 #include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_shadow_settings.h"
@@ -190,19 +194,21 @@ static AudioDeviceSettingsServer *audio_device_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
 static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
-static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
+static InputMapSettingsServer *input_map_settings_server = nullptr;
 static VideoWindowSettingsServer *video_window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
 static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
 static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
+static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
+static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
 #endif
 #ifndef _3D_DISABLED
-static CameraSettingsServer *camera_settings_server = nullptr;
+static Camera3DSettingsServer *camera_3d_settings_server = nullptr;
 #endif
 
 void register_server_types() {
@@ -252,12 +258,10 @@ void register_server_types() {
 	input_settings_server = memnew(InputSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputSettingsServer", InputSettingsServer::get_singleton(), "InputSettingsServer"));
 	settings_server_manager->register_server(input_settings_server);
-	GDREGISTER_CLASS(KeyBinding);
-	GDREGISTER_CLASS(KeyBindingList);
-	GDREGISTER_ABSTRACT_CLASS(KeyBindingSettingsServer);
-	key_binding_settings_server = memnew(KeyBindingSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("KeyBindingSettingsServer", KeyBindingSettingsServer::get_singleton(), "KeyBindingSettingsServer"));
-	settings_server_manager->register_server(key_binding_settings_server);
+	GDREGISTER_ABSTRACT_CLASS(InputMapSettingsServer);
+	input_map_settings_server = memnew(InputMapSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
+	settings_server_manager->register_server(input_map_settings_server);
 	GDREGISTER_CLASS(VideoWindowSettings);
 	GDREGISTER_ABSTRACT_CLASS(VideoWindowSettingsServer);
 	video_window_settings_server = memnew(VideoWindowSettingsServer);
@@ -288,12 +292,25 @@ void register_server_types() {
 	video_effect_settings_server = memnew(VideoEffectSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoEffectSettingsServer", VideoEffectSettingsServer::get_singleton(), "VideoEffectSettingsServer"));
 	settings_server_manager->register_server(video_effect_settings_server);
+	// After the four video domains it applies presets to (#25).
+	GDREGISTER_CLASS(VideoPreset);
+	GDREGISTER_CLASS(VideoPresetSettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoPresetSettingsServer);
+	video_preset_settings_server = memnew(VideoPresetSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoPresetSettingsServer", VideoPresetSettingsServer::get_singleton(), "VideoPresetSettingsServer"));
+	settings_server_manager->register_server(video_preset_settings_server);
 	GDREGISTER_CLASS(AccessibilitySettings);
 	GDREGISTER_CLASS(AccessibilityColorScheme);
 	GDREGISTER_ABSTRACT_CLASS(AccessibilitySettingsServer);
 	accessibility_settings_server = memnew(AccessibilitySettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AccessibilitySettingsServer", AccessibilitySettingsServer::get_singleton(), "AccessibilitySettingsServer"));
 	settings_server_manager->register_server(accessibility_settings_server);
+	GDREGISTER_CLASS(TTSPersonaSettings);
+	GDREGISTER_CLASS(TTSPersonaListSettings);
+	GDREGISTER_ABSTRACT_CLASS(TTSPersonaSettingsServer);
+	tts_persona_settings_server = memnew(TTSPersonaSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSPersonaSettingsServer", TTSPersonaSettingsServer::get_singleton(), "TTSPersonaSettingsServer"));
+	settings_server_manager->register_server(tts_persona_settings_server);
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	// Only with the texture_streaming module (#22); otherwise the domain is missing.
 	GDREGISTER_CLASS(VideoTextureStreamingSettings);
@@ -304,11 +321,11 @@ void register_server_types() {
 #endif
 #ifndef _3D_DISABLED
 	// Not with disable_3d (#28): Camera3D is missing.
-	GDREGISTER_CLASS(CameraSettings);
-	GDREGISTER_ABSTRACT_CLASS(CameraSettingsServer);
-	camera_settings_server = memnew(CameraSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("CameraSettingsServer", CameraSettingsServer::get_singleton(), "CameraSettingsServer"));
-	settings_server_manager->register_server(camera_settings_server);
+	GDREGISTER_CLASS(Camera3DSettings);
+	GDREGISTER_ABSTRACT_CLASS(Camera3DSettingsServer);
+	camera_3d_settings_server = memnew(Camera3DSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("Camera3DSettingsServer", Camera3DSettingsServer::get_singleton(), "Camera3DSettingsServer"));
+	settings_server_manager->register_server(camera_3d_settings_server);
 #endif
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
@@ -547,15 +564,19 @@ void unregister_server_types() {
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
 #ifndef _3D_DISABLED
-	memdelete(camera_settings_server);
-	camera_settings_server = nullptr;
+	memdelete(camera_3d_settings_server);
+	camera_3d_settings_server = nullptr;
 #endif
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	memdelete(video_texture_streaming_settings_server);
 	video_texture_streaming_settings_server = nullptr;
 #endif
+	memdelete(video_preset_settings_server);
+	video_preset_settings_server = nullptr;
 	memdelete(video_effect_settings_server);
 	video_effect_settings_server = nullptr;
+	memdelete(tts_persona_settings_server);
+	tts_persona_settings_server = nullptr;
 	memdelete(accessibility_settings_server);
 	accessibility_settings_server = nullptr;
 	memdelete(video_texture_settings_server);
@@ -568,8 +589,8 @@ void unregister_server_types() {
 	engine_settings_server = nullptr;
 	memdelete(video_window_settings_server);
 	video_window_settings_server = nullptr;
-	memdelete(key_binding_settings_server);
-	key_binding_settings_server = nullptr;
+	memdelete(input_map_settings_server);
+	input_map_settings_server = nullptr;
 	memdelete(input_settings_server);
 	input_settings_server = nullptr;
 	memdelete(language_settings_server);

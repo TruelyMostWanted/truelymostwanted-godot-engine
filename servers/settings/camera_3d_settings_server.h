@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  camera_settings_server.h                                              */
+/*  camera_3d_settings_server.h                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -37,17 +37,17 @@
 #include "scene/3d/camera_3d.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `camera` (#28): field of view, horizontal or vertical FOV (Camera3D.keep_aspect), near and far
-// clip plane, and the game-side motion values (camera shake, head bob, motion blur) (CameraSettings).
+// Settings domain `camera_3d` (#28): field of view, horizontal or vertical FOV (Camera3D.keep_aspect), near and far
+// clip plane, and the game-side motion values (camera shake, head bob, motion blur) (Camera3DSettings).
 // The camera values go to every Camera3D in the group get_camera_group() when it enters the tree, and to the
 // cameras passed to add_camera(). Other cameras (cutscenes, the editor) are never changed. The authored values of
 // each camera are remembered the first time it gets the settings and given back by remove_camera() and by
 // `enabled` = false. Applied in APPLY_PHASE_SCENE. Not built with `disable_3d`.
-// Defaults are the project settings `settings/camera/*`. Precedence: player's file > project settings.
-class CameraSettingsServer : public SettingsServer {
-	GDCLASS(CameraSettingsServer, SettingsServer);
+// Defaults are the project settings `settings/camera_3d/*`. Precedence: player's file > project settings.
+class Camera3DSettingsServer : public SettingsServer {
+	GDCLASS(Camera3DSettingsServer, SettingsServer);
 
-	static CameraSettingsServer *singleton;
+	static Camera3DSettingsServer *singleton;
 
 	// The values a camera had before it got the settings.
 	struct AuthoredValues {
@@ -81,12 +81,15 @@ class CameraSettingsServer : public SettingsServer {
 protected:
 	static void _bind_methods();
 
+	// Emits the typed `<value>_changed` signal of an applied value.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
+
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
 public:
-	static CameraSettingsServer *get_singleton();
+	static Camera3DSettingsServer *get_singleton();
 	static void register_settings();
 
 	// The group of cameras that get the settings when they enter the tree.
@@ -122,8 +125,8 @@ public:
 	// Gives the settings to every camera in the group now (for cameras that joined it while in the tree).
 	void apply_to_cameras();
 
-	CameraSettingsServer();
-	~CameraSettingsServer();
+	Camera3DSettingsServer();
+	~Camera3DSettingsServer();
 };
 
 #endif // _3D_DISABLED

@@ -47,6 +47,7 @@ TEST_FORCE_LINK(test_accessibility_settings_server)
 #include "servers/settings/accessibility_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/tts/tts_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestAccessibilitySettingsServer {
@@ -301,6 +302,40 @@ TEST_CASE("[SceneTree][AccessibilitySettingsServer] Speaking focused controls co
 		CHECK(server->speak_control(button) == -1);
 	}
 	memdelete(button);
+	memdelete(server);
+}
+
+TEST_CASE("[AccessibilitySettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	AccessibilitySettingsServer *server = memnew(AccessibilitySettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "ui_scale_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("ui_scale", 1.5);
+	SIGNAL_CHECK_FALSE("ui_scale_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 1.5 } };
+	SIGNAL_CHECK("ui_scale_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("ui_scale_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("ui_scale");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("ui_scale_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("ui_scale_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "ui_scale_changed");
 	memdelete(server);
 }
 

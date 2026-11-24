@@ -521,4 +521,62 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="allow_fog_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_fog] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="allow_glow_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_glow] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for effects the game draws itself instead of the [Environment] glow.
+			</description>
+		</signal>
+		<signal name="allow_ssao_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_ssao] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="allow_ssil_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_ssil] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="allow_ssr_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_ssr] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="allow_volumetric_fog_changed">
+			<param index="0" name="allowed" type="bool" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.allow_volumetric_fog] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="brightness_changed">
+			<param index="0" name="brightness" type="float" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.brightness] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a post-processing shader of the game.
+			</description>
+		</signal>
+		<signal name="contrast_changed">
+			<param index="0" name="contrast" type="float" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.contrast] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="saturation_changed">
+			<param index="0" name="saturation" type="float" />
+			<description>
+				Emitted once when a changed [member VideoEffectSettings.saturation] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>

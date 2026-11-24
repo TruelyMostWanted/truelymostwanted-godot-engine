@@ -42,6 +42,7 @@ TEST_FORCE_LINK(test_input_settings_server)
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestInputSettingsServer {
@@ -293,6 +294,40 @@ TEST_CASE("[SceneTree][InputSettingsServer] Vibration respects the settings") {
 	server->set_vibration_enabled(false);
 	server->vibrate(0, 1.0, 1.0, 0.5);
 	CHECK(input->get_joy_vibration_strength(0) == Vector2());
+	memdelete(server);
+}
+
+TEST_CASE("[InputSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	InputSettingsServer *server = memnew(InputSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "mouse_sensitivity_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("mouse_sensitivity", 2.0);
+	SIGNAL_CHECK_FALSE("mouse_sensitivity_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 2.0 } };
+	SIGNAL_CHECK("mouse_sensitivity_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("mouse_sensitivity_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("mouse_sensitivity");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("mouse_sensitivity_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("mouse_sensitivity_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "mouse_sensitivity_changed");
 	memdelete(server);
 }
 

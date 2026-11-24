@@ -30,9 +30,15 @@
 
 #pragma once
 
+#include "core/input/input_actions.h"
 #include "core/input/input_event.h"
 #include "core/object/object.h"
+#include "core/os/mutex.h"
 #include "core/templates/hash_map.h"
+#include "core/templates/hash_set.h"
+#include "core/templates/local_vector.h"
+#include "core/templates/safe_refcount.h"
+#include "core/variant/binder_common.h"
 
 template <typename T>
 class TypedArray;
@@ -52,6 +58,13 @@ public:
 		List<Ref<InputEvent>> inputs;
 	};
 
+	// The two layers of actions (#172): Godot's built-in `ui_*` actions (also when the project changed
+	// them) and every action the project or the game adds.
+	enum InputActionLayer {
+		INPUT_ACTION_LAYER_BUILTIN,
+		INPUT_ACTION_LAYER_CUSTOM,
+	};
+
 	static constexpr float DEFAULT_DEADZONE = 0.2f;
 	// Keep bigger deadzone for toggle actions (default `ui_*` actions, axis `pressed`) (GH-103360).
 	static constexpr float DEFAULT_TOGGLE_DEADZONE = 0.5f;
@@ -62,6 +75,24 @@ private:
 	mutable HashMap<StringName, Action> input_map;
 	HashMap<String, List<Ref<InputEvent>>> default_builtin_cache;
 	HashMap<String, List<Ref<InputEvent>>> default_builtin_with_overrides_cache;
+
+	// Names of Godot's built-in actions, with and without feature suffix (`ui_text_backspace_word.macos`).
+	HashSet<StringName> builtin_action_names;
+
+	// Reverse index (#172): event key (type and keycode, button or axis) to the actions that have an event
+	// with that key, as ordinals into `event_index_actions` (the actions in the order of `input_map`).
+	// Rebuilt on the next lookup after any change of the map or of one of its events.
+	mutable Mutex event_index_mutex;
+	mutable SafeFlag event_index_dirty;
+	mutable HashMap<uint64_t, LocalVector<uint32_t>> event_index;
+	mutable LocalVector<StringName> event_index_actions;
+	mutable LocalVector<uint32_t> event_index_unindexed; // Actions with event types the index doesn't know.
+
+	void _rebuild_event_index() const;
+	void _mark_event_index_dirty();
+	void _watch_event(const Ref<InputEvent> &p_event);
+	void _unwatch_event(const Ref<InputEvent> &p_event);
+	void _add_project_action(const String &p_name, const Dictionary &p_action);
 
 	List<Ref<InputEvent>>::Element *_find_event(Action &p_action, const Ref<InputEvent> &p_event, bool p_exact_match = false, bool *r_pressed = nullptr, float *r_strength = nullptr, float *r_raw_strength = nullptr, int *r_event_index = nullptr) const;
 
@@ -103,6 +134,19 @@ public:
 
 	String suggest_actions(const StringName &p_action) const;
 
+	// Layers (#172).
+	bool is_builtin_input_action(const StringName &p_action) const;
+	bool is_custom_input_action(const StringName &p_action) const;
+	InputActionLayer get_input_action_layer(const StringName &p_action) const;
+	Ref<InputAction> get_input_action(const StringName &p_action) const;
+	Ref<InputActions> get_input_actions(InputActionLayer p_layer) const;
+	void set_input_action(const Ref<InputAction> &p_action);
+	void set_input_actions(const Ref<InputActions> &p_actions);
+
+	// The actions that can match p_event, in the order of the action map: a superset of the actions for which
+	// event_get_index() is not -1. Used by Input::parse_input_event() instead of checking every action.
+	void get_event_candidate_actions(const Ref<InputEvent> &p_event, LocalVector<StringName> &r_actions) const;
+
 #ifdef TOOLS_ENABLED
 	virtual void get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const override;
 #endif
@@ -115,3 +159,5 @@ public:
 	InputMap();
 	~InputMap();
 };
+
+VARIANT_ENUM_CAST(InputMap::InputActionLayer);

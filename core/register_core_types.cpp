@@ -43,6 +43,8 @@
 #include "core/extension/gdextension_resource_format.h"
 #include "core/extension/godot_instance.h"
 #include "core/input/input.h"
+#include "core/input/input_action.h"
+#include "core/input/input_actions.h"
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
 #include "core/io/config_file.h"
@@ -246,6 +248,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(InputEventMagnifyGesture);
 	GDREGISTER_CLASS(InputEventPanGesture);
 	GDREGISTER_CLASS(InputEventMIDI);
+	GDREGISTER_CLASS(InputAction);
+	GDREGISTER_CLASS(InputActions);
 
 	// Network
 	GDREGISTER_ABSTRACT_CLASS(StreamPeer);

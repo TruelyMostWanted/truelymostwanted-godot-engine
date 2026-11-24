@@ -81,4 +81,20 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="input_device_changed">
+			<param index="0" name="device" type="String" />
+			<description>
+				Emitted once when a changed [member AudioDeviceSettings.input_device] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to restart voice chat or recording with the new device.
+			</description>
+		</signal>
+		<signal name="output_device_changed">
+			<param index="0" name="device" type="String" />
+			<description>
+				Emitted once when a changed [member AudioDeviceSettings.output_device] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to show the device in use, for example after the player picked another one in the options menu.
+			</description>
+		</signal>
+	</signals>
 </class>
