@@ -72,10 +72,22 @@ Offene PRs von Godot, die die eigene Engine schon vor dem Merge in Godot enthäl
 
 Bei einem Konflikt hält das Skript an; lösen, committen, erneut starten (erledigte Schritte laufen leer). Ein PR, der auf einem anderen aufbaut, steht in der Liste danach. Ist ein PR in Godot gemergt, die Zeile entfernen; `master` bringt ihn dann mit.
 
+## Releases
+
+Öffentliche Releases baut der Workflow [`truely_release.yml`](../.github/workflows/truely_release.yml), nur von Hand: *Actions → 📦 Truely Release → Run workflow* auf `truely-godot-engine` (Option `draft` für einen Entwurf) oder `gh workflow run truely_release.yml --ref truely-godot-engine -f draft=false`.
+
+- **Inhalt:** Editoren (Standard und Mono) für Windows, Linux und macOS (universal, per `lipo`) sowie Export-Templates (`.tpz` mit `templates/version.txt`) für Windows, Linux, macOS und Web mit und ohne Threads. Gebaut mit `production=yes`, ohne SCons-Cache.
+- **Namen:** `Truely_Godot<Version>-<Status>_<Hash>_<Plattform>`, z. B. `Truely_Godot4.8-beta5_a1b2c3d_win64.zip`, `…_mono_win64.zip`, `…_export_templates.tpz`, `…_mono_export_templates.tpz`. Tag `truely-godot4.8-beta5-a1b2c3d`, Titel „Truely (Godot 4.8 beta 5, a1b2c3d)“. Eine eigene Versionsnummer gibt es nicht.
+- **Status der Godot-Basis:** [`godot-status.txt`](godot-status.txt) (z. B. `beta5`). `build.ps1` nimmt ihn, wenn `-Status` fehlt, der Workflow immer. Nach einem Sync, der Godot auf einen neuen Stand bringt (`beta6`, `rc1`, `stable`), die Datei anpassen; `merge-chain.ps1` erinnert am Ende daran. Versionsstring: `4.8.beta5.truely.<hash>` (Mono: `4.8.beta5.mono.truely.<hash>`).
+- **Self-contained:** Jede Editor-Zip enthält einen Ordner mit dem Editor und `._sc_`. Einstellungen und Export-Templates bleiben in diesem Ordner, Truely und das offizielle Godot derselben Version überschreiben sich die Templates nicht.
+- **macOS:** unsigniert (nur Ad-hoc-Signatur). Erster Start per Rechtsklick → Öffnen; für den Self-contained-Modus einmal `xattr -dr com.apple.quarantine <Ordner>`.
+- **Lokal packen:** `./truely/pack-release.ps1` packt die Windows-Builds aus `bin/` mit denselben Namen nach `P:/Projects/GitHub/truely-releases/<Name>/` (Parameter `-OutDir`). Der Name kommt aus `<exe> --version`. **Lokale Packs enthalten nur Windows-Templates.** Vorher mit `production=yes` bauen, bei Mono danach Glue und `build_assemblies.py` (`FEATURE-WORKFLOW.md`, Abschnitt 3). Nach einem Wechsel des Status ohne SCons-Cache bauen (`$env:TRUELY_SCONS_CACHE = ''`), sonst landen alte Versionsstrings im Build.
+- **Packen im Workflow:** [`package-release.sh`](../.github/truely/package-release.sh) setzt die Artefakte der Build-Jobs zu Zips und `.tpz` zusammen.
+
 ## Wichtig
 
 - **PRs auf GitHub:** Vor dem Absenden das *base repository* prüfen: `TruelyMostWanted/truelymostwanted-godot-engine` für interne PRs, `godotengine/godot` nur für Beiträge. `gh` ist per `gh repo set-default` auf den Fork eingestellt.
 - **PR-Branches aktuell halten:** Bei Konflikten mit Godot den PR-Branch per Rebase auf `upstream/master` bringen (`git rebase upstream/master`), dann `git push --force-with-lease`.
 - **Gemeinsamer SCons-Cache:** Ist `TRUELY_SCONS_CACHE` gesetzt (einmal pro Rechner: `setx TRUELY_SCONS_CACHE P:\scons-cache`), hängt `build.ps1` `cache_path=<Ordner>` und `cache_limit=40` (GiB, änderbar über `TRUELY_SCONS_CACHE_LIMIT`) an. Alle Arbeitsbäume, auch die Git-Worktrees der Agenten, nutzen dann dieselben Objektdateien und bauen nur, was sich geändert hat.
-- **Versionskennung:** `build.ps1` setzt `BUILD_NAME` und optional `GODOT_VERSION_STATUS` über Umgebungsvariablen. `version.py` bleibt unverändert, damit beim Sync keine Konflikte entstehen.
+- **Versionskennung:** `build.ps1` setzt `BUILD_NAME` und `GODOT_VERSION_STATUS` (aus `-Status` oder `godot-status.txt`) über Umgebungsvariablen. `version.py` bleibt unverändert, damit beim Sync keine Konflikte entstehen.
 - **Konflikte beim Sync:** `git rerere` ist aktiv. Ein einmal gelöster Konflikt wird beim nächsten Merge automatisch wieder so gelöst.
