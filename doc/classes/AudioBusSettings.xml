@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioBusSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The stored volume, mute and solo values of one audio bus.
+	</brief_description>
+	<description>
+		One entry of [AudioBusListSettings], the settings resource of [AudioBusSettingsServer]. The bus is identified by [member bus_name]. In a CSV settings file, each [AudioBusSettings] is one row.
+		Change the values through [AudioBusSettingsServer] (for example [method AudioBusSettingsServer.set_bus_volume_db]) or [method ListSettingsServer.set_entry_value], not on the entries of [method SettingsServer.get_settings] directly, so that the change is applied and saved.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_volume_linear" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns [member volume_db] as a linear value: [code]1.0[/code] is 0 dB, [code]0.0[/code] is -80 dB (silence).
+			</description>
+		</method>
+		<method name="set_volume_linear">
+			<return type="void" />
+			<param index="0" name="volume_linear" type="float" />
+			<description>
+				Sets [member volume_db] from a linear value. [code]0.0[/code] or less is -80 dB. Not a stored property: only [member volume_db] is saved.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="bus_name" type="String" setter="set_bus_name" getter="get_bus_name" default="&quot;&quot;">
+			The name of the bus in the bus layout of [AudioServer], for example [code]"Master"[/code] or [code]"Music"[/code].
+		</member>
+		<member name="mute" type="bool" setter="set_mute" getter="is_mute" default="false">
+			If [code]true[/code], the bus is muted (see [method AudioServer.set_bus_mute]).
+		</member>
+		<member name="solo" type="bool" setter="set_solo" getter="is_solo" default="false">
+			If [code]true[/code], the bus is in solo mode (see [method AudioServer.set_bus_solo]).
+		</member>
+		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
+			The volume of the bus in decibels (see [method AudioServer.set_bus_volume_db]). Clamped to -80 dB … 24 dB, also when a hand-edited file is loaded.
+		</member>
+	</members>
+</class>

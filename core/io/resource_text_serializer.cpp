@@ -2283,92 +2283,31 @@ Ref<Resource> ResourceTextSerializer::dictionary_to_resource(const Dictionary &p
 	return resource;
 }
 
-String ResourceTextSerializer::resource_to_json(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_json(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::json_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_json(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
-}
-
-String ResourceTextSerializer::resource_to_ini(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_ini(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::ini_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_ini(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
-}
-
 bool ResourceTextSerializer::can_save_as_csv(const Ref<Resource> &p_resource) const {
 	String error;
 	return check_csv(p_resource, error) == OK;
-}
-
-String ResourceTextSerializer::resource_to_csv(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_csv(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::csv_to_resource(const String &p_text, const String &p_type_hint, const Dictionary &p_options) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_csv(p_text, p_type_hint, get_options(p_options), resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
 }
 
 void ResourceTextSerializer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resource_to_dictionary", "resource", "options"), &ResourceTextSerializer::resource_to_dictionary, DEFVAL(Dictionary()));
 	ClassDB::bind_method(D_METHOD("dictionary_to_resource", "data", "type_hint"), &ResourceTextSerializer::dictionary_to_resource, DEFVAL(String()));
 
-	ClassDB::bind_method(D_METHOD("resource_to_json", "resource", "options"), &ResourceTextSerializer::resource_to_json, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("json_to_resource", "text", "type_hint"), &ResourceTextSerializer::json_to_resource, DEFVAL(String()));
-
-	ClassDB::bind_method(D_METHOD("resource_to_ini", "resource", "options"), &ResourceTextSerializer::resource_to_ini, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("ini_to_resource", "text", "type_hint"), &ResourceTextSerializer::ini_to_resource, DEFVAL(String()));
-
 	ClassDB::bind_method(D_METHOD("can_save_as_csv", "resource"), &ResourceTextSerializer::can_save_as_csv);
-	ClassDB::bind_method(D_METHOD("resource_to_csv", "resource", "options"), &ResourceTextSerializer::resource_to_csv, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("csv_to_resource", "text", "type_hint", "options"), &ResourceTextSerializer::csv_to_resource, DEFVAL(Dictionary()));
+
+	ClassDB::bind_method(D_METHOD("serialize", "resource", "format", "options"), &ResourceTextSerializer::serialize, DEFVAL(Dictionary()));
+	ClassDB::bind_method(D_METHOD("deserialize", "text", "format", "type_hint", "options"), &ResourceTextSerializer::deserialize, DEFVAL(String()), DEFVAL(Dictionary()));
+	ClassDB::bind_method(D_METHOD("get_formats"), &ResourceTextSerializer::get_formats);
+	ClassDB::bind_method(D_METHOD("has_format", "format"), &ResourceTextSerializer::has_format);
 
 	BIND_CONSTANT(FORMAT_VERSION);
 }
 
 ResourceTextSerializer::ResourceTextSerializer() {
 	singleton = this;
+	register_builtin_formats();
 }
 
 ResourceTextSerializer::~ResourceTextSerializer() {
+	clear_formats();
 	singleton = nullptr;
 }

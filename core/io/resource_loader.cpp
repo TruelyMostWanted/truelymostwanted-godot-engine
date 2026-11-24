@@ -35,6 +35,8 @@
 #include "core/core_bind.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/path_prefix_server.h"
+#include "core/io/resource_error_capture.h"
 #include "core/io/resource_importer.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
@@ -684,7 +686,16 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 	const String &remapped_path = _path_remap(load_task.local_path, &xl_remapped);
 
 	Error load_err = OK;
-	Ref<Resource> res = _load(remapped_path, remapped_path != load_task.local_path ? load_task.local_path : String(), load_task.type_hint, load_task.cache_mode, &load_err, load_task.use_sub_threads, &load_task.progress);
+	Ref<Resource> res;
+	String load_error_message;
+	{
+		// Keeps what the loaders print, for `ResourceLoader.load_result()` (#70).
+		ResourceErrorCapture error_capture;
+		res = _load(remapped_path, remapped_path != load_task.local_path ? load_task.local_path : String(), load_task.type_hint, load_task.cache_mode, &load_err, load_task.use_sub_threads, &load_task.progress);
+		if (res.is_null() || load_err != OK) {
+			load_error_message = error_capture.get_message();
+		}
+	}
 	if (MessageQueue::get_singleton() != MessageQueue::get_main_singleton()) {
 		MessageQueue::get_singleton()->flush();
 	}
@@ -701,6 +712,7 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 
 	load_task.progress = 1.0; // It was fully loaded at this point, so force progress to 1.0.
 	load_task.error = load_err;
+	load_task.error_message = load_error_message;
 
 	bool ignoring = load_task.cache_mode == CACHE_MODE_IGNORE || load_task.cache_mode == CACHE_MODE_IGNORE_DEEP;
 	bool replacing = load_task.cache_mode == CACHE_MODE_REPLACE || load_task.cache_mode == CACHE_MODE_REPLACE_DEEP;
@@ -833,13 +845,22 @@ void ResourceLoader::_run_load_task(void *p_userdata) {
 }
 
 String ResourceLoader::_validate_local_path(const String &p_path) {
-	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(p_path);
+	// A registered prefix that resolves into `res://` or `uid://` loads like that path (cache, UIDs, remaps, PCK).
+	// Prefixes into `user://` keep their own resource path, so that saved references stay portable.
+	String path = p_path;
+	if (PathPrefixServer::get_singleton() && PathPrefixServer::get_singleton()->handles_path(p_path)) {
+		const String engine_path = PathPrefixServer::get_singleton()->resolve_engine_path(p_path);
+		if (engine_path.begins_with("res://") || engine_path.begins_with("uid://")) {
+			path = engine_path;
+		}
+	}
+	ResourceUID::ID uid = ResourceUID::get_singleton()->text_to_id(path);
 	if (uid != ResourceUID::INVALID_ID) {
 		return ResourceUID::get_singleton()->get_id_path(uid);
-	} else if (p_path.is_relative_path()) {
-		return ("res://" + p_path).simplify_path();
+	} else if (path.is_relative_path()) {
+		return ("res://" + path).simplify_path();
 	} else {
-		return ProjectSettings::get_singleton()->localize_path(p_path);
+		return ProjectSettings::get_singleton()->localize_path(path);
 	}
 }
 
@@ -1175,6 +1196,7 @@ Ref<Resource> ResourceLoader::_load_complete_inner(LoadToken &p_load_token, Erro
 	if (r_error) {
 		*r_error = OK;
 	}
+	last_load_error_message = String();
 
 	ThreadLoadTask *load_task_ptr = nullptr;
 	if (p_load_token.task_if_unregistered) {
@@ -1254,6 +1276,7 @@ Ref<Resource> ResourceLoader::_load_complete_inner(LoadToken &p_load_token, Erro
 	if (r_error) {
 		*r_error = load_task_ptr->error;
 	}
+	last_load_error_message = load_task_ptr->error_message;
 
 	if (resource.is_valid()) {
 		if (load_task_ptr->parent_task) {
@@ -1958,6 +1981,7 @@ thread_local bool ResourceLoader::import_thread = false;
 thread_local int ResourceLoader::load_nesting = 0;
 thread_local HashMap<int, HashMap<String, Ref<Resource>>> ResourceLoader::res_ref_overrides;
 thread_local ResourceLoader::ThreadLoadTask *ResourceLoader::curr_load_task = nullptr;
+thread_local String ResourceLoader::last_load_error_message;
 
 SafeBinaryMutex<ResourceLoader::BINARY_MUTEX_TAG> &_get_res_loader_mutex() {
 	return ResourceLoader::thread_load_mutex;
