@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_key_binding_settings_server.cpp                                  */
+/*  test_input_map_settings_server.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_key_binding_settings_server)
+TEST_FORCE_LINK(test_input_map_settings_server)
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -38,12 +38,13 @@ TEST_FORCE_LINK(test_key_binding_settings_server)
 #include "core/input/input_map.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
-#include "servers/settings/key_binding.h"
-#include "servers/settings/key_binding_settings_server.h"
+#include "servers/settings/input_map_action.h"
+#include "servers/settings/input_map_settings.h"
+#include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/test_utils.h"
 
-namespace TestKeyBindingSettingsServer {
+namespace TestInputMapSettingsServer {
 
 static constexpr const char *JUMP = "kb_test_jump";
 static constexpr const char *FIRE = "kb_test_fire";
@@ -125,7 +126,7 @@ struct TestSetup {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("key_binding_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("input_map_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -137,86 +138,86 @@ static bool is_action(const Ref<InputEvent> &p_event, const StringName &p_action
 	return InputMap::get_singleton()->event_is_action(p_event, p_action);
 }
 
-TEST_CASE("[KeyBindingSettingsServer] The domain is an engine singleton registered with the manager") {
-	KeyBindingSettingsServer *server = KeyBindingSettingsServer::get_singleton();
+TEST_CASE("[InputMapSettingsServer] The domain is an engine singleton registered with the manager") {
+	InputMapSettingsServer *server = InputMapSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("KeyBindingSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("key_bindings") == server);
-	CHECK(server->get_domain() == StringName("key_bindings"));
+	CHECK(Engine::get_singleton()->has_singleton("InputMapSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("input_map") == server);
+	CHECK(server->get_domain() == StringName("input_map"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SERVERS);
-	CHECK(server->get_list_property() == StringName("bindings"));
+	CHECK(server->get_list_property() == StringName("actions"));
 	CHECK(server->get_entry_key() == StringName("action"));
-	CHECK(ProjectSettings::get_singleton()->has_setting("settings/key_bindings/include_builtin_actions"));
+	CHECK(ProjectSettings::get_singleton()->has_setting("settings/input_map/include_builtin_actions"));
 }
 
-TEST_CASE("[KeyBindingSettingsServer] Text form of key, mouse button, joypad button and joypad axis") {
+TEST_CASE("[InputMapSettingsServer] Text form of key, mouse button, joypad button and joypad axis") {
 	// Round trip of every kind.
 	for (const String &text : { String("Key:Ctrl+S"), String("PhysicalKey:W"), String("KeyLabel:Alt+Shift+A"), String("Key:CmdOrCtrl+Z"),
 				 String("Key:F5"), String("Key:Kp Add"), String("MouseButton:Left"), String("MouseButton:Ctrl+WheelUp"), String("MouseButton:Extra2"),
 				 String("JoypadButton:A"), String("JoypadButton:LeftShoulder"), String("JoypadButton:30"),
 				 String("JoypadMotion:LeftX+"), String("JoypadMotion:LeftY-"), String("JoypadMotion:TriggerRight+"), String("JoypadMotion:7-") }) {
-		const Ref<InputEvent> event = KeyBinding::text_to_event(text);
+		const Ref<InputEvent> event = InputMapAction::text_to_event(text);
 		REQUIRE_MESSAGE(event.is_valid(), text);
-		CHECK_MESSAGE(KeyBinding::event_to_text(event) == text, text);
+		CHECK_MESSAGE(InputMapAction::event_to_text(event) == text, text);
 		CHECK(event->get_device() == -1);
 	}
 
-	const Ref<InputEventKey> ctrl_s = KeyBinding::text_to_event("Key:Ctrl+S");
+	const Ref<InputEventKey> ctrl_s = InputMapAction::text_to_event("Key:Ctrl+S");
 	CHECK(ctrl_s->get_keycode() == Key::S);
 	CHECK(ctrl_s->get_physical_keycode() == Key::NONE);
 	CHECK(ctrl_s->is_ctrl_pressed());
-	const Ref<InputEventKey> undo = KeyBinding::text_to_event("Key:CmdOrCtrl+Z");
+	const Ref<InputEventKey> undo = InputMapAction::text_to_event("Key:CmdOrCtrl+Z");
 	CHECK(undo->is_command_or_control_autoremap());
-	const Ref<InputEventJoypadMotion> left_y = KeyBinding::text_to_event("JoypadMotion:LeftY-");
+	const Ref<InputEventJoypadMotion> left_y = InputMapAction::text_to_event("JoypadMotion:LeftY-");
 	CHECK(left_y->get_axis() == JoyAxis::LEFT_Y);
 	CHECK(left_y->get_axis_value() == doctest::Approx(-1.0));
 
 	// A pressed key is stored by its physical code; a modifier key alone has no modifier flags.
-	CHECK(KeyBinding::event_to_text(make_pressed_key(Key::W)) == "PhysicalKey:W");
+	CHECK(InputMapAction::event_to_text(make_pressed_key(Key::W)) == "PhysicalKey:W");
 	Ref<InputEventKey> shift = make_pressed_key(Key::SHIFT);
 	shift->set_shift_pressed(true);
-	CHECK(KeyBinding::event_to_text(shift) == "PhysicalKey:Shift");
+	CHECK(InputMapAction::event_to_text(shift) == "PhysicalKey:Shift");
 
 	// Invalid texts and event types that can't be bound.
 	for (const String &text : { String(""), String("Key"), String("Key:"), String("Key:NoSuchKey"), String("Key:Hyper+S"), String("Mouse:Left"),
 				 String("MouseButton:Sideways"), String("JoypadButton:Z"), String("JoypadMotion:LeftX"), String("JoypadMotion:Nowhere+") }) {
-		CHECK_MESSAGE(KeyBinding::text_to_event(text).is_null(), text);
+		CHECK_MESSAGE(InputMapAction::text_to_event(text).is_null(), text);
 	}
 	Ref<InputEventScreenTouch> touch;
 	touch.instantiate();
-	CHECK(KeyBinding::event_to_text(touch).is_empty());
-	CHECK(KeyBinding::get_event_device(touch) == KeyBinding::INPUT_DEVICE_MAX);
-	CHECK(KeyBinding::get_event_device(make_key(Key::A, false)) == KeyBinding::INPUT_DEVICE_KEYBOARD);
-	CHECK(KeyBinding::get_event_device(make_mouse_button(MouseButton::LEFT)) == KeyBinding::INPUT_DEVICE_MOUSE);
-	CHECK(KeyBinding::get_event_device(InputEventJoypadButton::create_reference(JoyButton::B)) == KeyBinding::INPUT_DEVICE_GAMEPAD);
+	CHECK(InputMapAction::event_to_text(touch).is_empty());
+	CHECK(InputMapAction::get_event_device(touch) == InputMapAction::INPUT_DEVICE_MAX);
+	CHECK(InputMapAction::get_event_device(make_key(Key::A, false)) == InputMapAction::INPUT_DEVICE_KEYBOARD);
+	CHECK(InputMapAction::get_event_device(make_mouse_button(MouseButton::LEFT)) == InputMapAction::INPUT_DEVICE_MOUSE);
+	CHECK(InputMapAction::get_event_device(InputEventJoypadButton::create_reference(JoyButton::B)) == InputMapAction::INPUT_DEVICE_GAMEPAD);
 
 	// Labels for the UI.
-	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("Key:Ctrl+S")) == "Ctrl+S");
-	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("MouseButton:Right")) == "Right Mouse Button");
-	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("JoypadButton:A")) == "Joypad A");
-	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("JoypadMotion:LeftX+")) == "Left Stick Right");
-	CHECK(KeyBinding::event_to_label(KeyBinding::text_to_event("PhysicalKey:W")) == "W");
+	CHECK(InputMapAction::event_to_label(InputMapAction::text_to_event("Key:Ctrl+S")) == "Ctrl+S");
+	CHECK(InputMapAction::event_to_label(InputMapAction::text_to_event("MouseButton:Right")) == "Right Mouse Button");
+	CHECK(InputMapAction::event_to_label(InputMapAction::text_to_event("JoypadButton:A")) == "Joypad A");
+	CHECK(InputMapAction::event_to_label(InputMapAction::text_to_event("JoypadMotion:LeftX+")) == "Left Stick Right");
+	CHECK(InputMapAction::event_to_label(InputMapAction::text_to_event("PhysicalKey:W")) == "W");
 }
 
-TEST_CASE("[SceneTree][KeyBindingSettingsServer] Defaults come from InputMap; rebinding reaches InputMap at once") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] Defaults come from InputMap; rebinding reaches InputMap at once") {
 	TestSetup setup;
-	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 	const PackedStringArray actions = server->get_action_names();
 	CHECK(actions.has(String(JUMP)));
 	CHECK(actions.has(String(FIRE)));
 	CHECK_FALSE(actions.has("ui_accept")); // Built-in actions are left out by default.
 
-	CHECK(server->get_slot_count(JUMP, KeyBinding::INPUT_DEVICE_KEYBOARD) == 1);
-	CHECK(server->get_slot_count(JUMP, KeyBinding::INPUT_DEVICE_GAMEPAD) == 1);
-	CHECK(server->get_slot_count(JUMP, KeyBinding::INPUT_DEVICE_MOUSE) == 0);
-	CHECK(KeyBinding::event_to_text(server->get_binding(JUMP, KeyBinding::INPUT_DEVICE_KEYBOARD)) == "Key:Space");
+	CHECK(server->get_slot_count(JUMP, InputMapAction::INPUT_DEVICE_KEYBOARD) == 1);
+	CHECK(server->get_slot_count(JUMP, InputMapAction::INPUT_DEVICE_GAMEPAD) == 1);
+	CHECK(server->get_slot_count(JUMP, InputMapAction::INPUT_DEVICE_MOUSE) == 0);
+	CHECK(InputMapAction::event_to_text(server->get_event(JUMP, InputMapAction::INPUT_DEVICE_KEYBOARD)) == "Key:Space");
 	CHECK(server->get_events(JUMP).size() == 2);
 	CHECK(server->get_action_deadzone(JUMP) == doctest::Approx(0.3));
 
 	// Slot 0 replaced, slot 1 added; the device follows from the event.
 	CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK);
 	CHECK(server->rebind(JUMP, make_pressed_key(Key::UP), 1) == OK);
-	CHECK(server->get_slot_count(JUMP, KeyBinding::INPUT_DEVICE_KEYBOARD) == 2);
+	CHECK(server->get_slot_count(JUMP, InputMapAction::INPUT_DEVICE_KEYBOARD) == 2);
 	CHECK(is_action(make_pressed_key(Key::W), JUMP));
 	CHECK(is_action(make_pressed_key(Key::UP), JUMP));
 	CHECK_FALSE(is_action(make_pressed_key(Key::SPACE), JUMP));
@@ -228,9 +229,9 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Defaults come from InputMap; re
 	CHECK_FALSE(is_action(InputEventJoypadButton::create_reference(JoyButton::A, 0), JUMP));
 
 	// Cleared slot: the key no longer works.
-	server->clear_binding(JUMP, KeyBinding::INPUT_DEVICE_KEYBOARD, 1);
+	server->clear_event(JUMP, InputMapAction::INPUT_DEVICE_KEYBOARD, 1);
 	CHECK_FALSE(is_action(make_pressed_key(Key::UP), JUMP));
-	CHECK(server->get_binding(JUMP, KeyBinding::INPUT_DEVICE_KEYBOARD, 1).is_null());
+	CHECK(server->get_event(JUMP, InputMapAction::INPUT_DEVICE_KEYBOARD, 1).is_null());
 
 	server->set_action_deadzone(JUMP, 0.6f);
 	CHECK(InputMap::get_singleton()->action_get_deadzone(JUMP) == doctest::Approx(0.6));
@@ -245,9 +246,9 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Defaults come from InputMap; re
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][KeyBindingSettingsServer] Conflicts and reset to the project bindings") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] Conflicts and reset to the project bindings") {
 	TestSetup setup;
-	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 
 	// A pressed Space matches the stored `Key:Space` of jump.
 	PackedStringArray conflicts = server->find_conflicts(make_pressed_key(Key::SPACE));
@@ -272,22 +273,22 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Conflicts and reset to the proj
 	server->reset_all();
 	CHECK_FALSE(is_action(make_pressed_key(Key::SPACE), FIRE));
 	CHECK(is_action(make_mouse_button(MouseButton::LEFT), FIRE));
-	CHECK(SettingsServer::values_equal(server->get_value("bindings"), server->get_default_value("bindings")));
+	CHECK(SettingsServer::values_equal(server->get_value("actions"), server->get_default_value("actions")));
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][KeyBindingSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (INI, JSON, CSV)") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] Rebound, saved, restarted: the new key works, the old one does not (INI, JSON, CSV)") {
 	TestSetup setup;
 	for (const String &extension : { String("ini"), String("json"), String("csv") }) {
-		const String path = temp_file("key_bindings." + extension);
+		const String path = temp_file("input_map." + extension);
 		load_project_actions();
 		{
-			KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+			InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 			server->set_file_path(path);
 			CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK);
 			CHECK(server->rebind(JUMP, InputEventJoypadMotion::create_reference(JoyAxis::LEFT_Y, -1.0f)) == OK);
-			CHECK(server->rebind(FIRE, KeyBinding::text_to_event("MouseButton:Ctrl+Right")) == OK);
-			server->clear_binding(FIRE, KeyBinding::INPUT_DEVICE_MOUSE, 1);
+			CHECK(server->rebind(FIRE, InputMapAction::text_to_event("MouseButton:Ctrl+Right")) == OK);
+			server->clear_event(FIRE, InputMapAction::INPUT_DEVICE_MOUSE, 1);
 			CHECK(server->save() == OK);
 			memdelete(server);
 		}
@@ -298,7 +299,7 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Rebound, saved, restarted: the 
 
 		// "Restart": InputMap is back at the project settings.
 		load_project_actions();
-		KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+		InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 		server->set_file_path(path);
 		server->startup();
 		CHECK_MESSAGE(is_action(make_pressed_key(Key::W), JUMP), extension);
@@ -321,13 +322,13 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Rebound, saved, restarted: the 
 	}
 }
 
-TEST_CASE("[SceneTree][KeyBindingSettingsServer] A saved action that no longer exists is skipped; new project actions keep their bindings") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] A saved action that no longer exists is skipped; new project actions keep their bindings") {
 	TestSetup setup;
-	const String path = temp_file("key_bindings_old.ini");
+	const String path = temp_file("input_map_old.ini");
 	{
-		KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+		InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 		server->set_file_path(path);
-		Ref<KeyBinding> gone;
+		Ref<InputMapAction> gone;
 		gone.instantiate();
 		gone->set_action("kb_test_removed");
 		gone->set_event("Key:G");
@@ -337,7 +338,7 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] A saved action that no longer e
 		CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK);
 		// The file of an older version has no row for fire.
 		for (int i = server->get_entry_count() - 1; i >= 0; i--) {
-			const Ref<KeyBinding> row = server->get_entry(i);
+			const Ref<InputMapAction> row = server->get_entry(i);
 			if (row->get_action() == String(FIRE)) {
 				server->remove_entry(i);
 			}
@@ -348,7 +349,7 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] A saved action that no longer e
 	CHECK(FileAccess::get_file_as_string(path).contains("kb_test_removed"));
 
 	load_project_actions();
-	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 	server->set_file_path(path);
 	ERR_PRINT_OFF;
 	server->startup();
@@ -361,13 +362,13 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] A saved action that no longer e
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][KeyBindingSettingsServer] Other event types of an action are kept") {
+TEST_CASE("[SceneTree][InputMapSettingsServer] Other event types of an action are kept") {
 	TestSetup setup;
 	Ref<InputEventScreenTouch> touch;
 	touch.instantiate();
 	touch->set_index(0);
 	InputMap::get_singleton()->action_add_event(FIRE, touch);
-	KeyBindingSettingsServer *server = memnew(KeyBindingSettingsServer);
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
 	CHECK(server->rebind(FIRE, make_pressed_key(Key::F)) == OK);
 	CHECK(is_action(make_pressed_key(Key::F), FIRE));
 	bool has_touch = false;
@@ -378,4 +379,4 @@ TEST_CASE("[SceneTree][KeyBindingSettingsServer] Other event types of an action 
 	memdelete(server);
 }
 
-} // namespace TestKeyBindingSettingsServer
+} // namespace TestInputMapSettingsServer

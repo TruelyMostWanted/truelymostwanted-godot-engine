@@ -21,6 +21,16 @@
 		<member name="default_fade_time" type="float" setter="set_default_fade_time" getter="get_default_fade_time" default="0.0">
 			The cross-fade time in seconds used by [method AudioMixerServer.play_next], [method AudioMixerServer.play_previous] and [method AudioMixerServer.set_queue_index] when their [code]fade_time[/code] is negative, and by [member stop_on_scene_change]. [code]0.0[/code] switches at once.
 		</member>
+		<member name="duck_fade_time" type="float" setter="set_duck_fade_time" getter="get_duck_fade_time" default="0.25">
+			The time in seconds the channel takes to fade down when ducking starts and back up when it ends. Used for ducking while [TTSServer] speaks, and by [method AudioMixerServer.duck] and [method AudioMixerServer.unduck] when their [code]fade_time[/code] is negative. [code]0.0[/code] changes the volume at once.
+		</member>
+		<member name="duck_on_tts" type="bool" setter="set_duck_on_tts" getter="is_duck_on_tts" default="false">
+			If [code]true[/code], the channel is lowered by [member duck_volume_db] while [TTSServer] speaks (from the first [signal TTSServer.utterance_started] until the last active utterance has ended or was canceled), so spoken text stays understandable over music. See [method AudioMixerServer.set_ducking_enabled].
+			Changes take effect on the next frame, also for a channel that is already added to the [AudioMixerServer].
+		</member>
+		<member name="duck_volume_db" type="float" setter="set_duck_volume_db" getter="get_duck_volume_db" default="-12.0">
+			The volume offset in decibels applied while the channel is ducked for speech, between [code]-80.0[/code] and [code]0.0[/code]. It is added to the channel volume, so it multiplies with volume fades and voice fades.
+		</member>
 		<member name="loop_current_entry" type="bool" setter="set_loop_current_entry" getter="is_loop_current_entry" default="false">
 			If [code]true[/code], the current entry starts again when it ends instead of advancing the queue. The restart happens in the next frame; for a seamless loop, use the loop setting of the stream itself (for example [member AudioStreamWAV.loop_mode]).
 		</member>
