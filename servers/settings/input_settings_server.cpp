@@ -407,7 +407,51 @@ void InputSettingsServer::set_mouse_captured(bool p_captured) {
 	}
 }
 
+void InputSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"keyboard_sensitivity",
+		"keyboard_x_inverted",
+		"keyboard_y_inverted",
+		"mouse_sensitivity",
+		"mouse_x_inverted",
+		"mouse_y_inverted",
+		"mouse_smoothing",
+		"gamepad_sensitivity",
+		"gamepad_x_inverted",
+		"gamepad_y_inverted",
+		"gamepad_deadzone",
+		"vibration_enabled",
+		"vibration_strength",
+		"toggle_actions",
+		"first_player_device_id",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void InputSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("keyboard_sensitivity_changed", PropertyInfo(Variant::FLOAT, "sensitivity")));
+	ADD_SIGNAL(MethodInfo("keyboard_x_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("keyboard_y_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("mouse_sensitivity_changed", PropertyInfo(Variant::FLOAT, "sensitivity")));
+	ADD_SIGNAL(MethodInfo("mouse_x_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("mouse_y_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("mouse_smoothing_changed", PropertyInfo(Variant::FLOAT, "smoothing")));
+	ADD_SIGNAL(MethodInfo("gamepad_sensitivity_changed", PropertyInfo(Variant::FLOAT, "sensitivity")));
+	ADD_SIGNAL(MethodInfo("gamepad_x_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("gamepad_y_inverted_changed", PropertyInfo(Variant::BOOL, "inverted")));
+	ADD_SIGNAL(MethodInfo("gamepad_deadzone_changed", PropertyInfo(Variant::FLOAT, "deadzone")));
+	ADD_SIGNAL(MethodInfo("vibration_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("vibration_strength_changed", PropertyInfo(Variant::FLOAT, "strength")));
+	ADD_SIGNAL(MethodInfo("toggle_actions_changed", PropertyInfo(Variant::PACKED_STRING_ARRAY, "actions")));
+	ADD_SIGNAL(MethodInfo("first_player_device_id_changed", PropertyInfo(Variant::INT, "device")));
+
 	ClassDB::bind_method(D_METHOD("set_sensitivity", "device", "sensitivity"), &InputSettingsServer::set_sensitivity);
 	ClassDB::bind_method(D_METHOD("get_sensitivity", "device"), &InputSettingsServer::get_sensitivity);
 	ClassDB::bind_method(D_METHOD("set_x_inverted", "device", "inverted"), &InputSettingsServer::set_x_inverted);
