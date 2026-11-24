@@ -56,6 +56,7 @@ public:
 		PLACEMENT_EXTERNAL,
 		PLACEMENT_EMBED,
 		PLACEMENT_NONE,
+		PLACEMENT_BUNDLE,
 	};
 
 	static constexpr const char *SETTING_ENABLED = "filesystem/streaming_assets/enabled";
@@ -71,7 +72,7 @@ private:
 	bool active = false;
 	Placement placement = PLACEMENT_NONE;
 	String source_folder; // `res://` path, simplified, without a trailing slash.
-	String target_folder; // Expanded, relative to the export folder.
+	String target_folder; // Expanded, relative to the export folder or to the bundle resources.
 	String export_path; // Absolute path of the exported executable or pack.
 	PackedStringArray files; // Relative to `source_folder`.
 
@@ -100,6 +101,8 @@ public:
 	static bool is_file_excluded(const String &p_name);
 	static PackedStringArray collect_files(const String &p_folder);
 	static Placement resolve_placement(const PackedStringArray &p_features, const String &p_export_path, Fallback p_fallback);
+	// The `{exe_name}` the exported game sees at runtime (`StreamingAssetsServer::get_exe_name()`).
+	static String get_export_exe_name(const PackedStringArray &p_features, const String &p_export_path, const String &p_app_name);
 };
 
 VARIANT_ENUM_CAST(StreamingAssetsExportPlugin::Mode);

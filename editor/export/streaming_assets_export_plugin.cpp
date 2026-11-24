@@ -35,6 +35,7 @@
 #include "core/io/file_access.h"
 #include "core/io/streaming_assets_server.h"
 #include "core/object/class_db.h"
+#include "core/os/os.h"
 
 // Guards against deep or cyclic folder structures (links are skipped, but junctions may not be detected).
 static constexpr int STREAMING_ASSETS_MAX_FOLDER_DEPTH = 64;
@@ -121,15 +122,28 @@ PackedStringArray StreamingAssetsExportPlugin::collect_files(const String &p_fol
 }
 
 StreamingAssetsExportPlugin::Placement StreamingAssetsExportPlugin::resolve_placement(const PackedStringArray &p_features, const String &p_export_path, Fallback p_fallback) {
-	// Windows and Linux/BSD carry the `pc` feature. macOS carries it as well, but needs
-	// the bundle resources (#90): until then it uses the fallback like iOS and visionOS.
-	const bool desktop = p_features.has("pc") && !p_features.has("macos");
+	// macOS, iOS and visionOS place the folder in the bundle resources (#90), also inside a `.zip`.
+	if (p_features.has("macos") || p_features.has("ios") || p_features.has("visionos")) {
+		return PLACEMENT_BUNDLE;
+	}
+	// Windows and Linux/BSD carry the `pc` feature.
+	const bool desktop = p_features.has("pc");
 	// A folder next to a `.zip` would not be part of the archive.
 	const bool zip = p_export_path.to_lower().ends_with(".zip");
 	if (desktop && !zip) {
 		return PLACEMENT_EXTERNAL;
 	}
 	return p_fallback == FALLBACK_NONE ? PLACEMENT_NONE : PLACEMENT_EMBED;
+}
+
+String StreamingAssetsExportPlugin::get_export_exe_name(const PackedStringArray &p_features, const String &p_export_path, const String &p_app_name) {
+	// macOS names the bundle after the export file only for `.app` exports. For `.zip`, `.dmg`
+	// and `.pkg`, the bundle inside is named after the application (see the macOS exporter).
+	if (p_features.has("macos") && !p_export_path.to_lower().ends_with(".app")) {
+		const String app_name = p_app_name.strip_edges();
+		return OS::get_singleton()->get_safe_dir_name(app_name.is_empty() ? String("Unnamed") : app_name);
+	}
+	return p_export_path.get_file().get_basename();
 }
 
 // Settings.
@@ -226,14 +240,12 @@ void StreamingAssetsExportPlugin::_export_begin(const HashSet<String> &p_feature
 	path = path.simplify_path();
 
 	Placement new_placement = resolve_placement(features, path, fallback);
-	if (features.has("macos") || features.has("ios") || features.has("visionos")) {
-		_add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, TTR("App bundles are not supported yet. The fallback is used."));
-	} else if (features.has("pc") && path.to_lower().ends_with(".zip")) {
+	if (new_placement != PLACEMENT_BUNDLE && features.has("pc") && path.to_lower().ends_with(".zip")) {
 		_add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, TTR("ZIP exports cannot hold an external folder. The fallback is used."));
 	}
 
-	if (new_placement == PLACEMENT_EXTERNAL) {
-		const String exe_name = path.get_file().get_basename();
+	if (new_placement == PLACEMENT_EXTERNAL || new_placement == PLACEMENT_BUNDLE) {
+		const String exe_name = get_export_exe_name(features, path, _get_setting("application/config/name", String()));
 		const String target = expand_template(String(_get_setting(SETTING_TARGET_FOLDER, DEFAULT_TARGET_FOLDER)).strip_edges(), exe_name).replace_char('\\', '/');
 		if (!is_valid_target_folder(target)) {
 			_add_message(EditorExportPlatform::EXPORT_MESSAGE_ERROR, vformat(TTR("The target folder \"%s\" must be a relative folder without \".\", \"..\" or unknown placeholders. The folder is exported like any other folder."), target));
@@ -248,6 +260,13 @@ void StreamingAssetsExportPlugin::_export_begin(const HashSet<String> &p_feature
 	files = collect_files(source_folder);
 	active = true;
 
+	if (placement == PLACEMENT_BUNDLE) {
+		// The macOS and iOS/visionOS exporters copy these into the bundle resources before signing.
+		for (const String &file : files) {
+			add_bundle_resource(source_folder.path_join(file), target_folder.path_join(file));
+		}
+	}
+
 	uint64_t total_size = 0;
 	for (const String &file : files) {
 		const int64_t size = FileAccess::get_size(source_folder.path_join(file));
@@ -259,6 +278,9 @@ void StreamingAssetsExportPlugin::_export_begin(const HashSet<String> &p_feature
 	switch (placement) {
 		case PLACEMENT_EXTERNAL: {
 			_add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, vformat(TTR("raw: %s are copied to \"%s\" next to the export."), summary, target_folder));
+		} break;
+		case PLACEMENT_BUNDLE: {
+			_add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, vformat(TTR("raw: %s are copied to \"%s\" in the bundle resources."), summary, target_folder));
 		} break;
 		case PLACEMENT_EMBED: {
 			_add_message(EditorExportPlatform::EXPORT_MESSAGE_INFO, vformat(TTR("embed: %s are embedded as raw files into the main pack."), summary));
@@ -354,4 +376,5 @@ void StreamingAssetsExportPlugin::_bind_methods() {
 	BIND_ENUM_CONSTANT(PLACEMENT_EXTERNAL);
 	BIND_ENUM_CONSTANT(PLACEMENT_EMBED);
 	BIND_ENUM_CONSTANT(PLACEMENT_NONE);
+	BIND_ENUM_CONSTANT(PLACEMENT_BUNDLE);
 }
