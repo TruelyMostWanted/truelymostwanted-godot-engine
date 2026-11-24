@@ -998,7 +998,7 @@ Error SettingsServer::save() {
 			err = ResourceTextSerializer::write_json(copy, options, text, error);
 		} else {
 			// Plain INI: players and other tools can edit it.
-			options.plain_ini = true;
+			options.ini_plain_values = true;
 			err = ResourceTextSerializer::write_ini(copy, options, text, error);
 		}
 	}

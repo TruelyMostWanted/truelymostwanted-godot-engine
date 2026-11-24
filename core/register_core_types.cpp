@@ -76,6 +76,7 @@
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/resource_uid.h"
+#include "core/io/serializer_options.h"
 #include "core/io/stream_peer_gzip.h"
 #include "core/io/stream_peer_tls.h"
 #include "core/io/streaming_assets_server.h"
@@ -350,6 +351,7 @@ void register_core_types() {
 	GDREGISTER_CLASS(RandomNumberGenerator);
 	GDREGISTER_ABSTRACT_CLASS(SeedServer);
 	seed_server = memnew(SeedServer);
+	GDREGISTER_CLASS(SerializerOptions);
 	GDREGISTER_ABSTRACT_CLASS(ResourceTextSerializer);
 	_resource_text_serializer = memnew(ResourceTextSerializer);
 #ifndef DISABLE_DEPRECATED
