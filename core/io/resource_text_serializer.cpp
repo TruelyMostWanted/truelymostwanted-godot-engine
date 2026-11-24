@@ -113,6 +113,9 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_options(const Dictio
 	if (p_overrides.has("delimiter")) {
 		options.csv_delimiter = p_overrides["delimiter"];
 	}
+	if (p_overrides.has("defaults")) {
+		options.defaults = Ref<Resource>(p_overrides["defaults"]);
+	}
 	return options;
 }
 
@@ -995,6 +998,7 @@ namespace {
 struct TreeEncoder {
 	bool plain = true;
 	bool enums_as_names = true;
+	Ref<Resource> defaults; // Root values equal to these are skipped.
 	LocalVector<ResourceTextSerializer::Section> *sections = nullptr;
 	HashSet<const Resource *> stack;
 	String error;
@@ -1034,6 +1038,13 @@ Dictionary TreeEncoder::encode_resource(const Ref<Resource> &p_resource, const S
 		const Variant value = p_resource->get(info.name);
 		if (_is_skipped_default(info.name, value)) {
 			continue;
+		}
+		if (p_root && defaults.is_valid() && !info.name.begins_with("metadata/")) {
+			bool has_default = false;
+			const Variant default_value = defaults->get(info.name, &has_default);
+			if (has_default && default_value == value) {
+				continue;
+			}
 		}
 		bool omit = false;
 		const Variant encoded = encode_value(value, info, Variant(), p_path + "/" + _section_part_encode(info.name), omit);
@@ -1677,6 +1688,7 @@ Error ResourceTextSerializer::encode_resource(const Ref<Resource> &p_resource, c
 	TreeEncoder encoder;
 	encoder.plain = p_plain;
 	encoder.enums_as_names = p_options.enums_as_names;
+	encoder.defaults = p_options.defaults;
 	encoder.sections = r_sections;
 	r_tree = encoder.encode_resource(p_resource, String(), true, SECTION_ROOT);
 	if (!encoder.error.is_empty()) {
@@ -1924,6 +1936,16 @@ String ResourceTextSerializer::get_ini_marker_type(const String &p_text) {
 		}
 	}
 	return String();
+}
+
+Error ResourceTextSerializer::parse_ini_tree(const String &p_text, Dictionary &r_tree, String &r_error) {
+	LocalVector<Section> sections;
+	const Error err = parse_ini_sections(p_text, sections, r_error);
+	if (err != OK) {
+		return err;
+	}
+	r_tree = _ini_sections_to_tree(sections);
+	return OK;
 }
 
 Error ResourceTextSerializer::parse_ini(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error) {
@@ -2261,92 +2283,31 @@ Ref<Resource> ResourceTextSerializer::dictionary_to_resource(const Dictionary &p
 	return resource;
 }
 
-String ResourceTextSerializer::resource_to_json(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_json(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::json_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_json(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
-}
-
-String ResourceTextSerializer::resource_to_ini(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_ini(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::ini_to_resource(const String &p_text, const String &p_type_hint) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_ini(p_text, p_type_hint, resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
-}
-
 bool ResourceTextSerializer::can_save_as_csv(const Ref<Resource> &p_resource) const {
 	String error;
 	return check_csv(p_resource, error) == OK;
-}
-
-String ResourceTextSerializer::resource_to_csv(const Ref<Resource> &p_resource, const Dictionary &p_options) const {
-	String text;
-	String error;
-	if (write_csv(p_resource, get_options(p_options), text, error) != OK) {
-		ERR_PRINT(error);
-		return String();
-	}
-	return text;
-}
-
-Ref<Resource> ResourceTextSerializer::csv_to_resource(const String &p_text, const String &p_type_hint, const Dictionary &p_options) const {
-	Ref<Resource> resource;
-	String error;
-	if (parse_csv(p_text, p_type_hint, get_options(p_options), resource, error) != OK) {
-		ERR_PRINT(error);
-		return Ref<Resource>();
-	}
-	return resource;
 }
 
 void ResourceTextSerializer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resource_to_dictionary", "resource", "options"), &ResourceTextSerializer::resource_to_dictionary, DEFVAL(Dictionary()));
 	ClassDB::bind_method(D_METHOD("dictionary_to_resource", "data", "type_hint"), &ResourceTextSerializer::dictionary_to_resource, DEFVAL(String()));
 
-	ClassDB::bind_method(D_METHOD("resource_to_json", "resource", "options"), &ResourceTextSerializer::resource_to_json, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("json_to_resource", "text", "type_hint"), &ResourceTextSerializer::json_to_resource, DEFVAL(String()));
-
-	ClassDB::bind_method(D_METHOD("resource_to_ini", "resource", "options"), &ResourceTextSerializer::resource_to_ini, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("ini_to_resource", "text", "type_hint"), &ResourceTextSerializer::ini_to_resource, DEFVAL(String()));
-
 	ClassDB::bind_method(D_METHOD("can_save_as_csv", "resource"), &ResourceTextSerializer::can_save_as_csv);
-	ClassDB::bind_method(D_METHOD("resource_to_csv", "resource", "options"), &ResourceTextSerializer::resource_to_csv, DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("csv_to_resource", "text", "type_hint", "options"), &ResourceTextSerializer::csv_to_resource, DEFVAL(Dictionary()));
+
+	ClassDB::bind_method(D_METHOD("serialize", "resource", "format", "options"), &ResourceTextSerializer::serialize, DEFVAL(Dictionary()));
+	ClassDB::bind_method(D_METHOD("deserialize", "text", "format", "type_hint", "options"), &ResourceTextSerializer::deserialize, DEFVAL(String()), DEFVAL(Dictionary()));
+	ClassDB::bind_method(D_METHOD("get_formats"), &ResourceTextSerializer::get_formats);
+	ClassDB::bind_method(D_METHOD("has_format", "format"), &ResourceTextSerializer::has_format);
 
 	BIND_CONSTANT(FORMAT_VERSION);
 }
 
 ResourceTextSerializer::ResourceTextSerializer() {
 	singleton = this;
+	register_builtin_formats();
 }
 
 ResourceTextSerializer::~ResourceTextSerializer() {
+	clear_formats();
 	singleton = nullptr;
 }

@@ -58,6 +58,7 @@ public:
 		bool enums_as_names = true; // Enum properties as names instead of numbers.
 		bool plain_ini = false; // INI values without type syntax (other tools can read them).
 		String csv_delimiter = ","; // One character.
+		Ref<Resource> defaults; // JSON and INI: values of the root resource that are equal in this resource are not written.
 	};
 
 	// One INI section: the path (`root`, `root/entries/0`) and its keys.
@@ -92,6 +93,8 @@ public:
 	// INI.
 	static Error write_ini(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
 	static Error parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error);
+	// The tree of an INI text, in the layout of encode_resource(), without creating a resource.
+	static Error parse_ini_tree(const String &p_text, Dictionary &r_tree, String &r_error);
 	static Error parse_ini(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error);
 
 	// CSV.
@@ -101,19 +104,34 @@ public:
 	static Vector<Vector<String>> parse_csv_rows(const String &p_text, char32_t p_delimiter);
 	static String write_csv_row(const Vector<String> &p_cells, char32_t p_delimiter);
 
+	// XML: one element per resource (`<resource type="..." format_version="1">`), one child element per property.
+	// Implemented in resource_text_serializer_xml.cpp.
+	static String get_xml_marker_type(const String &p_text);
+	static Error write_xml(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
+	// Returns ERR_FILE_UNRECOGNIZED if the text is not a resource file and no type hint is given.
+	static Error parse_xml(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error);
+
+	// Text formats by name, for serialize() and deserialize(). Core registers "json", "ini", "csv" and "xml";
+	// modules add their own (the TOML module adds "toml"). Thread-safe. Implemented in resource_text_serializer_xml.cpp.
+	typedef Error (*FormatWriteFunction)(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
+	typedef Error (*FormatParseFunction)(const String &p_text, const String &p_type_hint, const Options &p_options, Ref<Resource> &r_resource, String &r_error);
+	static void register_format(const StringName &p_name, FormatWriteFunction p_write, FormatParseFunction p_parse);
+	static void unregister_format(const StringName &p_name);
+	static void register_builtin_formats();
+	static void clear_formats();
+	static Error write_format(const StringName &p_format, const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
+	static Error parse_format(const StringName &p_format, const String &p_text, const String &p_type_hint, const Options &p_options, Ref<Resource> &r_resource, String &r_error);
+
 	// Bound API.
 	Dictionary resource_to_dictionary(const Ref<Resource> &p_resource, const Dictionary &p_options = Dictionary()) const;
 	Ref<Resource> dictionary_to_resource(const Dictionary &p_data, const String &p_type_hint = String()) const;
 
-	String resource_to_json(const Ref<Resource> &p_resource, const Dictionary &p_options = Dictionary()) const;
-	Ref<Resource> json_to_resource(const String &p_text, const String &p_type_hint = String()) const;
-
-	String resource_to_ini(const Ref<Resource> &p_resource, const Dictionary &p_options = Dictionary()) const;
-	Ref<Resource> ini_to_resource(const String &p_text, const String &p_type_hint = String()) const;
-
 	bool can_save_as_csv(const Ref<Resource> &p_resource) const;
-	String resource_to_csv(const Ref<Resource> &p_resource, const Dictionary &p_options = Dictionary()) const;
-	Ref<Resource> csv_to_resource(const String &p_text, const String &p_type_hint, const Dictionary &p_options = Dictionary()) const;
+
+	String serialize(const Ref<Resource> &p_resource, const StringName &p_format, const Dictionary &p_options = Dictionary()) const;
+	Ref<Resource> deserialize(const String &p_text, const StringName &p_format, const String &p_type_hint = String(), const Dictionary &p_options = Dictionary()) const;
+	PackedStringArray get_formats() const;
+	bool has_format(const StringName &p_format) const;
 
 	ResourceTextSerializer();
 	~ResourceTextSerializer();

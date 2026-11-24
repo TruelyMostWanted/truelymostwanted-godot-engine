@@ -6,6 +6,18 @@
 	<description>
 		MP3 audio stream driver. See [member data] if you want to load an MP3 file at run-time. More info can be found in [ResourceImporterMP3].
 		[b]Note:[/b] This class can optionally support legacy MP1 and MP2 formats, provided that the engine is compiled with the [code]minimp3_extra_formats=yes[/code] SCons option. These extra formats are not enabled by default.
+		[b]Runtime loading:[/b] MP3 files without an import (for example in [code]user://[/code], in a mod folder, at an absolute path or in a PCK as raw files) are loaded with [method ResourceLoader.load] as [AudioStreamMP3], with the resource cache, [method ResourceLoader.load_threaded_request] and [method ResourceLoader.exists]. They use the default import options ([member loop] off, no [member bpm]); set the properties after loading if needed. The data stays compressed and is decoded while playing. If the engine supports MP1 and MP2, [code].mp1[/code] and [code].mp2[/code] files are loaded the same way. MP3 files under [code]res://[/code] that have a [code].import[/code] file are still loaded through their importer, unless the import mode is "Keep File" or "Skip File".
+		[b]Note:[/b] [method ResourceSaver.save] cannot write MP3 files, because the engine has no MP3 encoder. Save the stream as [code].tres[/code] or [code].res[/code] instead.
+		[codeblocks]
+		[gdscript]
+		var music = ResourceLoader.load("user://music/theme.mp3") as AudioStreamMP3
+		music.loop = true
+		[/gdscript]
+		[csharp]
+		var music = ResourceLoader.Load&lt;AudioStreamMP3&gt;("user://music/theme.mp3");
+		music.Loop = true;
+		[/csharp]
+		[/codeblocks]
 	</description>
 	<tutorials>
 		<link title="Audio streams">$DOCS_URL/tutorials/audio/audio_streams.html</link>
