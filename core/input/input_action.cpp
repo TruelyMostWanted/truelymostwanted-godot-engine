@@ -336,56 +336,6 @@ TypedArray<InputEvent> InputAction::get_events() const {
 	return result;
 }
 
-void InputAction::set_bindings(const String &p_bindings) {
-	events.clear();
-	PackedStringArray invalid;
-	const Vector<String> items = p_bindings.split(";", false);
-	for (const String &raw_item : items) {
-		String item = raw_item.strip_edges();
-		if (item.is_empty()) {
-			continue;
-		}
-		// A joypad binding for one pad ends with "@<device id>".
-		int device_id = -1;
-		const int at = item.rfind_char('@');
-		if (at > 0 && item.substr(at + 1).is_valid_int()) {
-			device_id = item.substr(at + 1).to_int();
-			item = item.substr(0, at).strip_edges();
-		}
-		const Ref<InputEvent> event = text_to_event(item);
-		if (event.is_null()) {
-			invalid.push_back(item);
-			continue;
-		}
-		if (device_id >= 0) {
-			event->set_device(device_id);
-		}
-		events.push_back(event);
-	}
-	emit_changed();
-	if (!invalid.is_empty()) {
-		WARN_PRINT(vformat("InputAction \"%s\": can't read the binding %s; it is skipped.", action, String(", ").join(invalid)));
-	}
-}
-
-String InputAction::get_bindings() const {
-	String result;
-	for (const Ref<InputEvent> &event : events) {
-		String text = event_to_text(event);
-		if (text.is_empty()) {
-			continue;
-		}
-		if (get_event_device(event) == INPUT_DEVICE_GAMEPAD && event->get_device() >= 0) {
-			text += "@" + itos(event->get_device());
-		}
-		if (!result.is_empty()) {
-			result += "; ";
-		}
-		result += text;
-	}
-	return result;
-}
-
 void InputAction::add_event(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND_MSG(p_event.is_null(), "InputAction: the event is null.");
 	if (has_event(p_event)) {
@@ -466,8 +416,6 @@ void InputAction::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_deadzone"), &InputAction::get_deadzone);
 	ClassDB::bind_method(D_METHOD("set_events", "events"), &InputAction::set_events);
 	ClassDB::bind_method(D_METHOD("get_events"), &InputAction::get_events);
-	ClassDB::bind_method(D_METHOD("set_bindings", "bindings"), &InputAction::set_bindings);
-	ClassDB::bind_method(D_METHOD("get_bindings"), &InputAction::get_bindings);
 
 	ClassDB::bind_method(D_METHOD("add_event", "event"), &InputAction::add_event);
 	ClassDB::bind_method(D_METHOD("has_event", "event"), &InputAction::has_event);
@@ -478,9 +426,7 @@ void InputAction::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "action"), "set_action", "get_action");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "deadzone", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_deadzone", "get_deadzone");
-	// Edited in the Inspector, stored as `bindings`.
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "events", PROPERTY_HINT_ARRAY_TYPE, "InputEvent", PROPERTY_USAGE_EDITOR), "set_events", "get_events");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "bindings", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE), "set_bindings", "get_bindings");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "events", PROPERTY_HINT_ARRAY_TYPE, "InputEvent"), "set_events", "get_events");
 
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_KEYBOARD);
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_MOUSE);

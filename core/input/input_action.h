@@ -36,9 +36,9 @@
 #include "core/variant/typed_array.h"
 
 // One input action of InputMap as a resource (#172): its name, deadzone and events.
-// `events` is the list for scripts and the Inspector; `bindings` is its stored text form
-// (`Key:Ctrl+S; JoypadButton:A`), so the resource can be saved as JSON, INI, CSV and `.tres`.
-// Only keys, mouse buttons, joypad buttons and joypad axes have a text form.
+// The events are stored as sub-resources (`.tres`, `.res`), like the events of the project settings.
+// event_to_text() and text_to_event() give the text form of an event (`Key:Ctrl+S`); only keys, mouse
+// buttons, joypad buttons and joypad axes have one. InputMapSettingsServer stores its actions with it.
 class InputAction : public Resource {
 	GDCLASS(InputAction, Resource);
 
@@ -78,9 +78,6 @@ public:
 	void set_events(const TypedArray<InputEvent> &p_events);
 	TypedArray<InputEvent> get_events() const;
 	const Vector<Ref<InputEvent>> &get_event_list() const { return events; }
-
-	void set_bindings(const String &p_bindings);
-	String get_bindings() const;
 
 	void add_event(const Ref<InputEvent> &p_event);
 	bool has_event(const Ref<InputEvent> &p_event) const;

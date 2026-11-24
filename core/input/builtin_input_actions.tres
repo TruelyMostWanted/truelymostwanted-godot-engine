@@ -1,15 +1,5 @@
 [gd_resource type="InputActions" format=3]
 
-; Godot's built-in input actions (ui_*): the data of InputMap::get_builtins() (#172).
-; An InputActions resource in the text resource format; it opens in the Inspector.
-; The build turns it into core/input/builtin_input_actions.gen.cpp (make_builtin_input_actions() in
-; core/input/input_builders.py); it is not loaded at runtime and not exported.
-; Platform variants: an action whose name ends with a feature tag (ui_close_dialog.macos) replaces the
-; action of the plain name when OS.has_feature() is true for the tag, like the input/ui_*.<tag> project settings.
-; Events are sub-resources: InputEventKey (keycode, modifier flags), InputEventJoypadButton (button_index)
-; and InputEventJoypadMotion (axis, axis_value). Edit this file as text: saving it from the editor
-; writes the events as InputAction.bindings, which the build does not read.
-
 [sub_resource type="InputEventKey" id="InputEventKey_1"]
 keycode = 4194309
 
@@ -83,7 +73,6 @@ button_index = 13
 
 [sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_1"]
 device = -1
-axis = 0
 axis_value = -1.0
 
 [sub_resource type="InputAction" id="InputAction_8"]
@@ -99,7 +88,6 @@ button_index = 14
 
 [sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_2"]
 device = -1
-axis = 0
 axis_value = 1.0
 
 [sub_resource type="InputAction" id="InputAction_9"]
@@ -168,7 +156,6 @@ events = Array[InputEvent]([SubResource("InputEventKey_18")])
 
 [sub_resource type="InputAction" id="InputAction_16"]
 action = &"ui_accessibility_drag_and_drop"
-events = Array[InputEvent]([])
 
 [sub_resource type="InputEventKey" id="InputEventKey_19"]
 command_or_control_autoremap = true
@@ -360,7 +347,6 @@ events = Array[InputEvent]([SubResource("InputEventKey_49")])
 
 [sub_resource type="InputAction" id="InputAction_34"]
 action = &"ui_text_backspace_all_to_left"
-events = Array[InputEvent]([])
 
 [sub_resource type="InputEventKey" id="InputEventKey_50"]
 command_or_control_autoremap = true
@@ -395,7 +381,6 @@ events = Array[InputEvent]([SubResource("InputEventKey_53")])
 
 [sub_resource type="InputAction" id="InputAction_39"]
 action = &"ui_text_delete_all_to_right"
-events = Array[InputEvent]([])
 
 [sub_resource type="InputEventKey" id="InputEventKey_54"]
 command_or_control_autoremap = true

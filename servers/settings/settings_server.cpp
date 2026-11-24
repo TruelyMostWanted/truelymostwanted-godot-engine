@@ -1010,7 +1010,8 @@ Error SettingsServer::load() {
 	String error;
 	Ref<Resource> loaded;
 	PackedStringArray present;
-	const String type_name = ResourceTextSerializer::get_type_name(defaults.ptr());
+	const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
+	const String type_name = ResourceTextSerializer::get_type_name(storage_defaults.ptr());
 	// The extension decides; an unknown extension is read in the format of `settings/storage/format`.
 	const ResourceTextSerializer::Format format = _get_format_for_path(path);
 
@@ -1076,6 +1077,14 @@ Error SettingsServer::load() {
 			err = ResourceTextSerializer::decode_resource(tree, type_name, loaded, error);
 		}
 	}
+	if (err == OK && loaded.is_valid()) {
+		// The storage form has the value names of the settings resource.
+		loaded = _settings_from_storage(loaded);
+		if (loaded.is_null()) {
+			err = ERR_INVALID_DATA;
+			error = "the stored values can't be converted to the settings";
+		}
+	}
 
 	if (err != OK || loaded.is_null()) {
 		// The file is kept as it is until the next save().
@@ -1125,10 +1134,15 @@ Error SettingsServer::save() {
 	String text;
 	String error;
 	Error err = OK;
-	if (format == ResourceTextSerializer::FORMAT_CSV) {
-		err = ResourceTextSerializer::write_csv(data, options, text, error);
+	// The storage form has the value names of the settings resource (see _settings_to_storage()).
+	const Ref<Resource> storage = _settings_to_storage(data);
+	if (storage.is_null()) {
+		err = ERR_INVALID_DATA;
+		error = "the settings can't be converted to their storage form";
+	} else if (format == ResourceTextSerializer::FORMAT_CSV) {
+		err = ResourceTextSerializer::write_csv(storage, options, text, error);
 	} else {
-		Ref<Resource> copy = data->duplicate(false);
+		Ref<Resource> copy = storage == data ? data->duplicate(false) : storage;
 		copy->set_meta(META_SETTINGS_VERSION, get_format_version());
 		const bool tree_format = format == ResourceTextSerializer::FORMAT_JSON || format == ResourceTextSerializer::FORMAT_INI || format == ResourceTextSerializer::FORMAT_MAX;
 		// Only JSON and INI are read back as a tree with the missing values taken from the defaults.
@@ -1136,13 +1150,13 @@ Error SettingsServer::save() {
 			// The serializer compares a value with its default by `==`, which compares the resources of a list by
 			// identity. A value equal to its default by its stored properties (values_equal()) is put into the
 			// compared defaults as the very same value, so it is skipped like an unchanged single value.
-			Ref<Resource> compared_defaults = defaults->duplicate(false);
+			const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
+			Ref<Resource> compared_defaults = storage_defaults.is_valid() ? storage_defaults->duplicate(false) : Ref<Resource>();
 			LocalVector<PropertyInfo> infos;
 			get_value_infos(data.ptr(), infos);
 			for (const PropertyInfo &info : infos) {
-				const Variant value = data->get(info.name);
-				if (values_equal(value, defaults->get(info.name))) {
-					compared_defaults->set(info.name, value);
+				if (compared_defaults.is_valid() && values_equal(data->get(info.name), defaults->get(info.name))) {
+					compared_defaults->set(info.name, storage->get(info.name));
 				}
 			}
 			options.defaults = compared_defaults;

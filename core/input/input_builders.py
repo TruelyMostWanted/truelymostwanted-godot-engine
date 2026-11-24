@@ -192,12 +192,13 @@ def _parse_builtin_input_actions_tres(path):
                 modifiers = [mask for prop, mask in _BUILTIN_INPUT_MODIFIERS if properties.get(prop, False)]
                 events.append({"type": "key", "keycode": int(properties["keycode"]), "modifiers": modifiers})
             elif event_type == "InputEventJoypadButton":
-                events.append({"type": "joypad_button", "button": int(properties["button_index"])})
+                # The saver leaves out default values (button 0, axis 0).
+                events.append({"type": "joypad_button", "button": int(properties.get("button_index", 0))})
             else:
                 events.append({
                     "type": "joypad_motion",
-                    "axis": int(properties["axis"]),
-                    "axis_value": float(properties["axis_value"]),
+                    "axis": int(properties.get("axis", 0)),
+                    "axis_value": float(properties.get("axis_value", 0.0)),
                 })
         result.append((name, events))
     return result
@@ -205,8 +206,12 @@ def _parse_builtin_input_actions_tres(path):
 
 def make_builtin_input_actions(target, source, env):
     """Generates the table of Godot's built-in input actions (InputMap::get_builtins()) from
-    builtin_input_actions.tres, an InputActions resource. An action name with a feature suffix
-    (`ui_close_dialog.macos`) is a platform variant of the plain action."""
+    builtin_input_actions.tres, an InputActions resource in Godot's text resource format. The file has
+    no comments, so it can be opened in the editor's Inspector and saved again unchanged; the build
+    reads its InputAction sub-resources and their `events` (InputEventKey, InputEventJoypadButton,
+    InputEventJoypadMotion). It is not loaded at runtime and not exported.
+    An action name with a feature suffix (`ui_close_dialog.macos`) replaces the action of the plain
+    name when OS.has_feature() is true for the tag, like the `input/ui_*.<tag>` project settings."""
     events = []
     actions = []
     for name, action_events in _parse_builtin_input_actions_tres(str(source[0])):

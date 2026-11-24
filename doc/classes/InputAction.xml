@@ -5,26 +5,30 @@
 	</brief_description>
 	<description>
 		An [InputAction] describes one action of the [InputMap] ([code]"jump"[/code], [code]"ui_accept"[/code], ...) with its [member action] name, its [member deadzone] and its [member events]. The layers of the [InputMap] are [InputActions] of [InputAction]s: [method InputMap.get_input_action] returns the action of the [InputMap] itself (changing it changes the [InputMap]), and [method InputMap.set_input_action] puts one into the [InputMap]. A set of actions is an [InputActions]. [InputMapSettingsServer] stores the player's bindings as [InputActions].
-		The events are available in two forms. [member events] is the list of [InputEvent]s for scripts and the Inspector. [member bindings] is the same list as readable text that is stored in files, so the resource survives JSON, INI, CSV and [code].tres[/code]. The events are separated by [code]"; "[/code], for example [code]Key:Ctrl+S; JoypadButton:A[/code]. A joypad event that is bound to one pad ends with [code]@[/code] and the device id, for example [code]JoypadButton:A@1[/code]. Each event has the text form [code]Type:Value[/code]:
+		[member events] is a list of [InputEvent]s. It is stored like any other resource property: a [code].tres[/code] file holds the events as sub-resources, the same layout the editor writes, so an [InputAction] or an [InputActions] can be edited in the Inspector and saved again. [InputMapSettingsServer] stores the player's bindings in readable text instead (see [method InputMapSettingsServer.events_to_text]).
+		[method event_to_text] and [method text_to_event] convert one event to and from its text form [code]Type:Value[/code]. Only keys, mouse buttons, joypad buttons and joypad axes have one:
 		- [code]Key:Ctrl+S[/code], [code]PhysicalKey:W[/code] and [code]KeyLabel:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.keycode], [member InputEventKey.physical_keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
 		- [code]MouseButton:Left[/code], [code]MouseButton:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
 		- [code]JoypadButton:A[/code]: an [InputEventJoypadButton] with the names of [enum JoyButton] in PascalCase ([code]LeftShoulder[/code], [code]DPadUp[/code], ...) or the button index.
 		- [code]JoypadMotion:LeftX+[/code]: an [InputEventJoypadMotion] with the axis ([code]LeftX[/code], [code]LeftY[/code], [code]RightX[/code], [code]RightY[/code], [code]TriggerLeft[/code], [code]TriggerRight[/code] or the axis index) and the direction ([code]+[/code] or [code]-[/code]).
-		Event types without a text form (touch, MIDI, ...) are kept in [member events] but are not part of [member bindings].
 		[codeblocks]
 		[gdscript]
 		var action = InputAction.new()
 		action.action = &amp;"jump"
 		action.deadzone = 0.3
-		action.bindings = "Key:Space; JoypadButton:A"
+		action.add_event(InputAction.text_to_event("Key:Space"))
+		action.add_event(InputAction.text_to_event("JoypadButton:A"))
 		InputMap.set_input_action(action)
+		ResourceSaver.save(action, "user://jump.tres") # The events are sub-resources of the file.
 		[/gdscript]
 		[csharp]
 		var action = new InputAction();
 		action.Action = "jump";
 		action.Deadzone = 0.3f;
-		action.Bindings = "Key:Space; JoypadButton:A";
+		action.AddEvent(InputAction.TextToEvent("Key:Space"));
+		action.AddEvent(InputAction.TextToEvent("JoypadButton:A"));
 		InputMap.Singleton.SetInputAction(action);
+		ResourceSaver.Save(action, "user://jump.tres"); // The events are sub-resources of the file.
 		[/csharp]
 		[/codeblocks]
 	</description>
@@ -97,14 +101,11 @@
 		<member name="action" type="StringName" setter="set_action" getter="get_action" default="&amp;&quot;&quot;">
 			The name of the action in the [InputMap], for example [code]&amp;"jump"[/code]. The property is not called [code]name[/code], because [member Resource.resource_name] already uses that name.
 		</member>
-		<member name="bindings" type="String" setter="set_bindings" getter="get_bindings" default="&quot;&quot;">
-			The events in text form, separated by [code]"; "[/code], for example [code]"Key:Ctrl+S; JoypadButton:A"[/code] (see the class description). This is the stored form of [member events]: setting it replaces all events, and the getter returns the events that have a text form. Texts that are not valid are skipped with a warning.
-		</member>
 		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
 			The deadzone of the action, from [code]0.0[/code] to [code]1.0[/code] (see [method InputMap.action_set_deadzone]).
 		</member>
 		<member name="events" type="InputEvent[]" setter="set_events" getter="get_events" default="[]">
-			The events that trigger the action. This list is shown in the Inspector; it is not stored in files, [member bindings] is. Event types without a text form (touch, MIDI, ...) are only kept here.
+			The events that trigger the action, shown in the Inspector and stored as sub-resources. Setting it replaces all events; [code]null[/code] entries are skipped. The getter returns a new array: change the events with [method add_event], [method remove_event] and [method clear_events], or set the whole list.
 		</member>
 	</members>
 	<constants>
