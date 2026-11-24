@@ -119,6 +119,8 @@ int ListSettingsServer::find_entry(const Variant &p_key) const {
 
 void ListSettingsServer::add_entry(const Ref<Resource> &p_entry, int p_at_index) {
 	ERR_FAIL_COND(p_entry.is_null());
+	// Float values of a new entry have at most three decimals, like set_entry_value().
+	snap_resource_floats(p_entry);
 	Array list = _get_list().duplicate(false);
 	if (p_at_index < 0 || p_at_index >= list.size()) {
 		list.push_back(p_entry);
@@ -178,7 +180,8 @@ Variant ListSettingsServer::_validate_entry(int p_index, const Ref<Resource> &p_
 	Variant value = validate_property_value(p_entry.ptr(), p_name, p_value);
 	Variant ret;
 	if (GDVIRTUAL_CALL(_validate_entry_value, p_index, p_name, value, ret)) {
-		value = ret;
+		// A value returned by _validate_entry_value() is snapped too.
+		value = snap_property_value(p_entry.ptr(), p_name, ret);
 	}
 	return value;
 }
@@ -208,7 +211,8 @@ Variant ListSettingsServer::get_entry_value(int p_index, const StringName &p_nam
 	ERR_FAIL_INDEX_V(p_index, list.size(), Variant());
 	const Ref<Resource> entry = list[p_index];
 	ERR_FAIL_COND_V(entry.is_null(), Variant());
-	return entry->get(p_name);
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(entry.ptr(), p_name, entry->get(p_name));
 }
 
 void ListSettingsServer::_bind_methods() {
