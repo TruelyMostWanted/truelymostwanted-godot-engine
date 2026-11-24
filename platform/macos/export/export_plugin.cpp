@@ -2803,6 +2803,16 @@ Error EditorExportPlatformMacOS::export_project(const Ref<EditorExportPreset> &p
 					break;
 				}
 			}
+
+			// Data files of export plugins go to `Contents/Resources` before the bundle is signed,
+			// so the bundle signature seals them. They are not signed one by one.
+			for (int i = 0; i < export_plugins.size() && err == OK; ++i) {
+				String failed_path;
+				err = export_plugins[i]->copy_bundle_resources(tmp_app_path_name + "/Contents/Resources", failed_path);
+				if (err != OK) {
+					add_message(EXPORT_MESSAGE_ERROR, TTR("Export"), vformat(TTR("Could not copy the bundle resource \"%s\" into \"Contents/Resources\"."), failed_path));
+				}
+			}
 		}
 
 		if (err == OK && sign_enabled) {
