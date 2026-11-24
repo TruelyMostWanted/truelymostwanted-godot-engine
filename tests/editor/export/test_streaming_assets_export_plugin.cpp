@@ -37,6 +37,7 @@ TEST_FORCE_LINK(test_streaming_assets_export_plugin)
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/streaming_assets_server.h"
+#include "core/os/os.h"
 #include "editor/export/streaming_assets_export_plugin.h"
 #include "tests/test_utils.h"
 
@@ -146,12 +147,30 @@ TEST_CASE("[StreamingAssetsExportPlugin] resolve_placement") {
 	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
 	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.ZIP", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
 
-	// Bundles (#90), Android and Web use the fallback.
-	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
-	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
+	// macOS, iOS and visionOS use the bundle resources (#90), also inside a `.zip`.
+	const PackedStringArray tags_visionos = { "visionos", "arm64" };
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.zip", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+	CHECK(Plugin::resolve_placement(tags_visionos, "/build/Game.ipa", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_BUNDLE);
+
+	// Android and Web use the fallback.
 	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
 	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
 	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+}
+
+TEST_CASE("[StreamingAssetsExportPlugin] get_export_exe_name") {
+	const PackedStringArray tags_windows = { "pc", "windows", "x86_64" };
+	const PackedStringArray tags_macos = { "pc", "macos", "arm64" };
+	const PackedStringArray tags_ios = { "mobile", "ios", "arm64" };
+
+	CHECK(Plugin::get_export_exe_name(tags_windows, "C:/build/MyGame.exe", "My Game") == "MyGame");
+	CHECK(Plugin::get_export_exe_name(tags_ios, "/build/MyGame.ipa", "My Game") == "MyGame");
+	// macOS: `.app` exports name the bundle after the file, the other formats after the application.
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.app", "My Game") == "MyGame");
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.zip", "My Game") == OS::get_singleton()->get_safe_dir_name("My Game"));
+	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.dmg", "") == "Unnamed");
 }
 
 } // namespace TestStreamingAssetsExportPlugin
