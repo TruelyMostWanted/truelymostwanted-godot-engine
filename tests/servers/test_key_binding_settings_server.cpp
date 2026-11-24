@@ -59,7 +59,8 @@ static Ref<InputEventKey> make_key(Key p_keycode, bool p_physical) {
 	return event;
 }
 
-// A key as the player presses it: all three codes are set.
+// A key as the player presses it: all three codes are set, on the keyboard's device id
+// (`InputEvent::DEVICE_ID_KEYBOARD`, the default), like the project bindings in InputMap.
 static Ref<InputEventKey> make_pressed_key(Key p_keycode) {
 	Ref<InputEventKey> event;
 	event.instantiate();
@@ -67,7 +68,6 @@ static Ref<InputEventKey> make_pressed_key(Key p_keycode) {
 	event->set_physical_keycode(p_keycode);
 	event->set_key_label(p_keycode);
 	event->set_pressed(true);
-	event->set_device(0);
 	return event;
 }
 
@@ -91,6 +91,18 @@ static void load_project_actions() {
 	input_map->action_add_event(JUMP, InputEventJoypadButton::create_reference(JoyButton::A));
 	input_map->add_action(FIRE, 0.2f);
 	input_map->action_add_event(FIRE, make_mouse_button(MouseButton::LEFT));
+
+	// The same actions as project settings (`input/<action>`): reset restores from there, like in a game.
+	for (const char *action : { JUMP, FIRE }) {
+		Dictionary value;
+		value["deadzone"] = input_map->action_get_deadzone(action);
+		Array events;
+		for (const Ref<InputEvent> &event : *input_map->action_get_events(action)) {
+			events.push_back(event);
+		}
+		value["events"] = events;
+		ProjectSettings::get_singleton()->set_setting(String("input/") + action, value);
+	}
 }
 
 struct TestSetup {
@@ -100,6 +112,9 @@ struct TestSetup {
 	}
 	~TestSetup() {
 		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		for (const char *action : { JUMP, FIRE }) {
+			ProjectSettings::get_singleton()->set_setting(String("input/") + action, Variant());
+		}
 		InputMap *input_map = InputMap::get_singleton();
 		for (const char *action : { JUMP, FIRE }) {
 			if (input_map->has_action(action)) {
