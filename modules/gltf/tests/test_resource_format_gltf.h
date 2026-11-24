@@ -115,7 +115,7 @@ TEST_CASE("[SceneTree][ResourceFormatGLTF] Save and load .glb and .gltf through 
 		const String path = folder.path_join("ship.gltf");
 		CHECK(ResourceSaver::save(ship, path) == OK);
 		CHECK(FileAccess::exists(path));
-		CHECK_MESSAGE(FileAccess::exists(folder.path_join("ship.bin")), "The .gltf file has an external .bin buffer.");
+		CHECK_MESSAGE(FileAccess::exists(folder.path_join("ship0.bin")), "The .gltf file has an external .bin buffer (GLTFDocument names it <name>0.bin).");
 
 		Ref<PackedScene> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 		check_ship(loaded);
