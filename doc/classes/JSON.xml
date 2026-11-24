@@ -37,6 +37,16 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a [Resource] from JSON [param text] written by [method serialize]. The class comes from the key [code]"$type"[/code] of the root object, or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_JSON, type_hint, options)[/code].
+				[b]Note:[/b] Use [method parse] or [method parse_string] for plain data; [method deserialize] is for resources only.
+			</description>
+		</method>
 		<method name="from_native" qualifiers="static">
 			<return type="Variant" />
 			<param index="0" name="variant" type="Variant" />
@@ -85,6 +95,25 @@
 			<param index="0" name="json_string" type="String" />
 			<description>
 				Attempts to parse the [param json_string] provided and returns the parsed data. Returns [code]null[/code] if parse failed.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as JSON text, with its stored properties, sub-resources and the type marker [code]"$type"[/code]. [param options] controls indentation, key order and more; [code]null[/code] uses the project settings [code]filesystem/resources/text_formats/*[/code]. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_JSON, options)[/code].
+				[b]Note:[/b] [method stringify] writes plain data and keeps an [Object] as it is; use [method serialize] for resources.
+				[codeblocks]
+				[gdscript]
+				var text = JSON.serialize(my_settings)
+				var copy = JSON.deserialize(text) as MySettings
+				[/gdscript]
+				[csharp]
+				string text = Json.Serialize(mySettings);
+				var copy = Json.Deserialize(text) as MySettings;
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="stringify" qualifiers="static">
