@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_settings.h                                                  */
+/*  video_preset_settings.h                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -31,20 +31,19 @@
 #pragma once
 
 #include "core/io/resource.h"
-#include "core/variant/typed_array.h"
-#include "servers/settings/input_map_action.h"
 
-// Settings of the `input_map` domain (#18): one InputMapAction per bound slot of all actions. It holds
-// nothing but the list, so it can be stored as CSV (one row per event).
-class InputMapSettings : public Resource {
-	GDCLASS(InputMapSettings, Resource);
+// Data of the `video_preset` settings domain (#25): the name of the graphics preset the player picked
+// ("Custom" after a change of a single value, empty if none was picked yet). The values of the preset are stored
+// by the video domains themselves. VideoPresetSettingsServer keeps it up to date.
+class VideoPresetSettings : public Resource {
+	GDCLASS(VideoPresetSettings, Resource);
 
-	TypedArray<InputMapAction> actions;
+	String preset;
 
 protected:
 	static void _bind_methods();
 
 public:
-	void set_actions(const TypedArray<InputMapAction> &p_actions);
-	TypedArray<InputMapAction> get_actions() const;
+	void set_preset(const String &p_preset);
+	String get_preset() const;
 };

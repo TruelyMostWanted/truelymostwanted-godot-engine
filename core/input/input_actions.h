@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  input_map_settings.cpp                                                */
+/*  input_actions.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,22 +28,43 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "input_map_settings.h"
+#pragma once
 
-#include "core/object/class_db.h"
+#include "core/input/input_action.h"
+#include "core/templates/hash_map.h"
+#include "core/templates/local_vector.h"
 
-void InputMapSettings::set_actions(const TypedArray<InputMapAction> &p_actions) {
-	actions = p_actions;
-	emit_changed();
-}
+// A collection of InputAction resources with O(1) lookup by action name (#172).
+// It is a layer of InputMap (InputMap.get_input_actions()) and the settings of InputMapSettingsServer.
+// The list is the typed array `actions` for the Inspector; action names are unique (adding an action
+// with a name that is already used replaces the old one).
+class InputActions : public Resource {
+	GDCLASS(InputActions, Resource);
 
-TypedArray<InputMapAction> InputMapSettings::get_actions() const {
-	return actions;
-}
+	LocalVector<Ref<InputAction>> actions;
+	mutable HashMap<StringName, uint32_t> lookup;
+	mutable bool lookup_dirty = false;
 
-void InputMapSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_actions", "actions"), &InputMapSettings::set_actions);
-	ClassDB::bind_method(D_METHOD("get_actions"), &InputMapSettings::get_actions);
+	int _find(const StringName &p_action) const;
+	void _attach(const Ref<InputAction> &p_action);
+	void _detach(const Ref<InputAction> &p_action);
+	void _action_changed();
 
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "actions", PROPERTY_HINT_ARRAY_TYPE, "InputMapAction"), "set_actions", "get_actions");
-}
+protected:
+	static void _bind_methods();
+
+public:
+	void set_actions(const TypedArray<InputAction> &p_actions);
+	TypedArray<InputAction> get_actions() const;
+	const LocalVector<Ref<InputAction>> &get_action_list() const { return actions; }
+
+	void add_action(const Ref<InputAction> &p_action);
+	Ref<InputAction> get_action(const StringName &p_action) const;
+	bool has_action(const StringName &p_action) const;
+	bool remove_action(const StringName &p_action);
+	TypedArray<StringName> get_action_names() const;
+	int get_action_count() const;
+	void clear();
+
+	~InputActions();
+};

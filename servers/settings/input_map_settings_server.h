@@ -30,28 +30,41 @@
 
 #pragma once
 
+#include "core/input/input_actions.h"
 #include "core/templates/hash_set.h"
-#include "servers/settings/input_map_settings.h"
+#include "core/variant/binder_common.h"
 #include "servers/settings/list_settings_server.h"
 
-// Settings domain `input_map` (#18): the player's events of the InputMap actions (InputMapSettings).
-// An event slot is addressed by action, device (keyboard, mouse, gamepad) and slot. Applying replaces the key,
-// mouse button and joypad events of each action in InputMap; other event types stay. The defaults are the
-// InputMap of the project settings at startup, so reset_action() and reset_all() give back the project events.
+// Settings domain `input_map` (#18, layers #172): the player's events of the InputMap actions.
+// The settings resource is an InputActions with one InputAction per action (one CSV row per action:
+// `action`, `deadzone`, `bindings`). Applying replaces the key, mouse button and joypad events of each
+// action in InputMap; other event types stay. The defaults are the InputMap of the project settings at
+// startup, so reset_action() and reset_all() give back the project events.
+// `save_mode` decides which layer is stored: the custom actions only (default) or the built-in `ui_*`
+// actions too.
 class InputMapSettingsServer : public ListSettingsServer {
 	GDCLASS(InputMapSettingsServer, ListSettingsServer);
 
+public:
+	enum SaveMode {
+		SAVE_MODE_CUSTOM_ONLY,
+		SAVE_MODE_ALL,
+	};
+
+private:
 	static InputMapSettingsServer *singleton;
 
-	bool include_builtin_actions = false; // Project setting `settings/input_map/include_builtin_actions`.
+	SaveMode save_mode = SAVE_MODE_CUSTOM_ONLY; // Project setting `settings/input_map/save_mode`.
 	HashSet<String> warned_actions; // Saved actions missing in the project that were reported once.
 
 	static bool _is_managed_event(const Ref<InputEvent> &p_event);
 	bool _is_managed_action(const StringName &p_action) const;
-	static void _add_action_rows(const StringName &p_action, TypedArray<InputMapAction> &r_rows);
-	Array _get_rows() const;
-	int _find_row(const String &p_action, InputMapAction::InputDevice p_device, int p_slot) const;
-	float _get_default_deadzone(const String &p_action) const;
+	static Ref<InputAction> _make_action(const StringName &p_action);
+	Ref<InputActions> _get_actions() const;
+	Ref<InputAction> _get_action(const StringName &p_action) const;
+	Ref<InputAction> _ensure_action(const StringName &p_action);
+	static int _find_slot(const Ref<InputAction> &p_action, InputAction::InputDevice p_device, int p_slot);
+	static Ref<InputEvent> _normalized_event(const Ref<InputEvent> &p_event, Error &r_error);
 	void _merge_project_actions();
 
 protected:
@@ -70,18 +83,26 @@ public:
 	virtual StringName get_list_property() const override;
 	virtual StringName get_entry_key() const override;
 
+	void set_save_mode(SaveMode p_save_mode);
+	SaveMode get_save_mode() const;
+
 	// Actions.
 	PackedStringArray get_action_names() const;
 	bool has_action(const StringName &p_action) const;
+	Ref<InputAction> get_input_action(const StringName &p_action) const;
 	TypedArray<InputEvent> get_events(const StringName &p_action) const;
 	void set_action_deadzone(const StringName &p_action, float p_deadzone);
 	float get_action_deadzone(const StringName &p_action) const;
 
-	// Slots.
-	Ref<InputEvent> get_event(const StringName &p_action, InputMapAction::InputDevice p_device, int p_slot = 0) const;
-	int get_slot_count(const StringName &p_action, InputMapAction::InputDevice p_device) const;
+	// Events.
+	Error add_event(const StringName &p_action, const Ref<InputEvent> &p_event);
+	Error remove_event(const StringName &p_action, const Ref<InputEvent> &p_event);
+
+	// Slots: slot n of a device is the n-th event of that device in the action.
+	Ref<InputEvent> get_event(const StringName &p_action, InputAction::InputDevice p_device, int p_slot = 0) const;
+	int get_slot_count(const StringName &p_action, InputAction::InputDevice p_device) const;
 	Error rebind(const StringName &p_action, const Ref<InputEvent> &p_event, int p_slot = 0);
-	void clear_event(const StringName &p_action, InputMapAction::InputDevice p_device, int p_slot = 0);
+	void clear_event(const StringName &p_action, InputAction::InputDevice p_device, int p_slot = 0);
 	PackedStringArray find_conflicts(const Ref<InputEvent> &p_event, const StringName &p_ignore_action = StringName()) const;
 
 	// Reset to the project bindings.
@@ -93,3 +114,5 @@ public:
 	InputMapSettingsServer();
 	~InputMapSettingsServer();
 };
+
+VARIANT_ENUM_CAST(InputMapSettingsServer::SaveMode);

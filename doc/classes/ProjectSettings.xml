@@ -3724,8 +3724,8 @@
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>
-		<member name="settings/input_map/include_builtin_actions" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [InputMapSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
+		<member name="settings/input_map/save_mode" type="int" setter="" getter="" default="0">
+			The default of [member InputMapSettingsServer.save_mode]: which actions [InputMapSettingsServer] manages and stores. [code]0[/code] (Custom Only) stores the custom actions of the project and leaves the built-in [code]ui_*[/code] actions out; [code]1[/code] (All) stores the built-in actions too, so players can rebind the keys of the GUI. See [enum InputMapSettingsServer.SaveMode]. Read once when the server is created.
 		</member>
 		<member name="settings/paths/accessibility_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"accessibility"[/code] settings domain ([AccessibilitySettingsServer]), for example [code]user://settings/accessibility.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/accessibility.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
@@ -3751,8 +3751,14 @@
 		<member name="settings/paths/language_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"language"[/code] settings domain ([LanguageSettingsServer]), for example [code]user://settings/language.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/language.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
+		<member name="settings/paths/tts_personas_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"tts_personas"[/code] settings domain ([TTSPersonaSettingsServer]), for example [code]user://settings/tts_personas.csv[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/tts_personas.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
 		<member name="settings/paths/video_effect_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_effect"[/code] settings domain ([VideoEffectSettingsServer]), for example [code]user://settings/video_effect.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_effect.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
+		</member>
+		<member name="settings/paths/video_preset_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"video_preset"[/code] settings domain ([VideoPresetSettingsServer]), for example [code]user://settings/video_preset.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_preset.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
 		<member name="settings/paths/video_quality_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_quality"[/code] settings domain ([VideoQualitySettingsServer]), for example [code]user://settings/video_quality.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_quality.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
@@ -3786,6 +3792,12 @@
 		</member>
 		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
+		</member>
+		<member name="settings/video_preset/presets" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The graphics presets of the project: [code].tres[/code] or [code].res[/code] files with a [VideoPreset]. A preset with the name of a built-in preset ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code], [code]"Ultra"[/code]) replaces it, other names are added after the built-in presets. Files that are no [VideoPreset] or have no name are ignored with an error. See [VideoPresetSettingsServer].
+		</member>
+		<member name="settings/video_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [VideoPresetSettingsServer] starts with the four built-in presets ([method VideoPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/video_preset/presets] exist.
 		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">
 			The ratio of [WorkerThreadPool]'s threads that will be reserved for low-priority tasks. For example, if 10 threads are available and this value is set to [code]0.3[/code], 3 of the worker threads will be reserved for low-priority tasks. The actual value won't exceed the number of CPU cores minus one, and if possible, at least one worker thread will be dedicated to low-priority tasks.
