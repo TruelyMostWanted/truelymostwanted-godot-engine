@@ -989,7 +989,7 @@ TEST_CASE("[SettingsServer] settings_changed names all values changed by one ope
 	{
 		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
 		REQUIRE(file.is_valid());
-		file->store_string("[root]\n$type=TestDomainSettings\nvolume=0.25\nquality=2\n");
+		file->store_string("[root]\n$type=TestDomainSettings\nvolume=0.25\nquality=High\n");
 	}
 	TestDomainServer *server = memnew(TestDomainServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
