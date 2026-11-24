@@ -35,7 +35,7 @@
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 #include "scene/gui/box_container.h"
-#include "scene/resources/texture_atlas.h"
+#include "scene/resources/sprite_sheet.h"
 
 class Button;
 class ConfirmationDialog;
@@ -47,20 +47,20 @@ class SpinBox;
 class Tree;
 class TextureAtlasEditor;
 
-// Undoable changes of the regions of a TextureAtlas: every change is a snapshot of `regions` and `margins`
+// Undoable changes of the regions of a SpriteSheet: every change is a snapshot of `regions` and `margins`
 // (do: the new state, undo: the old state), so deletes, renames and sorting restore the order as well.
 class TextureAtlasEditing {
 public:
-	static void commit(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
+	static void commit(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
 	// Old state = the current state of the atlas.
-	static void commit_regions(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
-	static void remove(const Ref<TextureAtlas> &p_atlas, const PackedStringArray &p_names);
-	static void rename(const Ref<TextureAtlas> &p_atlas, const StringName &p_from, const StringName &p_to);
-	static void add(const Ref<TextureAtlas> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
+	static void commit_regions(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
+	static void remove(const Ref<SpriteSheet> &p_atlas, const PackedStringArray &p_names);
+	static void rename(const Ref<SpriteSheet> &p_atlas, const StringName &p_from, const StringName &p_to);
+	static void add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
 	// Text "x, y, width, height" to a rectangle.
 	static bool parse_rect(const String &p_text, Rect2i &r_rect);
 	// A warning for the inspector and the dock, empty if the texture is usable.
-	static String get_texture_warning(const Ref<TextureAtlas> &p_atlas);
+	static String get_texture_warning(const Ref<SpriteSheet> &p_atlas);
 };
 
 // List of the regions with thumbnail, name and rectangle; rename and rectangle editing in place, filter,
@@ -68,7 +68,7 @@ public:
 class TextureAtlasRegionList : public VBoxContainer {
 	GDCLASS(TextureAtlasRegionList, VBoxContainer);
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	LineEdit *filter = nullptr;
 	Tree *tree = nullptr;
 	bool update_queued = false;
@@ -84,7 +84,7 @@ public:
 	// Called (deferred) when the user changes the selection.
 	Callable selection_changed_callback;
 
-	void set_atlas(const Ref<TextureAtlas> &p_atlas);
+	void set_atlas(const Ref<SpriteSheet> &p_atlas);
 	void update_list();
 	PackedStringArray get_selected_names() const;
 	void set_selected_names(const PackedStringArray &p_names);
@@ -142,7 +142,7 @@ public:
 	TextureAtlasCanvas();
 };
 
-// Bottom dock "TextureAtlas": canvas, region list, slicing, import and export.
+// Bottom dock "SpriteSheet": canvas, region list, slicing, import and export.
 class TextureAtlasEditor : public EditorDock {
 	GDCLASS(TextureAtlasEditor, EditorDock);
 
@@ -155,7 +155,7 @@ class TextureAtlasEditor : public EditorDock {
 
 	static TextureAtlasEditor *singleton;
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	PackedStringArray selection;
 
 	Label *warning = nullptr;
@@ -204,8 +204,8 @@ protected:
 public:
 	static TextureAtlasEditor *get_singleton() { return singleton; }
 
-	void edit(const Ref<TextureAtlas> &p_atlas);
-	Ref<TextureAtlas> get_atlas() const { return atlas; }
+	void edit(const Ref<SpriteSheet> &p_atlas);
+	Ref<SpriteSheet> get_atlas() const { return atlas; }
 
 	void set_selection(const PackedStringArray &p_names);
 	const PackedStringArray &get_selection() const { return selection; }
@@ -218,11 +218,11 @@ public:
 	~TextureAtlasEditor();
 };
 
-// Inspector of a TextureAtlas: texture warning, "Edit Regions" button and the region list with add and delete.
+// Inspector of a SpriteSheet: texture warning, "Edit Regions" button and the region list with add and delete.
 class TextureAtlasInspector : public VBoxContainer {
 	GDCLASS(TextureAtlasInspector, VBoxContainer);
 
-	Ref<TextureAtlas> atlas;
+	Ref<SpriteSheet> atlas;
 	Label *warning = nullptr;
 	TextureAtlasRegionList *region_list = nullptr;
 	Button *delete_button = nullptr;
@@ -234,7 +234,7 @@ class TextureAtlasInspector : public VBoxContainer {
 	void _selection_changed();
 
 public:
-	TextureAtlasInspector(const Ref<TextureAtlas> &p_atlas);
+	TextureAtlasInspector(const Ref<SpriteSheet> &p_atlas);
 };
 
 class EditorInspectorPluginTextureAtlas : public EditorInspectorPlugin {
@@ -251,7 +251,7 @@ class TextureAtlasEditorPlugin : public EditorPlugin {
 	TextureAtlasEditor *atlas_editor = nullptr;
 
 public:
-	virtual String get_plugin_name() const override { return "TextureAtlas"; }
+	virtual String get_plugin_name() const override { return "SpriteSheet"; }
 	virtual void edit(Object *p_object) override;
 	virtual bool handles(Object *p_object) const override;
 	virtual void make_visible(bool p_visible) override;

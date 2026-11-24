@@ -60,7 +60,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // TextureAtlasEditing
 
-void TextureAtlasEditing::commit(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
+void TextureAtlasEditing::commit(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
 	ERR_FAIL_COND(p_atlas.is_null());
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(p_action, p_merge, p_atlas.ptr());
@@ -71,12 +71,12 @@ void TextureAtlasEditing::commit(const String &p_action, const Ref<TextureAtlas>
 	undo_redo->commit_action();
 }
 
-void TextureAtlasEditing::commit_regions(const String &p_action, const Ref<TextureAtlas> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
+void TextureAtlasEditing::commit_regions(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
 	ERR_FAIL_COND(p_atlas.is_null());
 	commit(p_action, p_atlas, p_atlas->get_regions(), p_atlas->get_margins(), p_new_regions, p_new_margins, p_merge);
 }
 
-void TextureAtlasEditing::remove(const Ref<TextureAtlas> &p_atlas, const PackedStringArray &p_names) {
+void TextureAtlasEditing::remove(const Ref<SpriteSheet> &p_atlas, const PackedStringArray &p_names) {
 	ERR_FAIL_COND(p_atlas.is_null());
 	if (p_names.is_empty()) {
 		return;
@@ -90,12 +90,12 @@ void TextureAtlasEditing::remove(const Ref<TextureAtlas> &p_atlas, const PackedS
 	commit_regions(p_names.size() == 1 ? TTR("Delete Region") : TTR("Delete Regions"), p_atlas, regions, margins);
 }
 
-void TextureAtlasEditing::rename(const Ref<TextureAtlas> &p_atlas, const StringName &p_from, const StringName &p_to) {
+void TextureAtlasEditing::rename(const Ref<SpriteSheet> &p_atlas, const StringName &p_from, const StringName &p_to) {
 	ERR_FAIL_COND(p_atlas.is_null());
 	if (p_from == p_to) {
 		return;
 	}
-	if (!TextureAtlas::is_valid_region_name(p_to)) {
+	if (!SpriteSheet::is_valid_region_name(p_to)) {
 		EditorNode::get_singleton()->show_warning(vformat(TTR("\"%s\" is not a valid region name: it must not be empty and must not contain '/', ':', '\"', control characters or surrounding spaces."), p_to));
 		return;
 	}
@@ -119,13 +119,13 @@ void TextureAtlasEditing::rename(const Ref<TextureAtlas> &p_atlas, const StringN
 	commit(TTR("Rename Region"), p_atlas, old_regions, old_margins, regions, margins);
 }
 
-void TextureAtlasEditing::add(const Ref<TextureAtlas> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
+void TextureAtlasEditing::add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
 	ERR_FAIL_COND(p_atlas.is_null());
 	if (p_rects.is_empty()) {
 		return;
 	}
 	// Names and validation from the runtime API, applied to a copy so the change goes through undo/redo.
-	Ref<TextureAtlas> copy;
+	Ref<SpriteSheet> copy;
 	copy.instantiate();
 	copy->set_texture(p_atlas->get_sheet_texture());
 	copy->set_regions(p_atlas->get_regions());
@@ -153,7 +153,7 @@ bool TextureAtlasEditing::parse_rect(const String &p_text, Rect2i &r_rect) {
 	return true;
 }
 
-String TextureAtlasEditing::get_texture_warning(const Ref<TextureAtlas> &p_atlas) {
+String TextureAtlasEditing::get_texture_warning(const Ref<SpriteSheet> &p_atlas) {
 	if (p_atlas.is_null()) {
 		return String();
 	}
@@ -185,7 +185,7 @@ void TextureAtlasRegionList::_atlas_changed() {
 	callable_mp(this, &TextureAtlasRegionList::update_list).call_deferred();
 }
 
-void TextureAtlasRegionList::set_atlas(const Ref<TextureAtlas> &p_atlas) {
+void TextureAtlasRegionList::set_atlas(const Ref<SpriteSheet> &p_atlas) {
 	if (atlas == p_atlas) {
 		return;
 	}
@@ -336,7 +336,7 @@ Variant TextureAtlasRegionList::_get_drag_data_fw(const Point2 &p_point, Control
 		return Variant();
 	}
 	// The cached AtlasTexture of the atlas: it follows later changes of the region while the editor runs.
-	const Ref<AtlasTexture> texture = atlas->get_texture(name);
+	const Ref<AtlasTexture> texture = atlas->get_region_texture(name);
 	Dictionary drag_data;
 	drag_data["type"] = "resource";
 	drag_data["resource"] = texture;
@@ -399,7 +399,7 @@ Vector2i TextureAtlasCanvas::_snap(const Vector2 &p_texture) const {
 }
 
 Rect2i TextureAtlasCanvas::_clamp_to_texture(const Rect2i &p_rect) const {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	if (atlas.is_null() || atlas->get_sheet_texture().is_null()) {
 		return p_rect;
 	}
@@ -411,7 +411,7 @@ Rect2i TextureAtlasCanvas::_clamp_to_texture(const Rect2i &p_rect) const {
 }
 
 StringName TextureAtlasCanvas::_region_at(const Vector2 &p_texture) const {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	StringName found;
 	int64_t found_area = INT64_MAX;
 	// The smallest region under the cursor wins, so nested regions stay reachable.
@@ -441,7 +441,7 @@ void TextureAtlasCanvas::_handle_positions(const Rect2i &p_rect, Vector2 r_point
 }
 
 int TextureAtlasCanvas::_handle_at(const Vector2 &p_screen) const {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	const PackedStringArray &selection = editor->get_selection();
 	if (atlas.is_null() || selection.size() != 1 || !atlas->has_region(selection[0])) {
 		return -1;
@@ -465,7 +465,7 @@ void TextureAtlasCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
 }
 
 void TextureAtlasCanvas::fit() {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	if (atlas.is_null() || atlas->get_sheet_texture().is_null() || get_size().x <= 0 || get_size().y <= 0) {
 		zoom = 1.0f;
 		view_offset = Vector2(8, 8) * EDSCALE;
@@ -484,7 +484,7 @@ void TextureAtlasCanvas::fit() {
 }
 
 void TextureAtlasCanvas::_draw_canvas() {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	if (atlas.is_null()) {
 		return;
 	}
@@ -580,7 +580,7 @@ Control::CursorShape TextureAtlasCanvas::get_cursor_shape(const Point2 &p_pos) c
 }
 
 void TextureAtlasCanvas::gui_input(const Ref<InputEvent> &p_event) {
-	const Ref<TextureAtlas> atlas = editor->get_atlas();
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	if (atlas.is_null()) {
 		return;
 	}
@@ -796,7 +796,7 @@ TextureAtlasCanvas::TextureAtlasCanvas() {
 
 TextureAtlasEditor *TextureAtlasEditor::singleton = nullptr;
 
-void TextureAtlasEditor::edit(const Ref<TextureAtlas> &p_atlas) {
+void TextureAtlasEditor::edit(const Ref<SpriteSheet> &p_atlas) {
 	if (atlas == p_atlas) {
 		return;
 	}
@@ -859,7 +859,7 @@ String TextureAtlasEditor::make_new_region_name() const {
 	if (atlas.is_null()) {
 		return String();
 	}
-	if (!TextureAtlas::is_valid_region_name(_get_prefix() + "0")) {
+	if (!SpriteSheet::is_valid_region_name(_get_prefix() + "0")) {
 		EditorNode::get_singleton()->show_warning(vformat(TTR("\"%s\" cannot start a region name."), _get_prefix()));
 		return String();
 	}
@@ -888,8 +888,8 @@ void TextureAtlasEditor::_auto_slice() {
 		EditorNode::get_singleton()->show_warning(warning_text);
 		return;
 	}
-	const TypedArray<Rect2i> found = TextureAtlas::detect_sprite_rects(atlas->get_sheet_texture()->get_image());
-	// Like TextureAtlas.auto_slice(): sprites that are regions already are skipped.
+	const TypedArray<Rect2i> found = SpriteSheet::detect_sprite_rects(atlas->get_sheet_texture()->get_image());
+	// Like SpriteSheet.auto_slice(): sprites that are regions already are skipped.
 	TypedArray<Rect2i> new_rects;
 	const TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
 	const Array existing = Dictionary(regions).values();
@@ -920,7 +920,7 @@ void TextureAtlasEditor::_add_from_grid_confirmed() {
 	const Vector2i cell(int(grid_cell[0]->get_value()), int(grid_cell[1]->get_value()));
 	const Vector2i separation(int(grid_separation[0]->get_value()), int(grid_separation[1]->get_value()));
 	const Vector2i offset(int(grid_offset[0]->get_value()), int(grid_offset[1]->get_value()));
-	const TypedArray<Rect2i> cells = TextureAtlas::make_grid_rects(Vector2i(atlas->get_sheet_texture()->get_size()), cell, separation, offset);
+	const TypedArray<Rect2i> cells = SpriteSheet::make_grid_rects(Vector2i(atlas->get_sheet_texture()->get_size()), cell, separation, offset);
 	if (cells.is_empty()) {
 		EditorNode::get_singleton()->show_warning(TTR("No cell of this size fits into the texture."));
 		return;
@@ -969,8 +969,8 @@ void TextureAtlasEditor::_create_sprite_frames_confirmed(const String &p_path) {
 		return;
 	}
 	// The selected regions (all if none is selected) in a copy of the atlas, so names and frame order
-	// follow TextureAtlas.create_sprite_frames().
-	Ref<TextureAtlas> copy;
+	// follow SpriteSheet.create_sprite_frames().
+	Ref<SpriteSheet> copy;
 	copy.instantiate();
 	copy->set_texture(atlas->get_sheet_texture());
 	copy->set_filter_clip(atlas->is_filter_clip());
@@ -1015,7 +1015,7 @@ void TextureAtlasEditor::_assign_to_nodes() {
 			undo_redo->create_action(TTR("Assign Region Texture"));
 			any = true;
 		}
-		undo_redo->add_do_property(node, "texture", atlas->get_texture(name));
+		undo_redo->add_do_property(node, "texture", atlas->get_region_texture(name));
 		undo_redo->add_undo_property(node, "texture", old_texture);
 	}
 	if (!any) {
@@ -1037,7 +1037,7 @@ void TextureAtlasEditor::_import_confirmed(const String &p_path) {
 		return;
 	}
 	// Load into a copy (all-or-nothing, errors are printed by the atlas), then apply it with undo.
-	Ref<TextureAtlas> copy;
+	Ref<SpriteSheet> copy;
 	copy.instantiate();
 	copy->set_texture(atlas->get_sheet_texture());
 	copy->set_texture_path(atlas->get_texture_path());
@@ -1125,8 +1125,8 @@ static Button *_make_button(Control *p_parent, const String &p_text, const Strin
 TextureAtlasEditor::TextureAtlasEditor() {
 	singleton = this;
 
-	set_name(TTRC("TextureAtlas"));
-	set_icon_name("TextureAtlas");
+	set_name(TTRC("SpriteSheet"));
+	set_icon_name("SpriteSheet");
 	set_default_slot(EditorDock::DOCK_SLOT_BOTTOM);
 	set_available_layouts(EditorDock::DOCK_LAYOUT_HORIZONTAL | EditorDock::DOCK_LAYOUT_FLOATING);
 	set_global(false);
@@ -1293,7 +1293,7 @@ void TextureAtlasInspector::_selection_changed() {
 	delete_button->set_disabled(region_list->get_selected_names().is_empty());
 }
 
-TextureAtlasInspector::TextureAtlasInspector(const Ref<TextureAtlas> &p_atlas) {
+TextureAtlasInspector::TextureAtlasInspector(const Ref<SpriteSheet> &p_atlas) {
 	atlas = p_atlas;
 
 	warning = memnew(Label);
@@ -1331,11 +1331,11 @@ TextureAtlasInspector::TextureAtlasInspector(const Ref<TextureAtlas> &p_atlas) {
 // EditorInspectorPluginTextureAtlas
 
 bool EditorInspectorPluginTextureAtlas::can_handle(Object *p_object) {
-	return Object::cast_to<TextureAtlas>(p_object) != nullptr;
+	return Object::cast_to<SpriteSheet>(p_object) != nullptr;
 }
 
 void EditorInspectorPluginTextureAtlas::parse_begin(Object *p_object) {
-	Ref<TextureAtlas> atlas(Object::cast_to<TextureAtlas>(p_object));
+	Ref<SpriteSheet> atlas(Object::cast_to<SpriteSheet>(p_object));
 	ERR_FAIL_COND(atlas.is_null());
 	add_custom_control(memnew(TextureAtlasInspector(atlas)));
 }
@@ -1345,14 +1345,14 @@ void EditorInspectorPluginTextureAtlas::parse_begin(Object *p_object) {
 
 void TextureAtlasEditorPlugin::edit(Object *p_object) {
 	// Keep the last atlas when the selection moves to a node, so "Assign to Selected Nodes" works.
-	Ref<TextureAtlas> atlas(Object::cast_to<TextureAtlas>(p_object));
+	Ref<SpriteSheet> atlas(Object::cast_to<SpriteSheet>(p_object));
 	if (atlas.is_valid()) {
 		atlas_editor->edit(atlas);
 	}
 }
 
 bool TextureAtlasEditorPlugin::handles(Object *p_object) const {
-	return Object::cast_to<TextureAtlas>(p_object) != nullptr;
+	return Object::cast_to<SpriteSheet>(p_object) != nullptr;
 }
 
 void TextureAtlasEditorPlugin::make_visible(bool p_visible) {
