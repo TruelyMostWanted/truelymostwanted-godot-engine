@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/input/input_actions.h"
+#include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 #include "core/variant/binder_common.h"
@@ -100,6 +101,7 @@ protected:
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
+	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) override;
 
 public:
 	static InputMapSettingsServer *get_singleton();
