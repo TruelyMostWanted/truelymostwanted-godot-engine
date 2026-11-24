@@ -1720,6 +1720,9 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
+		<member name="VideoWindowSettingsServer" type="VideoWindowSettingsServer" setter="" getter="">
+			The [VideoWindowSettingsServer] singleton.
+		</member>
 		<member name="WorkerThreadPool" type="WorkerThreadPool" setter="" getter="">
 			The [WorkerThreadPool] singleton.
 		</member>

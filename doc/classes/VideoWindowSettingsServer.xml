@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoWindowSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for windows and display: mode, size, screen, V-Sync, content scale and HDR.
+	</brief_description>
+	<description>
+		[VideoWindowSettingsServer] is the settings domain [code]"video_window"[/code]: it stores the window and display options chosen by the player, loads them when the game starts and applies them to [DisplayServer] and the root window. The settings resource is a [VideoWindowSettings]. The file is [code]user://settings/video_window.ini[/code] by default.
+		The domain is applied in [constant SettingsServer.APPLY_PHASE_PRE_DISPLAY], before the display server exists: the main window is created with the stored mode, size, V-Sync mode and window flags, and it is placed on the stored screen before it is shown, so it opens without a visible jump. The content scale and the HDR values are applied as soon as the root window exists ([constant SettingsServer.APPLY_PHASE_SCENE]).
+		Changes of [member VideoWindowSettings.window_mode], [member VideoWindowSettings.window_size] and [member VideoWindowSettings.screen] go through the confirmation of [SettingsServer]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] they are applied at once, and they are reverted after [code]settings/apply/confirmation_timeout[/code] seconds unless the game calls [method SettingsServer.confirm_pending] (for example from a "Keep these settings?" dialog). Connect to [signal SettingsServer.confirmation_requested] to show the dialog.
+		The command line wins over the stored values: [code]--fullscreen[/code], [code]--maximized[/code], [code]--windowed[/code], [code]--resolution[/code], [code]--screen[/code], [code]--position[/code], [code]--always-on-top[/code] and [code]--disable-vsync[/code] are set as session overrides (see [method SettingsServer.set_session_override]): applied but never saved. A game embedded in the editor keeps the placement of the editor.
+		Further windows (an inventory window, a second screen) are stored by node path in [member VideoWindowSettings.window_states]: call [method save_window_state] when the player moved or resized one, and the window gets its mode, size, position and screen back when it enters the scene tree again. [method restore_window_state] restores a window on demand, also before it is added to the tree (pass a key then).
+		Without free windows (Android, iOS, Web, headless) the size, position, screen and window flags are stored but not applied; see [method SettingsServer.is_value_supported]. On the headless display server all values are kept by the domain and returned by [method SettingsServer.retrieve].
+		[codeblocks]
+		[gdscript]
+		func _on_fullscreen_toggled(toggled_on):
+			if toggled_on:
+				VideoWindowSettingsServer.set_window_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			else:
+				VideoWindowSettingsServer.set_window_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+
+		func _on_resolution_selected(size: Vector2i):
+			VideoWindowSettingsServer.set_window_size(size)
+
+		func _on_keep_pressed():
+			VideoWindowSettingsServer.confirm_pending() # Saved now.
+		[/gdscript]
+		[csharp]
+		private void OnFullscreenToggled(bool toggledOn)
+		{
+		    VideoWindowSettingsServer.SetWindowMode(toggledOn ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed);
+		}
+
+		private void OnResolutionSelected(Vector2I size)
+		{
+		    VideoWindowSettingsServer.SetWindowSize(size);
+		}
+
+		private void OnKeepPressed()
+		{
+		    VideoWindowSettingsServer.Singleton.ConfirmPending(); // Saved now.
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear_window_state">
+			<return type="void" />
+			<param index="0" name="key" type="String" />
+			<description>
+				Removes the stored state of the window with this key (its node path or the key passed to [method save_window_state]).
+			</description>
+		</method>
+		<method name="get_command_line_options" qualifiers="static">
+			<return type="Dictionary" />
+			<description>
+				Returns the window options passed on the command line, which the engine consumes before scripts run. Possible keys: [code]window_mode[/code], [code]window_size[/code], [code]screen[/code], [code]window_position[/code], [code]always_on_top[/code], [code]vsync_mode[/code] and [code]embedded[/code] (the game runs embedded in the editor). Only the options that were given are present.
+			</description>
+		</method>
+		<method name="get_content_scale_aspect" qualifiers="const">
+			<return type="int" enum="Window.ContentScaleAspect" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.content_scale_aspect]. See [method set_content_scale_aspect].
+			</description>
+		</method>
+		<method name="get_content_scale_factor" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.content_scale_factor]. See [method set_content_scale_factor].
+			</description>
+		</method>
+		<method name="get_content_scale_mode" qualifiers="const">
+			<return type="int" enum="Window.ContentScaleMode" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.content_scale_mode]. See [method set_content_scale_mode].
+			</description>
+		</method>
+		<method name="get_content_scale_stretch" qualifiers="const">
+			<return type="int" enum="Window.ContentScaleStretch" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.content_scale_stretch]. See [method set_content_scale_stretch].
+			</description>
+		</method>
+		<method name="get_hdr_max_luminance" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.hdr_max_luminance]. See [method set_hdr_max_luminance].
+			</description>
+		</method>
+		<method name="get_hdr_reference_luminance" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.hdr_reference_luminance]. See [method set_hdr_reference_luminance].
+			</description>
+		</method>
+		<method name="get_screen" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.screen]. See [method set_screen].
+			</description>
+		</method>
+		<method name="get_vsync_mode" qualifiers="const">
+			<return type="int" enum="DisplayServer.VSyncMode" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.vsync_mode]. See [method set_vsync_mode].
+			</description>
+		</method>
+		<method name="get_window_mode" qualifiers="const">
+			<return type="int" enum="DisplayServer.WindowMode" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.window_mode]. See [method set_window_mode].
+			</description>
+		</method>
+		<method name="get_window_position" qualifiers="const">
+			<return type="Vector2i" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.window_position]. See [method set_window_position].
+			</description>
+		</method>
+		<method name="get_window_size" qualifiers="const">
+			<return type="Vector2i" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.window_size]. See [method set_window_size].
+			</description>
+		</method>
+		<method name="has_window_state" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="key" type="String" />
+			<description>
+				Returns [code]true[/code] if a state is stored for this key (a node path or the key passed to [method save_window_state]).
+			</description>
+		</method>
+		<method name="is_always_on_top" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.always_on_top]. See [method set_always_on_top].
+			</description>
+		</method>
+		<method name="is_borderless" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.borderless]. See [method set_borderless].
+			</description>
+		</method>
+		<method name="is_hdr_output_requested" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.hdr_output_requested]. See [method set_hdr_output_requested].
+			</description>
+		</method>
+		<method name="is_transparent" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.transparent]. See [method set_transparent].
+			</description>
+		</method>
+		<method name="is_unresizable" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.unresizable]. See [method set_unresizable].
+			</description>
+		</method>
+		<method name="is_window_centered" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member VideoWindowSettings.window_centered]. See [method set_window_centered].
+			</description>
+		</method>
+		<method name="place_main_window">
+			<return type="void" />
+			<description>
+				Places the main window on [member VideoWindowSettings.screen] (or on the primary screen if it does not exist) and, in windowed mode, at [member VideoWindowSettings.window_position] or centered, always inside the usable area of the screen. Called when the game starts and when one of these values changes; call it after a change of the monitors to bring the window back. Does nothing without free windows.
+			</description>
+		</method>
+		<method name="restore_window_state">
+			<return type="bool" />
+			<param index="0" name="window" type="Window" />
+			<param index="1" name="key" type="String" default="&quot;&quot;" />
+			<description>
+				Gives [param window] the stored mode, size and position. The key is the node path of the window, or [param key] if it is not empty (needed for a window that is not in the scene tree yet). A stored screen that does not exist is replaced by the primary screen, and the window is kept inside the usable area of the screen. Returns [code]false[/code] if no state is stored for the key.
+			</description>
+		</method>
+		<method name="save_window_state">
+			<return type="void" />
+			<param index="0" name="window" type="Window" />
+			<param index="1" name="key" type="String" default="&quot;&quot;" />
+			<description>
+				Stores the mode, size, position and screen of [param window] in [member VideoWindowSettings.window_states] under its node path, or under [param key] if it is not empty. Windows with a stored state get it back when they enter the scene tree. The state is saved like any other value (autosave or [method SettingsServer.save]).
+			</description>
+		</method>
+		<method name="set_always_on_top">
+			<return type="void" />
+			<param index="0" name="always_on_top" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.always_on_top]. If [code]true[/code], the main window stays above other windows ([constant DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP]). The default is [member ProjectSettings.display/window/size/always_on_top].
+			</description>
+		</method>
+		<method name="set_borderless">
+			<return type="void" />
+			<param index="0" name="borderless" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.borderless]. If [code]true[/code], the main window has no title bar and no border ([constant DisplayServer.WINDOW_FLAG_BORDERLESS]). The default is [member ProjectSettings.display/window/size/borderless].
+			</description>
+		</method>
+		<method name="set_content_scale_aspect">
+			<return type="void" />
+			<param index="0" name="aspect" type="int" enum="Window.ContentScaleAspect" />
+			<description>
+				Sets [member VideoWindowSettings.content_scale_aspect]. How the root window keeps the aspect ratio of the game when it is scaled ([member Window.content_scale_aspect]). The default is [member ProjectSettings.display/window/stretch/aspect]. Applied when the root window exists.
+			</description>
+		</method>
+		<method name="set_content_scale_factor">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<description>
+				Sets [member VideoWindowSettings.content_scale_factor]. Scale factor of the root window ([member Window.content_scale_factor]), for example a UI scale option. The default is [member ProjectSettings.display/window/stretch/scale]. Values below [code]0.1[/code] are clamped.
+			</description>
+		</method>
+		<method name="set_content_scale_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="Window.ContentScaleMode" />
+			<description>
+				Sets [member VideoWindowSettings.content_scale_mode]. How the root window scales the game to the window size ([member Window.content_scale_mode]). The default is [member ProjectSettings.display/window/stretch/mode].
+			</description>
+		</method>
+		<method name="set_content_scale_stretch">
+			<return type="void" />
+			<param index="0" name="stretch" type="int" enum="Window.ContentScaleStretch" />
+			<description>
+				Sets [member VideoWindowSettings.content_scale_stretch]. Whether the root window scales by fractional or by integer factors ([member Window.content_scale_stretch]). The default is [member ProjectSettings.display/window/stretch/scale_mode].
+			</description>
+		</method>
+		<method name="set_hdr_max_luminance">
+			<return type="void" />
+			<param index="0" name="luminance" type="float" />
+			<description>
+				Sets [member VideoWindowSettings.hdr_max_luminance]. Maximum luminance in nits for HDR output of the main window ([method DisplayServer.window_set_hdr_output_max_luminance]). [code]-1.0[/code] (the default) uses the value of the screen; negative values become [code]-1.0[/code].
+			</description>
+		</method>
+		<method name="set_hdr_output_requested">
+			<return type="void" />
+			<param index="0" name="requested" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.hdr_output_requested]. If [code]true[/code], the main window requests HDR output ([member Window.hdr_output_requested]). The default is [member ProjectSettings.display/window/hdr/request_hdr_output]. Applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the project value. Whether HDR is used depends on the platform, the driver and the screen; see [method SettingsServer.is_value_supported].
+			</description>
+		</method>
+		<method name="set_hdr_reference_luminance">
+			<return type="void" />
+			<param index="0" name="luminance" type="float" />
+			<description>
+				Sets [member VideoWindowSettings.hdr_reference_luminance]. Reference (paper white) luminance in nits for HDR output of the main window ([method DisplayServer.window_set_hdr_output_reference_luminance]). [code]-1.0[/code] (the default) uses the value of the screen; negative values become [code]-1.0[/code].
+			</description>
+		</method>
+		<method name="set_screen">
+			<return type="void" />
+			<param index="0" name="screen" type="int" />
+			<description>
+				Sets [member VideoWindowSettings.screen]. The screen of the main window, an index from [code]0[/code] to [method DisplayServer.get_screen_count] minus one, or [constant DisplayServer.SCREEN_PRIMARY] (the default). If the screen does not exist when the window is placed (for example a monitor that was unplugged), the primary screen is used and the stored value stays. Values below [code]-2[/code] are clamped. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]).
+			</description>
+		</method>
+		<method name="set_transparent">
+			<return type="void" />
+			<param index="0" name="transparent" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.transparent]. If [code]true[/code], the main window has a transparent background ([constant DisplayServer.WINDOW_FLAG_TRANSPARENT]). Only applied if [member ProjectSettings.display/window/per_pixel_transparency/allowed] is enabled; the default is [member ProjectSettings.display/window/size/transparent].
+			</description>
+		</method>
+		<method name="set_unresizable">
+			<return type="void" />
+			<param index="0" name="unresizable" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.unresizable]. If [code]true[/code], the player can't resize the main window ([constant DisplayServer.WINDOW_FLAG_RESIZE_DISABLED]). The default is the opposite of [member ProjectSettings.display/window/size/resizable].
+			</description>
+		</method>
+		<method name="set_vsync_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="DisplayServer.VSyncMode" />
+			<description>
+				Sets [member VideoWindowSettings.vsync_mode]. The V-Sync mode of the main window ([method DisplayServer.window_set_vsync_mode]). The default is [member ProjectSettings.display/window/vsync/vsync_mode]. The command line argument [code]--disable-vsync[/code] overrides it for the session.
+			</description>
+		</method>
+		<method name="set_window_centered">
+			<return type="void" />
+			<param index="0" name="centered" type="bool" />
+			<description>
+				Sets [member VideoWindowSettings.window_centered]. If [code]true[/code] (the default), the main window is centered in the usable area of its [member VideoWindowSettings.screen] in windowed mode, and [member VideoWindowSettings.window_position] is ignored.
+			</description>
+		</method>
+		<method name="set_window_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="DisplayServer.WindowMode" />
+			<description>
+				Sets [member VideoWindowSettings.window_mode]. The mode of the main window: windowed, maximized, fullscreen or exclusive fullscreen. The default is [member ProjectSettings.display/window/size/mode]. The main window is created in this mode, so there is no visible change when the game starts. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]). The command line arguments [code]--fullscreen[/code], [code]--maximized[/code] and [code]--windowed[/code] override it for the session.
+			</description>
+		</method>
+		<method name="set_window_position">
+			<return type="void" />
+			<param index="0" name="position" type="Vector2i" />
+			<description>
+				Sets [member VideoWindowSettings.window_position]. Position of the main window in windowed mode, relative to the top-left corner of its [member VideoWindowSettings.screen]. Only used if [member VideoWindowSettings.window_centered] is [code]false[/code]. The window is always moved back into the usable area of the screen, so it stays visible after a change of the monitors.
+			</description>
+		</method>
+		<method name="set_window_size">
+			<return type="void" />
+			<param index="0" name="size" type="Vector2i" />
+			<description>
+				Sets [member VideoWindowSettings.window_size]. Size of the main window in windowed mode, in pixels. The default is [member ProjectSettings.display/window/size/viewport_width] and [member ProjectSettings.display/window/size/viewport_height] (or the window size overrides). The size is kept while the window is maximized or fullscreen and used again when it is windowed. It is limited to the usable area of the screen. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]). The command line argument [code]--resolution[/code] overrides it for the session.
+			</description>
+		</method>
+	</methods>
+</class>
