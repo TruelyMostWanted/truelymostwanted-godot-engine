@@ -294,10 +294,10 @@ TEST_CASE("[ResourceFormatCallable] Scripting API on the ResourceLoader and Reso
 	REQUIRE(loader != nullptr);
 	REQUIRE(saver != nullptr);
 
-	CHECK(loader->register_extension("cbbind", callable_mp_static(&load_text)) == OK);
-	CHECK(saver->register_extension("cbbind", callable_mp_static(&save_text)) == OK);
-	CHECK(loader->is_extension_registered("cbbind"));
-	CHECK(saver->is_extension_registered("cbbind"));
+	CHECK(loader->register_extension_loader("cbbind", callable_mp_static(&load_text)) == OK);
+	CHECK(saver->register_extension_saver("cbbind", callable_mp_static(&save_text)) == OK);
+	CHECK(loader->has_extension_loader("cbbind"));
+	CHECK(saver->has_extension_saver("cbbind"));
 
 	Ref<Resource> resource;
 	resource.instantiate();
@@ -308,10 +308,10 @@ TEST_CASE("[ResourceFormatCallable] Scripting API on the ResourceLoader and Reso
 	REQUIRE(loaded.is_valid());
 	CHECK(String(loaded->get_meta("text")) == "bound");
 
-	CHECK(loader->unregister_extension("cbbind") == OK);
-	CHECK(saver->unregister_extension("cbbind") == OK);
-	CHECK_FALSE(loader->is_extension_registered("cbbind"));
-	CHECK_FALSE(saver->is_extension_registered("cbbind"));
+	CHECK(loader->unregister_extension_loader("cbbind") == OK);
+	CHECK(saver->unregister_extension_saver("cbbind") == OK);
+	CHECK_FALSE(loader->has_extension_loader("cbbind"));
+	CHECK_FALSE(saver->has_extension_saver("cbbind"));
 	DirAccess::remove_absolute(path);
 }
 
