@@ -43,6 +43,7 @@
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/gui/editor_file_dialog.h"
+#include "editor/scene/texture/texture_region_editor_plugin.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/button.h"
 #include "scene/gui/dialogs.h"
@@ -153,6 +154,21 @@ bool SpriteSheetEditing::parse_rect(const String &p_text, Rect2i &r_rect) {
 	return true;
 }
 
+bool SpriteSheetEditing::rect_from_region_editor(const Rect2 &p_rect, const Size2i &p_texture_size, Rect2i &r_rect) {
+	const Rect2 rect = p_rect.abs();
+	const Vector2i from = Vector2i(rect.position.round());
+	const Vector2i to = Vector2i(rect.get_end().round());
+	Rect2i result(from, to - from);
+	if (p_texture_size.x > 0 && p_texture_size.y > 0) {
+		result = result.intersection(Rect2i(Point2i(), p_texture_size));
+	}
+	if (result.size.x <= 0 || result.size.y <= 0) {
+		return false;
+	}
+	r_rect = result;
+	return true;
+}
+
 String SpriteSheetEditing::get_texture_warning(const Ref<SpriteSheet> &p_atlas) {
 	if (p_atlas.is_null()) {
 		return String();
@@ -212,6 +228,7 @@ void SpriteSheetRegionList::update_list() {
 	const Ref<Texture2D> texture = atlas->get_sheet_texture();
 	const String filter_text = filter->get_text().strip_edges();
 	const int thumbnail_size = int(32 * EDSCALE);
+	const Ref<Texture2D> edit_icon = EditorNode::get_singleton()->get_editor_theme()->get_icon(SNAME("RegionEdit"), EditorStringName(EditorIcons));
 	for (const String &name : atlas->get_region_names()) {
 		if (!filter_text.is_empty() && !name.containsn(filter_text)) {
 			continue;
@@ -224,6 +241,7 @@ void SpriteSheetRegionList::update_list() {
 		item->set_text(1, vformat("%d, %d, %d, %d", rect.position.x, rect.position.y, rect.size.x, rect.size.y));
 		item->set_editable(1, true);
 		item->set_tooltip_text(1, TTR("X, Y, width, height in pixels of the texture."));
+		item->add_button(1, edit_icon, 0, texture.is_null(), TTR("Edit Region"));
 		if (texture.is_valid()) {
 			// A thumbnail of its own, so the list does not create the cached textures of the atlas.
 			Ref<AtlasTexture> thumbnail;
@@ -276,6 +294,25 @@ void SpriteSheetRegionList::_multi_selected(Object *p_item, int p_column, bool p
 	}
 	// Tree emits one signal per changed cell; report the selection once.
 	callable_mp(this, &SpriteSheetRegionList::_emit_selection_changed).call_deferred();
+}
+
+void SpriteSheetRegionList::_button_clicked(Object *p_item, int p_column, int p_id, MouseButton p_button) {
+	if (p_button == MouseButton::LEFT) {
+		_edit_region(Object::cast_to<TreeItem>(p_item));
+	}
+}
+
+void SpriteSheetRegionList::_icon_double_clicked() {
+	_edit_region(tree->get_selected());
+}
+
+void SpriteSheetRegionList::_edit_region(TreeItem *p_item) {
+	if (p_item == nullptr || atlas.is_null()) {
+		return;
+	}
+	SpriteSheetEditor *editor = SpriteSheetEditor::get_singleton();
+	ERR_FAIL_NULL(editor);
+	editor->edit_region(atlas, p_item->get_metadata(0));
 }
 
 void SpriteSheetRegionList::_emit_selection_changed() {
@@ -370,6 +407,8 @@ SpriteSheetRegionList::SpriteSheetRegionList() {
 	tree->set_accessibility_name(TTRC("Regions"));
 	tree->connect("item_edited", callable_mp(this, &SpriteSheetRegionList::_item_edited));
 	tree->connect("multi_selected", callable_mp(this, &SpriteSheetRegionList::_multi_selected));
+	tree->connect("button_clicked", callable_mp(this, &SpriteSheetRegionList::_button_clicked));
+	tree->connect("item_icon_double_clicked", callable_mp(this, &SpriteSheetRegionList::_icon_double_clicked));
 	tree->set_drag_forwarding(callable_mp(this, &SpriteSheetRegionList::_get_drag_data_fw).bind(tree), Callable(), Callable());
 	add_child(tree);
 }
@@ -1251,6 +1290,76 @@ SpriteSheetEditor::SpriteSheetEditor() {
 	frames_dialog->add_filter("*.tres", TTR("SpriteFrames"));
 	frames_dialog->connect("file_selected", callable_mp(this, &SpriteSheetEditor::_create_sprite_frames_confirmed));
 	add_child(frames_dialog);
+}
+
+void SpriteSheetEditor::edit_region(const Ref<SpriteSheet> &p_atlas, const StringName &p_name) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	ERR_FAIL_COND_MSG(!p_atlas->has_region(p_name), vformat("The sprite sheet has no region \"%s\".", p_name));
+	const Ref<Texture2D> texture = p_atlas->get_sheet_texture();
+	if (texture.is_null()) {
+		EditorNode::get_singleton()->show_warning(TTR("The sprite sheet has no texture: set \"Texture\" to edit a region."));
+		return;
+	}
+	if (region_dialog == nullptr) {
+		// Godot's region editor; undo/redo is off there, the result is committed here on OK.
+		region_dialog = memnew(TextureRegionEditor);
+		region_dialog->set_use_undo_redo(false);
+		region_dialog->set_ok_button_text(TTR("OK"));
+		region_dialog->add_cancel_button(TTR("Cancel"));
+		region_dialog->connect(SceneStringName(confirmed), callable_mp(this, &SpriteSheetEditor::_region_dialog_confirmed));
+		region_dialog->connect(SceneStringName(visibility_changed), callable_mp(this, &SpriteSheetEditor::_region_dialog_visibility_changed));
+		EditorNode::get_singleton()->get_gui_base()->add_child(region_dialog);
+	}
+	region_dialog_atlas = p_atlas;
+	region_dialog_name = p_name;
+	// A temporary AtlasTexture carries the rectangle; the sheet itself changes only on OK.
+	region_dialog_texture.instantiate();
+	region_dialog_texture->set_atlas(texture);
+	region_dialog_texture->set_region(Rect2(p_atlas->get_region(p_name)));
+	region_dialog->edit(region_dialog_texture.ptr());
+	region_dialog->set_title(vformat(TTR("Edit Region: %s"), p_name));
+}
+
+void SpriteSheetEditor::_region_dialog_confirmed() {
+	const Ref<SpriteSheet> sheet = region_dialog_atlas;
+	const StringName region_name = region_dialog_name;
+	const Ref<AtlasTexture> edited = region_dialog_texture;
+	_region_dialog_release();
+	if (sheet.is_null() || edited.is_null() || !sheet->has_region(region_name)) {
+		return; // Removed or renamed while the dialog was open.
+	}
+	Size2i texture_size;
+	if (sheet->get_sheet_texture().is_valid()) {
+		texture_size = Size2i(sheet->get_sheet_texture()->get_size());
+	}
+	Rect2i rect;
+	if (!SpriteSheetEditing::rect_from_region_editor(edited->get_region(), texture_size, rect)) {
+		EditorNode::get_singleton()->show_warning(TTR("The rectangle must have a size greater than 0 and lie inside the texture."));
+		return;
+	}
+	if (rect == sheet->get_region(region_name)) {
+		return;
+	}
+	TypedDictionary<StringName, Rect2i> regions = sheet->get_regions();
+	regions[region_name] = rect;
+	SpriteSheetEditing::commit_regions(TTR("Set Region Rectangle"), sheet, regions, sheet->get_margins());
+}
+
+void SpriteSheetEditor::_region_dialog_visibility_changed() {
+	// Cancel, Escape and the close button only hide the dialog. Deferred, so "confirmed" (emitted after
+	// hiding) still finds the edited region.
+	if (region_dialog && !region_dialog->is_visible()) {
+		callable_mp(this, &SpriteSheetEditor::_region_dialog_release).call_deferred();
+	}
+}
+
+void SpriteSheetEditor::_region_dialog_release() {
+	if (region_dialog && region_dialog->is_visible()) {
+		return; // Opened again for another region.
+	}
+	region_dialog_atlas.unref();
+	region_dialog_name = StringName();
+	region_dialog_texture.unref();
 }
 
 SpriteSheetEditor::~SpriteSheetEditor() {

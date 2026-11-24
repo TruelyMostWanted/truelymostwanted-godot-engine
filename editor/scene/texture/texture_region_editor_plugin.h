@@ -104,6 +104,7 @@ class TextureRegionEditor : public AcceptDialog {
 	Vector2 drag_from;
 	int drag_index = -1;
 	bool request_center = false;
+	bool use_undo_redo = true;
 
 	Ref<ViewPanner> panner;
 	void _pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_event);
@@ -160,6 +161,8 @@ protected:
 
 public:
 	void edit(Object *p_obj);
+	// If disabled, changes are only applied to the edited object; the caller records them itself.
+	void set_use_undo_redo(bool p_enabled) { use_undo_redo = p_enabled; }
 
 	TextureRegionEditor();
 };
