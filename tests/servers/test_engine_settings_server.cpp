@@ -156,7 +156,7 @@ TEST_CASE("[EngineSettingsServer] Each value reaches the engine at once") {
 
 	// Reading back from the engine.
 	engine->set_max_fps(75);
-	server->retrieve();
+	server->read_from_engine();
 	CHECK(server->get_max_fps() == 75);
 
 	server->reset_to_defaults();
@@ -302,7 +302,7 @@ TEST_CASE("[EngineSettingsServer] Session overrides reach the engine but are nev
 	CHECK(server->get_max_fps() == 120);
 
 	// Reading the engine back keeps the stored value.
-	server->retrieve();
+	server->read_from_engine();
 	CHECK(server->get_max_fps() == 120);
 
 	server->clear_session_override("max_fps");

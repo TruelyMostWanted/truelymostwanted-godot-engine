@@ -270,9 +270,9 @@ Ref<Resource> EngineSettingsServer::_create_default_settings() const {
 	return default_settings;
 }
 
-void EngineSettingsServer::_retrieve_settings(const Ref<Resource> &p_settings) {
-	SettingsServer::_retrieve_settings(p_settings);
-	// The first retrieval fills the defaults; later ones read the engine.
+void EngineSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+	SettingsServer::_read_settings_from_engine(p_settings);
+	// The first read fills the defaults; later ones read the engine.
 	defaults_captured = true;
 }
 

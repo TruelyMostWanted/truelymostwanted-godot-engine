@@ -638,7 +638,7 @@ void VideoWindowSettingsServer::_on_loaded() {
 	}
 }
 
-void VideoWindowSettingsServer::_on_startup_applied(int p_phase) {
+void VideoWindowSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		// After Main::start() and SceneTree have set the project values of the root window.
 		_deliver_undelivered(TARGET_SCENE);
@@ -929,7 +929,7 @@ VideoWindowSettingsServer::VideoWindowSettingsServer() {
 	};
 	for (const char *bound_name : bound_names) {
 		const StringName setting_name = bound_name;
-		// Mode, size and screen can leave the player without a visible window: they wait for confirm_pending().
+		// Mode, size and screen can leave the player without a visible window: they wait for confirm_changes().
 		const bool confirm = setting_name == SNAME("window_mode") || setting_name == SNAME("window_size") || setting_name == SNAME("screen");
 		bind_setting_callbacks(setting_name, callable_mp(this, &VideoWindowSettingsServer::_push_window_value).bind(setting_name), callable_mp(this, &VideoWindowSettingsServer::_pull_window_value).bind(setting_name), confirm ? SETTING_FLAG_CONFIRM : SETTING_FLAG_NONE);
 	}

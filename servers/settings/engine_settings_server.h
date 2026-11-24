@@ -60,7 +60,7 @@ protected:
 	static void _bind_methods();
 
 	virtual Ref<Resource> _create_default_settings() const override;
-	virtual void _retrieve_settings(const Ref<Resource> &p_settings) override;
+	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
 public:

@@ -54,7 +54,7 @@ protected:
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;
-	virtual void _retrieve_settings(const Ref<Resource> &p_settings) override;
+	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 
 public:
 	static AudioBusSettingsServer *get_singleton();

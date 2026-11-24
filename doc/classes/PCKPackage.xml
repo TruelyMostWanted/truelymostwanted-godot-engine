@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="PckPackage" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="PCKPackage" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		A [code].pck[/code] file as a resource: an opened pack, or a pack description that can be built.
 	</brief_description>
 	<description>
-		A [PckPackage] holds the file list of a pack. It has two forms:
-		- An [b]opened pack[/b] is read from a [code].pck[/code] file by [method PckPackageServer.open] or by [code]load("res://dlc.pck")[/code]. Only the header and the directory are read, and the pack is never mounted (see [method PckPackageServer.mount]). [member pack_path] is the pack file.
-		- A [b]pack description[/b] is created with [code]PckPackage.new()[/code] or loaded from a [code].tres[/code] or [code].res[/code] file. It maps target paths to sources: files on disk ([method add_file]), data in memory ([method add_file_from_buffer]) or files of the [member base_pack]. Saved as [code].tres[/code], it is plain text that can be versioned. [method is_description] returns [code]true[/code].
-		Files can be added, removed and renamed in memory in both forms. [method PckPackageServer.build] writes the result as a new pack, and so does [code]ResourceSaver.save(package, "user://patch.pck")[/code]. Reading file data and verifying go through [PckPackageServer].
+		A [PCKPackage] holds the file list of a pack. It has two forms:
+		- An [b]opened pack[/b] is read from a [code].pck[/code] file by [method PCKPackageServer.open] or by [code]load("res://dlc.pck")[/code]. Only the header and the directory are read, and the pack is never mounted (see [method PCKPackageServer.mount]). [member pack_path] is the pack file.
+		- A [b]pack description[/b] is created with [code]PCKPackage.new()[/code] or loaded from a [code].tres[/code] or [code].res[/code] file. It maps target paths to sources: files on disk ([method add_file]), data in memory ([method add_file_from_buffer]) or files of the [member base_pack]. Saved as [code].tres[/code], it is plain text that can be versioned. [method is_description] returns [code]true[/code].
+		Files can be added, removed and renamed in memory in both forms. [method PCKPackageServer.build] writes the result as a new pack, and so does [code]ResourceSaver.save(package, "user://patch.pck")[/code]. Reading file data and verifying go through [PCKPackageServer].
 		A description stores [member base_pack], [member alignment], [member encrypted_directory] and two storage-only properties: [code]files[/code], an [Array] of [Dictionary] with the keys [code skip-lint]path[/code] and one of [code]source[/code] (a file path), [code]data[/code] (a [PackedByteArray]) or [code]from_pack[/code] (a path in [member base_pack]), plus [code]encrypt[/code] if the file is encrypted; and [code]removals[/code], a [PackedStringArray] of removal entries. An opened pack saved as [code].tres[/code] becomes a description whose files come from the pack. The key set with [method set_key] is never stored.
 		Paths inside a package can be given with or without [code]res://[/code]; they are always listed with [code]res://[/code].
 		[codeblocks]
 		[gdscript]
 		# Open a pack, edit it and build a new one.
-		var package: PckPackage = load("res://dlc/level_pack.pck")
+		var package: PCKPackage = load("res://dlc/level_pack.pck")
 		package.add_file_from_buffer("res://levels/extra.txt", "Hello".to_utf8_buffer())
 		package.remove_file("res://levels/old.tscn")
 		ResourceSaver.save(package, "user://mods/level_pack_v2.pck")
 
 		# Describe a pack as text and build it later.
-		var description := PckPackage.new()
+		var description := PCKPackage.new()
 		description.add_file("res://textures/a.png", "res://art/a.png")
 		ResourceSaver.save(description, "res://packs/textures.tres")
 		ResourceSaver.save(description, "user://textures.pck")
@@ -38,8 +38,8 @@
 		ResourceSaver.Save(description, "user://textures.pck");
 		[/csharp]
 		[/codeblocks]
-		[b]Note:[/b] Loaded packs are cached by path like every resource: a second [code]load()[/code] returns the same object. Use [method PckPackageServer.open] for a fresh object, or [constant ResourceLoader.CACHE_MODE_REPLACE] to read a changed pack into the cached object.
-		[b]Note:[/b] A [PckPackage] is not thread-safe. Use one package from one thread at a time.
+		[b]Note:[/b] Loaded packs are cached by path like every resource: a second [code]load()[/code] returns the same object. Use [method PCKPackageServer.open] for a fresh object, or [constant ResourceLoader.CACHE_MODE_REPLACE] to read a changed pack into the cached object.
+		[b]Note:[/b] A [PCKPackage] is not thread-safe. Use one package from one thread at a time.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -50,7 +50,7 @@
 			<param index="1" name="source_path" type="String" />
 			<param index="2" name="encrypt" type="bool" default="false" />
 			<description>
-				Adds the file [param source_path] to the package as [param target_path], or replaces the entry with that path. Only the source path is recorded: the file does not need to exist yet, and its data is read when the pack is built. [method PckPackageServer.build] fails with [constant ERR_FILE_NOT_FOUND] and lists all sources that are missing then. The size and MD5 sum of the entry stay [code]0[/code] until the pack is built. If [param encrypt] is [code]true[/code], the file is encrypted with the key used by [method PckPackageServer.build].
+				Adds the file [param source_path] to the package as [param target_path], or replaces the entry with that path. Only the source path is recorded: the file does not need to exist yet, and its data is read when the pack is built. [method PCKPackageServer.build] fails with [constant ERR_FILE_NOT_FOUND] and lists all sources that are missing then. The size and MD5 sum of the entry stay [code]0[/code] until the pack is built. If [param encrypt] is [code]true[/code], the file is encrypted with the key used by [method PCKPackageServer.build].
 				Returns [constant ERR_INVALID_PARAMETER] if [param target_path] is empty or a folder, or if [param source_path] is empty.
 			</description>
 		</method>
@@ -60,23 +60,20 @@
 			<param index="1" name="data" type="PackedByteArray" />
 			<param index="2" name="encrypt" type="bool" default="false" />
 			<description>
-				Adds [param data] to the package as the file [param target_path], or replaces the entry with that path. If [param encrypt] is [code]true[/code], the file is encrypted with the key used by [method PckPackageServer.build]. A description saved as [code].tres[/code] stores the data in the file.
+				Adds [param data] to the package as the file [param target_path], or replaces the entry with that path. If [param encrypt] is [code]true[/code], the file is encrypted with the key used by [method PCKPackageServer.build]. A description saved as [code].tres[/code] stores the data in the file.
+			</description>
+		</method>
+		<method name="add_removal">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Adds a removal entry for [param path], or replaces the entry with that path. When the built pack is mounted, [param path] disappears from [code]res://[/code], even if an earlier pack provides it. Use it for patch packs that delete files.
 			</description>
 		</method>
 		<method name="get_entries" qualifiers="const">
-			<return type="Dictionary[]" />
+			<return type="PCKPackageEntry[]" />
 			<description>
-				Returns one [Dictionary] per entry, in pack order, with these keys:
-				- [code skip-lint]path[/code]: the path of the file, with [code]res://[/code].
-				- [code]size[/code]: the size of the file data in bytes (before encryption), or [code]0[/code] while it is not known.
-				- [code]offset[/code]: the position of the data in the pack file, or [code]0[/code] for pending entries.
-				- [code]md5[/code]: the MD5 sum of the file data as a hexadecimal [String].
-				- [code]encrypted[/code]: [code]true[/code] if the file data is encrypted.
-				- [code]removal[/code]: [code]true[/code] for a removal entry (see [method mark_removal]).
-				- [code]delta[/code]: [code]true[/code] if the entry is a delta patch of a file in an earlier pack.
-				- [code]pending[/code]: [code]true[/code] if the entry is not in the pack file at [member pack_path]: added in memory, or part of a description.
-				- [code]source_type[/code]: where the data comes from, one of the [enum SourceType] constants.
-				- [code]source[/code]: the source file for [constant SOURCE_FILE], the path in the pack with [code]res://[/code] for [constant SOURCE_PACK], or an empty [String].
+				Returns one [PCKPackageEntry] per entry, in pack order, including removal entries (see [method add_removal]). Each entry is a snapshot: it does not change when the package is edited afterwards.
 			</description>
 		</method>
 		<method name="get_file_count" qualifiers="const">
@@ -85,7 +82,7 @@
 				Returns the number of entries, including removal entries.
 			</description>
 		</method>
-		<method name="get_paths" qualifiers="const">
+		<method name="get_file_paths" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
 				Returns the paths of all files in pack order, with [code]res://[/code]. Removal entries are not included.
@@ -102,13 +99,6 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] if the package is a pack description, that is, if it was not read from a [code].pck[/code] file and [member pack_path] is empty.
-			</description>
-		</method>
-		<method name="mark_removal">
-			<return type="int" enum="Error" />
-			<param index="0" name="path" type="String" />
-			<description>
-				Adds a removal entry for [param path], or replaces the entry with that path. When the built pack is mounted, [param path] disappears from [code]res://[/code], even if an earlier pack provides it. Use it for patch packs that delete files.
 			</description>
 		</method>
 		<method name="remove_file">
@@ -130,30 +120,30 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="key" type="String" />
 			<description>
-				Sets the key used to read encrypted files of the pack and of the [member base_pack], and to build when [method PckPackageServer.build] gets no key: 64 hexadecimal characters, or an empty [String] for the script encryption key compiled into the engine. Returns [constant ERR_INVALID_PARAMETER] for an invalid key.
+				Sets the key used to read encrypted files of the pack and of the [member base_pack], and to build when [method PCKPackageServer.build] gets no key: 64 hexadecimal characters, or an empty [String] for the script encryption key compiled into the engine. Returns [constant ERR_INVALID_PARAMETER] for an invalid key.
 				The key is only kept in memory. It is never saved with the resource, and there is no getter.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="alignment" type="int" setter="set_alignment" getter="get_alignment" default="32">
-			The alignment of file data in bytes, used by [method PckPackageServer.build]. The pack format does not store it: [method PckPackageServer.open] detects it from the file offsets (the largest power of two up to 4096 that divides all of them).
+			The alignment of file data in bytes, used by [method PCKPackageServer.build]. The pack format does not store it: [method PCKPackageServer.open] detects it from the file offsets (the largest power of two up to 4096 that divides all of them).
 		</member>
 		<member name="base_pack" type="String" setter="set_base_pack" getter="get_base_pack" default="&quot;&quot;">
 			The pack that the files with the source type [constant SOURCE_PACK] are read from. Reading a pack sets it to [member pack_path]. When it is changed, all such files are read from the new base pack by their path.
 		</member>
 		<member name="encrypted_directory" type="bool" setter="set_encrypted_directory" getter="is_encrypted_directory" default="false">
-			If [code]true[/code], the file list of the pack is encrypted. Read from the pack by [method PckPackageServer.open], and used by [method PckPackageServer.build].
+			If [code]true[/code], the file list of the pack is encrypted. Read from the pack by [method PCKPackageServer.open], and used by [method PCKPackageServer.build].
 		</member>
 		<member name="engine_version" type="String" setter="" getter="get_engine_version" default="&quot;&quot;">
 			The engine version that wrote the pack, for example [code]"4.8.0"[/code]. Empty for a package that was not read from a pack.
 		</member>
 		<member name="format_version" type="int" setter="" getter="get_format_version" default="0">
-			The version of the pack format: [code]2[/code], [code]3[/code] or [code]4[/code]. [code]0[/code] for a package that was not read from a pack. [method PckPackageServer.build] always writes the current format.
+			The version of the pack format: [code]2[/code], [code]3[/code] or [code]4[/code]. [code]0[/code] for a package that was not read from a pack. [method PCKPackageServer.build] always writes the current format.
 		</member>
 		<member name="pack_path" type="String" setter="" getter="get_pack_path" default="&quot;&quot;">
 			The path of the pack file the package was read from. Empty for a pack description. Not stored when the package is saved.
-			[b]Note:[/b] [member Resource.resource_path] is the path of the resource file, which is the same for a loaded [code].pck[/code], but differs for a pack opened with [method PckPackageServer.open] (empty) and for a description (the [code].tres[/code] file).
+			[b]Note:[/b] [member Resource.resource_path] is the path of the resource file, which is the same for a loaded [code].pck[/code], but differs for a pack opened with [method PCKPackageServer.open] (empty) and for a description (the [code].tres[/code] file).
 		</member>
 	</members>
 	<constants>
