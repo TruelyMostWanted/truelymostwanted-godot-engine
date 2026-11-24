@@ -655,4 +655,59 @@ TEST_CASE("[SceneTree][InputMapSettingsServer] Other event types of an action ar
 	memdelete(server);
 }
 
+// Records `action_events_changed`.
+class ActionEventsRecorder : public Object {
+public:
+	PackedStringArray actions;
+
+	void on_action_events_changed(const StringName &p_action) {
+		actions.push_back(p_action);
+	}
+};
+
+TEST_CASE("[SceneTree][InputMapSettingsServer] action_events_changed fires once per changed action, for every kind of change") {
+	TestSetup setup;
+	const String path = temp_file("input_map_events_changed.ini");
+	InputMapSettingsServer *server = memnew(InputMapSettingsServer);
+	server->set_file_path(path);
+	ActionEventsRecorder *recorder = memnew(ActionEventsRecorder);
+	server->connect(SNAME("action_events_changed"), callable_mp(recorder, &ActionEventsRecorder::on_action_events_changed));
+
+	// Setters.
+	CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK);
+	CHECK(recorder->actions == PackedStringArray({ JUMP }));
+	recorder->actions.clear();
+	CHECK(server->rebind(JUMP, make_pressed_key(Key::W)) == OK); // Same event: no change.
+	server->set_action_deadzone(JUMP, 0.7f); // Deadzone only.
+	CHECK(recorder->actions.is_empty());
+	CHECK(server->add_event(FIRE, make_pressed_key(Key::F)) == OK);
+	CHECK(server->remove_event(FIRE, make_pressed_key(Key::F)) == OK);
+	server->clear_event(FIRE, InputAction::INPUT_DEVICE_MOUSE);
+	CHECK(recorder->actions == PackedStringArray({ FIRE, FIRE, FIRE }));
+	recorder->actions.clear();
+
+	// Save, change, load: the loaded events differ from the pending ones for both actions.
+	CHECK(server->save() == OK);
+	server->reset_all();
+	CHECK(recorder->actions.size() == 2);
+	CHECK(recorder->actions.has(JUMP));
+	CHECK(recorder->actions.has(FIRE));
+	recorder->actions.clear();
+	CHECK(server->load() == OK);
+	CHECK(recorder->actions.size() == 2);
+	CHECK(recorder->actions.has(JUMP));
+	CHECK(recorder->actions.has(FIRE));
+	recorder->actions.clear();
+	CHECK(server->load() == OK); // Nothing changed.
+	CHECK(recorder->actions.is_empty());
+
+	// Reset of one action.
+	server->reset_action(JUMP);
+	CHECK(recorder->actions == PackedStringArray({ JUMP }));
+
+	server->disconnect(SNAME("action_events_changed"), callable_mp(recorder, &ActionEventsRecorder::on_action_events_changed));
+	memdelete(recorder);
+	memdelete(server);
+}
+
 } // namespace TestInputMapSettingsServer

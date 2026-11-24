@@ -490,6 +490,69 @@ void InputMapSettingsServer::_merge_project_actions() {
 	}
 }
 
+void InputMapSettingsServer::_validate_loaded_settings(const Ref<Resource> &p_settings) {
+	ListSettingsServer::_validate_loaded_settings(p_settings);
+	// Before `settings_changed`: the signal and `action_events_changed` see the merged actions.
+	_merge_project_actions();
+}
+
+void InputMapSettingsServer::_on_settings_changed(const PackedStringArray &p_names) {
+	if (p_names.has(String(get_list_property()))) {
+		_emit_action_events_changed();
+	}
+}
+
+void InputMapSettingsServer::_emit_action_events_changed() {
+	const Ref<InputActions> actions = _get_actions();
+	if (actions.is_null()) {
+		return;
+	}
+	if (!event_texts_ready) {
+		// The pending settings start as a copy of the defaults.
+		event_texts_ready = true;
+		const Ref<InputActions> default_actions = get_default_settings();
+		if (default_actions.is_valid()) {
+			for (const Ref<InputAction> &action : default_actions->get_action_list()) {
+				event_texts[action->get_action()] = events_to_text(action->get_events());
+			}
+		}
+	}
+
+	const InputMap *input_map = InputMap::get_singleton();
+	LocalVector<StringName> changed;
+	HashSet<StringName> present;
+	for (const Ref<InputAction> &action : actions->get_action_list()) {
+		const StringName action_name = action->get_action();
+		const String text = events_to_text(action->get_events());
+		present.insert(action_name);
+		String previous;
+		const HashMap<StringName, String>::Iterator found = event_texts.find(action_name);
+		if (found) {
+			previous = found->value;
+		} else if (input_map != nullptr && input_map->has_action(action_name)) {
+			// Added to the settings by a setter (_ensure_action()): it had the events of InputMap before.
+			previous = events_to_text(_make_action(action_name)->get_events());
+		}
+		if (text != previous) {
+			changed.push_back(action_name);
+		}
+		event_texts[action_name] = text;
+	}
+	LocalVector<StringName> removed;
+	for (const KeyValue<StringName, String> &kv : event_texts) {
+		if (!present.has(kv.key)) {
+			removed.push_back(kv.key);
+		}
+	}
+	for (const StringName &action_name : removed) {
+		event_texts.erase(action_name);
+		changed.push_back(action_name);
+	}
+	for (const StringName &action_name : changed) {
+		emit_signal(SNAME("action_events_changed"), action_name);
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
@@ -761,6 +824,8 @@ void InputMapSettingsServer::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "save_mode", PROPERTY_HINT_ENUM, "Custom Only,All"), "set_save_mode", "get_save_mode");
 
+	ADD_SIGNAL(MethodInfo("action_events_changed", PropertyInfo(Variant::STRING_NAME, "action")));
+
 	BIND_ENUM_CONSTANT(SAVE_MODE_CUSTOM_ONLY);
 	BIND_ENUM_CONSTANT(SAVE_MODE_ALL);
 }
@@ -775,7 +840,7 @@ InputMapSettingsServer::InputMapSettingsServer() {
 		const int mode = project_settings->get_setting_with_override(SETTING_SAVE_MODE);
 		save_mode = mode == SAVE_MODE_ALL ? SAVE_MODE_ALL : SAVE_MODE_CUSTOM_ONLY;
 	}
-	connect(SNAME("loaded"), callable_mp(this, &InputMapSettingsServer::_merge_project_actions));
+	connect(SNAME("settings_changed"), callable_mp(this, &InputMapSettingsServer::_on_settings_changed));
 }
 
 InputMapSettingsServer::~InputMapSettingsServer() {
