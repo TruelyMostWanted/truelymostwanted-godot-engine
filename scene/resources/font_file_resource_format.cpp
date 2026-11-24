@@ -30,6 +30,7 @@
 
 #include "font_file_resource_format.h"
 
+#include "core/config/engine.h"
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
@@ -116,7 +117,9 @@ bool is_bitmap_font_extension(const String &p_extension) {
 bool is_imported_path(const String &p_path) {
 	const String import_path = p_path + ".import";
 	if (!FileAccess::exists(import_path)) {
-		return false;
+		// In the editor, a `res://` file without `.import` is about to be imported (or is read by
+		// another importer as a dependency): leave it to the import system.
+		return p_path.begins_with("res://") && Engine::get_singleton()->is_editor_hint();
 	}
 	Ref<ConfigFile> config;
 	config.instantiate();
