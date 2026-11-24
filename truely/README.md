@@ -74,7 +74,14 @@ Bei einem Konflikt hält das Skript an; lösen, committen, erneut starten (erled
 
 ## Releases
 
-Öffentliche Releases baut der Workflow [`truely_release.yml`](../.github/workflows/truely_release.yml), **automatisch**: Nach jedem grünen Lauf von *🔗 GHA* auf `truely-godot-engine` startet er (`workflow_run`) und baut genau den Commit, den die CI getestet hat (`head_sha`; Name und Hash kommen von diesem Commit). Er released nur, wenn sich seit dem letzten Release-Tag (`truely-godot*`) Dateien außer `*.md` und `.agents/` geändert haben; `doc/classes/` zählt mit (API-Doku). Reine Doku- oder Handover-Commits erzeugen also kein Release, ein schon released Commit auch nicht. Von Hand geht es weiter mit *Actions → 📦 Truely Release → Run workflow* (Option `draft` für einen Entwurf) oder `gh workflow run truely_release.yml --ref truely-godot-engine -f draft=false`; das released immer.
+Entwicklung und Veröffentlichung sind getrennt: `truely-godot-engine` ist der Entwicklungsstand (Merges, CI, **keine** Releases), `truely-godot-engine-releases` enthält nur freigegebene Stände.
+
+```powershell
+./truely/release.ps1                  # Spitze von origin/truely-godot-engine freigeben
+./truely/release.ps1 -Commit 3acb141  # einen bestimmten, grün getesteten Commit freigeben
+```
+
+Das Skript schiebt den Release-Branch per Fast-forward auf den Commit. Der Push startet die volle CI auf `truely-godot-engine-releases`; ist sie grün, startet der Workflow [`truely_release.yml`](../.github/workflows/truely_release.yml) (`workflow_run`) und baut genau diesen Commit (`head_sha`). Er released nur, wenn sich seit dem letzten Release-Tag (`truely-godot*`) Dateien außer `*.md` und `.agents/` geändert haben; `doc/classes/` zählt mit. Von Hand geht es weiter mit *Actions → 📦 Truely Release → Run workflow* (Option `draft` für einen Entwurf); das released immer.
 
 - **Release-Notes:** [`release-notes.sh`](../.github/truely/release-notes.sh) schreibt sie aus der Git-Historie: First-Parent-Commits seit dem letzten Release-Tag (ohne Tag: die letzten 50), ohne Merge- und `[skip ci]`-Commits. Die Issue-Nummer `(#N)` am Ende der Betreffzeile wird per `gh` nachgeschlagen und nach Label gruppiert (*Features* = `type: feature`, *Fixes* = `type: bug`, sonst *Refactoring and tasks*). Dazu ein Link aufs Wiki, die Godot-Basis (z. B. „Godot 4.8 beta4 → beta5“, aus `version.py` und `godot-status.txt`), die mitgeführten Godot-PRs aus [`upstream-prs.tsv`](upstream-prs.tsv), Installationshinweise und der Link auf den vollen Diff. Lokal testen (Git Bash, `gh` angemeldet): `bash .github/truely/release-notes.sh HEAD <tag> 4.8.beta5 [<vorheriger-tag>]`.
 - **Pre-Release und Latest:** Ist der Status nicht `stable`, wird das Release als Pre-Release angelegt und nicht „Latest“; nur `stable` wird „Latest“.
