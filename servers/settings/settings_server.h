@@ -78,6 +78,9 @@ public:
 	static constexpr ApplyPhase APPLY_PHASE_SCENE = SettingsServerEnums::APPLY_PHASE_SCENE;
 	static constexpr ApplyPhase APPLY_PHASE_MAX = SettingsServerEnums::APPLY_PHASE_MAX;
 
+	// The finest step of a [float] setting: at most three decimals.
+	static constexpr double FLOAT_STEP = 0.001;
+
 	enum SettingFlags {
 		SETTING_FLAG_NONE = 0,
 		SETTING_FLAG_RESTART_REQUIRED = 1, // The engine reads the value only at startup.
@@ -169,6 +172,12 @@ protected:
 	// as input events) returns a resource with the same value names and plain values, and converts it back.
 	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const { return p_settings; }
 	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const { return p_storage; }
+	// The storage form for one text format (#193): a domain whose list does not fit CSV as it is (nested records)
+	// returns flat rows for FORMAT_CSV. By default _settings_to_storage() for every format.
+	virtual Ref<Resource> _settings_to_storage_for_format(const Ref<Resource> &p_settings, ResourceTextSerializer::Format p_format) const { return _settings_to_storage(p_settings); }
+	// The type name of the storage form that a file with this text is read as (a CSV header of an older layout can
+	// name another type). By default the type of _settings_to_storage_for_format() of the defaults.
+	virtual String _get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const;
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)
@@ -203,6 +212,17 @@ public:
 	static Variant copy_value(const Variant &p_value);
 	static bool values_equal(const Variant &p_a, const Variant &p_b);
 	static Ref<Resource> copy_settings(const Ref<Resource> &p_settings);
+
+	// Float values have at most three decimals: snapped to `p_step` (at least 0.001) relative to `p_offset`, then to
+	// 0.001; -0.0 becomes 0.0. Non-finite values are returned unchanged.
+	static double snap_float(double p_value, double p_step = FLOAT_STEP, double p_offset = 0.0);
+	// The step and offset (range minimum) of a [float] property: the step of its PROPERTY_HINT_RANGE if it is at
+	// least FLOAT_STEP, else FLOAT_STEP and no offset.
+	static void get_float_step(const PropertyInfo &p_info, double &r_step, double &r_offset);
+	// `p_value` of the property `p_name` of `p_object`, a [float] property snapped to its step (other values unchanged).
+	static Variant snap_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value);
+	// Snaps every [float] value of a settings resource and of the resources in its Array values (list entries).
+	static void snap_resource_floats(const Ref<Resource> &p_resource);
 
 	static void register_settings();
 	// The project settings `settings/general/folder` and `settings/general/default_format`. Bound on SettingsServerManager.

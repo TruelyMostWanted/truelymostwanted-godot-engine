@@ -31,53 +31,19 @@
 #pragma once
 
 #include "core/input/input_actions.h"
-#include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 #include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
+#include "servers/settings/input_map_settings_records.h"
 #include "servers/settings/list_settings_server.h"
-
-// Storage form of InputMapSettingsServer (#172), internal: one row per action with its events as one text
-// cell (`bindings`: `Key:Ctrl+S; JoypadButton:A@0`), so every settings text format (CSV one row per action,
-// INI, JSON, TOML, YAML, XML) stays readable. Not used outside the settings file.
-class InputMapSettingsRow : public Resource {
-	GDCLASS(InputMapSettingsRow, Resource);
-
-	StringName action;
-	float deadzone = InputAction::DEFAULT_DEADZONE;
-	String bindings;
-
-protected:
-	static void _bind_methods();
-
-public:
-	void set_action(const StringName &p_action);
-	StringName get_action() const;
-	void set_deadzone(float p_deadzone);
-	float get_deadzone() const;
-	void set_bindings(const String &p_bindings);
-	String get_bindings() const;
-};
-
-class InputMapSettingsRows : public Resource {
-	GDCLASS(InputMapSettingsRows, Resource);
-
-	TypedArray<InputMapSettingsRow> actions;
-
-protected:
-	static void _bind_methods();
-
-public:
-	void set_actions(const TypedArray<InputMapSettingsRow> &p_actions);
-	TypedArray<InputMapSettingsRow> get_actions() const;
-};
 
 // Settings domain `input_map` (#18, layers #172): the player's events of the InputMap actions.
 // The settings resource is an InputActions with one InputAction per action. The file stores it as
-// InputMapSettingsRows (one CSV row per action: `action`, `deadzone`, `bindings`, the events in their
-// text form). The events of the settings are always in their text form (one code, device -1 or one joypad),
-// so a value read back from the file equals the value that was saved. Applying replaces the key, mouse button and joypad events of each
+// InputMapSettingsActions (one InputMapSettingsAction per action with one InputMapSettingsEvent per event;
+// CSV: one InputMapSettingsEventRow per event). The events of the settings are always in their canonical form
+// (one code, device -1 or one joypad), so a value read back from the file equals the value that was saved.
+// Applying replaces the key, mouse button and joypad events of each
 // action in InputMap; other event types stay. The defaults are the InputMap of the project settings at
 // startup, so reset_action() and reset_all() give back the project events.
 // `save_mode` decides which layer is stored: the custom actions only (default) or the built-in `ui_*`
@@ -96,9 +62,6 @@ private:
 
 	SaveMode save_mode = SAVE_MODE_CUSTOM_ONLY; // Project setting `settings/input_map/save_mode`.
 	HashSet<String> warned_actions; // Saved actions missing in the project that were reported once.
-	// The text form of the pending events per action, for `action_events_changed`.
-	HashMap<StringName, String> event_texts;
-	bool event_texts_ready = false;
 
 	static bool _is_managed_event(const Ref<InputEvent> &p_event);
 	bool _is_managed_action(const StringName &p_action) const;
@@ -128,18 +91,20 @@ protected:
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data) override;
 	virtual Ref<Resource> _settings_to_storage(const Ref<Resource> &p_settings) const override;
 	virtual Ref<Resource> _settings_from_storage(const Ref<Resource> &p_storage) const override;
+	virtual Ref<Resource> _settings_to_storage_for_format(const Ref<Resource> &p_settings, ResourceTextSerializer::Format p_format) const override;
+	virtual String _get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual void _apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) override;
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
-	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) override;
 
 public:
 	static InputMapSettingsServer *get_singleton();
 	static void register_settings();
 
-	// The stored text form of events: `Key:Ctrl+S; JoypadButton:A@0` (InputAction::event_to_text(), joypad events
-	// of one pad with `@<device id>`). Events without a text form are skipped, and so are invalid items of the text.
+	// The text form of events: `Keyboard:Ctrl+S; KeyboardLabel:E; Mouse:Left; Gamepad:A@Any; GamepadAxis:LeftX-`
+	// (InputMapSettingsEvent::to_text()). Events without a text form are skipped, and so are invalid items of the
+	// text; the names of version 2 (`Key:`, `PhysicalKey:`, `JoypadButton:`, ...) are read, too.
 	static String events_to_text(const TypedArray<InputEvent> &p_events);
 	static TypedArray<InputEvent> text_to_events(const String &p_text);
 

@@ -135,6 +135,10 @@ bool SettingsServer::values_equal(const Variant &p_a, const Variant &p_b) {
 		}
 		return true;
 	}
+	if (p_a.get_type() == Variant::FLOAT && p_b.get_type() == Variant::FLOAT) {
+		// A 32-bit member (0.2f read as 0.20000000298023224) equals the value it was set to (0.2).
+		return snap_float(p_a) == snap_float(p_b);
+	}
 	return p_a == p_b;
 }
 
@@ -150,6 +154,84 @@ Ref<Resource> SettingsServer::copy_settings(const Ref<Resource> &p_settings) {
 		copy->set(info.name, copy_value(p_settings->get(info.name)));
 	}
 	return copy;
+}
+
+double SettingsServer::snap_float(double p_value, double p_step, double p_offset) {
+	if (!Math::is_finite(p_value)) {
+		return p_value;
+	}
+	double value = p_value;
+	// Values beyond 2^40 have no three decimals left in a double; they are kept.
+	if (Math::abs(value) < 1099511627776.0) {
+		const double step = MAX(Math::is_finite(p_step) ? p_step : FLOAT_STEP, FLOAT_STEP);
+		const double offset = Math::is_finite(p_offset) ? p_offset : 0.0;
+		value = Math::round((value - offset) / step) * step + offset;
+		// n / 1000 is the double nearest to the decimal value, so 3 * 0.1 is 0.3 and not 0.30000000000000004.
+		value = Math::round(value * 1000.0) / 1000.0;
+	}
+	return value == 0.0 ? 0.0 : value;
+}
+
+void SettingsServer::get_float_step(const PropertyInfo &p_info, double &r_step, double &r_offset) {
+	r_step = FLOAT_STEP;
+	r_offset = 0.0;
+	if (p_info.hint != PROPERTY_HINT_RANGE) {
+		return;
+	}
+	const Vector<String> parts = p_info.hint_string.split(",");
+	if (parts.size() < 3 || !parts[2].is_valid_float() || parts[2].to_float() < FLOAT_STEP) {
+		return;
+	}
+	r_step = parts[2].to_float();
+	r_offset = parts[0].is_valid_float() ? parts[0].to_float() : 0.0;
+}
+
+Variant SettingsServer::snap_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) {
+	if (p_value.get_type() != Variant::FLOAT) {
+		return p_value;
+	}
+	double step = FLOAT_STEP;
+	double offset = 0.0;
+	if (p_object != nullptr) {
+		List<PropertyInfo> list;
+		p_object->get_property_list(&list);
+		for (const PropertyInfo &info : list) {
+			if (info.name == p_name) {
+				get_float_step(info, step, offset);
+				break;
+			}
+		}
+	}
+	return snap_float(p_value, step, offset);
+}
+
+void SettingsServer::snap_resource_floats(const Ref<Resource> &p_resource) {
+	if (p_resource.is_null()) {
+		return;
+	}
+	LocalVector<PropertyInfo> infos;
+	get_value_infos(p_resource.ptr(), infos);
+	for (const PropertyInfo &info : infos) {
+		const Variant value = p_resource->get(info.name);
+		if (info.type == Variant::FLOAT && value.get_type() == Variant::FLOAT) {
+			double step = FLOAT_STEP;
+			double offset = 0.0;
+			get_float_step(info, step, offset);
+			const double snapped = snap_float(value, step, offset);
+			if (snapped != double(value)) {
+				p_resource->set(info.name, snapped);
+			}
+		} else if (value.get_type() == Variant::ARRAY) {
+			// List entries. Entries with a resource path are shared (like copy_value(), which keeps them) and left alone.
+			const Array list = value;
+			for (int i = 0; i < list.size(); i++) {
+				const Ref<Resource> entry = list[i];
+				if (entry.is_valid() && entry != p_resource && entry->get_path().is_empty()) {
+					snap_resource_floats(entry);
+				}
+			}
+		}
+	}
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -286,6 +368,11 @@ Variant SettingsServer::_validate_setting(const StringName &p_name, const Varian
 	return p_value;
 }
 
+String SettingsServer::_get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const {
+	const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, p_format);
+	return ResourceTextSerializer::get_type_name(storage_defaults.ptr());
+}
+
 Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionary &p_data) {
 	Dictionary ret;
 	if (GDVIRTUAL_CALL(_migrate, p_from_version, p_data, ret)) {
@@ -387,6 +474,7 @@ void SettingsServer::_initialize() {
 		}
 	}
 
+	snap_resource_floats(defaults);
 	settings = copy_settings(defaults);
 	applied = copy_settings(defaults);
 	restart_baseline = copy_settings(defaults);
@@ -457,7 +545,8 @@ bool SettingsServer::has_setting(const StringName &p_name) const {
 }
 
 Variant SettingsServer::_validate(const StringName &p_name, const Variant &p_value) const {
-	return _validate_setting(p_name, validate_property_value(settings.ptr(), p_name, p_value));
+	// A value returned by _validate_value() is snapped too.
+	return snap_property_value(settings.ptr(), p_name, _validate_setting(p_name, validate_property_value(settings.ptr(), p_name, p_value)));
 }
 
 Variant SettingsServer::validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const {
@@ -477,14 +566,30 @@ Variant SettingsServer::validate_property_value(const Object *p_object, const St
 				const bool or_greater = parts.has("or_greater");
 				const bool or_less = parts.has("or_less");
 				double number = value;
+				if (info.type == Variant::FLOAT) {
+					// Snapped to the step first, then clamped (like Range): a limit off the step stays reachable.
+					double step = FLOAT_STEP;
+					double offset = 0.0;
+					get_float_step(info, step, offset);
+					number = snap_float(number, step, offset);
+				}
 				if (!or_less && number < min_value) {
 					number = min_value;
 				}
 				if (!or_greater && number > max_value) {
 					number = max_value;
 				}
-				value = info.type == Variant::INT ? Variant(int64_t(Math::round(number))) : Variant(number);
+				if (info.type == Variant::INT) {
+					value = int64_t(Math::round(number));
+				} else {
+					value = snap_float(number);
+				}
+			} else if (info.type == Variant::FLOAT) {
+				value = snap_float(value);
 			}
+		} else if (info.type == Variant::FLOAT && (value.get_type() == Variant::INT || value.get_type() == Variant::FLOAT)) {
+			// A [float] without a range hint: three decimals.
+			value = snap_float(value);
 		} else if (info.hint == PROPERTY_HINT_ENUM && info.type == Variant::INT && value.get_type() == Variant::INT) {
 			const Vector<String> entries = info.hint_string.split(",");
 			int64_t next = 0;
@@ -537,7 +642,7 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 }
 
 void SettingsServer::notify_value_changed(const StringName &p_name) {
-	emit_signal(SNAME("value_changed"), p_name, settings->get(p_name));
+	emit_signal(SNAME("value_changed"), p_name, snap_property_value(settings.ptr(), p_name, settings->get(p_name)));
 	PackedStringArray names;
 	names.push_back(p_name);
 	_emit_settings_changed(names);
@@ -551,7 +656,8 @@ Variant SettingsServer::get_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = settings->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(settings.ptr(), p_name, value);
 }
 
 Variant SettingsServer::get_applied_value(const StringName &p_name) const {
@@ -559,7 +665,8 @@ Variant SettingsServer::get_applied_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = applied->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(applied.ptr(), p_name, value);
 }
 
 Variant SettingsServer::get_default_value(const StringName &p_name) const {
@@ -567,7 +674,8 @@ Variant SettingsServer::get_default_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = defaults->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(defaults.ptr(), p_name, value);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -682,7 +790,7 @@ Ref<Resource> SettingsServer::_push_values(const PackedStringArray &p_names) {
 
 void SettingsServer::_notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective) {
 	for (const String &name : p_names) {
-		_notify_value_applied(name, p_effective->get(name));
+		_notify_value_applied(name, snap_property_value(p_effective.ptr(), name, p_effective->get(name)));
 	}
 }
 
@@ -721,6 +829,8 @@ void SettingsServer::_read_from_engine_into(const Ref<Resource> &p_settings) {
 		}
 	}
 	_read_settings_from_engine(p_settings);
+	// Engine values and internal conversions (linear volume to dB, ...) have at most three decimals too.
+	snap_resource_floats(p_settings);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -764,7 +874,7 @@ void SettingsServer::revert() {
 	const PackedStringArray names = _get_changed_names(settings, applied);
 	settings = copy_settings(applied);
 	for (const String &name : names) {
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 }
@@ -781,7 +891,7 @@ void SettingsServer::reset_to_defaults() {
 	settings = copy_settings(defaults);
 	for (const String &name : names) {
 		session_overrides.erase(name);
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 	emit_signal(SNAME("reset"));
@@ -932,7 +1042,7 @@ void SettingsServer::cancel_confirmation() {
 	_update_restart_required_names(names);
 	_notify_values_applied(names, effective);
 	for (const String &name : names) {
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 	if (!names.is_empty()) {
@@ -1047,10 +1157,9 @@ Error SettingsServer::load() {
 	String error;
 	Ref<Resource> loaded;
 	PackedStringArray present;
-	const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
-	const String type_name = ResourceTextSerializer::get_type_name(storage_defaults.ptr());
 	// The extension decides; an unknown extension is read in the format of the domain.
 	const ResourceTextSerializer::Format format = _get_format_for_path(path);
+	const String type_name = _get_storage_type_for_text(text, format);
 
 	if (err != OK) {
 		error = vformat("can't read the file (%s)", error_names[err]);
@@ -1172,7 +1281,7 @@ Error SettingsServer::save() {
 	String error;
 	Error err = OK;
 	// The storage form has the value names of the settings resource (see _settings_to_storage()).
-	const Ref<Resource> storage = _settings_to_storage(data);
+	const Ref<Resource> storage = _settings_to_storage_for_format(data, format);
 	if (storage.is_null()) {
 		err = ERR_INVALID_DATA;
 		error = "the settings can't be converted to their storage form";
@@ -1187,7 +1296,7 @@ Error SettingsServer::save() {
 			// The serializer compares a value with its default by `==`, which compares the resources of a list by
 			// identity. A value equal to its default by its stored properties (values_equal()) is put into the
 			// compared defaults as the very same value, so it is skipped like an unchanged single value.
-			const Ref<Resource> storage_defaults = _settings_to_storage(defaults);
+			const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, format);
 			Ref<Resource> compared_defaults = storage_defaults.is_valid() ? storage_defaults->duplicate(false) : Ref<Resource>();
 			LocalVector<PropertyInfo> infos;
 			get_value_infos(data.ptr(), infos);
@@ -1294,6 +1403,7 @@ void SettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_setting_names"), &SettingsServer::get_setting_names);
 	ClassDB::bind_method(D_METHOD("has_setting", "name"), &SettingsServer::has_setting);
 	ClassDB::bind_method(D_METHOD("set_value", "name", "value"), &SettingsServer::set_value);
+	ClassDB::bind_static_method("SettingsServer", D_METHOD("snap_float", "value", "step", "offset"), &SettingsServer::snap_float, DEFVAL(FLOAT_STEP), DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("get_value", "name"), &SettingsServer::get_value);
 	ClassDB::bind_method(D_METHOD("get_applied_value", "name"), &SettingsServer::get_applied_value);
 	ClassDB::bind_method(D_METHOD("get_default_value", "name"), &SettingsServer::get_default_value);
