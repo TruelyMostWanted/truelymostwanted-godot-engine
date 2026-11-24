@@ -608,6 +608,48 @@ Ref<InputEvent> InputMapSettingsServer::_normalized_event(const Ref<InputEvent> 
 	return InputAction::text_to_event(text);
 }
 
+TypedArray<InputEvent> InputMapSettingsServer::_get_merged_events(const StringName &p_action, bool &r_exists, bool &r_managed) const {
+	r_exists = false;
+	r_managed = false;
+	const Ref<InputAction> action = _get_action(p_action);
+	if (action.is_valid()) {
+		r_exists = true;
+		r_managed = true;
+		return action->get_events();
+	}
+	InputMap *input_map = InputMap::get_singleton();
+	if (input_map == nullptr || !input_map->has_action(p_action)) {
+		return TypedArray<InputEvent>();
+	}
+	r_exists = true;
+	r_managed = _is_managed_action(p_action);
+	return _make_action(p_action)->get_events();
+}
+
+Error InputMapSettingsServer::_set_events_of_actions(const LocalVector<StringName> &p_actions, const LocalVector<TypedArray<InputEvent>> &p_events) {
+	ERR_FAIL_COND_V(p_actions.size() != p_events.size(), ERR_INVALID_PARAMETER);
+	LocalVector<Ref<InputAction>> targets;
+	for (const StringName &action_name : p_actions) {
+		const Ref<InputAction> action = _ensure_action(action_name);
+		ERR_FAIL_COND_V_MSG(action.is_null(), ERR_DOES_NOT_EXIST, vformat("Input map settings: there is no action \"%s\".", action_name));
+		targets.push_back(action);
+	}
+	bool changed = false;
+	for (uint32_t i = 0; i < targets.size(); i++) {
+		// The stored form, like an action read back from the file.
+		const TypedArray<InputEvent> events = _canonical_events(p_events[i]);
+		if (events_to_text(targets[i]->get_events()) == events_to_text(events)) {
+			continue;
+		}
+		targets[i]->set_events(events);
+		changed = true;
+	}
+	if (changed) {
+		notify_value_changed(get_list_property());
+	}
+	return OK;
+}
+
 PackedStringArray InputMapSettingsServer::get_action_names() const {
 	PackedStringArray names;
 	const Ref<InputActions> actions = _get_actions();

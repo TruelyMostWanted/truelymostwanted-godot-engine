@@ -88,6 +88,7 @@
 #include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
+#include "servers/settings/input_action_rebinder.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
@@ -268,6 +269,7 @@ void register_server_types() {
 	GDREGISTER_CLASS(InputMapSettingsRow);
 	GDREGISTER_CLASS(InputMapSettingsRows);
 	GDREGISTER_ABSTRACT_CLASS(InputMapSettingsServer);
+	GDREGISTER_CLASS(InputActionRebinder);
 	input_map_settings_server = memnew(InputMapSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
 	settings_server_manager->register_server(input_map_settings_server);

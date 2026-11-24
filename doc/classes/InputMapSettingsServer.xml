@@ -214,7 +214,7 @@
 		<signal name="action_events_changed">
 			<param index="0" name="action" type="StringName" />
 			<description>
-				Emitted once for each action whose events in the pending settings changed, whatever changed them: [method rebind], [method add_event], [method remove_event], [method clear_event], [method reset_action], [method reset_all], [method SettingsServer.set_value], [method SettingsServer.revert], [method SettingsServer.read_from_engine], [method SettingsServer.load] (after the saved actions are merged with the project actions) and [code]InputActionRebinder[/code] (a swap emits it for both actions). It is not emitted when the events stay the same, and a change of the deadzone alone does not emit it. Connect a rebinding menu to it to refresh the labels of [param action].
+				Emitted once for each action whose events in the pending settings changed, whatever changed them: [method rebind], [method add_event], [method remove_event], [method clear_event], [method reset_action], [method reset_all], [method SettingsServer.set_value], [method SettingsServer.revert], [method SettingsServer.read_from_engine], [method SettingsServer.load] (after the saved actions are merged with the project actions) and [InputActionRebinder] (a swap emits it for both actions). It is not emitted when the events stay the same, and a change of the deadzone alone does not emit it. Connect a rebinding menu to it to refresh the labels of [param action].
 				It is emitted after [signal SettingsServer.value_changed] and before the change is applied: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] [InputMap] has the new events right after the signal, in [constant SettingsServer.APPLY_MODE_MANUAL] after [method SettingsServer.apply].
 			</description>
 		</signal>

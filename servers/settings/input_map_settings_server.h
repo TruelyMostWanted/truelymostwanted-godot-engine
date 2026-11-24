@@ -33,6 +33,7 @@
 #include "core/input/input_actions.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
+#include "core/templates/local_vector.h"
 #include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
 #include "servers/settings/list_settings_server.h"
@@ -110,6 +111,14 @@ private:
 	void _merge_project_actions();
 	void _on_settings_changed(const PackedStringArray &p_names);
 	void _emit_action_events_changed();
+
+	// For InputActionRebinder (#191).
+	friend class InputActionRebinder;
+	// The events of an action as the player has them: the pending settings if this server stores the action,
+	// otherwise the bindable events of InputMap in their text form. `r_managed`: this server can change them.
+	TypedArray<InputEvent> _get_merged_events(const StringName &p_action, bool &r_exists, bool &r_managed) const;
+	// Replaces the events of several actions in one change: one `value_changed`, one apply, one autosave.
+	Error _set_events_of_actions(const LocalVector<StringName> &p_actions, const LocalVector<TypedArray<InputEvent>> &p_events);
 	static TypedArray<InputEvent> _parse_events(const String &p_text, PackedStringArray &r_invalid);
 	static TypedArray<InputEvent> _canonical_events(const TypedArray<InputEvent> &p_events);
 
