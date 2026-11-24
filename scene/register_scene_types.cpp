@@ -102,6 +102,7 @@
 #include "scene/main/canvas_item.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/http_request.h"
+#include "scene/main/http_response.h"
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
@@ -139,7 +140,9 @@
 #include "scene/resources/font.h"
 #include "scene/resources/gradient.h"
 #include "scene/resources/gradient_texture.h"
+#include "scene/resources/image_save_options.h"
 #include "scene/resources/image_texture.h"
+#include "scene/resources/image_texture_resource_format.h"
 #include "scene/resources/immediate_mesh.h"
 #include "scene/resources/label_settings.h"
 #include "scene/resources/material.h"
@@ -397,6 +400,8 @@ static Ref<ResourceFormatLoaderCompressedTexture2D> resource_loader_compressed_t
 static Ref<ResourceFormatLoaderStreamedTexture2D> resource_loader_streamed_texture;
 static Ref<ResourceFormatLoaderCompressedTextureLayered> resource_loader_texture_layered;
 static Ref<ResourceFormatLoaderCompressedTexture3D> resource_loader_texture_3d;
+static Ref<ResourceFormatLoaderImageTexture> resource_loader_image_texture;
+static Ref<ResourceFormatSaverImageTexture> resource_saver_image_texture;
 
 static Ref<ResourceFormatSaverShader> resource_saver_shader;
 static Ref<ResourceFormatLoaderShader> resource_loader_shader;
@@ -431,6 +436,15 @@ void register_scene_types() {
 	if constexpr (GD_IS_CLASS_ENABLED(Texture3D)) {
 		resource_loader_texture_3d.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_texture_3d);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(ImageTexture)) {
+		// Loader not at the front: ResourceFormatImporter keeps precedence for imported images.
+		resource_loader_image_texture.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_image_texture);
+		// Saver at the front: takes PNG and WebP from ResourceSaverPNG and ResourceSaverWebP to apply ImageSaveOptions.
+		resource_saver_image_texture.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_image_texture, true);
 	}
 
 	resource_saver_text.instantiate();
@@ -481,6 +495,8 @@ void register_scene_types() {
 	GDREGISTER_VIRTUAL_CLASS(MultiplayerAPIExtension);
 
 	GDREGISTER_CLASS(HTTPRequest);
+	GDREGISTER_CLASS(HTTPRequestTarget);
+	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
@@ -975,6 +991,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(StreamedTexture2D);
 	GDREGISTER_CLASS(PortableCompressedTexture2D);
 	GDREGISTER_CLASS(ImageTexture);
+	GDREGISTER_CLASS(ImageSaveOptions);
 	GDREGISTER_CLASS(AtlasTexture);
 	GDREGISTER_CLASS(TextureAtlas);
 	GDREGISTER_CLASS(MeshTexture);
@@ -1399,6 +1416,13 @@ void unregister_scene_types() {
 	if constexpr (GD_IS_CLASS_ENABLED(Texture3D)) {
 		ResourceLoader::remove_resource_format_loader(resource_loader_texture_3d);
 		resource_loader_texture_3d.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(ImageTexture)) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_image_texture);
+		resource_loader_image_texture.unref();
+		ResourceSaver::remove_resource_format_saver(resource_saver_image_texture);
+		resource_saver_image_texture.unref();
 	}
 
 	if constexpr (GD_IS_CLASS_ENABLED(CompressedTexture2D)) {
