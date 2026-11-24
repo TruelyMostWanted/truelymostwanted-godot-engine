@@ -295,7 +295,7 @@ void TextureAtlas::set_regions(const TypedDictionary<StringName, Rect2i> &p_regi
 		const Rect2i rect = E.value;
 		String error;
 		if (!is_valid_region_name(region_name)) {
-			errors.push_back(vformat("\"%s\" is not a valid region region_name.", region_name));
+			errors.push_back(vformat("\"%s\" is not a valid region name.", region_name));
 			continue;
 		}
 		if (_check_rect(region_name, rect, texture, error) != OK) {
