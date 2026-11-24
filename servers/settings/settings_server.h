@@ -121,6 +121,7 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	String format_warned_path; // The last path whose extension gave no usable format (warned once).
 
 	bool confirmation_active = false;
 	Ref<Resource> confirmation_backup;
@@ -139,6 +140,11 @@ private:
 	void _queue_autosave();
 	void _set_confirmation_processing(bool p_enabled);
 	void _on_process_frame();
+	// The project setting `settings/paths/<domain>_settings_path`; empty if not set.
+	String _get_project_file_path() const;
+	// The format of a settings file from its extension; the global format if the extension is unknown or not available.
+	ResourceTextSerializer::Format _get_format_for_path(const String &p_path);
+	void _emit_settings_changed(const PackedStringArray &p_names);
 
 protected:
 	static void _bind_methods();
@@ -184,6 +190,10 @@ public:
 	// The project settings `settings/storage/*`. Bound on SettingsServerManager.
 	static String get_storage_folder();
 	static ResourceTextSerializer::Format get_storage_format();
+	// `settings/paths/<domain>_settings_path`: the file path of a domain set in the project settings.
+	static String get_path_setting_name(const StringName &p_domain);
+	// Defines the project setting of the domain's path (called by SettingsServerManager::register_server()).
+	static void register_path_setting(const StringName &p_domain, bool p_csv);
 
 	// Identity. C++ domains override these; scripts implement _get_domain() and the others.
 	virtual StringName get_domain() const;

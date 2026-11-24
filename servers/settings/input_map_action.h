@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  key_binding.h                                                         */
+/*  input_map_action.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -32,14 +32,13 @@
 
 #include "core/input/input_event.h"
 #include "core/io/resource.h"
-#include "core/variant/typed_array.h"
 
-// Data of the `key_bindings` settings domain (#18). One KeyBinding is one slot of an action: the key,
+// Data of the `input_map` settings domain (#18). One InputMapAction is one slot of an action: the key,
 // mouse button or joypad input in a readable text form (`Key:Ctrl+S`, `MouseButton:Left`,
 // `JoypadButton:A`, `JoypadMotion:LeftX+`). The text form is stable and English, so the saved file can
 // be read and edited by hand and survives JSON, INI and CSV.
-class KeyBinding : public Resource {
-	GDCLASS(KeyBinding, Resource);
+class InputMapAction : public Resource {
+	GDCLASS(InputMapAction, Resource);
 
 public:
 	enum InputDevice {
@@ -93,19 +92,4 @@ public:
 	bool is_empty() const;
 };
 
-// Settings of the `key_bindings` domain: one KeyBinding per bound slot of all actions. It holds
-// nothing but the list, so it can be stored as CSV (one row per event).
-class KeyBindingList : public Resource {
-	GDCLASS(KeyBindingList, Resource);
-
-	TypedArray<KeyBinding> bindings;
-
-protected:
-	static void _bind_methods();
-
-public:
-	void set_bindings(const TypedArray<KeyBinding> &p_bindings);
-	TypedArray<KeyBinding> get_bindings() const;
-};
-
-VARIANT_ENUM_CAST(KeyBinding::InputDevice);
+VARIANT_ENUM_CAST(InputMapAction::InputDevice);

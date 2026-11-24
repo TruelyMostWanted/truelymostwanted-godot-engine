@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="ListSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		A [SettingsServer] whose settings are a list of entries, such as audio buses, key bindings or voices.
+		A [SettingsServer] whose settings are a list of entries, such as audio buses, input map actions or voices.
 	</brief_description>
 	<description>
 		A [ListSettingsServer] is a [SettingsServer] whose settings resource holds a list of entry resources in one typed [Array] property, for example the buses of an audio layout or the personas of a game. The entries are found by their index or by the value of a key property (see [method _get_entry_key]).

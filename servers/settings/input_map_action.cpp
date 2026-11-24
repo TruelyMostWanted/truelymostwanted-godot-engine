@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  key_binding.cpp                                                       */
+/*  input_map_action.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "key_binding.h"
+#include "input_map_action.h"
 
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
@@ -158,7 +158,7 @@ static int _text_to_index(const String &p_text, const char *const *p_names, int 
 	return -1;
 }
 
-String KeyBinding::event_to_text(const Ref<InputEvent> &p_event) {
+String InputMapAction::event_to_text(const Ref<InputEvent> &p_event) {
 	const Ref<InputEventKey> key_event = p_event;
 	if (key_event.is_valid()) {
 		// A pressed key has all three codes; the physical one keeps the binding on the same key on every layout.
@@ -205,7 +205,7 @@ String KeyBinding::event_to_text(const Ref<InputEvent> &p_event) {
 	return String();
 }
 
-Ref<InputEvent> KeyBinding::text_to_event(const String &p_text) {
+Ref<InputEvent> InputMapAction::text_to_event(const String &p_text) {
 	const int colon = p_text.find_char(':');
 	if (colon <= 0) {
 		return Ref<InputEvent>();
@@ -284,7 +284,7 @@ Ref<InputEvent> KeyBinding::text_to_event(const String &p_text) {
 	return Ref<InputEvent>();
 }
 
-KeyBinding::InputDevice KeyBinding::get_event_device(const Ref<InputEvent> &p_event) {
+InputMapAction::InputDevice InputMapAction::get_event_device(const Ref<InputEvent> &p_event) {
 	if (Ref<InputEventKey>(p_event).is_valid()) {
 		return INPUT_DEVICE_KEYBOARD;
 	}
@@ -307,7 +307,7 @@ static bool _has_keyboard_layout() {
 	return server_name == "Windows" || server_name == "X11" || server_name == "Wayland" || server_name == "macOS" || server_name == "embedded";
 }
 
-String KeyBinding::event_to_label(const Ref<InputEvent> &p_event) {
+String InputMapAction::event_to_label(const Ref<InputEvent> &p_event) {
 	const Ref<InputEventKey> key_event = p_event;
 	if (key_event.is_valid()) {
 		Key code = key_event->get_keycode();
@@ -357,64 +357,64 @@ String KeyBinding::event_to_label(const Ref<InputEvent> &p_event) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// KeyBinding.
+// InputMapAction.
 
-void KeyBinding::set_action(const String &p_action) {
+void InputMapAction::set_action(const String &p_action) {
 	action = p_action;
 	emit_changed();
 }
 
-String KeyBinding::get_action() const {
+String InputMapAction::get_action() const {
 	return action;
 }
 
-void KeyBinding::set_device(InputDevice p_device) {
+void InputMapAction::set_device(InputDevice p_device) {
 	ERR_FAIL_INDEX(int(p_device), int(INPUT_DEVICE_MAX));
 	device = p_device;
 	emit_changed();
 }
 
-KeyBinding::InputDevice KeyBinding::get_device() const {
+InputMapAction::InputDevice InputMapAction::get_device() const {
 	return device;
 }
 
-void KeyBinding::set_slot(int p_slot) {
+void InputMapAction::set_slot(int p_slot) {
 	slot = MAX(p_slot, 0);
 	emit_changed();
 }
 
-int KeyBinding::get_slot() const {
+int InputMapAction::get_slot() const {
 	return slot;
 }
 
-void KeyBinding::set_event(const String &p_event) {
+void InputMapAction::set_event(const String &p_event) {
 	event = p_event;
 	emit_changed();
 }
 
-String KeyBinding::get_event() const {
+String InputMapAction::get_event() const {
 	return event;
 }
 
-void KeyBinding::set_device_id(int p_device_id) {
+void InputMapAction::set_device_id(int p_device_id) {
 	device_id = MAX(p_device_id, -1);
 	emit_changed();
 }
 
-int KeyBinding::get_device_id() const {
+int InputMapAction::get_device_id() const {
 	return device_id;
 }
 
-void KeyBinding::set_deadzone(float p_deadzone) {
+void InputMapAction::set_deadzone(float p_deadzone) {
 	deadzone = CLAMP(p_deadzone, 0.0f, 1.0f);
 	emit_changed();
 }
 
-float KeyBinding::get_deadzone() const {
+float InputMapAction::get_deadzone() const {
 	return deadzone;
 }
 
-Ref<InputEvent> KeyBinding::get_input_event() const {
+Ref<InputEvent> InputMapAction::get_input_event() const {
 	if (event.is_empty()) {
 		return Ref<InputEvent>();
 	}
@@ -425,43 +425,43 @@ Ref<InputEvent> KeyBinding::get_input_event() const {
 	return input_event;
 }
 
-void KeyBinding::set_input_event(const Ref<InputEvent> &p_event) {
+void InputMapAction::set_input_event(const Ref<InputEvent> &p_event) {
 	if (p_event.is_null()) {
 		set_event(String());
 		return;
 	}
 	const InputDevice event_device = get_event_device(p_event);
-	ERR_FAIL_COND_MSG(event_device == INPUT_DEVICE_MAX, vformat("KeyBinding: a %s can't be bound; use a key, mouse button, joypad button or joypad axis.", p_event->get_class()));
+	ERR_FAIL_COND_MSG(event_device == INPUT_DEVICE_MAX, vformat("InputMapAction: a %s can't be bound; use a key, mouse button, joypad button or joypad axis.", p_event->get_class()));
 	device = event_device;
 	device_id = MAX(p_event->get_device(), -1);
 	set_event(event_to_text(p_event));
 }
 
-bool KeyBinding::is_empty() const {
+bool InputMapAction::is_empty() const {
 	return event.is_empty();
 }
 
-void KeyBinding::_bind_methods() {
-	ClassDB::bind_static_method("KeyBinding", D_METHOD("event_to_text", "event"), &KeyBinding::event_to_text);
-	ClassDB::bind_static_method("KeyBinding", D_METHOD("text_to_event", "text"), &KeyBinding::text_to_event);
-	ClassDB::bind_static_method("KeyBinding", D_METHOD("get_event_device", "event"), &KeyBinding::get_event_device);
-	ClassDB::bind_static_method("KeyBinding", D_METHOD("event_to_label", "event"), &KeyBinding::event_to_label);
+void InputMapAction::_bind_methods() {
+	ClassDB::bind_static_method("InputMapAction", D_METHOD("event_to_text", "event"), &InputMapAction::event_to_text);
+	ClassDB::bind_static_method("InputMapAction", D_METHOD("text_to_event", "text"), &InputMapAction::text_to_event);
+	ClassDB::bind_static_method("InputMapAction", D_METHOD("get_event_device", "event"), &InputMapAction::get_event_device);
+	ClassDB::bind_static_method("InputMapAction", D_METHOD("event_to_label", "event"), &InputMapAction::event_to_label);
 
-	ClassDB::bind_method(D_METHOD("set_action", "action"), &KeyBinding::set_action);
-	ClassDB::bind_method(D_METHOD("get_action"), &KeyBinding::get_action);
-	ClassDB::bind_method(D_METHOD("set_device", "device"), &KeyBinding::set_device);
-	ClassDB::bind_method(D_METHOD("get_device"), &KeyBinding::get_device);
-	ClassDB::bind_method(D_METHOD("set_slot", "slot"), &KeyBinding::set_slot);
-	ClassDB::bind_method(D_METHOD("get_slot"), &KeyBinding::get_slot);
-	ClassDB::bind_method(D_METHOD("set_event", "event"), &KeyBinding::set_event);
-	ClassDB::bind_method(D_METHOD("get_event"), &KeyBinding::get_event);
-	ClassDB::bind_method(D_METHOD("set_device_id", "device_id"), &KeyBinding::set_device_id);
-	ClassDB::bind_method(D_METHOD("get_device_id"), &KeyBinding::get_device_id);
-	ClassDB::bind_method(D_METHOD("set_deadzone", "deadzone"), &KeyBinding::set_deadzone);
-	ClassDB::bind_method(D_METHOD("get_deadzone"), &KeyBinding::get_deadzone);
-	ClassDB::bind_method(D_METHOD("get_input_event"), &KeyBinding::get_input_event);
-	ClassDB::bind_method(D_METHOD("set_input_event", "event"), &KeyBinding::set_input_event);
-	ClassDB::bind_method(D_METHOD("is_empty"), &KeyBinding::is_empty);
+	ClassDB::bind_method(D_METHOD("set_action", "action"), &InputMapAction::set_action);
+	ClassDB::bind_method(D_METHOD("get_action"), &InputMapAction::get_action);
+	ClassDB::bind_method(D_METHOD("set_device", "device"), &InputMapAction::set_device);
+	ClassDB::bind_method(D_METHOD("get_device"), &InputMapAction::get_device);
+	ClassDB::bind_method(D_METHOD("set_slot", "slot"), &InputMapAction::set_slot);
+	ClassDB::bind_method(D_METHOD("get_slot"), &InputMapAction::get_slot);
+	ClassDB::bind_method(D_METHOD("set_event", "event"), &InputMapAction::set_event);
+	ClassDB::bind_method(D_METHOD("get_event"), &InputMapAction::get_event);
+	ClassDB::bind_method(D_METHOD("set_device_id", "device_id"), &InputMapAction::set_device_id);
+	ClassDB::bind_method(D_METHOD("get_device_id"), &InputMapAction::get_device_id);
+	ClassDB::bind_method(D_METHOD("set_deadzone", "deadzone"), &InputMapAction::set_deadzone);
+	ClassDB::bind_method(D_METHOD("get_deadzone"), &InputMapAction::get_deadzone);
+	ClassDB::bind_method(D_METHOD("get_input_event"), &InputMapAction::get_input_event);
+	ClassDB::bind_method(D_METHOD("set_input_event", "event"), &InputMapAction::set_input_event);
+	ClassDB::bind_method(D_METHOD("is_empty"), &InputMapAction::is_empty);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "action"), "set_action", "get_action");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "device", PROPERTY_HINT_ENUM, "Keyboard,Mouse,Gamepad"), "set_device", "get_device");
@@ -474,23 +474,4 @@ void KeyBinding::_bind_methods() {
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_MOUSE);
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_GAMEPAD);
 	BIND_ENUM_CONSTANT(INPUT_DEVICE_MAX);
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// KeyBindingList.
-
-void KeyBindingList::set_bindings(const TypedArray<KeyBinding> &p_bindings) {
-	bindings = p_bindings;
-	emit_changed();
-}
-
-TypedArray<KeyBinding> KeyBindingList::get_bindings() const {
-	return bindings;
-}
-
-void KeyBindingList::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_bindings", "bindings"), &KeyBindingList::set_bindings);
-	ClassDB::bind_method(D_METHOD("get_bindings"), &KeyBindingList::get_bindings);
-
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bindings", PROPERTY_HINT_ARRAY_TYPE, "KeyBinding"), "set_bindings", "get_bindings");
 }
