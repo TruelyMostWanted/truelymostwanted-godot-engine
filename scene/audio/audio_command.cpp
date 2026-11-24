@@ -60,7 +60,7 @@ static const char *AUDIO_COMMAND_LABELS[] = {
 	"Stop All",
 };
 
-static_assert(sizeof(AUDIO_COMMAND_LABELS) / sizeof(AUDIO_COMMAND_LABELS[0]) == AudioCommand::COMMAND_STOP_ALL + 1, "Every AudioCommand::Command needs a label.");
+static_assert(int(sizeof(AUDIO_COMMAND_LABELS) / sizeof(AUDIO_COMMAND_LABELS[0])) == int(AudioCommand::COMMAND_STOP_ALL) + 1, "Every AudioCommand::Command needs a label.");
 
 /////////////////////////////////////////////////////////////////////////////
 // AudioCommand.
