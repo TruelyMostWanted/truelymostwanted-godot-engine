@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SerializerOptions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Typed options of the text formats of [ResourceTextSerializer].
+	</brief_description>
+	<description>
+		[SerializerOptions] holds the options of [method ResourceTextSerializer.serialize], [method ResourceTextSerializer.deserialize], [method ResourceTextSerializer.resource_to_dictionary] and [method TOML.serialize]. It is a [Resource], so a set of options can be edited in the Inspector and saved as a preset ([code].tres[/code]) that gives the same output when loaded again.
+		[code]SerializerOptions.new()[/code] has the class defaults, which are the same as the defaults of the project settings under [code]filesystem/resources/text_formats/[/code]. Passing [code]null[/code] instead uses the current values of these project settings, like [ResourceSaver] and [ResourceLoader] do. Options that a format does not use are ignored.
+		[codeblocks]
+		[gdscript]
+		var options = SerializerOptions.new()
+		options.indent = "\t"
+		options.sort_keys = true
+		var text = ResourceTextSerializer.serialize(settings, ResourceTextSerializer.FORMAT_JSON, options)
+
+		# A preset made in the Inspector:
+		var preset = load("res://export_options.tres") as SerializerOptions
+		var xml = ResourceTextSerializer.serialize(settings, ResourceTextSerializer.FORMAT_XML, preset)
+		[/gdscript]
+		[csharp]
+		var options = new SerializerOptions { Indent = "\t", SortKeys = true };
+		string text = ResourceTextSerializer.Serialize(settings, ResourceTextSerializer.Format.Json, options);
+
+		// A preset made in the Inspector:
+		var preset = GD.Load&lt;SerializerOptions&gt;("res://export_options.tres");
+		string xml = ResourceTextSerializer.Serialize(settings, ResourceTextSerializer.Format.Xml, preset);
+		[/csharp]
+		[/codeblocks]
+		Formats with options of their own extend this class (for example [code]class_name MyFormatOptions extends SerializerOptions[/code], or a C++ subclass in a module) instead of passing untyped values.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="csv_delimiter" type="String" setter="set_csv_delimiter" getter="get_csv_delimiter" default="&quot;,&quot;">
+			CSV: the delimiter between cells, one character, for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated values. Used for writing and reading. Other values (empty, longer than one character, a quote or a line break) fall back to [code]","[/code].
+		</member>
+		<member name="csv_headers" type="bool" setter="set_csv_headers" getter="is_csv_headers" default="true">
+			CSV: if [code]true[/code], the first row holds the property names and only the columns that are used are written; reading maps the cells by these names. If [code]false[/code], there is no header row: every stored property of the element class is written as a column, in property order, and reading maps the cells by position. Use the same value for writing and reading.
+		</member>
+		<member name="defaults" type="Resource" setter="set_defaults" getter="get_defaults">
+			JSON, INI, XML and TOML: values of the root resource that are equal to the same property of [member defaults] are not written (metadata is always written). Nested resources are written completely. Used by the settings servers to write only changed settings. Reading is not affected: missing keys keep the defaults of the class.
+		</member>
+		<member name="enums_as_names" type="bool" setter="set_enums_as_names" getter="is_enums_as_names" default="true">
+			All formats: if [code]true[/code], enum properties are written as their names ([code]"High"[/code]); if [code]false[/code], as numbers ([code]2[/code]). Both are read.
+		</member>
+		<member name="full_precision_floats" type="bool" setter="set_full_precision_floats" getter="is_full_precision_floats" default="false">
+			All formats: vectors, rectangles, transforms and colors hold 32-bit floats. If [code]false[/code], each is written as the shortest decimal that reads back as the same 32-bit value ([code]0.1[/code]). If [code]true[/code], the exact value is written ([code]0.10000000149011612[/code]), for tools that compare the text with 64-bit values. The same applies to a [float] value that is exactly a 32-bit float, such as a property stored as a 32-bit float in C++ ([code]0.2[/code] instead of [code]0.20000000298023224[/code]); other [float] values are 64-bit and always written exactly ([code]0.30000000000000004[/code]). Has no effect in builds with [code]precision=double[/code] for vectors.
+		</member>
+		<member name="include_type_marker" type="bool" setter="set_include_type_marker" getter="is_include_type_marker" default="true">
+			JSON, INI, XML and TOML: if [code]true[/code], the class of the root resource is written ([code]"$type"[/code], the XML attribute [code]type[/code]). If [code]false[/code], it is left out, for example for data sent to a server that knows the type; such text must be read with a type hint (the [code]type_hint[/code] argument of [method ResourceTextSerializer.deserialize]), and [ResourceLoader] does not recognize it as a resource file. Nested resources whose class differs from the declared type always keep their type.
+		</member>
+		<member name="indent" type="String" setter="set_indent" getter="get_indent" default="&quot;  &quot;">
+			JSON and XML: the indentation of one level. An empty string writes JSON on one line and XML without line breaks. INI, CSV and TOML ignore it.
+		</member>
+		<member name="ini_plain_values" type="bool" setter="set_ini_plain_values" getter="is_ini_plain_values" default="false">
+			INI: if [code]true[/code], values are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so players and other tools can edit them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read.
+		</member>
+		<member name="sort_keys" type="bool" setter="set_sort_keys" getter="is_sort_keys" default="false">
+			JSON, INI, XML and TOML: if [code]true[/code], the keys of every object, section and element are written in alphabetical order (also the keys of [Dictionary] properties), which keeps diffs in version control small. If [code]false[/code], properties are written in property order. CSV columns always keep the property order.
+		</member>
+		<member name="xml_declaration" type="bool" setter="set_xml_declaration" getter="is_xml_declaration" default="true">
+			XML: if [code]true[/code], the text starts with [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Both are read.
+		</member>
+	</members>
+</class>

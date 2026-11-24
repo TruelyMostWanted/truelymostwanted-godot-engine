@@ -41,7 +41,12 @@
 		}
 		[/csharp]
 		[/codeblocks]
+		[b]Summary and budgets:[/b] while recording, the recorder also keeps the count, minimum, maximum and sum of every column and a fixed-size histogram, so [method get_summary] returns the statistics of the whole run, also when it is longer than the ring buffer. Frames slower than [member PerformanceRecordingProfile.hitch_threshold_usec] are counted as hitches. [method check_budget] compares the summary with a [PerformanceBudget]; with the command line option [code]--performance-budget &lt;file&gt;[/code] (or [member ProjectSettings.debug/performance_recording/budget]) the budget is checked when the engine quits, and the exit code is [code]1[/code] if it fails. With [member PerformanceRecordingProfile.write_summary_json], the summary is also written as JSON next to the CSV file.
+		[codeblock lang=text]
+		godot --headless --path . --fixed-fps 60 --quit-after 600 --record-performance user://perf/run.csv --performance-budget res://perf/budget.tres
+		[/codeblock]
 		Missing values are written as empty CSV cells and returned as [constant @GDScript.NAN] by [method get_column]: for example a gauge that was never set, or the process memory on a platform that cannot report it.
+		[b].NET runtime metrics:[/b] in .NET builds of Godot, the C# module registers the metric source [code]"dotnet"[/code] once the .NET runtime is initialized. Add [code]"dotnet"[/code] to [member PerformanceRecordingProfile.metric_sources] to record the columns [code]dotnet/gc_allocated_bytes[/code], [code]dotnet/gc_total_memory_bytes[/code], [code]dotnet/gc_heap_size_bytes[/code], [code]dotnet/gc_fragmented_bytes[/code], [code]dotnet/gc_committed_bytes[/code], [code]dotnet/gc_pause_time_percent[/code], [code]dotnet/gc_pause_total_ms[/code], [code]dotnet/gc_collections_gen0[/code], [code]dotnet/gc_collections_gen1[/code], [code]dotnet/gc_collections_gen2[/code], [code]dotnet/threadpool_threads[/code], [code]dotnet/threadpool_pending[/code], [code]dotnet/threadpool_completed[/code], [code]dotnet/lock_contentions[/code] and [code]dotnet/jit_compiled_methods[/code], plus the per-row deltas [code]dotnet/gc_allocated_bytes_delta[/code], [code]dotnet/gc_collections_delta[/code] and [code]dotnet/gc_pause_delta_ms[/code] (empty in the first row of a recording). Totals count since the start of the process; heap size, fragmented and committed bytes and the pause time percentage describe the last garbage collection. All values are read with a single call into .NET per row, without allocating. The same values (without the deltas) are also available as [Performance] custom monitors [code]dotnet/&lt;name&gt;[/code], for example [code]Performance.get_custom_monitor(&amp;"dotnet/gc_allocated_bytes")[/code]; they are read at most once per frame. The source does not exist on Web (no .NET support) or in builds without .NET; [method has_metric_source] tells whether it is available. On iOS (NativeAOT), [code]jit_compiled_methods[/code] is [code]0[/code]; on Android (Mono runtime), the last-collection values and the pause time can be [code]0[/code].
 		[b]Note:[/b] On Android, iOS and Web the application can be closed without a clean shutdown. Rows that are not written yet are lost, so call [method flush] when the application is paused (see [constant Node.NOTIFICATION_APPLICATION_PAUSED] and [constant Node.NOTIFICATION_APPLICATION_FOCUS_OUT]).
 		[b]Note:[/b] On Web, the CSV file lives in IndexedDB ([code]user://[/code]). Every write opens, appends and closes the file, so it is persisted. Read it with [method FileAccess.get_file_as_bytes] and offer it with [method JavaScriptBridge.download_buffer].
 		[b]Note:[/b] [method start], [method stop], [method flush] and the methods that read recorded data must be called on the main thread. [method register_metric], [method set_metric] and [method add_metric] can be called from any thread.
@@ -55,6 +60,29 @@
 			<param index="1" name="delta" type="float" />
 			<description>
 				Adds [param delta] to the metric [param id]. For a [constant METRIC_COUNTER] the sum is recorded and reset to [code]0[/code] after each row. A gauge that was never set starts from [code]0[/code]. Lock-free and thread-safe.
+			</description>
+		</method>
+		<method name="check_budget" qualifiers="const">
+			<return type="PerformanceBudgetResult" />
+			<param index="0" name="budget" type="PerformanceBudget" />
+			<description>
+				Checks the current (or last) recording against [param budget]: a shortcut for [code]budget.check_summary(get_summary())[/code]. Use [method PerformanceBudgetResult.get_exit_code] to end an automated run with a failing exit code.
+				[codeblocks]
+				[gdscript]
+				var result = PerformanceRecorder.check_budget(load("res://perf/budget.tres"))
+				if not result.is_passed():
+					printerr(result.to_text())
+				get_tree().quit(result.get_exit_code())
+				[/gdscript]
+				[csharp]
+				var result = PerformanceRecorder.CheckBudget(GD.Load&lt;PerformanceBudget&gt;("res://perf/budget.tres"));
+				if (!result.IsPassed())
+				{
+					GD.PrintErr(result.ToText());
+				}
+				GetTree().Quit(result.GetExitCode());
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="flush">
@@ -94,6 +122,13 @@
 			<return type="int" />
 			<description>
 				Returns the number of rows recorded since [method start], including rows that are no longer in the ring buffer.
+			</description>
+		</method>
+		<method name="get_summary" qualifiers="const">
+			<return type="PerformanceSummary" />
+			<description>
+				Returns the statistics of the current (or last) recording: minimum, maximum, mean and percentiles per column, and the hitches. While recording, the summary covers the rows up to now. The data stays available after [method stop] until the next [method start].
+				The percentiles are exact while the whole run fits in the ring buffer ([member PerformanceRecordingProfile.buffer_frames]); for longer runs they are estimated from a histogram and are at most 9.05% away from the exact value (see [method PerformanceSummary.is_percentiles_exact]). Minimum, maximum and mean are always exact. Empty cells are skipped.
 			</description>
 		</method>
 		<method name="has_metric_source" qualifiers="const">

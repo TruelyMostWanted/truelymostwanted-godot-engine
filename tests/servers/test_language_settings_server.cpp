@@ -43,6 +43,7 @@ TEST_FORCE_LINK(test_language_settings_server)
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestLanguageSettingsServer {
@@ -56,7 +57,7 @@ struct TestSetup {
 	Ref<Translation> japanese;
 
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		original_locale = translation_server->get_locale();
 		original_pseudolocalization = translation_server->is_pseudolocalization_enabled();
 		french.instantiate();
@@ -72,7 +73,7 @@ struct TestSetup {
 		translation_server->set_locale(original_locale);
 		translation_server->set_pseudolocalization_enabled(original_pseudolocalization);
 		ProjectSettings::get_singleton()->set_setting("internationalization/locale/test", "");
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 
@@ -214,7 +215,7 @@ TEST_CASE("[LanguageSettingsServer] Root window values wait until a SceneTree ex
 	server->set_layout_direction(Window::LAYOUT_DIRECTION_RTL);
 	CHECK(server->get_layout_direction() == Window::LAYOUT_DIRECTION_RTL);
 	// Kept for the root window and read back from there.
-	server->retrieve();
+	server->read_from_engine();
 	CHECK(server->get_layout_direction() == Window::LAYOUT_DIRECTION_RTL);
 
 	// Values out of range are rejected.
@@ -244,6 +245,40 @@ TEST_CASE("[SceneTree][LanguageSettingsServer] Layout direction and auto-transla
 	server->reset_to_defaults();
 	CHECK(root->get_layout_direction() == original_direction);
 	CHECK(root->get_auto_translate_mode() == original_mode);
+	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "locale_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("locale", String("fr_FR"));
+	SIGNAL_CHECK_FALSE("locale_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { String("fr_FR") } };
+	SIGNAL_CHECK("locale_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("locale_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("locale");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("locale_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("locale_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "locale_changed");
 	memdelete(server);
 }
 

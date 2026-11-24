@@ -25,7 +25,7 @@
 
 		func _on_apply_pressed():
 			SettingsServerManager.apply_all()
-			if SettingsServerManager.is_any_dirty():
+			if SettingsServerManager.has_dirty_servers():
 				print("Some values could not be applied.")
 		[/gdscript]
 		[csharp]
@@ -48,6 +48,10 @@
 		private void OnApplyPressed()
 		{
 		    SettingsServerManager.ApplyAll();
+		    if (SettingsServerManager.HasDirtyServers())
+		    {
+		        GD.Print("Some values could not be applied.");
+		    }
 		}
 		[/csharp]
 		[/codeblocks]
@@ -82,15 +86,27 @@
 			</description>
 		</method>
 		<method name="get_startup_phase" qualifiers="const">
-			<return type="int" />
+			<return type="int" enum="SettingsServer.ApplyPhase" />
 			<description>
-				Returns the last [enum SettingsServer.ApplyPhase] that startup has reached, or [code]-1[/code] if startup has not begun (for example in the editor).
+				Returns the last [enum SettingsServer.ApplyPhase] that startup has reached, or [constant SettingsServer.APPLY_PHASE_NONE] if startup has not begun (for example in the editor).
 			</description>
 		</method>
 		<method name="get_storage_folder" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the folder of the settings files, like [method SettingsServer.get_storage_folder].
+				Returns the folder of the settings files: [member ProjectSettings.settings/general/folder], by default [code]"user://settings"[/code].
+			</description>
+		</method>
+		<method name="get_storage_format" qualifiers="const">
+			<return type="int" enum="ResourceTextSerializer.Format" />
+			<description>
+				Returns the default text format of the settings files: [member ProjectSettings.settings/general/default_format]. A domain with [code]settings/&lt;domain&gt;/override_format[/code] uses its own [code]settings/&lt;domain&gt;/format[/code] instead. A format name written by hand into [code]project.godot[/code] (such as [code]"json"[/code]) is accepted too; unknown values give [constant ResourceTextSerializer.FORMAT_INI]. A domain uses INI instead if it can't use the format: [constant ResourceTextSerializer.FORMAT_CSV] is only for a [ListSettingsServer] whose list fits into CSV, and a format whose module is missing is not available (see [method ResourceTextSerializer.is_format_available]).
+			</description>
+		</method>
+		<method name="has_dirty_servers" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if any server has pending values that are not applied (see [method SettingsServer.is_dirty]).
 			</description>
 		</method>
 		<method name="has_server" qualifiers="const">
@@ -98,12 +114,6 @@
 			<param index="0" name="domain" type="StringName" />
 			<description>
 				Returns [code]true[/code] if a server is registered for [param domain].
-			</description>
-		</method>
-		<method name="is_any_dirty" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Returns [code]true[/code] if any server has pending values that are not applied (see [method SettingsServer.is_dirty]).
 			</description>
 		</method>
 		<method name="load_all">
@@ -160,7 +170,7 @@
 			</description>
 		</signal>
 		<signal name="startup_applied">
-			<param index="0" name="phase" type="int" />
+			<param index="0" name="phase" type="int" enum="SettingsServer.ApplyPhase" />
 			<description>
 				Emitted after the servers of a startup phase were started. [param phase] is a value of [enum SettingsServer.ApplyPhase]. Not emitted if [member ProjectSettings.settings/startup/apply_on_startup] is [code]false[/code].
 			</description>

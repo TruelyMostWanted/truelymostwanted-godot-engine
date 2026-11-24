@@ -55,21 +55,21 @@ StringName ListSettingsServer::get_entry_key() const {
 	return ret;
 }
 
-String ListSettingsServer::_get_default_extension() {
-	const String format = get_storage_format();
-	if (format != "csv") {
-		return format;
+ResourceTextSerializer::Format ListSettingsServer::_get_file_format() {
+	if (_get_configured_format() != ResourceTextSerializer::FORMAT_CSV) {
+		return SettingsServer::_get_file_format();
 	}
 	String error;
 	const Ref<Resource> default_settings = get_default_settings();
-	if (default_settings.is_valid() && ResourceTextSerializer::check_csv(default_settings, error) == OK) {
-		return "csv";
+	const Ref<Resource> storage = default_settings.is_valid() ? _settings_to_storage_for_format(default_settings, ResourceTextSerializer::FORMAT_CSV) : Ref<Resource>();
+	if (storage.is_valid() && ResourceTextSerializer::check_csv(storage, error) == OK) {
+		return ResourceTextSerializer::FORMAT_CSV;
 	}
 	if (!format_warned_csv) {
 		format_warned_csv = true;
 		WARN_PRINT(vformat("Settings domain \"%s\" can't be stored as CSV (%s); INI is used.", get_domain(), error));
 	}
-	return "ini";
+	return ResourceTextSerializer::FORMAT_INI;
 }
 
 Array ListSettingsServer::_get_list() const {
@@ -119,6 +119,8 @@ int ListSettingsServer::find_entry(const Variant &p_key) const {
 
 void ListSettingsServer::add_entry(const Ref<Resource> &p_entry, int p_at_index) {
 	ERR_FAIL_COND(p_entry.is_null());
+	// Float values of a new entry have at most three decimals, like set_entry_value().
+	snap_resource_floats(p_entry);
 	Array list = _get_list().duplicate(false);
 	if (p_at_index < 0 || p_at_index >= list.size()) {
 		list.push_back(p_entry);
@@ -165,11 +167,43 @@ void ListSettingsServer::set_entry_value(int p_index, const StringName &p_name, 
 	bool valid = false;
 	const Variant current = entry->get(p_name, &valid);
 	ERR_FAIL_COND_MSG(!valid, vformat("Settings domain \"%s\": the entries have no value \"%s\".", get_domain(), p_name));
-	if (values_equal(current, p_value)) {
+	// Entry values are validated like single values: range and enum hints of the entry, then _validate_entry_value().
+	const Variant value = _validate_entry(p_index, entry, p_name, p_value);
+	if (values_equal(current, value)) {
 		return;
 	}
-	entry->set(p_name, p_value);
+	entry->set(p_name, value);
 	notify_value_changed(get_list_property());
+}
+
+Variant ListSettingsServer::_validate_entry(int p_index, const Ref<Resource> &p_entry, const StringName &p_name, const Variant &p_value) const {
+	Variant value = validate_property_value(p_entry.ptr(), p_name, p_value);
+	Variant ret;
+	if (GDVIRTUAL_CALL(_validate_entry_value, p_index, p_name, value, ret)) {
+		// A value returned by _validate_entry_value() is snapped too.
+		value = snap_property_value(p_entry.ptr(), p_name, ret);
+	}
+	return value;
+}
+
+void ListSettingsServer::_validate_loaded_settings(const Ref<Resource> &p_settings) {
+	// Hand-edited entries are clamped like hand-edited single values.
+	const StringName property = get_list_property();
+	if (property == StringName() || p_settings.is_null()) {
+		return;
+	}
+	const Array list = p_settings->get(property);
+	for (int i = 0; i < list.size(); i++) {
+		const Ref<Resource> entry = list[i];
+		if (entry.is_null()) {
+			continue;
+		}
+		LocalVector<PropertyInfo> infos;
+		get_value_infos(entry.ptr(), infos);
+		for (const PropertyInfo &info : infos) {
+			entry->set(info.name, _validate_entry(i, entry, info.name, entry->get(info.name)));
+		}
+	}
 }
 
 Variant ListSettingsServer::get_entry_value(int p_index, const StringName &p_name) const {
@@ -177,7 +211,8 @@ Variant ListSettingsServer::get_entry_value(int p_index, const StringName &p_nam
 	ERR_FAIL_INDEX_V(p_index, list.size(), Variant());
 	const Ref<Resource> entry = list[p_index];
 	ERR_FAIL_COND_V(entry.is_null(), Variant());
-	return entry->get(p_name);
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(entry.ptr(), p_name, entry->get(p_name));
 }
 
 void ListSettingsServer::_bind_methods() {
@@ -196,4 +231,5 @@ void ListSettingsServer::_bind_methods() {
 
 	GDVIRTUAL_BIND(_get_list_property);
 	GDVIRTUAL_BIND(_get_entry_key);
+	GDVIRTUAL_BIND(_validate_entry_value, "index", "name", "value");
 }

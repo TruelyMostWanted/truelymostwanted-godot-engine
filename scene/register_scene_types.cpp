@@ -45,6 +45,7 @@
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
+#include "scene/audio/audio_command.h"
 #include "scene/audio/audio_mixer_server.h"
 #include "scene/audio/audio_stream_player.h"
 #include "scene/debugger/scene_debugger.h"
@@ -138,6 +139,7 @@
 #include "scene/resources/environment.h"
 #include "scene/resources/external_texture.h"
 #include "scene/resources/font.h"
+#include "scene/resources/font_file_resource_format.h"
 #include "scene/resources/gradient.h"
 #include "scene/resources/gradient_texture.h"
 #include "scene/resources/image_save_options.h"
@@ -149,7 +151,7 @@
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/mesh_texture.h"
 #include "scene/resources/multimesh.h"
-#include "scene/resources/texture_atlas.h"
+#include "scene/resources/sprite_sheet.h"
 #if !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/navigation_mesh.h"
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
@@ -409,6 +411,9 @@ static Ref<ResourceFormatLoaderShader> resource_loader_shader;
 static Ref<ResourceFormatSaverShaderInclude> resource_saver_shader_include;
 static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
 
+static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
+static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
+
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
 
@@ -467,6 +472,15 @@ void register_scene_types() {
 
 		resource_loader_shader_include.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_shader_include, true);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		// Not at the front: ResourceFormatImporter keeps precedence for imported fonts.
+		resource_saver_font_file.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_font_file);
+
+		resource_loader_font_file.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
 	}
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -993,7 +1007,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(ImageTexture);
 	GDREGISTER_CLASS(ImageSaveOptions);
 	GDREGISTER_CLASS(AtlasTexture);
-	GDREGISTER_CLASS(TextureAtlas);
+	GDREGISTER_CLASS(SpriteSheet);
 	GDREGISTER_CLASS(MeshTexture);
 	GDREGISTER_CLASS(CurveTexture);
 	GDREGISTER_CLASS(CurveXYZTexture);
@@ -1080,6 +1094,8 @@ void register_scene_types() {
 	GDREGISTER_ABSTRACT_CLASS(AudioStreamPlaybackPolyphonic);
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
+	GDREGISTER_CLASS(AudioCommand);
+	GDREGISTER_CLASS(AudioCommandList);
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
@@ -1455,6 +1471,14 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_shader_include);
 		resource_loader_shader_include.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(FontFile)) {
+		ResourceSaver::remove_resource_format_saver(resource_saver_font_file);
+		resource_saver_font_file.unref();
+
+		ResourceLoader::remove_resource_format_loader(resource_loader_font_file);
+		resource_loader_font_file.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either
