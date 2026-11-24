@@ -3676,6 +3676,9 @@
 		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
 		</member>
+		<member name="settings/key_bindings/include_builtin_actions" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [KeyBindingSettingsServer] also manages the built-in [code]ui_*[/code] actions of [InputMap], so players can rebind the keys of the GUI. If [code]false[/code], only the actions of the project are stored. Read once when the server is created.
+		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
 		</member>
