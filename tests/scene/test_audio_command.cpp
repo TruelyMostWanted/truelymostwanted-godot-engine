@@ -393,7 +393,7 @@ TEST_CASE("[Audio][AudioCommand] A group starts all ambience commands") {
 	CHECK(mixer->is_playing("wind"));
 	CHECK(mixer->is_playing("river"));
 	CHECK_FALSE(mixer->is_playing("traffic"));
-	CHECK(mixer->get_channel("birds")->is_loop_entry());
+	CHECK(mixer->get_channel("birds")->is_loop_current_entry());
 
 	// The whole list at once.
 	Ref<AudioCommandList> stop_all;
