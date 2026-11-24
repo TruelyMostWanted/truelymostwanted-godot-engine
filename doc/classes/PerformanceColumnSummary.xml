@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceColumnSummary" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Statistics of one column of a [PerformanceRecorder] run.
+	</brief_description>
+	<description>
+		A [PerformanceColumnSummary] holds the number of samples, the minimum, maximum and mean, and the 50th, 95th and 99th percentiles of one recorded column over the whole run. Get it from [method PerformanceSummary.get_column]. Values are in the unit of the column: microseconds for the time builtins, bytes for memory.
+		Minimum, maximum and mean are always exact. The percentiles are exact while the whole run fits in the ring buffer of the recorder ([method is_exact]); for longer runs they are estimated from a log-scaled histogram with 8 buckets per power of two and are at most 9.05% away from the exact value (typically 2-4%).
+		[codeblocks]
+		[gdscript]
+		var frame_time = PerformanceRecorder.get_summary().get_column("frame_time")
+		print("p95: %.1f ms, max: %.1f ms" % [frame_time.get_p95() / 1000.0, frame_time.get_maximum() / 1000.0])
+		[/gdscript]
+		[csharp]
+		var frameTime = PerformanceRecorder.GetSummary().GetColumn("frame_time");
+		GD.Print($"p95: {frameTime.GetP95() / 1000.0:F1} ms, max: {frameTime.GetMaximum() / 1000.0:F1} ms");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_histogram" qualifiers="const">
+			<return type="PackedInt64Array" />
+			<param index="0" name="limits" type="PackedFloat64Array" />
+			<description>
+				Returns how many samples fall into each range between [param limits], which must be in ascending order. The result has one more element than [param limits]: element [code]i[/code] counts the samples that are less than or equal to [code]limits[i][/code] and greater than [code]limits[i - 1][/code]; the last element counts the samples above the last limit.
+				For example, a frame-time histogram with [code][8333, 16667, 33333][/code] returns the frames that ran at 120 FPS or faster, at 60 FPS, at 30 FPS, and slower. For runs longer than the ring buffer the counts are estimated from the histogram buckets.
+			</description>
+		</method>
+		<method name="get_maximum" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the largest value of the column. [code]0.0[/code] if there are no samples.
+			</description>
+		</method>
+		<method name="get_mean" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the average value of the column. [code]0.0[/code] if there are no samples.
+			</description>
+		</method>
+		<method name="get_minimum" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the smallest value of the column. [code]0.0[/code] if there are no samples.
+			</description>
+		</method>
+		<method name="get_name" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the name of the column, as in the CSV header and [method PerformanceRecorder.get_column_names].
+			</description>
+		</method>
+		<method name="get_p50" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the median (50th percentile) of the column.
+			</description>
+		</method>
+		<method name="get_p95" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the 95th percentile of the column: 95% of the samples are less than or equal to this value.
+			</description>
+		</method>
+		<method name="get_p99" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the 99th percentile of the column: 99% of the samples are less than or equal to this value.
+			</description>
+		</method>
+		<method name="get_percentile" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="percentile" type="float" />
+			<description>
+				Returns any percentile of the column, [param percentile] between [code]0.0[/code] (the minimum) and [code]100.0[/code] (the maximum). Values between two samples are interpolated linearly. Returns [code]0.0[/code] if there are no samples.
+			</description>
+		</method>
+		<method name="get_sample_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of values in the column. Empty cells (for example a gauge that was never set) are not counted.
+			</description>
+		</method>
+		<method name="is_exact" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the percentiles were computed from all samples, [code]false[/code] if they were estimated from the histogram because the run was longer than the ring buffer.
+			</description>
+		</method>
+	</methods>
+</class>

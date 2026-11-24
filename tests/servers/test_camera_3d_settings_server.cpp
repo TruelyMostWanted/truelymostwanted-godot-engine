@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_camera_settings_server.cpp                                       */
+/*  test_camera_3d_settings_server.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_camera_settings_server)
+TEST_FORCE_LINK(test_camera_3d_settings_server)
 
 #ifndef _3D_DISABLED
 
@@ -41,13 +41,13 @@ TEST_FORCE_LINK(test_camera_settings_server)
 #include "scene/3d/camera_3d.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
-#include "servers/settings/camera_settings.h"
-#include "servers/settings/camera_settings_server.h"
+#include "servers/settings/camera_3d_settings.h"
+#include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
-namespace TestCameraSettingsServer {
+namespace TestCamera3DSettingsServer {
 
 // Autosave off for the test.
 struct TestSetup {
@@ -60,7 +60,7 @@ struct TestSetup {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("camera_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("camera_3d_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -85,17 +85,17 @@ static void check_authored(const Camera3D *p_camera) {
 	CHECK(p_camera->get_far() == doctest::Approx(500.0));
 }
 
-TEST_CASE("[CameraSettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[Camera3DSettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	CameraSettingsServer *server = CameraSettingsServer::get_singleton();
+	Camera3DSettingsServer *server = Camera3DSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("CameraSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("camera") == server);
-	CHECK(server->get_domain() == StringName("camera"));
+	CHECK(Engine::get_singleton()->has_singleton("Camera3DSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("camera_3d") == server);
+	CHECK(server->get_domain() == StringName("camera_3d"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(server->get_file_path() == "user://settings/camera.ini");
-	CHECK(Object::cast_to<CameraSettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(CameraSettingsServer::get_camera_group() == StringName("camera_settings"));
+	CHECK(server->get_file_path() == "user://settings/camera_3d.ini");
+	CHECK(Object::cast_to<Camera3DSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(Camera3DSettingsServer::get_camera_group() == StringName("camera_3d_settings"));
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 8);
@@ -110,17 +110,17 @@ TEST_CASE("[CameraSettingsServer] The domain is an engine singleton registered w
 	}
 }
 
-TEST_CASE("[CameraSettingsServer] Defaults are the project settings") {
+TEST_CASE("[Camera3DSettingsServer] Defaults are the project settings") {
 	TestSetup setup;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
-	const Variant old_fov = project_settings->get_setting("settings/camera/field_of_view", 75.0);
-	const Variant old_keep_aspect = project_settings->get_setting("settings/camera/keep_aspect", 1);
-	const Variant old_far = project_settings->get_setting("settings/camera/far", 4000.0);
-	project_settings->set_setting("settings/camera/field_of_view", 90.0);
-	project_settings->set_setting("settings/camera/keep_aspect", int(Camera3D::KEEP_WIDTH));
-	project_settings->set_setting("settings/camera/far", 1000.0);
+	const Variant old_fov = project_settings->get_setting("settings/camera_3d/field_of_view", 75.0);
+	const Variant old_keep_aspect = project_settings->get_setting("settings/camera_3d/keep_aspect", 1);
+	const Variant old_far = project_settings->get_setting("settings/camera_3d/far", 4000.0);
+	project_settings->set_setting("settings/camera_3d/field_of_view", 90.0);
+	project_settings->set_setting("settings/camera_3d/keep_aspect", int(Camera3D::KEEP_WIDTH));
+	project_settings->set_setting("settings/camera_3d/far", 1000.0);
 
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	CHECK(server->is_enabled());
 	CHECK(server->get_field_of_view() == doctest::Approx(90.0));
@@ -133,14 +133,14 @@ TEST_CASE("[CameraSettingsServer] Defaults are the project settings") {
 	CHECK(double(server->get_default_value("field_of_view")) == doctest::Approx(90.0));
 	memdelete(server);
 
-	project_settings->set_setting("settings/camera/field_of_view", old_fov);
-	project_settings->set_setting("settings/camera/keep_aspect", old_keep_aspect);
-	project_settings->set_setting("settings/camera/far", old_far);
+	project_settings->set_setting("settings/camera_3d/field_of_view", old_fov);
+	project_settings->set_setting("settings/camera_3d/keep_aspect", old_keep_aspect);
+	project_settings->set_setting("settings/camera_3d/far", old_far);
 }
 
-TEST_CASE("[CameraSettingsServer] Values out of range are clamped with a warning") {
+TEST_CASE("[Camera3DSettingsServer] Values out of range are clamped with a warning") {
 	TestSetup setup;
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -168,11 +168,11 @@ TEST_CASE("[CameraSettingsServer] Values out of range are clamped with a warning
 	memdelete(server);
 }
 
-TEST_CASE("[CameraSettingsServer] Values are saved and loaded") {
+TEST_CASE("[Camera3DSettingsServer] Values are saved and loaded") {
 	TestSetup setup;
 	const String path = temp_file("camera.ini");
 	{
-		CameraSettingsServer *server = memnew(CameraSettingsServer);
+		Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_field_of_view(95.0);
@@ -187,7 +187,7 @@ TEST_CASE("[CameraSettingsServer] Values are saved and loaded") {
 		memdelete(server);
 	}
 
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	CHECK(server->load() == OK);
@@ -201,9 +201,9 @@ TEST_CASE("[CameraSettingsServer] Values are saved and loaded") {
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][CameraSettingsServer] Added cameras get the values and their authored values back") {
+TEST_CASE("[SceneTree][Camera3DSettingsServer] Added cameras get the values and their authored values back") {
 	TestSetup setup;
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_file_path(temp_file("added.ini"));
 	server->set_field_of_view(100.0);
 	server->set_near(0.5);
@@ -245,18 +245,18 @@ TEST_CASE("[SceneTree][CameraSettingsServer] Added cameras get the values and th
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][CameraSettingsServer] Cameras in the group get the values, others keep theirs") {
+TEST_CASE("[SceneTree][Camera3DSettingsServer] Cameras in the group get the values, others keep theirs") {
 	TestSetup setup;
 	Window *root = SceneTree::get_singleton()->get_root().ptr();
 
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_file_path(temp_file("group.ini"));
 	server->set_field_of_view(90.0);
 	server->apply_to_cameras(); // Connects to the SceneTree.
 
 	// In the group: gets the values when it enters the tree (a camera of a new scene).
 	Camera3D *player = create_authored_camera();
-	player->add_to_group(CameraSettingsServer::get_camera_group());
+	player->add_to_group(Camera3DSettingsServer::get_camera_group());
 	root->add_child(player);
 	CHECK(server->has_camera(player));
 	CHECK(player->get_fov() == doctest::Approx(90.0));
@@ -275,13 +275,13 @@ TEST_CASE("[SceneTree][CameraSettingsServer] Cameras in the group get the values
 	root->remove_child(player);
 	memdelete(player);
 	Camera3D *next_player = create_authored_camera();
-	next_player->add_to_group(CameraSettingsServer::get_camera_group());
+	next_player->add_to_group(Camera3DSettingsServer::get_camera_group());
 	root->add_child(next_player);
 	CHECK(next_player->get_fov() == doctest::Approx(70.0));
 	CHECK(server->get_managed_cameras().size() == 1);
 
 	// Joined the group while in the tree: apply_to_cameras() picks it up.
-	cutscene->add_to_group(CameraSettingsServer::get_camera_group());
+	cutscene->add_to_group(Camera3DSettingsServer::get_camera_group());
 	CHECK_FALSE(server->has_camera(cutscene));
 	server->apply_to_cameras();
 	CHECK(cutscene->get_fov() == doctest::Approx(70.0));
@@ -293,9 +293,9 @@ TEST_CASE("[SceneTree][CameraSettingsServer] Cameras in the group get the values
 	memdelete(server);
 }
 
-TEST_CASE("[CameraSettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[Camera3DSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	CameraSettingsServer *server = memnew(CameraSettingsServer);
+	Camera3DSettingsServer *server = memnew(Camera3DSettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "field_of_view_changed");
 
@@ -327,6 +327,6 @@ TEST_CASE("[CameraSettingsServer] Typed signals fire once per applied change") {
 	memdelete(server);
 }
 
-} // namespace TestCameraSettingsServer
+} // namespace TestCamera3DSettingsServer
 
 #endif // _3D_DISABLED

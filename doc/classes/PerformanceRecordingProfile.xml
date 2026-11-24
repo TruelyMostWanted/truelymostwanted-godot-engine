@@ -44,6 +44,9 @@
 			Number of recorded rows after which they are appended to the CSV file. Rows that are not yet written are lost if the application is killed or crashes, so keep this short on mobile and Web.
 			If [code]0[/code], nothing is written until [method PerformanceRecorder.flush] or [method PerformanceRecorder.stop], and only the last [member buffer_frames] rows are kept. Use this to record "the last N seconds" before a hitch, or for in-game graphs with [method PerformanceRecorder.get_column].
 		</member>
+		<member name="hitch_threshold_usec" type="int" setter="set_hitch_threshold_usec" getter="get_hitch_threshold_usec" default="50000">
+			A frame that takes longer than this many microseconds is counted as a hitch in [method PerformanceRecorder.get_summary] ([method PerformanceSummary.get_hitch_count]). Every frame is checked, also the frames between two rows when [member sample_interval_frames] is greater than [code]1[/code]. [code]0[/code] disables hitch detection. The default of 50 ms is three frames at 60 FPS.
+		</member>
 		<member name="include_custom_monitors" type="bool" setter="set_include_custom_monitors" getter="is_include_custom_monitors" default="false">
 			If [code]true[/code], every custom monitor of [Performance] that exists when recording starts gets a column (see [method Performance.add_custom_monitor]). Custom monitors call a [Callable] per row, which costs more than the other columns. Values that are not numbers are written as empty cells.
 		</member>
@@ -66,6 +69,9 @@
 		</member>
 		<member name="sample_interval_frames" type="int" setter="set_sample_interval_frames" getter="get_sample_interval_frames" default="1">
 			Records one row every this many frames. [code]1[/code] records every frame. Values of [constant PerformanceRecorder.METRIC_COUNTER] metrics added in the frames in between are summed into the next row.
+		</member>
+		<member name="write_summary_json" type="bool" setter="set_write_summary_json" getter="is_write_summary_json" default="false">
+			If [code]true[/code], [method PerformanceRecorder.stop] (and the engine at exit) writes the summary ([method PerformanceSummary.to_text]) as JSON next to the CSV file: [member output_path] with the extension replaced by [code].summary.json[/code]. Nothing is written if [member output_path] is empty.
 		</member>
 	</members>
 </class>
