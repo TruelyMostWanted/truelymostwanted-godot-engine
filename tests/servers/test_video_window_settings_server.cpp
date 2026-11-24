@@ -143,17 +143,17 @@ TEST_CASE("[VideoWindowSettingsServer] Mode and size wait for the confirmation, 
 
 	server->set_window_mode(DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
 	CHECK(server->is_confirmation_pending());
-	server->confirm_pending();
+	server->confirm_changes();
 	CHECK_FALSE(server->is_confirmation_pending());
 	CHECK(server->get_applied_value("window_mode") == Variant(int(DisplayServerEnums::WINDOW_MODE_FULLSCREEN)));
 
 	server->set_window_size(Size2i(1920, 1080));
 	CHECK(server->is_confirmation_pending());
-	server->cancel_pending();
+	server->cancel_confirmation();
 	CHECK(server->get_window_size() != Size2i(1920, 1080));
 
-	// Without a screen the domain keeps the pushed values: retrieve() gives them back.
-	server->retrieve();
+	// Without a screen the domain keeps the pushed values: read_from_engine() gives them back.
+	server->read_from_engine();
 	CHECK(server->get_window_mode() == DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
 	CHECK(server->get_vsync_mode() == DisplayServerEnums::VSYNC_DISABLED);
 	memdelete(server);
@@ -174,7 +174,7 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 		CHECK(server->apply() == OK);
 		// Mode, size and screen: the player keeps them in the confirmation dialog.
 		CHECK(server->is_confirmation_pending());
-		server->confirm_pending();
+		server->confirm_changes();
 		CHECK(server->save() == OK);
 		memdelete(server);
 	}

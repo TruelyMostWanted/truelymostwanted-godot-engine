@@ -47,7 +47,7 @@ class ListSettingsServer : public SettingsServer {
 protected:
 	static void _bind_methods();
 
-	virtual String _get_default_extension() override;
+	virtual ResourceTextSerializer::Format _get_file_format() override;
 
 	GDVIRTUAL0RC(StringName, _get_list_property)
 	GDVIRTUAL0RC(StringName, _get_entry_key)
