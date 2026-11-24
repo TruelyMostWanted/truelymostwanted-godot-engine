@@ -63,7 +63,7 @@ struct TestSetup {
 	}
 	~TestSetup() {
 		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/format", "ini");
+		ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
 	}
 };
 
@@ -102,7 +102,7 @@ TEST_CASE("[Audio][AudioSettingsServer] Both domains are engine singletons regis
 
 	CHECK(audio->get_file_path() == "user://settings/audio.ini");
 	CHECK(buses->get_file_path() == "user://settings/audio_buses.ini");
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", "csv");
+	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
 	CHECK(buses->get_file_path() == "user://settings/audio_buses.csv");
 	ERR_PRINT_OFF;
 	// The devices are one record: no CSV.
