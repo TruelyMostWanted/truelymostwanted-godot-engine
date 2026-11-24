@@ -35,14 +35,19 @@
 #include "core/config/engine.h"
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
+#include "core/io/resource_importer.h"
 #include "core/object/class_db.h"
 
 bool ResourceFormatLoaderTheora::is_imported_path(const String &p_path) {
 	const String import_path = p_path + ".import";
 	if (!FileAccess::exists(import_path)) {
-		// In the editor, a `res://` file without `.import` is about to be imported (or is read by
-		// another importer as a dependency): leave it to the import system.
-		return p_path.begins_with("res://") && Engine::get_singleton()->is_editor_hint();
+		// In the editor, a `res://` file without `.import` is about to be imported only if an
+		// importer handles it. Godot has no `.ogv` importer, so this loader reads it directly.
+		if (!p_path.begins_with("res://") || !Engine::get_singleton()->is_editor_hint()) {
+			return false;
+		}
+		const ResourceFormatImporter *format_importer = ResourceFormatImporter::get_singleton();
+		return format_importer && format_importer->get_importer_by_file(p_path).is_valid();
 	}
 	Ref<ConfigFile> config;
 	config.instantiate();
