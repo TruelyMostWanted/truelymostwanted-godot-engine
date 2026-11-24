@@ -273,7 +273,7 @@ TEST_CASE("[AudioCommand] Registering, collisions and unregistering") {
 	ERR_PRINT_ON;
 }
 
-TEST_CASE("[AudioCommand] Queue commands without playback") {
+TEST_CASE("[Audio][AudioCommand] Queue commands without playback") {
 	MixerReset reset;
 	AudioMixerServer *mixer = AudioMixerServer::get_singleton();
 	REQUIRE(mixer != nullptr);
