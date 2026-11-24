@@ -129,6 +129,7 @@
 #include "editor/doc/doc_tools.h"
 #include "editor/doc/editor_help.h"
 #include "editor/editor_node.h"
+#include "editor/export/pck_package_exporter.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/progress_dialog.h"
@@ -666,6 +667,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("--export-pack <preset> <path>", "Export the project data only using the given preset and output path. The <path> extension determines whether it will be in PCK or ZIP format.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--export-patch <preset> <path>", "Export pack with changed files only. See --export-pack description for other considerations.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--patches <paths>", "List of patches to use with --export-patch. The list is comma-separated.\n", CLI_OPTION_AVAILABILITY_EDITOR);
+	print_help_option("--export-pack-description <preset> <description> <path>", "Build the PCKPackage description (.tres/.res) into a pack at <path>, through the export pipeline of the given preset.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--install-android-build-template", "Install the Android build template. Used in conjunction with --export-release or --export-debug.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 #ifndef DISABLE_DEPRECATED
 	// Commands are long; split the description to a second line.
@@ -1672,7 +1674,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			wait_for_import = true;
 			quit_after = 1;
 		} else if (arg == "--export-release" || arg == "--export-debug" ||
-				arg == "--export-pack" || arg == "--export-patch") { // Export project
+				arg == "--export-pack" || arg == "--export-patch" || arg == "--export-pack-description") { // Export project
 			// Actually handling is done in start().
 			editor = true;
 			cmdline_tool = true;
@@ -4157,6 +4159,8 @@ int Main::start() {
 	bool export_pack_only = false;
 	bool install_android_build_template = false;
 	bool export_patch = false;
+	String pack_description_preset;
+	String pack_description_path;
 #ifdef MODULE_GDSCRIPT_ENABLED
 	String gdscript_docs_path;
 #endif
@@ -4278,6 +4282,13 @@ int Main::start() {
 				export_patch = true;
 			} else if (E->get() == "--patches") {
 				patches = E->next()->get().split(",", false);
+			} else if (E->get() == "--export-pack-description") {
+				ERR_FAIL_COND_V_MSG(!editor && !found_project, EXIT_FAILURE, "Please provide a valid project path when exporting, aborting.");
+				ERR_FAIL_COND_V_MSG(!E->next()->next(), EXIT_FAILURE, "Missing description path after --export-pack-description <preset>, aborting.");
+				editor = true;
+				pack_description_preset = E->next()->get();
+				E = E->next(); // The description is a second argument; the pack path is the positional argument.
+				pack_description_path = E->next()->get();
 #endif
 			} else {
 				// The parameter does not match anything known, don't skip the next argument
@@ -4741,6 +4752,10 @@ int Main::start() {
 
 			if (!_export_preset.is_empty()) {
 				editor_node->export_preset(_export_preset, positional_arg, export_debug, export_pack_only, install_android_build_template, export_patch, patches);
+				game_path = ""; // Do not load anything.
+			}
+			if (!pack_description_preset.is_empty()) {
+				PCKPackageExporter::request_command_line_export(pack_description_preset, pack_description_path, positional_arg, false);
 				game_path = ""; // Do not load anything.
 			}
 
