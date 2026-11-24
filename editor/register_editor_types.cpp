@@ -187,6 +187,7 @@ void register_editor_types() {
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
 	GDREGISTER_ABSTRACT_CLASS(PCKPackageExporter);
+	GDREGISTER_CLASS(PCKBuildPlan);
 
 	register_exporter_types();
 

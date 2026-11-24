@@ -94,8 +94,8 @@ void PCKExportPlugin::_export_begin(const HashSet<String> &p_features, bool p_de
 			_add_message(EditorExportPlatform::EXPORT_MESSAGE_WARNING, vformat(TTR("Can't load the pack description \"%s\" listed in \"%s\". Its files are exported."), description_path, OPTION_EXCLUDED_DESCRIPTIONS));
 			continue;
 		}
-		const PCKPackageExporter::Plan plan = PCKPackageExporter::make_plan(description);
-		for (const String &source : plan.export_sources) {
+		const Ref<PCKBuildPlan> plan = PCKPackageExporter::plan_description(description);
+		for (const String &source : plan->get_export_sources()) {
 			excluded_sources.insert(source);
 		}
 	}
