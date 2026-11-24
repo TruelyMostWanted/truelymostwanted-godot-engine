@@ -8,6 +8,7 @@
 		Channels come from the [AudioMixerLayout] set in the project setting [code]audio/mixer/default_layout[/code] (loaded on first use), from [method apply_layout] or from [method add_channel].
 		Streams can be given as an [AudioStream] or as a path. Queue entries given as a path are loaded when they start and released when they no longer play, so only the current entry (and, with [member AudioMixerChannel.preload_next], the next one) is kept in memory.
 		The volume of a voice is its fade gain (see [method get_fade_gain]) times the channel volume (see [method set_channel_volume_db]) times the volume of its bus. The mixer never changes buses or bus volumes.
+		Channels can duck (lower their volume) while [TTSServer] speaks, so spoken text stays understandable over music: enable [member AudioMixerChannel.duck_on_tts] and set [member AudioMixerChannel.duck_volume_db] and [member AudioMixerChannel.duck_fade_time]. The channels stay ducked until the last utterance ends or is canceled. [method duck] and [method unduck] do the same by hand, for dialog that plays as normal audio. The ducking offset is added to the channel volume, so a [method fade_out] during ducking still ends at silence.
 		[codeblocks]
 		[gdscript]
 		func _ready():
@@ -103,6 +104,30 @@
 				Removes the queue entry at [param index] of [param channel], or the last entry if [param index] is negative. If the removed entry is the current one, it keeps playing, and the cursor moves to the entry before it, so [method play_next] plays the entry that followed.
 			</description>
 		</method>
+		<method name="duck">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="volume_db" type="float" />
+			<param index="2" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Lowers [param channel] by [param volume_db] decibels (clamped to [code]-80.0[/code] to [code]0.0[/code]) over [param fade_time] seconds until [method unduck] is called, for example while dialog plays as normal audio on another channel. A negative [param fade_time] uses [member AudioMixerChannel.duck_fade_time].
+				A manual duck and the duck while [TTSServer] speaks do not add up: the lower volume wins. Manual ducks do not depend on [method set_ducking_enabled].
+				[codeblocks]
+				[gdscript]
+				AudioMixerServer.duck(&amp;"music", -10.0)
+				AudioMixerServer.play(&amp;"voice", "res://dialog/intro.ogg")
+				await AudioMixerServer.channel_finished
+				AudioMixerServer.unduck(&amp;"music")
+				[/gdscript]
+				[csharp]
+				AudioMixerServer.Duck("music", -10.0f);
+				AudioMixerServer.Play("voice", "res://dialog/intro.ogg");
+				await ToSignal(AudioMixerServer.Singleton, AudioMixerServerInstance.SignalName.ChannelFinished);
+				AudioMixerServer.Unduck("music");
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="enqueue">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -174,6 +199,13 @@
 				Fades the voices of [param channel] out over [param time] seconds and stops them at the end. One-shots stop at once. [method is_playing] returns [code]false[/code] from this call on. Emits [signal fade_finished] when the fade ends.
 			</description>
 		</method>
+		<method name="get_active_utterance_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of [TTSServer] utterances that have started and not yet ended or been canceled. While it is greater than [code]0[/code], channels with [member AudioMixerChannel.duck_on_tts] are ducked.
+				If the operating system loses the end event of an utterance, the mixer treats all utterances as finished after [TTSServer] has reported no speech for one second.
+			</description>
+		</method>
 		<method name="get_channel" qualifiers="const">
 			<return type="AudioMixerChannel" />
 			<param index="0" name="channel" type="StringName" />
@@ -212,6 +244,13 @@
 			<return type="PackedStringArray" />
 			<description>
 				Returns the names of all registered commands, in the order they were registered. Commands without a name are registered too (for [method execute_group]) but are not listed.
+			</description>
+		</method>
+		<method name="get_duck_volume_db" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the current ducking offset of [param channel] in decibels: [code]0.0[/code] when not ducked, the target offset when ducked, and the value in between while the duck fades.
 			</description>
 		</method>
 		<method name="get_fade_gain" qualifiers="const">
@@ -261,6 +300,19 @@
 			<param index="0" name="command_name" type="StringName" />
 			<description>
 				Returns [code]true[/code] if a command named [param command_name] is registered.
+			</description>
+		</method>
+		<method name="is_ducked" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param channel] is ducked, either by [method duck] or because [TTSServer] speaks and [member AudioMixerChannel.duck_on_tts] is enabled. The volume may still be fading, see [method get_duck_volume_db].
+			</description>
+		</method>
+		<method name="is_ducking_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if channels are ducked while [TTSServer] speaks. See [method set_ducking_enabled].
 			</description>
 		</method>
 		<method name="is_fading" qualifiers="const">
@@ -383,6 +435,13 @@
 				Sets the volume of [param channel] in decibels, at once or, if [param fade_time] is greater than [code]0.0[/code], linearly in decibels over [param fade_time] seconds. Emits [signal fade_finished] when a fade ends. The volume of the bus is not changed.
 			</description>
 		</method>
+		<method name="set_ducking_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Enables or disables ducking while [TTSServer] speaks for all channels (enabled by default), for example from an accessibility option. Disabling it restores the ducked channels with their [member AudioMixerChannel.duck_fade_time]. Utterances are still counted, so enabling it again during speech ducks at once. Manual ducks from [method duck] are not affected.
+			</description>
+		</method>
 		<method name="set_queue_index">
 			<return type="void" />
 			<param index="0" name="channel" type="StringName" />
@@ -415,6 +474,15 @@
 				Switches the current voice of [param channel] to the clip named [param clip], if the voice plays an [AudioStreamInteractive] (module [code]interactive_music[/code]). Prints an error for other streams.
 			</description>
 		</method>
+		<method name="unduck">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="fade_time" type="float" default="-1.0" />
+			<description>
+				Ends a manual duck of [param channel] started with [method duck] and restores its volume over [param fade_time] seconds. A negative [param fade_time] uses [member AudioMixerChannel.duck_fade_time]. If [TTSServer] still speaks and the channel ducks for speech, it stays ducked by [member AudioMixerChannel.duck_volume_db].
+				A voice that was faded out with [method fade_out] while ducked stays silent: ducking only offsets the volume and never restarts or raises a fade.
+			</description>
+		</method>
 		<method name="unregister_commands">
 			<return type="void" />
 			<param index="0" name="list" type="AudioCommandList" />
@@ -444,6 +512,13 @@
 			<param index="1" name="command" type="AudioCommand" />
 			<description>
 				Emitted after [param command] ran successfully through [method execute], [method execute_list], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
+			</description>
+		</signal>
+		<signal name="ducking_changed">
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="ducked" type="bool" />
+			<description>
+				Emitted when [param channel] becomes ducked ([param ducked] is [code]true[/code]) or is restored ([param ducked] is [code]false[/code]), at the start of the duck fade.
 			</description>
 		</signal>
 		<signal name="fade_finished">

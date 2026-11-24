@@ -34,6 +34,7 @@
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
+#include "servers/settings/list_settings_server.h"
 
 static constexpr const char *SETTING_APPLY_ON_STARTUP = "settings/startup/apply_on_startup";
 static constexpr const char *SETTING_CUSTOM_SERVERS = "settings/startup/custom_servers";
@@ -97,6 +98,8 @@ Error SettingsServerManager::register_server(SettingsServer *p_server) {
 		}
 	}
 	ERR_FAIL_COND_V_MSG(duplicate, ERR_ALREADY_EXISTS, vformat("A settings server for the domain \"%s\" is already registered.", domain));
+	// `settings/paths/<domain>_settings_path`: engine domains register in the editor too, so their path shows up in the project settings.
+	SettingsServer::register_path_setting(domain, Object::cast_to<ListSettingsServer>(p_server) != nullptr);
 	// Registered after its startup phase (for example by a module or a GDExtension at scene level).
 	if (enabled && phase != SettingsServer::APPLY_PHASE_NONE && int(p_server->get_apply_phase()) <= int(phase)) {
 		p_server->startup();

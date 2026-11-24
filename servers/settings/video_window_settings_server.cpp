@@ -37,6 +37,7 @@
 #include "core/templates/local_vector.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
+#include "servers/settings/accessibility_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_window_settings.h"
 
@@ -331,7 +332,8 @@ void VideoWindowSettingsServer::_deliver(const StringName &p_name, const Variant
 	} else if (p_name == SNAME("content_scale_stretch")) {
 		root->set_content_scale_stretch(Window::ContentScaleStretch(int(p_value)));
 	} else if (p_name == SNAME("content_scale_factor")) {
-		root->set_content_scale_factor(MAX(real_t(p_value), real_t(0.01)));
+		// Times the UI scale of the accessibility domain (#27), which owns that part of the factor.
+		root->set_content_scale_factor(MAX(real_t(p_value), real_t(0.01)) * AccessibilitySettingsServer::get_root_ui_scale());
 	} else if (p_name == SNAME("hdr_output_requested")) {
 		root->set_hdr_output_requested(bool(p_value));
 	} else if (p_name == SNAME("hdr_reference_luminance")) {
@@ -381,7 +383,7 @@ Variant VideoWindowSettingsServer::_pull_window_value(const StringName &p_name) 
 		} else if (p_name == SNAME("content_scale_stretch") && root != nullptr) {
 			return int(root->get_content_scale_stretch());
 		} else if (p_name == SNAME("content_scale_factor") && root != nullptr) {
-			return float(root->get_content_scale_factor());
+			return float(root->get_content_scale_factor() / MAX(AccessibilitySettingsServer::get_root_ui_scale(), 0.01f));
 		} else if (p_name == SNAME("hdr_output_requested") && root != nullptr && display_server != nullptr) {
 			return root->is_hdr_output_requested();
 		} else if (p_name == SNAME("hdr_reference_luminance") && display_server != nullptr) {

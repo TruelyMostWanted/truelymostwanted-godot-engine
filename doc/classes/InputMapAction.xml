@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="KeyBinding" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="InputMapAction" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		One slot of an input action in the key bindings of [KeyBindingSettingsServer].
+		One event slot of an [InputMap] action in [InputMapSettings].
 	</brief_description>
 	<description>
-		A [KeyBinding] is one row of the settings domain [code]"key_bindings"[/code]: the key, mouse button, joypad button or joypad axis bound to a slot of an [InputMap] action. A slot is addressed by [member action], [member device] and [member slot], so a rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" maps every cell to one [KeyBinding].
+		An [InputMapAction] is one row of the settings domain [code]"input_map"[/code]: the key, mouse button, joypad button or joypad axis bound to a slot of an [InputMap] action. A slot is addressed by [member action], [member device] and [member slot], so a rebinding menu with the columns "Keyboard 1", "Keyboard 2" and "Gamepad" maps every cell to one [InputMapAction].
 		The event is stored as readable text ([member event]), so the saved file can be read and edited by hand and survives JSON, INI and CSV:
 		- [code]Key:Ctrl+S[/code], [code]PhysicalKey:W[/code] and [code]KeyLabel:Shift+A[/code]: an [InputEventKey] matched by [member InputEventKey.keycode], [member InputEventKey.physical_keycode] or [member InputEventKey.key_label]. The modifiers are [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code], [code]Meta[/code] and [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms). The key names are those of [method OS.get_keycode_string]; unknown codes are written as [code]#[/code] and the number.
 		- [code]MouseButton:Left[/code], [code]MouseButton:Ctrl+WheelUp[/code]: an [InputEventMouseButton]. The buttons are [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] and [code]Extra2[/code].
@@ -13,14 +13,14 @@
 		An empty [member event] is a cleared slot: the project binding of that slot does not come back after a restart.
 		[codeblocks]
 		[gdscript]
-		var text = KeyBinding.event_to_text(event) # "PhysicalKey:W"
-		var same = KeyBinding.text_to_event(text)
-		$Label.text = KeyBinding.event_to_label(same) # "W", or "Z" on an AZERTY keyboard.
+		var text = InputMapAction.event_to_text(event) # "PhysicalKey:W"
+		var same = InputMapAction.text_to_event(text)
+		$Label.text = InputMapAction.event_to_label(same) # "W", or "Z" on an AZERTY keyboard.
 		[/gdscript]
 		[csharp]
-		string text = KeyBinding.EventToText(@event); // "PhysicalKey:W"
-		InputEvent same = KeyBinding.TextToEvent(text);
-		GetNode&lt;Label&gt;("Label").Text = KeyBinding.EventToLabel(same); // "W", or "Z" on an AZERTY keyboard.
+		string text = InputMapAction.EventToText(@event); // "PhysicalKey:W"
+		InputEvent same = InputMapAction.TextToEvent(text);
+		GetNode&lt;Label&gt;("Label").Text = InputMapAction.EventToLabel(same); // "W", or "Z" on an AZERTY keyboard.
 		[/csharp]
 		[/codeblocks]
 	</description>
@@ -42,7 +42,7 @@
 			</description>
 		</method>
 		<method name="get_event_device" qualifiers="static">
-			<return type="int" enum="KeyBinding.InputDevice" />
+			<return type="int" enum="InputMapAction.InputDevice" />
 			<param index="0" name="event" type="InputEvent" />
 			<description>
 				Returns the device that [param event] belongs to: [constant INPUT_DEVICE_KEYBOARD] for an [InputEventKey], [constant INPUT_DEVICE_MOUSE] for an [InputEventMouseButton], [constant INPUT_DEVICE_GAMEPAD] for an [InputEventJoypadButton] or [InputEventJoypadMotion], and [constant INPUT_DEVICE_MAX] for event types that can't be bound.
@@ -80,13 +80,13 @@
 			The name of the [InputMap] action.
 		</member>
 		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
-			The deadzone of the action (see [method InputMap.action_set_deadzone]), from [code]0.0[/code] to [code]1.0[/code]. All rows of one action carry the same value; [KeyBindingSettingsServer] applies the value of the first row.
+			The deadzone of the action (see [method InputMap.action_set_deadzone]), from [code]0.0[/code] to [code]1.0[/code]. All rows of one action carry the same value; [InputMapSettingsServer] applies the value of the first row.
 		</member>
-		<member name="device" type="int" setter="set_device" getter="get_device" enum="KeyBinding.InputDevice" default="0">
-			The device of the slot. [KeyBindingSettingsServer] numbers the slots per device, so keyboard slot 0 and gamepad slot 0 are different slots.
+		<member name="device" type="int" setter="set_device" getter="get_device" enum="InputMapAction.InputDevice" default="0">
+			The device of the slot. [InputMapSettingsServer] numbers the slots per device, so keyboard slot 0 and gamepad slot 0 are different slots.
 		</member>
 		<member name="device_id" type="int" setter="set_device_id" getter="get_device_id" default="-1">
-			The device id the binding reacts to; [code]-1[/code] for all devices. [method KeyBindingSettingsServer.rebind] stores [code]-1[/code], because the id of a joypad changes when it is reconnected. Set a fixed id for local multiplayer.
+			The device id the binding reacts to; [code]-1[/code] for all devices. [method InputMapSettingsServer.rebind] stores [code]-1[/code], because the id of a joypad changes when it is reconnected. Set a fixed id for local multiplayer.
 		</member>
 		<member name="event" type="String" setter="set_event" getter="get_event" default="&quot;&quot;">
 			The bound event in text form, for example [code]"Key:Ctrl+S"[/code] (see the class description). Empty for a cleared slot.
