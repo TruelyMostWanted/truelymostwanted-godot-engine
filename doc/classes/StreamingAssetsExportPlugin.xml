@@ -7,7 +7,8 @@
 		The editor registers one instance of this export plugin. It is active when the project setting [code]filesystem/streaming_assets/enabled[/code] is [code]true[/code], and handles the folder set in [code]filesystem/streaming_assets/source_folder[/code] (default [code]"res://streaming_assets"[/code]):
 		- Every file below the folder is skipped by the regular export, together with its [code].import[/code] remap and its imported artifacts. The files are never converted.
 		- [b]External[/b] (Windows and Linux/BSD, mode [code]raw[/code]): after the export, the folder is copied unchanged to [code]filesystem/streaming_assets/target_folder[/code] (default [code]"{exe_name}_Data/StreamingAssets"[/code]), relative to the folder of the exported executable or, for "Export PCK/ZIP only", of the [code].pck[/code]. A previous copy is removed first. [code]{exe_name}[/code] is replaced by the base name of the export file.
-		- [b]Embed[/b] (Android, Web, macOS and iOS for now, [code].zip[/code] exports, and any other platform, with [code]filesystem/streaming_assets/fallback[/code] set to [code]embed[/code]): the files are added unchanged to the main pack at their [code]res://[/code] paths.
+		- [b]Bundle[/b] (macOS, iOS and visionOS, mode [code]raw[/code], also for [code].zip[/code], [code].dmg[/code] and [code].pkg[/code] exports): every file is registered with [code]EditorExportPlugin.add_bundle_resource()[/code], so the exporter copies the folder to [code]filesystem/streaming_assets/target_folder[/code] inside the bundle resources ([code]Contents/Resources[/code] on macOS, the bundle root on iOS and visionOS) before the app is signed. [code]{exe_name}[/code] is the name of the app bundle: the base name of the export file for [code].app[/code] exports and on iOS and visionOS, and the application name ([member ProjectSettings.application/config/name]) for the other macOS formats.
+		- [b]Embed[/b] (Android, Web, Windows and Linux/BSD [code].zip[/code] exports, and any other platform, with [code]filesystem/streaming_assets/fallback[/code] set to [code]embed[/code]): the files are added unchanged to the main pack at their [code]res://[/code] paths.
 		- [b]None[/b] (the same platforms, with the fallback set to [code]none[/code]): the files are not shipped.
 		Files and folders whose name starts with [code].[/code] (such as [code].gdignore[/code]), [code]*.import[/code] and [code]*.uid[/code] files, and symbolic links to folders are never shipped.
 		The settings are read per export preset, so feature tag overrides such as [code]filesystem/streaming_assets/fallback.web[/code] apply. When a setting does not exist, its default is used. The [code]pack[/code] mode is not available yet: the folder is then exported in [code]raw[/code] mode and a warning is shown.
@@ -72,7 +73,7 @@
 			<param index="1" name="export_path" type="String" />
 			<param index="2" name="fallback" type="int" enum="StreamingAssetsExportPlugin.Fallback" />
 			<description>
-				Returns where the plugin puts the streaming assets for an export with the given [param features] (the export features of the preset) to [param export_path]. Returns [constant PLACEMENT_EXTERNAL] if [param features] contains [code]"pc"[/code] but not [code]"macos"[/code] and [param export_path] does not end with [code].zip[/code]. Otherwise returns [constant PLACEMENT_NONE] if [param fallback] is [constant FALLBACK_NONE], and [constant PLACEMENT_EMBED] if not.
+				Returns where the plugin puts the streaming assets for an export with the given [param features] (the export features of the preset) to [param export_path]. Returns [constant PLACEMENT_BUNDLE] if [param features] contains [code]"macos"[/code], [code]"ios"[/code] or [code]"visionos"[/code]. Returns [constant PLACEMENT_EXTERNAL] if [param features] contains [code]"pc"[/code] and [param export_path] does not end with [code].zip[/code]. Otherwise returns [constant PLACEMENT_NONE] if [param fallback] is [constant FALLBACK_NONE], and [constant PLACEMENT_EMBED] if not.
 			</description>
 		</method>
 	</methods>
@@ -97,6 +98,9 @@
 		</constant>
 		<constant name="PLACEMENT_NONE" value="2" enum="Placement">
 			The files are left out of the export.
+		</constant>
+		<constant name="PLACEMENT_BUNDLE" value="3" enum="Placement">
+			The files are copied into the resources of the app bundle (macOS, iOS, visionOS) before it is signed.
 		</constant>
 	</constants>
 </class>
