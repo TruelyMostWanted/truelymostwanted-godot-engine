@@ -207,7 +207,7 @@ void LanguageSettingsServer::_on_loaded() {
 	}
 }
 
-void LanguageSettingsServer::_on_startup_applied(int p_phase) {
+void LanguageSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		_push_pending_root_values();
 	}

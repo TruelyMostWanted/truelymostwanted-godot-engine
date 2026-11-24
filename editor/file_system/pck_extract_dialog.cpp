@@ -64,7 +64,7 @@ void PckExtractDialog::_open_package() {
 	package.unref();
 	status_label->set_text(String());
 	if (!opened_path.is_empty()) {
-		package = PckPackageServer::get_singleton()->open(opened_path, key_edit->get_text().strip_edges());
+		package = PCKPackageServer::get_singleton()->open(opened_path, key_edit->get_text().strip_edges());
 		if (package.is_null()) {
 			status_label->set_text(TTR("The pack can't be opened. If its directory is encrypted, enter the key and press \"Open\"."));
 		}
@@ -78,7 +78,7 @@ void PckExtractDialog::_update_tree() {
 	TreeItem *root = tree->create_item();
 	if (package.is_valid()) {
 		const bool skip_engine = skip_engine_check->is_pressed();
-		for (const KeyValue<String, PckPackage::Entry> &kv : package->get_entry_map()) {
+		for (const KeyValue<String, PCKPackage::Entry> &kv : package->get_entry_map()) {
 			if (kv.value.removal) {
 				continue;
 			}
@@ -209,7 +209,7 @@ void PckExtractDialog::_extract_progress(const String &p_path, int p_done, int p
 	}
 }
 
-void PckExtractDialog::_show_result(const Ref<PckExtractResult> &p_result, const String &p_target) {
+void PckExtractDialog::_show_result(const Ref<PCKExtractResult> &p_result, const String &p_target) {
 	String text = vformat(TTR("%d files were written to \"%s\"."), p_result->get_written().size(), p_target);
 	if (!p_result->get_renamed().is_empty()) {
 		text += "\n" + vformat(TTR("%d of them under a new name."), p_result->get_renamed().size());
@@ -245,11 +245,11 @@ void PckExtractDialog::ok_pressed() {
 		return;
 	}
 
-	PckPackageServer *server = PckPackageServer::get_singleton();
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
 	const Callable progress_callable = callable_mp(this, &PckExtractDialog::_extract_progress);
 	progress = memnew(EditorProgress("extract_pck", TTR("Extracting Pack"), paths.size()));
 	server->connect(SNAME("extract_progress"), progress_callable);
-	const Ref<PckExtractResult> result = server->extract(package, target, paths, PckPackageServer::ExtractPolicy(policy_option->get_selected_id()), skip_engine_check->is_pressed());
+	const Ref<PCKExtractResult> result = server->extract(package, target, paths, PCKPackageServer::ExtractPolicy(policy_option->get_selected_id()), skip_engine_check->is_pressed());
 	server->disconnect(SNAME("extract_progress"), progress_callable);
 	memdelete(progress);
 	progress = nullptr;
@@ -272,7 +272,7 @@ void PckExtractDialog::popup_for_path(const String &p_pack_path) {
 	popup_centered_clamped(Size2(800, 600) * EDSCALE, 0.8);
 }
 
-void PckExtractDialog::popup_for_package(const Ref<PckPackage> &p_package) {
+void PckExtractDialog::popup_for_package(const Ref<PCKPackage> &p_package) {
 	ERR_FAIL_COND(p_package.is_null());
 	opened_path = p_package->get_pack_path();
 	package = p_package;
@@ -374,9 +374,9 @@ PckExtractDialog::PckExtractDialog() {
 	Label *policy_label = memnew(Label(TTR("Existing Files:")));
 	options_hb->add_child(policy_label);
 	policy_option = memnew(OptionButton);
-	policy_option->add_item(TTR("Skip"), PckPackageServer::EXTRACT_SKIP);
-	policy_option->add_item(TTR("Overwrite"), PckPackageServer::EXTRACT_OVERWRITE);
-	policy_option->add_item(TTR("Rename"), PckPackageServer::EXTRACT_RENAME);
+	policy_option->add_item(TTR("Skip"), PCKPackageServer::EXTRACT_SKIP);
+	policy_option->add_item(TTR("Overwrite"), PCKPackageServer::EXTRACT_OVERWRITE);
+	policy_option->add_item(TTR("Rename"), PCKPackageServer::EXTRACT_RENAME);
 	policy_option->set_accessibility_name(TTRC("Existing Files"));
 	policy_option->connect(SceneStringName(item_selected), callable_mp(this, &PckExtractDialog::_option_changed));
 	options_hb->add_child(policy_option);

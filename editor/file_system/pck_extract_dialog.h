@@ -45,13 +45,13 @@ class TreeItem;
 struct EditorProgress;
 
 // "Extract Pack…": lists the files of a pack with checkboxes and writes the checked ones into a folder
-// with `PckPackageServer::extract()`. Opened from the FileSystem dock and from the Inspector of a `.pck`.
+// with `PCKPackageServer::extract()`. Opened from the FileSystem dock and from the Inspector of a `.pck`.
 class PckExtractDialog : public ConfirmationDialog {
 	GDCLASS(PckExtractDialog, ConfirmationDialog);
 
 	static inline PckExtractDialog *singleton = nullptr;
 
-	Ref<PckPackage> package;
+	Ref<PCKPackage> package;
 	String opened_path;
 
 	Label *pack_label = nullptr;
@@ -85,7 +85,7 @@ class PckExtractDialog : public ConfirmationDialog {
 	void _option_changed(int p_index);
 	void _skip_engine_toggled(bool p_pressed);
 	void _extract_progress(const String &p_path, int p_done, int p_total);
-	void _show_result(const Ref<PckExtractResult> &p_result, const String &p_target);
+	void _show_result(const Ref<PCKExtractResult> &p_result, const String &p_target);
 
 protected:
 	void _notification(int p_what);
@@ -97,7 +97,7 @@ public:
 	// Opens the pack at `p_pack_path` (header and directory only) and shows the dialog.
 	void popup_for_path(const String &p_pack_path);
 	// Shows the dialog for a package that is already open, or for a pack description.
-	void popup_for_package(const Ref<PckPackage> &p_package);
+	void popup_for_package(const Ref<PCKPackage> &p_package);
 
 	PckExtractDialog();
 	~PckExtractDialog();

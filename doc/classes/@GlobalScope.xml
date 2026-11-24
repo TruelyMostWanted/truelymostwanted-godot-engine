@@ -1553,14 +1553,14 @@
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
 		</member>
+		<member name="AudioDeviceSettingsServer" type="AudioDeviceSettingsServer" setter="" getter="">
+			The [AudioDeviceSettingsServer] singleton.
+		</member>
 		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
 			The [AudioMixerServer] singleton.
 		</member>
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
-		</member>
-		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
-			The [AudioSettingsServer] singleton.
 		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
@@ -1648,11 +1648,11 @@
 		<member name="OS" type="OS" setter="" getter="">
 			The [OS] singleton.
 		</member>
+		<member name="PCKPackageServer" type="PCKPackageServer" setter="" getter="">
+			The [PCKPackageServer] singleton.
+		</member>
 		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
 			The [PathPrefixServer] singleton.
-		</member>
-		<member name="PckPackageServer" type="PckPackageServer" setter="" getter="">
-			The [PckPackageServer] singleton.
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
