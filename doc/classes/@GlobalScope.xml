@@ -1553,6 +1553,9 @@
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
 		</member>
+		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
+			The [AudioMixerServer] singleton.
+		</member>
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
 		</member>
