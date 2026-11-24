@@ -425,7 +425,10 @@ TEST_CASE("[Audio][AudioBusSettingsServer] Typed bus signals fire once per appli
 
 	// A new bus in the layout: the values are pushed again and the layout signal fires.
 	audio_server->add_bus();
-	SIGNAL_CHECK("bus_layout_changed", Array({ Array() }));
+	// One call without arguments. Built explicitly, `Array({ Array() })` collapses to one level.
+	Array layout_calls;
+	layout_calls.push_back(Array());
+	SIGNAL_CHECK("bus_layout_changed", layout_calls);
 
 	SIGNAL_UNWATCH(server, "bus_volume_changed");
 	SIGNAL_UNWATCH(server, "bus_mute_changed");
