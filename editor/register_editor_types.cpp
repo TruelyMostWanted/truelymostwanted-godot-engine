@@ -51,6 +51,7 @@
 #include "editor/export/editor_export_platform_pc.h"
 #include "editor/export/editor_export_plugin.h"
 #include "editor/export/register_exporters.h"
+#include "editor/export/streaming_assets_export_plugin.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -123,6 +124,7 @@
 #include "editor/scene/texture/bit_map_editor_plugin.h"
 #include "editor/scene/texture/gradient_texture_2d_editor_plugin.h"
 #include "editor/scene/texture/texture_3d_editor_plugin.h"
+#include "editor/scene/texture/texture_atlas_editor_plugin.h"
 #include "editor/scene/texture/texture_editor_plugin.h"
 #include "editor/scene/texture/texture_layered_editor_plugin.h"
 #include "editor/scene/texture/texture_region_editor_plugin.h"
@@ -179,6 +181,7 @@ void register_editor_types() {
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPlatformAppleEmbedded);
 	GDREGISTER_CLASS(EditorExportPlatformExtension);
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
 
 	register_exporter_types();
 
@@ -253,6 +256,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<TextureEditorPlugin>();
 	EditorPlugins::add_by_type<TextureLayeredEditorPlugin>();
 	EditorPlugins::add_by_type<TextureRegionEditorPlugin>();
+	EditorPlugins::add_by_type<TextureAtlasEditorPlugin>();
 	EditorPlugins::add_by_type<ThemeEditorPlugin>();
 	EditorPlugins::add_by_type<ToolButtonEditorPlugin>();
 	EditorPlugins::add_by_type<VirtualJoystickEditorPlugin>();
