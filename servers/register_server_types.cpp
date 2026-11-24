@@ -113,6 +113,8 @@
 #include "servers/settings/video_texture_streaming_settings_server.h"
 #include "servers/settings/video_window_settings.h"
 #include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/xr_settings.h"
+#include "servers/settings/xr_settings_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 #include "servers/text/text_server_extension.h"
@@ -209,6 +211,9 @@ static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_ser
 #endif
 #ifndef _3D_DISABLED
 static Camera3DSettingsServer *camera_3d_settings_server = nullptr;
+#endif
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+static XRSettingsServer *xr_settings_server = nullptr;
 #endif
 
 void register_server_types() {
@@ -326,6 +331,14 @@ void register_server_types() {
 	camera_3d_settings_server = memnew(Camera3DSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Camera3DSettingsServer", Camera3DSettingsServer::get_singleton(), "Camera3DSettingsServer"));
 	settings_server_manager->register_server(camera_3d_settings_server);
+#endif
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+	// Only with the openxr module (#30); otherwise the domain is missing.
+	GDREGISTER_CLASS(XRSettings);
+	GDREGISTER_ABSTRACT_CLASS(XRSettingsServer);
+	xr_settings_server = memnew(XRSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("XRSettingsServer", XRSettingsServer::get_singleton(), "XRSettingsServer"));
+	settings_server_manager->register_server(xr_settings_server);
 #endif
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
@@ -563,6 +576,10 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+	memdelete(xr_settings_server);
+	xr_settings_server = nullptr;
+#endif
 #ifndef _3D_DISABLED
 	memdelete(camera_3d_settings_server);
 	camera_3d_settings_server = nullptr;

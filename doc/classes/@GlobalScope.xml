@@ -1758,6 +1758,9 @@
 		<member name="XRServer" type="XRServer" setter="" getter="">
 			The [XRServer] singleton.
 		</member>
+		<member name="XRSettingsServer" type="XRSettingsServer" setter="" getter="">
+			The [XRSettingsServer] singleton.
+		</member>
 	</members>
 	<constants>
 		<constant name="SIDE_LEFT" value="0" enum="Side">

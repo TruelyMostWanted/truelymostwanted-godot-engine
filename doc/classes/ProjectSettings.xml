@@ -3779,6 +3779,9 @@
 		<member name="settings/paths/video_window_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
 			The file of the [code]"video_window"[/code] settings domain ([VideoWindowSettingsServer]), for example [code]user://settings/video_window.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/video_window.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path].
 		</member>
+		<member name="settings/paths/xr_settings_path" type="String" setter="" getter="" default="&quot;&quot;">
+			The file of the [code]"xr"[/code] settings domain ([XRSettingsServer]), for example [code]user://settings/xr.json[/code]; the extension picks the text format. If empty, the file is [code]&lt;[member settings/storage/folder]&gt;/xr.&lt;extension of [member settings/storage/format]&gt;[/code]. [member SettingsServer.file_path] set at runtime takes precedence. See [member SettingsServer.file_path]. Only defined when the engine is built with the OpenXR module.
+		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
 		</member>
