@@ -14,7 +14,7 @@
 			for row in csv.get_data():
 				print(row["name"], " ", int(row["level"]))
 		else:
-			print("Line %d: %s" % [csv.get_error_line(), csv.get_error_message()])
+			print(csv.get_error_message()) # For example "Line 2: ..."; the line alone is csv.get_error_line().
 
 		print(CSV.stringify([{ "name": "Ann", "level": 3 }]))
 		# name,level
@@ -32,7 +32,7 @@
 		}
 		else
 		{
-			GD.Print($"Line {csv.GetErrorLine()}: {csv.GetErrorMessage()}");
+			GD.Print(csv.GetErrorMessage()); // For example "Line 2: ..."; the line alone is csv.GetErrorLine().
 		}
 
 		var rows = new Godot.Collections.Array { new Godot.Collections.Dictionary { { "name", "Ann" }, { "level", 3 } } };
@@ -68,7 +68,7 @@
 		<method name="get_error_message" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded. The message starts with the position, for example [code]Line 2: ...[/code].
 			</description>
 		</method>
 		<method name="parse">

@@ -15,7 +15,7 @@
 			print(data[""]["version"]) # Prints 2
 			print(data["video"]["size"]) # Prints (1280, 720)
 		else:
-			print("Line %d: %s" % [ini.get_error_line(), ini.get_error_message()])
+			print(ini.get_error_message()) # For example "Line 2: ..."; the line alone is ini.get_error_line().
 
 		print(INI.stringify({ "audio": { "volume": 0.5, "device": "Speakers" } }))
 		# [audio]
@@ -32,7 +32,7 @@
 		}
 		else
 		{
-			GD.Print($"Line {ini.GetErrorLine()}: {ini.GetErrorMessage()}");
+			GD.Print(ini.GetErrorMessage()); // For example "Line 2: ..."; the line alone is ini.GetErrorLine().
 		}
 
 		var audio = new Godot.Collections.Dictionary { { "volume", 0.5 }, { "device", "Speakers" } };
@@ -68,7 +68,7 @@
 		<method name="get_error_message" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded. The message starts with the position, for example [code]Line 2: ...[/code].
 			</description>
 		</method>
 		<method name="parse">

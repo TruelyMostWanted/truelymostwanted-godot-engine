@@ -18,7 +18,7 @@
 			print(root["attributes"]["width"]) # Prints 1280
 			print(root["children"][0]["text"]) # Prints Game
 		else:
-			print("Line %d: %s" % [xml.get_error_line(), xml.get_error_message()])
+			print(xml.get_error_message()) # For example "Line 2: ..."; the line alone is xml.get_error_line().
 
 		var element = { "name": "note", "attributes": { "to": "Ann" }, "text": "Hi" }
 		print(XML.stringify(element)) # Prints the declaration and &lt;note to="Ann"&gt;Hi&lt;/note&gt;
@@ -33,7 +33,7 @@
 		}
 		else
 		{
-			GD.Print($"Line {xml.GetErrorLine()}: {xml.GetErrorMessage()}");
+			GD.Print(xml.GetErrorMessage()); // For example "Line 2: ..."; the line alone is xml.GetErrorLine().
 		}
 
 		var element = new Godot.Collections.Dictionary
@@ -75,7 +75,7 @@
 		<method name="get_error_message" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded.
+				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded. The message starts with the position, for example [code]Line 2: ...[/code].
 			</description>
 		</method>
 		<method name="parse">
