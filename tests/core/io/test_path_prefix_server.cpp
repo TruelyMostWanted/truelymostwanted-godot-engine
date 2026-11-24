@@ -132,19 +132,19 @@ TEST_CASE("[PathPrefixServer] resolve() reports unknown prefixes") {
 TEST_CASE("[PathPrefixServer] resolve_safe() rejects unsafe paths") {
 	PathPrefixServer *server = PathPrefixServer::get_singleton();
 
-	CHECK(server->resolve_safe("user://saves/a.json", true)->is_valid());
-	CHECK(server->resolve_safe("user://saves/../../x", false)->get_error() == ERR_FILE_BAD_PATH);
-	CHECK(server->resolve_safe("user://saves/../a.json", false)->get_error() == ERR_FILE_BAD_PATH);
-	CHECK(server->resolve_safe("/etc/passwd", false)->get_error() == ERR_FILE_BAD_PATH);
-	CHECK(server->resolve_safe("C:/Windows/win.ini", false)->get_error() == ERR_FILE_BAD_PATH);
-	CHECK(server->resolve_safe("nope://a", false)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("user://saves/a.json", PathPrefixServer::ACCESS_WRITE)->is_valid());
+	CHECK(server->resolve_safe("user://saves/../../x", PathPrefixServer::ACCESS_READ)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("user://saves/../a.json", PathPrefixServer::ACCESS_READ)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("/etc/passwd", PathPrefixServer::ACCESS_READ)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("C:/Windows/win.ini", PathPrefixServer::ACCESS_READ)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("nope://a", PathPrefixServer::ACCESS_READ)->get_error() == ERR_FILE_BAD_PATH);
 
 	PackedStringArray roots;
 	roots.push_back("user://saves/");
-	CHECK(server->resolve_safe("user://saves/a.json", true, roots)->is_valid());
-	CHECK(server->resolve_safe("user://saves", true, roots)->is_valid());
-	CHECK(server->resolve_safe("user://other/a.json", true, roots)->get_error() == ERR_FILE_BAD_PATH);
-	CHECK(server->resolve_safe("user://savesx/a.json", true, roots)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("user://saves/a.json", PathPrefixServer::ACCESS_WRITE, roots)->is_valid());
+	CHECK(server->resolve_safe("user://saves", PathPrefixServer::ACCESS_WRITE, roots)->is_valid());
+	CHECK(server->resolve_safe("user://other/a.json", PathPrefixServer::ACCESS_WRITE, roots)->get_error() == ERR_FILE_BAD_PATH);
+	CHECK(server->resolve_safe("user://savesx/a.json", PathPrefixServer::ACCESS_WRITE, roots)->get_error() == ERR_FILE_BAD_PATH);
 }
 
 TEST_CASE("[PathPrefixServer] Registered folder prefixes") {
