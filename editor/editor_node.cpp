@@ -79,6 +79,7 @@
 #include "editor/export/project_export.h"
 #include "editor/export/project_zip_packer.h"
 #include "editor/export/register_exporters.h"
+#include "editor/export/streaming_assets_export_plugin.h"
 #include "editor/file_system/dependency_editor.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_about.h"
@@ -9716,6 +9717,10 @@ EditorNode::EditorNode() {
 	dedicated_server_export_plugin.instantiate();
 
 	EditorExport::get_singleton()->add_export_plugin(dedicated_server_export_plugin);
+
+	Ref<StreamingAssetsExportPlugin> streaming_assets_export_plugin;
+	streaming_assets_export_plugin.instantiate();
+	EditorExport::get_singleton()->add_export_plugin(streaming_assets_export_plugin);
 
 #ifdef RD_ENABLED
 	Ref<ShaderBakerExportPlugin> shader_baker_export_plugin;
