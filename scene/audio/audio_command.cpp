@@ -46,9 +46,9 @@ static const char *AUDIO_COMMAND_LABELS[] = {
 	"Enqueue",
 	"Dequeue",
 	"Clear",
-	"Change Index",
-	"Next",
-	"Previous",
+	"Set Queue Index",
+	"Play Next",
+	"Play Previous",
 	"Fade In",
 	"Fade Out",
 	"Cross Fade",
@@ -56,7 +56,7 @@ static const char *AUDIO_COMMAND_LABELS[] = {
 	"Set Pitch",
 	"Seek",
 	"Play One Shot",
-	"Switch Clip",
+	"Switch To Clip",
 	"Stop All",
 };
 
@@ -222,7 +222,7 @@ void AudioCommand::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "command_name"), "set_command_name", "get_command_name");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "group"), "set_group", "get_group");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "channel"), "set_channel", "get_channel");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "command", PROPERTY_HINT_ENUM, "Play,Stop,Pause,Resume,Toggle,Enqueue,Dequeue,Clear,Change Index,Next,Previous,Fade In,Fade Out,Cross Fade,Set Volume,Set Pitch,Seek,Play One Shot,Switch Clip,Stop All"), "set_command", "get_command");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "command", PROPERTY_HINT_ENUM, "Play,Stop,Pause,Resume,Toggle,Enqueue,Dequeue,Clear,Set Queue Index,Play Next,Play Previous,Fade In,Fade Out,Cross Fade,Set Volume,Set Pitch,Seek,Play One Shot,Switch To Clip,Stop All"), "set_command", "get_command");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "stream_path", PROPERTY_HINT_FILE), "set_stream_path", "get_stream_path");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,0.01,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,4,0.01,or_greater"), "set_pitch_scale", "get_pitch_scale");
@@ -241,9 +241,9 @@ void AudioCommand::_bind_methods() {
 	BIND_ENUM_CONSTANT(COMMAND_ENQUEUE);
 	BIND_ENUM_CONSTANT(COMMAND_DEQUEUE);
 	BIND_ENUM_CONSTANT(COMMAND_CLEAR);
-	BIND_ENUM_CONSTANT(COMMAND_CHANGE_INDEX);
-	BIND_ENUM_CONSTANT(COMMAND_NEXT);
-	BIND_ENUM_CONSTANT(COMMAND_PREVIOUS);
+	BIND_ENUM_CONSTANT(COMMAND_SET_QUEUE_INDEX);
+	BIND_ENUM_CONSTANT(COMMAND_PLAY_NEXT);
+	BIND_ENUM_CONSTANT(COMMAND_PLAY_PREVIOUS);
 	BIND_ENUM_CONSTANT(COMMAND_FADE_IN);
 	BIND_ENUM_CONSTANT(COMMAND_FADE_OUT);
 	BIND_ENUM_CONSTANT(COMMAND_CROSS_FADE);
@@ -251,7 +251,7 @@ void AudioCommand::_bind_methods() {
 	BIND_ENUM_CONSTANT(COMMAND_SET_PITCH);
 	BIND_ENUM_CONSTANT(COMMAND_SEEK);
 	BIND_ENUM_CONSTANT(COMMAND_PLAY_ONE_SHOT);
-	BIND_ENUM_CONSTANT(COMMAND_SWITCH_CLIP);
+	BIND_ENUM_CONSTANT(COMMAND_SWITCH_TO_CLIP);
 	BIND_ENUM_CONSTANT(COMMAND_STOP_ALL);
 
 	BIND_ENUM_CONSTANT(LOOP_MODE_CHANNEL);
@@ -427,7 +427,7 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 	}
 
 	const int queue_size = (int)server->get_queue(channel_name).size();
-	const bool starts_playback = (type == AudioCommand::COMMAND_TOGGLE && !stops) || type == AudioCommand::COMMAND_PLAY || type == AudioCommand::COMMAND_FADE_IN || type == AudioCommand::COMMAND_CROSS_FADE || type == AudioCommand::COMMAND_CHANGE_INDEX || type == AudioCommand::COMMAND_NEXT || type == AudioCommand::COMMAND_PREVIOUS;
+	const bool starts_playback = (type == AudioCommand::COMMAND_TOGGLE && !stops) || type == AudioCommand::COMMAND_PLAY || type == AudioCommand::COMMAND_FADE_IN || type == AudioCommand::COMMAND_CROSS_FADE || type == AudioCommand::COMMAND_SET_QUEUE_INDEX || type == AudioCommand::COMMAND_PLAY_NEXT || type == AudioCommand::COMMAND_PLAY_PREVIOUS;
 	if (starts_playback && stream.is_null() && queue_size == 0 && !(type == AudioCommand::COMMAND_FADE_IN && playing)) {
 		r_message = vformat("the command has no stream_path and the queue of the audio mixer channel \"%s\" is empty.", channel_name);
 		return ERR_DOES_NOT_EXIST;
@@ -474,7 +474,7 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 		case AudioCommand::COMMAND_CLEAR: {
 			server->clear_queue(channel_name);
 		} break;
-		case AudioCommand::COMMAND_CHANGE_INDEX: {
+		case AudioCommand::COMMAND_SET_QUEUE_INDEX: {
 			const int index = p_command.get_queue_index();
 			if (index < 0 || index >= queue_size) {
 				r_message = vformat("the queue of the audio mixer channel \"%s\" has no entry %d.", channel_name, index);
@@ -482,10 +482,10 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 			}
 			server->set_queue_index(channel_name, index, fade);
 		} break;
-		case AudioCommand::COMMAND_NEXT: {
+		case AudioCommand::COMMAND_PLAY_NEXT: {
 			server->play_next(channel_name, fade);
 		} break;
-		case AudioCommand::COMMAND_PREVIOUS: {
+		case AudioCommand::COMMAND_PLAY_PREVIOUS: {
 			server->play_previous(channel_name, fade);
 		} break;
 		case AudioCommand::COMMAND_FADE_IN: {
@@ -526,7 +526,7 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 			}
 			server->play_one_shot(channel_name, stream_argument, p_command.get_volume_db(), p_command.get_pitch_scale());
 		} break;
-		case AudioCommand::COMMAND_SWITCH_CLIP: {
+		case AudioCommand::COMMAND_SWITCH_TO_CLIP: {
 			if (p_command.get_clip_name() == StringName()) {
 				r_message = "the command needs a clip_name.";
 				return ERR_INVALID_PARAMETER;
