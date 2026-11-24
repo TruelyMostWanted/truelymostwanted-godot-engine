@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="TtsServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="TTSServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Server for text to speech with voice personas.
 	</brief_description>
 	<description>
-		[TtsServer] speaks text with a [TtsPersona], keeps a list of named personas and emits one signal per utterance event. The speech itself is done by the platform through [DisplayServer] ([method DisplayServer.tts_speak] and the other [code]tts_*[/code] methods), which stay available as before.
-		If the voice of a persona does not exist on the current machine, [TtsServer] picks a voice for the persona's language instead (see [method resolve_voice]), so a saved persona works on every platform.
+		[TTSServer] speaks text with a [TTSPersona], keeps a list of named personas and emits one signal per utterance event. The speech itself is done by the platform through [DisplayServer] ([method DisplayServer.tts_speak] and the other [code]tts_*[/code] methods), which stay available as before.
+		If the voice of a persona does not exist on the current machine, [TTSServer] picks a voice for the persona's language instead (see [method resolve_voice_id]), so a saved persona works on every platform.
 		[codeblocks]
 		[gdscript]
 		func _ready():
-			TtsServer.utterance_ended.connect(_on_utterance_ended)
+			TTSServer.utterance_ended.connect(_on_utterance_ended)
 
-			var guard = TtsPersona.new()
-			guard.name = "guard"
+			var guard = TTSPersona.new()
+			guard.persona_name = "guard"
 			guard.language = "en"
 			guard.pitch = 0.8
-			TtsServer.add_persona(guard)
+			TTSServer.add_persona(guard)
 
-			var id = TtsServer.speak("Halt! Who goes there?", TtsServer.get_persona("guard"))
+			var id = TTSServer.speak("Halt! Who goes there?", TTSServer.get_persona("guard"))
 			if id == -1:
 				print("Text to speech is not available.")
 
@@ -30,7 +30,7 @@
 			TtsServer.UtteranceEnded += OnUtteranceEnded;
 
 			var guard = new TtsPersona();
-			guard.Name = "guard";
+			guard.PersonaName = "guard";
 			guard.Language = "en";
 			guard.Pitch = 0.8f;
 			TtsServer.AddPersona(guard);
@@ -56,9 +56,9 @@
 	<methods>
 		<method name="add_persona">
 			<return type="void" />
-			<param index="0" name="persona" type="TtsPersona" />
+			<param index="0" name="persona" type="TTSPersona" />
 			<description>
-				Adds [param persona] to the persona list under its [member TtsPersona.name]. A persona with the same name is replaced. Reports an error if [param persona] is [code]null[/code] or has no name.
+				Adds [param persona] to the persona list under its [member TTSPersona.persona_name]. A persona with the same name is replaced. Reports an error if [param persona] is [code]null[/code] or has no name.
 			</description>
 		</method>
 		<method name="clear_personas">
@@ -68,15 +68,15 @@
 			</description>
 		</method>
 		<method name="get_default_persona" qualifiers="const">
-			<return type="TtsPersona" />
+			<return type="TTSPersona" />
 			<description>
 				Returns the persona used by [method speak] when no persona is given. This is the persona set with [method set_default_persona], or a built-in persona with default values (system language, volume [code]50[/code], pitch and rate [code]1.0[/code]).
 			</description>
 		</method>
 		<method name="get_default_persona_name" qualifiers="const">
-			<return type="String" />
+			<return type="StringName" />
 			<description>
-				Returns the name set with [method set_default_persona], or an empty [String] if the built-in persona is used.
+				Returns the name set with [method set_default_persona], or an empty [StringName] if the built-in persona is used.
 			</description>
 		</method>
 		<method name="get_pending_utterances" qualifiers="const">
@@ -86,8 +86,8 @@
 			</description>
 		</method>
 		<method name="get_persona" qualifiers="const">
-			<return type="TtsPersona" />
-			<param index="0" name="name" type="String" />
+			<return type="TTSPersona" />
+			<param index="0" name="name" type="StringName" />
 			<description>
 				Returns the persona called [param name], or [code]null[/code] if there is none.
 			</description>
@@ -99,7 +99,7 @@
 			</description>
 		</method>
 		<method name="get_personas" qualifiers="const">
-			<return type="TtsPersona[]" />
+			<return type="TTSPersona[]" />
 			<description>
 				Returns all personas, in the order they were added.
 			</description>
@@ -115,7 +115,7 @@
 		</method>
 		<method name="has_persona" qualifiers="const">
 			<return type="bool" />
-			<param index="0" name="name" type="String" />
+			<param index="0" name="name" type="StringName" />
 			<description>
 				Returns [code]true[/code] if there is a persona called [param name].
 			</description>
@@ -147,21 +147,21 @@
 		</method>
 		<method name="remove_persona">
 			<return type="void" />
-			<param index="0" name="name" type="String" />
+			<param index="0" name="name" type="StringName" />
 			<description>
 				Removes the persona called [param name]. If it was the default persona, the built-in persona becomes the default again. Does nothing if there is no such persona.
 			</description>
 		</method>
-		<method name="resolve_voice" qualifiers="const">
+		<method name="resolve_voice_id" qualifiers="const">
 			<return type="String" />
-			<param index="0" name="persona" type="TtsPersona" default="null" />
+			<param index="0" name="persona" type="TTSPersona" default="null" />
 			<description>
 				Returns the voice ID that [method speak] would use for [param persona] (or the default persona if [code]null[/code]) on this machine:
-				1. [member TtsPersona.voice], if a voice with this ID or name exists.
-				2. Otherwise the first voice for [member TtsPersona.language], first with the same region, then with any region.
+				1. [member TTSPersona.voice], if a voice with this ID or name exists.
+				2. Otherwise the first voice for [member TTSPersona.language], first with the same region, then with any region.
 				3. Otherwise the first voice for the language of the system ([method OS.get_locale]).
 				4. Otherwise the first voice of the system.
-				If the system reports no voices at all (text to speech not available, or the Web voice list is still loading), [member TtsPersona.voice] is returned unchanged and the platform decides.
+				If the system reports no voices at all (text to speech not available, or the Web voice list is still loading), [member TTSPersona.voice] is returned unchanged and the platform decides.
 			</description>
 		</method>
 		<method name="resume">
@@ -172,7 +172,7 @@
 		</method>
 		<method name="set_default_persona">
 			<return type="void" />
-			<param index="0" name="name" type="String" />
+			<param index="0" name="name" type="StringName" />
 			<description>
 				Makes the persona called [param name] the default persona for [method speak]. The persona must have been added with [method add_persona]. An empty [param name] resets the default to the built-in persona.
 			</description>
@@ -180,9 +180,9 @@
 		<method name="speak">
 			<return type="int" />
 			<param index="0" name="text" type="String" />
-			<param index="1" name="persona" type="TtsPersona" default="null" />
+			<param index="1" name="persona" type="TTSPersona" default="null" />
 			<description>
-				Adds [param text] to the queue of the synthesizer, spoken with [param persona], or with [method get_default_persona] if [code]null[/code]. The voice is chosen with [method resolve_voice]. If [member TtsPersona.interrupt] is [code]true[/code], the current utterance and the queue are canceled first.
+				Adds [param text] to the queue of the synthesizer, spoken with [param persona], or with [method get_default_persona] if [code]null[/code]. The voice is chosen with [method resolve_voice_id]. If [member TTSPersona.interrupt] is [code]true[/code], the current utterance and the queue are canceled first.
 				Returns the ID of the utterance, a positive number that is used by the [code]utterance_*[/code] signals. Returns [code]-1[/code] and reports an error if [param text] is empty or text to speech is not available (see [method is_available]).
 			</description>
 		</method>
@@ -205,7 +205,7 @@
 		<signal name="utterance_canceled">
 			<param index="0" name="id" type="int" />
 			<description>
-				Emitted when utterance [param id] is canceled, by [method stop], by a persona with [member TtsPersona.interrupt], or by the system.
+				Emitted when utterance [param id] is canceled, by [method stop], by a persona with [member TTSPersona.interrupt], or by the system.
 			</description>
 		</signal>
 		<signal name="utterance_ended">

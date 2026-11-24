@@ -72,13 +72,13 @@ float AudioMixerChannel::get_pitch_scale() const {
 	return pitch_scale;
 }
 
-void AudioMixerChannel::set_polyphony(int p_polyphony) {
-	polyphony = CLAMP(p_polyphony, 1, AUDIO_MIXER_MAX_POLYPHONY);
+void AudioMixerChannel::set_max_polyphony(int p_max_polyphony) {
+	max_polyphony = CLAMP(p_max_polyphony, 1, AUDIO_MIXER_MAX_POLYPHONY);
 	emit_changed();
 }
 
-int AudioMixerChannel::get_polyphony() const {
-	return polyphony;
+int AudioMixerChannel::get_max_polyphony() const {
+	return max_polyphony;
 }
 
 void AudioMixerChannel::set_queue_mode(QueueMode p_mode) {
@@ -91,13 +91,13 @@ AudioMixerChannel::QueueMode AudioMixerChannel::get_queue_mode() const {
 	return queue_mode;
 }
 
-void AudioMixerChannel::set_loop_entry(bool p_enabled) {
-	loop_entry = p_enabled;
+void AudioMixerChannel::set_loop_current_entry(bool p_enabled) {
+	loop_current_entry = p_enabled;
 	emit_changed();
 }
 
-bool AudioMixerChannel::is_loop_entry() const {
-	return loop_entry;
+bool AudioMixerChannel::is_loop_current_entry() const {
+	return loop_current_entry;
 }
 
 void AudioMixerChannel::set_default_fade_time(float p_time) {
@@ -145,12 +145,12 @@ void AudioMixerChannel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioMixerChannel::get_volume_db);
 	ClassDB::bind_method(D_METHOD("set_pitch_scale", "pitch_scale"), &AudioMixerChannel::set_pitch_scale);
 	ClassDB::bind_method(D_METHOD("get_pitch_scale"), &AudioMixerChannel::get_pitch_scale);
-	ClassDB::bind_method(D_METHOD("set_polyphony", "polyphony"), &AudioMixerChannel::set_polyphony);
-	ClassDB::bind_method(D_METHOD("get_polyphony"), &AudioMixerChannel::get_polyphony);
+	ClassDB::bind_method(D_METHOD("set_max_polyphony", "max_polyphony"), &AudioMixerChannel::set_max_polyphony);
+	ClassDB::bind_method(D_METHOD("get_max_polyphony"), &AudioMixerChannel::get_max_polyphony);
 	ClassDB::bind_method(D_METHOD("set_queue_mode", "mode"), &AudioMixerChannel::set_queue_mode);
 	ClassDB::bind_method(D_METHOD("get_queue_mode"), &AudioMixerChannel::get_queue_mode);
-	ClassDB::bind_method(D_METHOD("set_loop_entry", "enabled"), &AudioMixerChannel::set_loop_entry);
-	ClassDB::bind_method(D_METHOD("is_loop_entry"), &AudioMixerChannel::is_loop_entry);
+	ClassDB::bind_method(D_METHOD("set_loop_current_entry", "enabled"), &AudioMixerChannel::set_loop_current_entry);
+	ClassDB::bind_method(D_METHOD("is_loop_current_entry"), &AudioMixerChannel::is_loop_current_entry);
 	ClassDB::bind_method(D_METHOD("set_default_fade_time", "time"), &AudioMixerChannel::set_default_fade_time);
 	ClassDB::bind_method(D_METHOD("get_default_fade_time"), &AudioMixerChannel::get_default_fade_time);
 	ClassDB::bind_method(D_METHOD("set_pause_with_tree", "enabled"), &AudioMixerChannel::set_pause_with_tree);
@@ -164,9 +164,9 @@ void AudioMixerChannel::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "bus", PROPERTY_HINT_AUDIO_BUS), "set_bus", "get_bus");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,0.01,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,4,0.01,or_greater"), "set_pitch_scale", "get_pitch_scale");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "polyphony", PROPERTY_HINT_RANGE, "1,128,1"), "set_polyphony", "get_polyphony");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_polyphony", PROPERTY_HINT_RANGE, "1,128,1"), "set_max_polyphony", "get_max_polyphony");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "queue_mode", PROPERTY_HINT_ENUM, "Stop,Loop Queue,Shuffle"), "set_queue_mode", "get_queue_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop_entry"), "set_loop_entry", "is_loop_entry");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop_current_entry"), "set_loop_current_entry", "is_loop_current_entry");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "default_fade_time", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_default_fade_time", "get_default_fade_time");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_with_tree"), "set_pause_with_tree", "is_pause_with_tree");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_on_scene_change"), "set_stop_on_scene_change", "is_stop_on_scene_change");

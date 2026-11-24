@@ -83,6 +83,11 @@ public:
 		OS_PATH_TEMP,
 	};
 
+	enum AccessMode {
+		ACCESS_READ,
+		ACCESS_WRITE,
+	};
+
 private:
 	static PathPrefixServer *singleton;
 
@@ -127,7 +132,7 @@ public:
 	// True for the four engine prefixes that keep their hard-coded fast path in FileAccess, DirAccess and ProjectSettings.
 	static bool is_engine_fast_path(const String &p_path);
 
-	Error register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_logic, const PackedStringArray &p_platforms = PackedStringArray());
+	Error register_prefix(const String &p_prefix, const Ref<PathPrefix> &p_path_prefix, const PackedStringArray &p_platforms = PackedStringArray());
 	Error register_prefix_callable(const String &p_prefix, const Callable &p_globalize, const PackedStringArray &p_platforms = PackedStringArray(), const Callable &p_localize = Callable(), const Callable &p_is_available = Callable());
 	Error register_prefix_folder(const String &p_prefix, const String &p_folder, const PackedStringArray &p_platforms = PackedStringArray());
 	Error unregister_prefix(const String &p_prefix, const PackedStringArray &p_platforms = PackedStringArray());
@@ -149,11 +154,11 @@ public:
 	String resolve_engine_path(const String &p_path) const;
 
 	Ref<PathInfo> resolve(const String &p_path) const;
-	Ref<PathInfo> resolve_safe(const String &p_path, bool p_for_write, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;
+	Ref<PathInfo> resolve_safe(const String &p_path, AccessMode p_access, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;
 
-	Ref<PathPrefix> create_folder_logic(const String &p_folder) const;
-	Ref<PathPrefix> create_system_dir_logic(CoreBind::OS::SystemDir p_dir, bool p_shared_storage = true) const;
-	Ref<PathPrefix> create_os_path_logic(OSPath p_path) const;
+	Ref<PathPrefix> create_folder_prefix(const String &p_folder) const;
+	Ref<PathPrefix> create_system_dir_prefix(CoreBind::OS::SystemDir p_dir, bool p_shared_storage = true) const;
+	Ref<PathPrefix> create_os_path_prefix(OSPath p_path) const;
 
 	// Registers `appdata://`, `config://`, `cache://` and `temp://` if `filesystem/path_prefixes/defaults` is on.
 	// Called once after the project settings are loaded.
@@ -164,3 +169,4 @@ public:
 };
 
 VARIANT_ENUM_CAST(PathPrefixServer::OSPath);
+VARIANT_ENUM_CAST(PathPrefixServer::AccessMode);

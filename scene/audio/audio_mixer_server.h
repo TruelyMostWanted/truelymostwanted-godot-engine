@@ -168,7 +168,7 @@ public:
 	static AudioMixerServer *get_singleton();
 
 	// Channels.
-	void load_layout(const Ref<AudioMixerLayout> &p_layout);
+	void apply_layout(const Ref<AudioMixerLayout> &p_layout);
 	void add_channel(const Ref<AudioMixerChannel> &p_channel);
 	void remove_channel(const StringName &p_channel);
 	bool has_channel(const StringName &p_channel) const;
@@ -193,10 +193,10 @@ public:
 	void dequeue(const StringName &p_channel, int p_index = -1);
 	void clear_queue(const StringName &p_channel);
 	PackedStringArray get_queue(const StringName &p_channel) const;
-	void change_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
-	void next(const StringName &p_channel, float p_fade_time = -1.0f);
-	void previous(const StringName &p_channel, float p_fade_time = -1.0f);
-	int get_index(const StringName &p_channel) const;
+	void set_queue_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
+	void play_next(const StringName &p_channel, float p_fade_time = -1.0f);
+	void play_previous(const StringName &p_channel, float p_fade_time = -1.0f);
+	int get_queue_index(const StringName &p_channel) const;
 
 	// Mixing.
 	void fade_in(const StringName &p_channel, float p_time, FadeCurve p_curve = FADE_CURVE_LINEAR);
@@ -208,7 +208,7 @@ public:
 	float get_channel_volume_db(const StringName &p_channel) const;
 	void set_channel_pitch_scale(const StringName &p_channel, float p_pitch_scale);
 	float get_channel_pitch_scale(const StringName &p_channel) const;
-	void switch_clip(const StringName &p_channel, const StringName &p_clip);
+	void switch_to_clip(const StringName &p_channel, const StringName &p_clip);
 	Ref<AudioStreamPlayback> get_channel_playback(const StringName &p_channel) const;
 
 	// Commands (AudioCommand, AudioCommandList), implemented by AudioCommandRegistry.

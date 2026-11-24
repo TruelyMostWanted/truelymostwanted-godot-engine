@@ -4,7 +4,7 @@
 		A list of [AudioMixerChannel] definitions for the [AudioMixerServer].
 	</brief_description>
 	<description>
-		An [AudioMixerLayout] holds the channel definitions of a project. Edit it in the Inspector, save it as a [code].tres[/code] file and set its path in the project setting [code]audio/mixer/default_layout[/code]; the [AudioMixerServer] loads it on its first use. A layout can also be loaded at any time with [method AudioMixerServer.load_layout].
+		An [AudioMixerLayout] holds the channel definitions of a project. Edit it in the Inspector, save it as a [code].tres[/code] file and set its path in the project setting [code]audio/mixer/default_layout[/code]; the [AudioMixerServer] loads it on its first use. A layout can also be loaded at any time with [method AudioMixerServer.apply_layout].
 	</description>
 	<tutorials>
 	</tutorials>
