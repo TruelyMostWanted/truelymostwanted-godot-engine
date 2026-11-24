@@ -79,8 +79,10 @@
 #include "servers/rendering/storage/render_scene_buffers.h"
 #include "servers/rendering/storage/render_scene_data.h"
 #include "servers/settings/audio_bus_settings_server.h"
+#include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
-#include "servers/settings/audio_settings_server.h"
+#include "servers/settings/engine_settings.h"
+#include "servers/settings/engine_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
 #include "servers/settings/key_binding.h"
@@ -169,12 +171,13 @@ static bool has_server_feature_callback(const String &p_feature) {
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
 static TTSServer *tts_server = nullptr;
 static SettingsServerManager *settings_server_manager = nullptr;
-static AudioSettingsServer *audio_settings_server = nullptr;
+static AudioDeviceSettingsServer *audio_device_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
 static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
 static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
 static VideoWindowSettingsServer *video_window_settings_server = nullptr;
+static EngineSettingsServer *engine_settings_server = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -202,14 +205,14 @@ void register_server_types() {
 	settings_server_manager = memnew(SettingsServerManager);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("SettingsServerManager", SettingsServerManager::get_singleton(), "SettingsServerManager"));
 
-	GDREGISTER_CLASS(AudioSettings);
+	GDREGISTER_CLASS(AudioDeviceSettings);
 	GDREGISTER_CLASS(AudioBusSettings);
 	GDREGISTER_CLASS(AudioBusListSettings);
-	GDREGISTER_ABSTRACT_CLASS(AudioSettingsServer);
+	GDREGISTER_ABSTRACT_CLASS(AudioDeviceSettingsServer);
 	GDREGISTER_ABSTRACT_CLASS(AudioBusSettingsServer);
-	audio_settings_server = memnew(AudioSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioSettingsServer", AudioSettingsServer::get_singleton(), "AudioSettingsServer"));
-	settings_server_manager->register_server(audio_settings_server);
+	audio_device_settings_server = memnew(AudioDeviceSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioDeviceSettingsServer", AudioDeviceSettingsServer::get_singleton(), "AudioDeviceSettingsServer"));
+	settings_server_manager->register_server(audio_device_settings_server);
 	audio_bus_settings_server = memnew(AudioBusSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioBusSettingsServer", AudioBusSettingsServer::get_singleton(), "AudioBusSettingsServer"));
 	settings_server_manager->register_server(audio_bus_settings_server);
@@ -234,6 +237,11 @@ void register_server_types() {
 	video_window_settings_server = memnew(VideoWindowSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoWindowSettingsServer", VideoWindowSettingsServer::get_singleton(), "VideoWindowSettingsServer"));
 	settings_server_manager->register_server(video_window_settings_server);
+	GDREGISTER_CLASS(EngineSettings);
+	GDREGISTER_ABSTRACT_CLASS(EngineSettingsServer);
+	engine_settings_server = memnew(EngineSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineSettingsServer", EngineSettingsServer::get_singleton(), "EngineSettingsServer"));
+	settings_server_manager->register_server(engine_settings_server);
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -470,6 +478,8 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+	memdelete(engine_settings_server);
+	engine_settings_server = nullptr;
 	memdelete(video_window_settings_server);
 	video_window_settings_server = nullptr;
 	memdelete(key_binding_settings_server);
@@ -480,8 +490,8 @@ void unregister_server_types() {
 	language_settings_server = nullptr;
 	memdelete(audio_bus_settings_server);
 	audio_bus_settings_server = nullptr;
-	memdelete(audio_settings_server);
-	audio_settings_server = nullptr;
+	memdelete(audio_device_settings_server);
+	audio_device_settings_server = nullptr;
 	memdelete(settings_server_manager);
 	settings_server_manager = nullptr;
 	if constexpr (GD_IS_CLASS_ENABLED(MovieWriterPNGWAV)) {

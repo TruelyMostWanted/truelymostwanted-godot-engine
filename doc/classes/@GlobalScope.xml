@@ -1553,14 +1553,14 @@
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
 		</member>
+		<member name="AudioDeviceSettingsServer" type="AudioDeviceSettingsServer" setter="" getter="">
+			The [AudioDeviceSettingsServer] singleton.
+		</member>
 		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
 			The [AudioMixerServer] singleton.
 		</member>
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
-		</member>
-		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
-			The [AudioSettingsServer] singleton.
 		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
@@ -1580,6 +1580,9 @@
 		</member>
 		<member name="EngineDebugger" type="EngineDebugger" setter="" getter="">
 			The [EngineDebugger] singleton.
+		</member>
+		<member name="EngineSettingsServer" type="EngineSettingsServer" setter="" getter="">
+			The [EngineSettingsServer] singleton.
 		</member>
 		<member name="FilesManifestServer" type="FilesManifestServer" setter="" getter="">
 			The [FilesManifestServer] singleton.
