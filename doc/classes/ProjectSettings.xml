@@ -506,7 +506,7 @@
 			Path to an [AudioCommandList] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
 		</member>
 		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
-			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.load_layout].
+			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.apply_layout].
 		</member>
 		<member name="audio/video/video_delay_compensation_ms" type="int" setter="" getter="" default="0">
 			Setting to hardcode audio delay when playing video. Best to leave this unchanged unless you know what you are doing.

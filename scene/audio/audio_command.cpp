@@ -433,7 +433,7 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 		return ERR_DOES_NOT_EXIST;
 	}
 	if (starts_playback && p_command.get_loop_mode() != AudioCommand::LOOP_MODE_CHANNEL && config.is_valid()) {
-		config->set_loop_entry(p_command.get_loop_mode() == AudioCommand::LOOP_MODE_ON);
+		config->set_loop_current_entry(p_command.get_loop_mode() == AudioCommand::LOOP_MODE_ON);
 	}
 	Variant stream_argument;
 	if (stream.is_valid()) {
@@ -480,13 +480,13 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 				r_message = vformat("the queue of the audio mixer channel \"%s\" has no entry %d.", channel_name, index);
 				return ERR_PARAMETER_RANGE_ERROR;
 			}
-			server->change_index(channel_name, index, fade);
+			server->set_queue_index(channel_name, index, fade);
 		} break;
 		case AudioCommand::COMMAND_NEXT: {
-			server->next(channel_name, fade);
+			server->play_next(channel_name, fade);
 		} break;
 		case AudioCommand::COMMAND_PREVIOUS: {
-			server->previous(channel_name, fade);
+			server->play_previous(channel_name, fade);
 		} break;
 		case AudioCommand::COMMAND_FADE_IN: {
 			if (stream.is_valid()) {
@@ -540,7 +540,7 @@ Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_m
 				r_message = vformat("the stream of the audio mixer channel \"%s\" is not an AudioStreamInteractive.", channel_name);
 				return ERR_UNAVAILABLE;
 			}
-			server->switch_clip(channel_name, p_command.get_clip_name());
+			server->switch_to_clip(channel_name, p_command.get_clip_name());
 		} break;
 		case AudioCommand::COMMAND_STOP_ALL: {
 			// Handled above: it has no channel.

@@ -49,9 +49,9 @@ private:
 	StringName bus = "Master";
 	float volume_db = 0.0f;
 	float pitch_scale = 1.0f;
-	int polyphony = 1;
+	int max_polyphony = 1;
 	QueueMode queue_mode = QUEUE_MODE_STOP;
-	bool loop_entry = false;
+	bool loop_current_entry = false;
 	float default_fade_time = 0.0f;
 	bool pause_with_tree = false;
 	bool stop_on_scene_change = false;
@@ -73,14 +73,14 @@ public:
 	void set_pitch_scale(float p_pitch_scale);
 	float get_pitch_scale() const;
 
-	void set_polyphony(int p_polyphony);
-	int get_polyphony() const;
+	void set_max_polyphony(int p_max_polyphony);
+	int get_max_polyphony() const;
 
 	void set_queue_mode(QueueMode p_mode);
 	QueueMode get_queue_mode() const;
 
-	void set_loop_entry(bool p_enabled);
-	bool is_loop_entry() const;
+	void set_loop_current_entry(bool p_enabled);
+	bool is_loop_current_entry() const;
 
 	void set_default_fade_time(float p_time);
 	float get_default_fade_time() const;

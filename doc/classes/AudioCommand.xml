@@ -73,7 +73,7 @@
 			A group name, so [method AudioMixerServer.execute_group] runs all registered commands of the group at once, for example all ambience of a level.
 		</member>
 		<member name="loop_mode" type="int" setter="set_loop_mode" getter="get_loop_mode" enum="AudioCommand.LoopMode" default="-1">
-			Whether the channel loops its current entry. With [constant LOOP_MODE_ON] or [constant LOOP_MODE_OFF], a command that starts playback ([constant COMMAND_PLAY], [constant COMMAND_TOGGLE], [constant COMMAND_FADE_IN], [constant COMMAND_CROSS_FADE], [constant COMMAND_CHANGE_INDEX], [constant COMMAND_NEXT], [constant COMMAND_PREVIOUS]) sets [member AudioMixerChannel.loop_entry] of the channel first; the channel keeps that setting.
+			Whether the channel loops its current entry. With [constant LOOP_MODE_ON] or [constant LOOP_MODE_OFF], a command that starts playback ([constant COMMAND_PLAY], [constant COMMAND_TOGGLE], [constant COMMAND_FADE_IN], [constant COMMAND_CROSS_FADE], [constant COMMAND_CHANGE_INDEX], [constant COMMAND_NEXT], [constant COMMAND_PREVIOUS]) sets [member AudioMixerChannel.loop_current_entry] of the channel first; the channel keeps that setting.
 		</member>
 		<member name="pitch_scale" type="float" setter="set_pitch_scale" getter="get_pitch_scale" default="1.0">
 			The channel pitch for [constant COMMAND_SET_PITCH], or the extra pitch of a [constant COMMAND_PLAY_ONE_SHOT]. Must be greater than [code]0[/code] for these commands.
@@ -117,13 +117,13 @@
 			Removes all queue entries. See [method AudioMixerServer.clear_queue].
 		</constant>
 		<constant name="COMMAND_CHANGE_INDEX" value="8" enum="Command">
-			Moves the queue cursor to [member queue_index]. See [method AudioMixerServer.change_index].
+			Moves the queue cursor to [member queue_index]. See [method AudioMixerServer.set_queue_index].
 		</constant>
 		<constant name="COMMAND_NEXT" value="9" enum="Command">
-			Moves to the next queue entry. See [method AudioMixerServer.next].
+			Moves to the next queue entry. See [method AudioMixerServer.play_next].
 		</constant>
 		<constant name="COMMAND_PREVIOUS" value="10" enum="Command">
-			Moves to the previous queue entry. See [method AudioMixerServer.previous].
+			Moves to the previous queue entry. See [method AudioMixerServer.play_previous].
 		</constant>
 		<constant name="COMMAND_FADE_IN" value="11" enum="Command">
 			Fades the channel in. With a [member stream_path], cross-fades to that stream instead (on a silent channel this fades the new stream in). See [method AudioMixerServer.fade_in].
@@ -144,22 +144,22 @@
 			Jumps to [member position] in the current stream of the channel. See [method AudioMixerServer.seek].
 		</constant>
 		<constant name="COMMAND_PLAY_ONE_SHOT" value="17" enum="Command">
-			Plays [member stream_path] once on top of the channel (fire and forget, limited by [member AudioMixerChannel.polyphony]). See [method AudioMixerServer.play_one_shot].
+			Plays [member stream_path] once on top of the channel (fire and forget, limited by [member AudioMixerChannel.max_polyphony]). See [method AudioMixerServer.play_one_shot].
 		</constant>
 		<constant name="COMMAND_SWITCH_CLIP" value="18" enum="Command">
-			Switches the [AudioStreamInteractive] of the channel to [member clip_name]. See [method AudioMixerServer.switch_clip].
+			Switches the [AudioStreamInteractive] of the channel to [member clip_name]. See [method AudioMixerServer.switch_to_clip].
 		</constant>
 		<constant name="COMMAND_STOP_ALL" value="19" enum="Command">
 			Stops all channels. See [method AudioMixerServer.stop_all].
 		</constant>
 		<constant name="LOOP_MODE_CHANNEL" value="-1" enum="LoopMode">
-			Keeps the [member AudioMixerChannel.loop_entry] setting of the channel.
+			Keeps the [member AudioMixerChannel.loop_current_entry] setting of the channel.
 		</constant>
 		<constant name="LOOP_MODE_OFF" value="0" enum="LoopMode">
-			Turns [member AudioMixerChannel.loop_entry] of the channel off.
+			Turns [member AudioMixerChannel.loop_current_entry] of the channel off.
 		</constant>
 		<constant name="LOOP_MODE_ON" value="1" enum="LoopMode">
-			Turns [member AudioMixerChannel.loop_entry] of the channel on, so the current entry repeats.
+			Turns [member AudioMixerChannel.loop_current_entry] of the channel on, so the current entry repeats.
 		</constant>
 	</constants>
 </class>
