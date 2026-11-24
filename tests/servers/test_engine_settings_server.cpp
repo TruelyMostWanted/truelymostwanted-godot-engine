@@ -58,6 +58,13 @@ struct TestSetup {
 	explicit TestSetup(bool p_allow_simulation = true) {
 		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
 		ProjectSettings::get_singleton()->set_setting("settings/engine/allow_simulation_values", p_allow_simulation);
+		// The test runner does not define the physics project settings; use the engine defaults, like a project does.
+		if (!ProjectSettings::get_singleton()->has_setting("physics/common/physics_ticks_per_second")) {
+			ProjectSettings::get_singleton()->set_setting("physics/common/physics_ticks_per_second", 60);
+		}
+		if (!ProjectSettings::get_singleton()->has_setting("physics/common/max_physics_steps_per_frame")) {
+			ProjectSettings::get_singleton()->set_setting("physics/common/max_physics_steps_per_frame", 8);
+		}
 		const Engine *engine = Engine::get_singleton();
 		max_fps = engine->get_max_fps();
 		time_scale = engine->get_time_scale();
