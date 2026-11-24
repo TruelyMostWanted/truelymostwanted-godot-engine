@@ -48,7 +48,7 @@
 			If [code]true[/code], every custom monitor of [Performance] that exists when recording starts gets a column (see [method Performance.add_custom_monitor]). Custom monitors call a [Callable] per row, which costs more than the other columns. Values that are not numbers are written as empty cells.
 		</member>
 		<member name="metric_sources" type="PackedStringArray" setter="set_metric_sources" getter="get_metric_sources" default="PackedStringArray()">
-			Names of native metric sources to record, for example [code]"dotnet"[/code] when the .NET module provides one. Each value of a source gets a column [code]source/value[/code]. Sources that are not registered are skipped with a warning.
+			Names of native metric sources to record, for example [code]"dotnet"[/code] for the .NET runtime metrics in .NET builds (see [PerformanceRecorder]). Each value of a source gets a column [code]source/value[/code]. Sources that are not registered are skipped with a warning.
 		</member>
 		<member name="metrics" type="PackedStringArray" setter="set_metrics" getter="get_metrics" default="PackedStringArray()">
 			Names of the pushed metrics to record (see [method PerformanceRecorder.register_metric]). If empty, all metrics registered when recording starts are recorded. Names that are not registered yet are registered as [constant PerformanceRecorder.METRIC_GAUGE], so a profile used at startup can name metrics that the game registers later.

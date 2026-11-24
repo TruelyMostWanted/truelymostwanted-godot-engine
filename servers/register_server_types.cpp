@@ -92,6 +92,8 @@
 #include "servers/settings/list_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/video_quality_settings.h"
+#include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_window_settings.h"
 #include "servers/settings/video_window_settings_server.h"
 #include "servers/text/text_server.h"
@@ -178,6 +180,7 @@ static InputSettingsServer *input_settings_server = nullptr;
 static KeyBindingSettingsServer *key_binding_settings_server = nullptr;
 static VideoWindowSettingsServer *video_window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
+static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
 
 void register_server_types() {
 	OS::get_singleton()->benchmark_begin_measure("Servers", "Register Extensions");
@@ -242,6 +245,11 @@ void register_server_types() {
 	engine_settings_server = memnew(EngineSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineSettingsServer", EngineSettingsServer::get_singleton(), "EngineSettingsServer"));
 	settings_server_manager->register_server(engine_settings_server);
+	GDREGISTER_CLASS(VideoQualitySettings);
+	GDREGISTER_ABSTRACT_CLASS(VideoQualitySettingsServer);
+	video_quality_settings_server = memnew(VideoQualitySettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoQualitySettingsServer", VideoQualitySettingsServer::get_singleton(), "VideoQualitySettingsServer"));
+	settings_server_manager->register_server(video_quality_settings_server);
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
 
@@ -478,6 +486,8 @@ void unregister_server_types() {
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+	memdelete(video_quality_settings_server);
+	video_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
 	engine_settings_server = nullptr;
 	memdelete(video_window_settings_server);
