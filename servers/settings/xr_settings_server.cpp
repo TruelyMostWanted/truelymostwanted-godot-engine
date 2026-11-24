@@ -537,7 +537,37 @@ bool XRSettingsServer::is_hand_tracking_enabled() const {
 	return get_value(SNAME("hand_tracking_enabled"));
 }
 
+void XRSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// Every value has a typed signal `<value>_changed` (see the class reference).
+	for (const char *setting_name : xr_setting_names) {
+		if (p_name == StringName(setting_name)) {
+			emit_signal(StringName(String(setting_name) + "_changed"), p_value);
+			return;
+		}
+	}
+	for (const char *setting_name : xr_game_setting_names) {
+		if (p_name == StringName(setting_name)) {
+			emit_signal(StringName(String(setting_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void XRSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("foveation_level_changed", PropertyInfo(Variant::INT, "level", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "XRSettings.FoveationLevel")));
+	ADD_SIGNAL(MethodInfo("foveation_dynamic_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("foveation_with_subsampled_images_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("render_target_size_multiplier_changed", PropertyInfo(Variant::FLOAT, "multiplier")));
+	ADD_SIGNAL(MethodInfo("display_refresh_rate_changed", PropertyInfo(Variant::FLOAT, "rate")));
+	ADD_SIGNAL(MethodInfo("vrs_min_radius_changed", PropertyInfo(Variant::FLOAT, "radius")));
+	ADD_SIGNAL(MethodInfo("vrs_strength_changed", PropertyInfo(Variant::FLOAT, "strength")));
+	ADD_SIGNAL(MethodInfo("cpu_level_changed", PropertyInfo(Variant::INT, "level", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "XRSettings.PerformanceLevel")));
+	ADD_SIGNAL(MethodInfo("gpu_level_changed", PropertyInfo(Variant::INT, "level", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "XRSettings.PerformanceLevel")));
+	ADD_SIGNAL(MethodInfo("left_hand_motion_range_changed", PropertyInfo(Variant::INT, "range", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "XRSettings.HandMotionRange")));
+	ADD_SIGNAL(MethodInfo("right_hand_motion_range_changed", PropertyInfo(Variant::INT, "range", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "XRSettings.HandMotionRange")));
+	ADD_SIGNAL(MethodInfo("hand_tracking_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+
 	ClassDB::bind_method(D_METHOD("set_foveation_level", "level"), &XRSettingsServer::set_foveation_level);
 	ClassDB::bind_method(D_METHOD("get_foveation_level"), &XRSettingsServer::get_foveation_level);
 	ClassDB::bind_method(D_METHOD("set_foveation_dynamic", "enabled"), &XRSettingsServer::set_foveation_dynamic);

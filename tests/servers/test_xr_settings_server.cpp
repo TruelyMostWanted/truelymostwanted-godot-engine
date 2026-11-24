@@ -45,6 +45,7 @@ TEST_FORCE_LINK(test_xr_settings_server)
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/xr_settings.h"
 #include "servers/settings/xr_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestXRSettingsServer {
@@ -441,6 +442,46 @@ TEST_CASE("[XRSettingsServer] Reading the engine back during a session") {
 
 	memdelete(server);
 	memdelete(xr_interface);
+}
+
+TEST_CASE("[XRSettingsServer] Typed signals fire once per applied change, also while the value is deferred") {
+	TestSetup setup;
+	Object *gone = memnew(Object);
+	XRSettingsServer *server = create_server("signals.ini", gone);
+	memdelete(gone); // No interface: the value is stored and deferred, the signal still fires on apply().
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "foveation_level_changed");
+	SIGNAL_WATCH(server, "hand_tracking_enabled_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_foveation_level(XRSettings::FOVEATION_LEVEL_LOW);
+	SIGNAL_CHECK_FALSE("foveation_level_changed");
+
+	CHECK(server->apply() == OK);
+	Array level_call;
+	level_call.push_back(int(XRSettings::FOVEATION_LEVEL_LOW));
+	Array level_args;
+	level_args.push_back(level_call);
+	SIGNAL_CHECK("foveation_level_changed", level_args);
+	CHECK(server->get_deferred_setting_names().has("foveation_level"));
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("foveation_level_changed");
+
+	// The game-only value has a signal too.
+	server->set_hand_tracking_enabled(false);
+	CHECK(server->apply() == OK);
+	Array hand_call;
+	hand_call.push_back(false);
+	Array hand_args;
+	hand_args.push_back(hand_call);
+	SIGNAL_CHECK("hand_tracking_enabled_changed", hand_args);
+	SIGNAL_CHECK_FALSE("foveation_level_changed");
+
+	SIGNAL_UNWATCH(server, "foveation_level_changed");
+	SIGNAL_UNWATCH(server, "hand_tracking_enabled_changed");
+	memdelete(server);
 }
 
 } // namespace TestXRSettingsServer
