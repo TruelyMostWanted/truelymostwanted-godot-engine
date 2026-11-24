@@ -115,6 +115,9 @@ public:
 	virtual uint64_t get_ticks_usec() const override;
 
 	virtual Dictionary get_memory_info() const override;
+	// Implemented in os_unix_process_memory.cpp.
+	virtual uint64_t get_process_memory_usage() const override;
+	virtual Dictionary get_process_memory_info() const override;
 
 	virtual String multibyte_to_string(const String &p_encoding, const PackedByteArray &p_array) const override;
 	virtual PackedByteArray string_to_multibyte(const String &p_encoding, const String &p_string) const override;

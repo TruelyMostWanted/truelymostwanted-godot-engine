@@ -65,6 +65,7 @@ ClassDB::APIType ClassDB::get_current_api() {
 
 HashMap<StringName, ClassDB::ClassInfo> ClassDB::classes;
 HashMap<StringName, StringName> ClassDB::resource_base_extensions;
+static SafeNumeric<uint32_t> resource_base_extensions_version; // Changes whenever `resource_base_extensions` changes.
 HashMap<StringName, StringName> ClassDB::compat_classes;
 
 #ifdef TOOLS_ENABLED
@@ -1851,6 +1852,11 @@ void ClassDB::add_resource_base_extension(const StringName &p_extension, const S
 	}
 
 	resource_base_extensions[p_extension] = p_class;
+	resource_base_extensions_version.increment();
+}
+
+uint32_t ClassDB::get_resource_base_extensions_version() {
+	return resource_base_extensions_version.get();
 }
 
 void ClassDB::get_resource_base_extensions(List<String> *p_extensions) {
@@ -2085,6 +2091,7 @@ void ClassDB::cleanup() {
 
 	classes.clear();
 	resource_base_extensions.clear();
+	resource_base_extensions_version.increment();
 	compat_classes.clear();
 	native_structs.clear();
 

@@ -1550,8 +1550,17 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
+			The [AudioBusSettingsServer] singleton.
+		</member>
+		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
+			The [AudioMixerServer] singleton.
+		</member>
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
+		</member>
+		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
+			The [AudioSettingsServer] singleton.
 		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
@@ -1597,6 +1606,9 @@
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
 		</member>
+		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
+			The [InputSettingsServer] singleton.
+		</member>
 		<member name="JavaClassWrapper" type="JavaClassWrapper" setter="" getter="">
 			The [JavaClassWrapper] singleton.
 			[b]Note:[/b] Only implemented on Android.
@@ -1604,6 +1616,9 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
+		</member>
+		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
+			The [LanguageSettingsServer] singleton.
 		</member>
 		<member name="Marshalls" type="Marshalls" setter="" getter="">
 			The [Marshalls] singleton.
@@ -1633,8 +1648,14 @@
 		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
 			The [PathPrefixServer] singleton.
 		</member>
+		<member name="PckPackageServer" type="PckPackageServer" setter="" getter="">
+			The [PckPackageServer] singleton.
+		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
+		</member>
+		<member name="PerformanceRecorder" type="PerformanceRecorder" setter="" getter="">
+			The [PerformanceRecorder] singleton.
 		</member>
 		<member name="PhysicsServer2D" type="PhysicsServer2D" setter="" getter="">
 			The [PhysicsServer2D] singleton.
@@ -1654,6 +1675,9 @@
 		<member name="RenderingServer" type="RenderingServer" setter="" getter="">
 			The [RenderingServer] singleton.
 		</member>
+		<member name="ResourceDatabase" type="ResourceDatabase" setter="" getter="">
+			The [ResourceDatabase] singleton.
+		</member>
 		<member name="ResourceLoader" type="ResourceLoader" setter="" getter="">
 			The [ResourceLoader] singleton.
 		</member>
@@ -1668,6 +1692,12 @@
 		</member>
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
+		</member>
+		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
+			The [SettingsServerManager] singleton.
+		</member>
+		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
+			The [StreamingAssetsServer] singleton.
 		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
