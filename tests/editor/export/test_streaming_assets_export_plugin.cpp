@@ -39,6 +39,7 @@ TEST_FORCE_LINK(test_streaming_assets_export_plugin)
 #include "core/io/streaming_assets_server.h"
 #include "core/os/os.h"
 #include "editor/export/streaming_assets_export_plugin.h"
+#include "editor/export/streaming_assets_pack_builder.h"
 #include "tests/test_utils.h"
 
 namespace TestStreamingAssetsExportPlugin {
@@ -158,6 +159,17 @@ TEST_CASE("[StreamingAssetsExportPlugin] resolve_placement") {
 	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
 	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED) == Plugin::PLACEMENT_EMBED);
 	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_NONE) == Plugin::PLACEMENT_NONE);
+
+	// `pack` mode (#91): a second pack next to the main pack on desktop, the fallback everywhere else.
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_PACK);
+	CHECK(Plugin::resolve_placement(tags_linux, "/build/Game.pck", Plugin::FALLBACK_NONE, Plugin::MODE_PACK) == Plugin::PLACEMENT_PACK);
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.zip", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_macos, "/build/Game.app", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_ios, "/build/Game.ipa", Plugin::FALLBACK_NONE, Plugin::MODE_PACK) == Plugin::PLACEMENT_NONE);
+	CHECK(Plugin::resolve_placement(tags_android, "/build/Game.apk", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	CHECK(Plugin::resolve_placement(tags_web, "/build/index.html", Plugin::FALLBACK_EMBED, Plugin::MODE_PACK) == Plugin::PLACEMENT_EMBED);
+	// The default mode is `raw`.
+	CHECK(Plugin::resolve_placement(tags_windows, "C:/build/Game.exe", Plugin::FALLBACK_EMBED, Plugin::MODE_RAW) == Plugin::PLACEMENT_EXTERNAL);
 }
 
 TEST_CASE("[StreamingAssetsExportPlugin] get_export_exe_name") {
@@ -171,6 +183,35 @@ TEST_CASE("[StreamingAssetsExportPlugin] get_export_exe_name") {
 	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.app", "My Game") == "MyGame");
 	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.zip", "My Game") == OS::get_singleton()->get_safe_dir_name("My Game"));
 	CHECK(Plugin::get_export_exe_name(tags_macos, "/build/MyGame.dmg", "") == "Unnamed");
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] get_pack_path") {
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("C:/build/Game.exe", "Game.streaming.pck") == "C:/build/Game.streaming.pck");
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("C:\\build\\Game.pck", "Game.streaming.pck") == "C:/build/Game.streaming.pck");
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", " assets.pck ") == "/build/assets.pck");
+	// Only a plain file name is accepted.
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", "sub/assets.pck").is_empty());
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("/build/Game.x86_64", "").is_empty());
+	CHECK(StreamingAssetsPackBuilder::get_pack_path("", "assets.pck").is_empty());
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] make_description_for_files") {
+	const Ref<PCKPackage> description = StreamingAssetsPackBuilder::make_description_for_files("res://streaming_assets", { "a.png", "levels/l1.tscn", "data/b.json" });
+	REQUIRE(description.is_valid());
+	CHECK(description->is_description());
+	CHECK(description->get_file_count() == 3);
+	// The target is the `res://` path, so the export keeps the path and `load()` finds the file once mounted.
+	CHECK(description->has_file("streaming_assets/a.png"));
+	CHECK(description->has_file("streaming_assets/levels/l1.tscn"));
+	CHECK(description->has_file("streaming_assets/data/b.json"));
+}
+
+TEST_CASE("[StreamingAssetsPackBuilder] make_description refuses folders outside res://") {
+	ERR_PRINT_OFF;
+	CHECK(StreamingAssetsPackBuilder::make_description("user://streaming_assets").is_null());
+	CHECK(StreamingAssetsPackBuilder::make_description("res://").is_null());
+	CHECK(StreamingAssetsPackBuilder::build(Ref<EditorExportPreset>(), "res://streaming_assets", "user://a.pck") == ERR_INVALID_PARAMETER);
+	ERR_PRINT_ON;
 }
 
 } // namespace TestStreamingAssetsExportPlugin
