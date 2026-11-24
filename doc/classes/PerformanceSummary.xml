@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceSummary" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Statistics of a [PerformanceRecorder] run: per column and frame-time hitches.
+	</brief_description>
+	<description>
+		A [PerformanceSummary] is returned by [method PerformanceRecorder.get_summary]. It holds one [PerformanceColumnSummary] per recorded column, the number of frames and rows, the duration, and the hitches (frames slower than [member PerformanceRecordingProfile.hitch_threshold_usec]). Check it against a [PerformanceBudget] with [method PerformanceBudget.check_summary], or write it with [method to_text].
+		[codeblocks]
+		[gdscript]
+		var summary = PerformanceRecorder.get_summary()
+		print("%d frames, %d hitches" % [summary.get_frame_count(), summary.get_hitch_count()])
+		for column in summary.get_columns():
+			print("%s: mean %.1f, p99 %.1f" % [column.get_name(), column.get_mean(), column.get_p99()])
+		[/gdscript]
+		[csharp]
+		var summary = PerformanceRecorder.GetSummary();
+		GD.Print($"{summary.GetFrameCount()} frames, {summary.GetHitchCount()} hitches");
+		foreach (var column in summary.GetColumns())
+		{
+			GD.Print($"{column.GetName()}: mean {column.GetMean():F1}, p99 {column.GetP99():F1}");
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_column" qualifiers="const">
+			<return type="PerformanceColumnSummary" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the statistics of the column [param name]. Prints an error and returns [code]null[/code] if the column was not recorded; use [method has_column] to check first.
+			</description>
+		</method>
+		<method name="get_column_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the columns, in CSV order.
+			</description>
+		</method>
+		<method name="get_columns" qualifiers="const">
+			<return type="PerformanceColumnSummary[]" />
+			<description>
+				Returns the statistics of all columns, in CSV order.
+			</description>
+		</method>
+		<method name="get_duration_usec" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the time from [method PerformanceRecorder.start] to [method PerformanceRecorder.stop] (or to now while recording), in microseconds.
+			</description>
+		</method>
+		<method name="get_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of frames seen while recording, including the frames between two rows when [member PerformanceRecordingProfile.sample_interval_frames] is greater than [code]1[/code].
+			</description>
+		</method>
+		<method name="get_hitch_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of frames whose frame time was above [method get_hitch_threshold_usec].
+			</description>
+		</method>
+		<method name="get_hitch_frames" qualifiers="const">
+			<return type="PackedInt64Array" />
+			<description>
+				Returns the process frame numbers ([method Engine.get_process_frames]) of the hitches, oldest first. Only the first 1024 hitches are kept; [method get_hitch_count] keeps counting after that.
+			</description>
+		</method>
+		<method name="get_hitch_threshold_usec" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the hitch threshold of the recording, in microseconds ([member PerformanceRecordingProfile.hitch_threshold_usec]). [code]0[/code] means hitch detection was disabled.
+			</description>
+		</method>
+		<method name="get_recorded_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of recorded rows, like [method PerformanceRecorder.get_recorded_frame_count].
+			</description>
+		</method>
+		<method name="has_column" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if the column [param name] was recorded.
+			</description>
+		</method>
+		<method name="is_percentiles_exact" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the whole run fits in the ring buffer and all percentiles are exact. For longer runs the percentiles are estimated from a histogram (see [PerformanceColumnSummary]).
+			</description>
+		</method>
+		<method name="to_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the summary as JSON text, the same content that [member PerformanceRecordingProfile.write_summary_json] writes to [code]&lt;output&gt;.summary.json[/code]: [code]frame_count[/code], [code]recorded_frame_count[/code], [code]duration_usec[/code], [code]percentiles_exact[/code], [code]hitches[/code] ([code]threshold_usec[/code], [code]count[/code], [code]frames[/code]), [code]columns[/code] (per column [code]count[/code], [code]min[/code], [code]max[/code], [code]avg[/code], [code]p50[/code], [code]p95[/code], [code]p99[/code]) and, if the column [code]frame_time[/code] was recorded, [code]frame_time_histogram[/code] ([code]limits_usec[/code] for 240, 120, 60, 30, 20 and 10 FPS, and [code]counts[/code], see [method PerformanceColumnSummary.get_histogram]).
+			</description>
+		</method>
+	</methods>
+</class>

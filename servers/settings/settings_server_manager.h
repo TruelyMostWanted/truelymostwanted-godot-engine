@@ -51,7 +51,7 @@ class SettingsServerManager : public Object {
 	mutable Mutex mutex;
 	LocalVector<Entry> servers;
 	LocalVector<ObjectID> owned; // Created from `settings/startup/custom_servers`.
-	int startup_phase = -1; // Last phase passed to startup().
+	SettingsServer::ApplyPhase startup_phase = SettingsServer::APPLY_PHASE_NONE; // Last phase passed to startup().
 	bool startup_enabled = false;
 
 	LocalVector<SettingsServer *> _get_servers_snapshot() const;
@@ -78,10 +78,11 @@ public:
 	Error apply_all();
 	void revert_all();
 	void reset_all_to_defaults();
-	bool is_any_dirty() const;
+	bool has_dirty_servers() const;
 
 	String get_storage_folder() const;
-	int get_startup_phase() const;
+	ResourceTextSerializer::Format get_storage_format() const;
+	SettingsServer::ApplyPhase get_startup_phase() const;
 
 	// Called from main/main.cpp for games (not in the editor or the project manager).
 	void startup(SettingsServer::ApplyPhase p_phase);

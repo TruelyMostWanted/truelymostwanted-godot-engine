@@ -6,6 +6,7 @@
 	<description>
 		[TTSServer] speaks text with a [TTSPersona], keeps a list of named personas and emits one signal per utterance event. The speech itself is done by the platform through [DisplayServer] ([method DisplayServer.tts_speak] and the other [code]tts_*[/code] methods), which stay available as before.
 		If the voice of a persona does not exist on the current machine, [TTSServer] picks a voice for the persona's language instead (see [method resolve_voice_id]), so a saved persona works on every platform.
+		The personas have two layers: the personas of the game ([method add_persona], [method set_default_persona]) and the player's overrides ([method set_persona_override], [method set_default_persona_override]), which [TTSPersonaSettingsServer] stores and applies. [method get_persona], [method get_personas], [method get_default_persona] and [method speak_with_persona] see the player's override first, so the game can add its personas at any time without hiding the player's choice.
 		[codeblocks]
 		[gdscript]
 		func _ready():
@@ -61,22 +62,41 @@
 				Adds [param persona] to the persona list under its [member TTSPersona.persona_name]. A persona with the same name is replaced. Reports an error if [param persona] is [code]null[/code] or has no name.
 			</description>
 		</method>
+		<method name="clear_persona_overrides">
+			<return type="void" />
+			<description>
+				Removes all of the player's persona overrides and the player's default persona (see [method set_default_persona_override]). The personas of the game are used again.
+			</description>
+		</method>
 		<method name="clear_personas">
 			<return type="void" />
 			<description>
-				Removes all personas from the list and resets the default persona to the built-in one.
+				Removes all personas of the game from the list and resets the game's default persona to the built-in one. The player's overrides are kept (see [method clear_persona_overrides]).
+			</description>
+		</method>
+		<method name="get_base_persona" qualifiers="const">
+			<return type="TTSPersona" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the persona of the game called [param name], without the player's override, or [code]null[/code] if the game has no such persona. Use it to show the original values or to start an override from them.
 			</description>
 		</method>
 		<method name="get_default_persona" qualifiers="const">
 			<return type="TTSPersona" />
 			<description>
-				Returns the persona used by [method speak] when no persona is given. This is the persona set with [method set_default_persona], or a built-in persona with default values (system language, volume [code]50[/code], pitch and rate [code]1.0[/code]).
+				Returns the persona used by [method speak] when no persona is given. This is the persona named by [method set_default_persona_override] if it exists, otherwise the persona set with [method set_default_persona], otherwise a built-in persona with default values (system language, volume [code]50[/code], pitch and rate [code]1.0[/code]). The player's override of that persona is returned if there is one.
 			</description>
 		</method>
 		<method name="get_default_persona_name" qualifiers="const">
 			<return type="StringName" />
 			<description>
-				Returns the name set with [method set_default_persona], or an empty [StringName] if the built-in persona is used.
+				Returns the name of the persona returned by [method get_default_persona]: the player's default persona if it exists, otherwise the name set with [method set_default_persona], or an empty [StringName] if the built-in persona is used.
+			</description>
+		</method>
+		<method name="get_default_persona_override" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Returns the name set with [method set_default_persona_override], or an empty [StringName] if the player has not chosen a default persona.
 			</description>
 		</method>
 		<method name="get_pending_utterances" qualifiers="const">
@@ -89,19 +109,32 @@
 			<return type="TTSPersona" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Returns the persona called [param name], or [code]null[/code] if there is none.
+				Returns the persona called [param name]: the player's override if there is one (see [method set_persona_override]), otherwise the persona of the game. Returns [code]null[/code] if there is none.
 			</description>
 		</method>
 		<method name="get_persona_names" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the names of all personas, in the order they were added.
+				Returns the names of all personas: the personas of the game in the order they were added, then the personas only the player has.
+			</description>
+		</method>
+		<method name="get_persona_override" qualifiers="const">
+			<return type="TTSPersona" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the player's override called [param name], or [code]null[/code] if the player has not changed or created this persona.
+			</description>
+		</method>
+		<method name="get_persona_overrides" qualifiers="const">
+			<return type="TTSPersona[]" />
+			<description>
+				Returns all of the player's persona overrides, in the order they were set.
 			</description>
 		</method>
 		<method name="get_personas" qualifiers="const">
 			<return type="TTSPersona[]" />
 			<description>
-				Returns all personas, in the order they were added.
+				Returns all personas as [method get_persona] returns them: the personas of the game in the order they were added (each replaced by the player's override if there is one), then the personas only the player has.
 			</description>
 		</method>
 		<method name="get_voices" qualifiers="const">
@@ -117,7 +150,14 @@
 			<return type="bool" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Returns [code]true[/code] if there is a persona called [param name].
+				Returns [code]true[/code] if there is a persona called [param name], of the game or of the player.
+			</description>
+		</method>
+		<method name="has_persona_override" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the player has an override called [param name].
 			</description>
 		</method>
 		<method name="is_available" qualifiers="const">
@@ -152,6 +192,13 @@
 				Removes the persona called [param name]. If it was the default persona, the built-in persona becomes the default again. Does nothing if there is no such persona.
 			</description>
 		</method>
+		<method name="remove_persona_override">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the player's override called [param name]. If the game has a persona with this name, it is used again. Does nothing if there is no such override.
+			</description>
+		</method>
 		<method name="resolve_voice_id" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="persona" type="TTSPersona" default="null" />
@@ -174,7 +221,23 @@
 			<return type="void" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Makes the persona called [param name] the default persona for [method speak]. The persona must have been added with [method add_persona]. An empty [param name] resets the default to the built-in persona.
+				Makes the persona called [param name] the default persona of the game for [method speak]. The persona must exist (added with [method add_persona] or [method set_persona_override]). An empty [param name] resets the default to the built-in persona. The player's default persona ([method set_default_persona_override]) still comes first.
+			</description>
+		</method>
+		<method name="set_default_persona_override">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Sets the player's default persona. It comes before the default persona of the game as long as a persona with this name exists; the name is not checked, so it may name a persona the game adds later. An empty [param name] removes the player's choice.
+				[b]Note:[/b] [TTSPersonaSettingsServer] calls this method; games usually change [method TTSPersonaSettingsServer.set_default_persona] instead, which is saved.
+			</description>
+		</method>
+		<method name="set_persona_override">
+			<return type="void" />
+			<param index="0" name="persona" type="TTSPersona" />
+			<description>
+				Sets the player's version of the persona called [member TTSPersona.persona_name]. It replaces the persona of the game with the same name for [method get_persona], [method speak_with_persona] and the default persona, without removing it (see [method get_base_persona]). A persona only the player has is added this way too. An override with the same name is replaced. Reports an error if [param persona] is [code]null[/code] or has no name.
+				[b]Note:[/b] [TTSPersonaSettingsServer] calls this method; games usually change [TTSPersonaSettingsServer] instead, which is saved.
 			</description>
 		</method>
 		<method name="speak">
@@ -184,6 +247,15 @@
 			<description>
 				Adds [param text] to the queue of the synthesizer, spoken with [param persona], or with [method get_default_persona] if [code]null[/code]. The voice is chosen with [method resolve_voice_id]. If [member TTSPersona.interrupt] is [code]true[/code], the current utterance and the queue are canceled first.
 				Returns the ID of the utterance, a positive number that is used by the [code]utterance_*[/code] signals. Returns [code]-1[/code] and reports an error if [param text] is empty or text to speech is not available (see [method is_available]).
+			</description>
+		</method>
+		<method name="speak_with_persona">
+			<return type="int" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="persona_name" type="StringName" />
+			<description>
+				Speaks [param text] like [method speak] with the persona called [param persona_name] (the player's override if there is one, see [method get_persona]). If there is no such persona, a warning is printed and the default persona is used; an empty [param persona_name] uses the default persona without a warning.
+				Returns the ID of the utterance, or [code]-1[/code] like [method speak].
 			</description>
 		</method>
 		<method name="stop">

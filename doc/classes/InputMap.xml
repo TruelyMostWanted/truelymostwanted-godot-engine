@@ -5,6 +5,8 @@
 	</brief_description>
 	<description>
 		Manages all [InputEventAction] which can be created/modified from the project settings menu [b]Project &gt; Project Settings &gt; Input Map[/b] or in code with [method add_action] and [method action_add_event]. See [method Node._input].
+		The actions are in two layers, two [InputActions] resources that the [InputMap] references: the [constant INPUT_ACTION_LAYER_BUILTIN] layer holds Godot's built-in [code]ui_*[/code] actions and the [constant INPUT_ACTION_LAYER_CUSTOM] layer holds every other action of the project or the game. The layers hold the data; the methods of this class read and write them ([method add_action] puts an action with the name of a built-in action into the built-in layer, any other into the custom layer). [method get_input_actions] returns a layer itself.
+		The merged list of both layers (built-in actions first) is what [Input] checks events against. It is rebuilt on the next access after a layer or one of its [InputAction]s emits [signal Resource.changed], so direct edits of a layer or an action also take effect. Prefer the methods of this class or [InputMapSettingsServer] for edits: they skip duplicate events and release an action that is pressed when its events change.
 	</description>
 	<tutorials>
 		<link title="Using InputEvent: InputMap">$DOCS_URL/tutorials/inputs/inputevent.html#inputmap</link>
@@ -103,6 +105,27 @@
 				Returns an array of all actions in the [InputMap].
 			</description>
 		</method>
+		<method name="get_input_action" qualifiers="const">
+			<return type="InputAction" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns the [InputAction] of [param action] in its layer, or [code]null[/code] if the action does not exist. It is not a copy: changing its [member InputAction.deadzone] or [member InputAction.events] changes the [InputMap].
+			</description>
+		</method>
+		<method name="get_input_action_layer" qualifiers="const">
+			<return type="int" enum="InputMap.InputActionLayer" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns the layer that holds [param action]. For a name that is in neither layer, returns the layer [method add_action] would put it in: [constant INPUT_ACTION_LAYER_BUILTIN] for the names of Godot's built-in [code]ui_*[/code] actions, otherwise [constant INPUT_ACTION_LAYER_CUSTOM].
+			</description>
+		</method>
+		<method name="get_input_actions" qualifiers="const">
+			<return type="InputActions" />
+			<param index="0" name="layer" type="int" enum="InputMap.InputActionLayer" />
+			<description>
+				Returns the [InputActions] resource of [param layer] itself, the same object on every call; it is not a copy. Its actions are in the order of [method get_actions]. Changes of the resource and of its actions change the [InputMap] (see the class description).
+			</description>
+		</method>
 		<method name="has_action" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="action" type="StringName" />
@@ -110,10 +133,38 @@
 				Returns [code]true[/code] if the [InputMap] has a registered action with the given name.
 			</description>
 		</method>
+		<method name="is_builtin_input_action" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param action] is in the built-in layer, the layer of Godot's built-in actions ([code]ui_accept[/code], [code]ui_cancel[/code], ...). A lookup in that layer: [code]false[/code] for a built-in action that was erased and for platform variants such as [code]ui_text_backspace_word.macos[/code], which are not actions of the [InputMap].
+			</description>
+		</method>
+		<method name="is_custom_input_action" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param action] is in the custom layer, the layer of the actions of the project and of the game. A lookup in that layer.
+			</description>
+		</method>
 		<method name="load_from_project_settings">
 			<return type="void" />
 			<description>
 				Clears all [InputEventAction] in the [InputMap] and load it anew from [ProjectSettings].
+			</description>
+		</method>
+		<method name="set_input_action">
+			<return type="void" />
+			<param index="0" name="action" type="InputAction" />
+			<description>
+				Puts [param action] itself into its layer (see [method get_input_action_layer]): it replaces the action named [member InputAction.action] in its place, or is added if there is none. The [InputMap] references the resource afterwards, so later changes of [param action] change the [InputMap] too.
+			</description>
+		</method>
+		<method name="set_input_actions">
+			<return type="void" />
+			<param index="0" name="actions" type="InputActions" />
+			<description>
+				Calls [method set_input_action] for every action of [param actions], so the layers reference those [InputAction] resources. Actions of the [InputMap] that are not in [param actions] stay unchanged.
 			</description>
 		</method>
 	</methods>
@@ -124,4 +175,12 @@
 			</description>
 		</signal>
 	</signals>
+	<constants>
+		<constant name="INPUT_ACTION_LAYER_BUILTIN" value="0" enum="InputActionLayer">
+			The layer of Godot's built-in [code]ui_*[/code] actions, also when the project changed their events.
+		</constant>
+		<constant name="INPUT_ACTION_LAYER_CUSTOM" value="1" enum="InputActionLayer">
+			The layer of all other actions: the ones of the project and the ones a game adds at runtime.
+		</constant>
+	</constants>
 </class>

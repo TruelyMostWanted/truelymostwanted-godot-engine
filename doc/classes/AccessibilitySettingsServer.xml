@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AccessibilitySettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for accessibility: UI scale, font size, color scheme, focus outline, spoken focus, reduced motion, colorblind mode and subtitles.
+	</brief_description>
+	<description>
+		[AccessibilitySettingsServer] is the settings domain [code]"accessibility"[/code]: it stores the accessibility options chosen by the player, loads them when the game starts and applies them before the main scene is loaded ([constant SettingsServer.APPLY_PHASE_SCENE]), so the first menu is already shown with them. The settings resource is an [AccessibilitySettings]. The file is [code]user://settings/accessibility.ini[/code] by default.
+		[b]Engine-applied values[/b] take effect at once:
+		- [member AccessibilitySettings.ui_scale] multiplies [member Window.content_scale_factor] of the root window. The factor of the video window domain ([method VideoWindowSettingsServer.set_content_scale_factor]) stays separate: the root window gets both multiplied. In [constant Window.CONTENT_SCALE_MODE_VIEWPORT] a larger factor also lowers the render resolution; games in that mode should rather use the font size factor.
+		- [member AccessibilitySettings.font_size_factor], [member AccessibilitySettings.color_scheme] and [member AccessibilitySettings.focus_outline_width] go into an [i]overlay theme[/i] that is set as [member Window.theme] of the root window: a copy of the root window's previous theme plus the changed items (default font size and the font sizes of the built-in types, text and selection colors, flat style boxes, the [code]focus[/code] style box). The project theme is not changed and keeps providing all other items. Themes that the game sets on its own nodes win over the overlay. When all these values are back at their defaults, the root window gets its previous theme again. See [method get_overlay_theme].
+		- [member AccessibilitySettings.speak_focused_controls] speaks the control that gets the focus in the root window with [TTSServer], using the persona [member AccessibilitySettings.speech_persona]. The text comes from [method get_control_speech_text]. Nothing is spoken while a screen reader is active ([method is_screen_reader_active]), which would speak the same control.
+		[b]Game-side values[/b] have no engine target ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): [member AccessibilitySettings.reduce_motion], [member AccessibilitySettings.reduce_transparency], [member AccessibilitySettings.colorblind_mode], [member AccessibilitySettings.subtitles_enabled] and [member AccessibilitySettings.subtitle_scale]. The game reads them, or uses the helpers [method get_animation_duration], [method get_motion_scale], [method scale_font_size] and [method scale_subtitle_font_size]. Connect to [signal SettingsServer.value_changed] to react to a change, and to [signal color_scheme_changed] to recolor UI that the game draws itself.
+		[b]Defaults from the OS:[/b] when the domain starts, [method DisplayServer.accessibility_should_reduce_animation], [method DisplayServer.accessibility_should_reduce_transparency] and [method DisplayServer.accessibility_should_increase_contrast] set the defaults of reduced motion, reduced transparency and the color scheme ([constant COLOR_SCHEME_HIGH_CONTRAST_DARK]). Platforms that don't answer (builds without AccessKit, headless, Android, iOS, Web) keep the off defaults. A value the player has saved always wins.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			# Options menu.
+			$UIScale.value = AccessibilitySettingsServer.get_ui_scale()
+			$UIScale.value_changed.connect(AccessibilitySettingsServer.set_ui_scale)
+			$HighContrast.toggled.connect(func(on):
+				AccessibilitySettingsServer.set_color_scheme(
+						AccessibilitySettingsServer.COLOR_SCHEME_HIGH_CONTRAST_DARK if on
+						else AccessibilitySettingsServer.COLOR_SCHEME_DEFAULT))
+			$Save.pressed.connect(AccessibilitySettingsServer.save)
+
+		func open_panel():
+			# Game-side: no animation when the player asked for reduced motion.
+			var tween = create_tween()
+			tween.tween_property($Panel, "position:y", 0.0, AccessibilitySettingsServer.get_animation_duration(0.3))
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+			// Options menu.
+			GetNode&lt;Slider&gt;("UIScale").Value = AccessibilitySettingsServer.GetUiScale();
+			GetNode&lt;Slider&gt;("UIScale").ValueChanged += value =&gt; AccessibilitySettingsServer.SetUiScale((float)value);
+			GetNode&lt;CheckButton&gt;("HighContrast").Toggled += on =&gt; AccessibilitySettingsServer.SetColorScheme(on
+					? AccessibilitySettingsServer.ColorScheme.HighContrastDark
+					: AccessibilitySettingsServer.ColorScheme.Default);
+			GetNode&lt;Button&gt;("Save").Pressed += () =&gt; AccessibilitySettingsServer.Singleton.Save();
+		}
+
+		public void OpenPanel()
+		{
+			// Game-side: no animation when the player asked for reduced motion.
+			Tween tween = CreateTween();
+			tween.TweenProperty(GetNode("Panel"), "position:y", 0.0, AccessibilitySettingsServer.GetAnimationDuration(0.3));
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Platforms:[/b] all values work on Windows, Linux, macOS, Android, iOS and Web. Spoken focus needs a voice ([method TTSServer.is_available]).
+		[b]Note:[/b] Call the methods from the main thread only. Only the root window is covered: embedded sub-windows have their own focus and theme.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_active_color_scheme" qualifiers="const">
+			<return type="AccessibilityColorScheme" />
+			<description>
+				Returns the color scheme the engine has applied now, or [code]null[/code] with [constant COLOR_SCHEME_DEFAULT] (and with [constant COLOR_SCHEME_CUSTOM] if the custom scheme can't be loaded). For [constant COLOR_SCHEME_HIGH_CONTRAST_DARK] and [constant COLOR_SCHEME_HIGH_CONTRAST_LIGHT] it is a new resource built in code each time the scheme changes; changing it has no effect on the theme.
+			</description>
+		</method>
+		<method name="get_animation_duration" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="duration" type="float" />
+			<description>
+				Returns [param duration], or [code]0.0[/code] if [member AccessibilitySettings.reduce_motion] is on. Use it for tweens and transitions that move or zoom UI or the camera.
+			</description>
+		</method>
+		<method name="get_color_scheme" qualifiers="const">
+			<return type="int" enum="AccessibilitySettingsServer.ColorScheme" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.color_scheme].
+			</description>
+		</method>
+		<method name="get_colorblind_mode" qualifiers="const">
+			<return type="int" enum="AccessibilitySettingsServer.ColorblindMode" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.colorblind_mode].
+			</description>
+		</method>
+		<method name="get_control_speech_text" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="control" type="Control" />
+			<description>
+				Returns the text that is spoken for [param control], in this order: [member Control.accessibility_name], the [code]text[/code] property (for example of [Button], [Label] and [LineEdit]), the [code]placeholder_text[/code] property, [member Control.tooltip_text]. Returns an empty string if none of them has text. Set [member Control.accessibility_name] on controls without text, such as icon buttons.
+			</description>
+		</method>
+		<method name="get_custom_color_scheme_path" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.custom_color_scheme_path].
+			</description>
+		</method>
+		<method name="get_focus_outline_width" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.focus_outline_width].
+			</description>
+		</method>
+		<method name="get_font_size_factor" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.font_size_factor].
+			</description>
+		</method>
+		<method name="get_motion_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns [code]0.0[/code] if [member AccessibilitySettings.reduce_motion] is on, otherwise [code]1.0[/code]. Multiply camera shake, head bob, parallax or screen effects with it.
+			</description>
+		</method>
+		<method name="get_overlay_theme" qualifiers="const">
+			<return type="Theme" />
+			<description>
+				Returns the overlay theme set on the root window, or [code]null[/code] while no theme value differs from its default. Set it on sub-windows that should look the same. Don't change it: it is rebuilt when a theme value changes.
+			</description>
+		</method>
+		<method name="get_scheme_color" qualifiers="const">
+			<return type="Color" />
+			<param index="0" name="role" type="StringName" />
+			<param index="1" name="default" type="Color" default="Color(0, 0, 0, 1)" />
+			<description>
+				Returns the color of [param role] in the active color scheme (see [method AccessibilityColorScheme.get_role_color]), or [param default] if no scheme is active. Use it for UI the game draws itself:
+				[codeblock]
+				health_bar.modulate = AccessibilitySettingsServer.get_scheme_color("problem", Color.RED)
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_speech_persona" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.speech_persona].
+			</description>
+		</method>
+		<method name="get_subtitle_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.subtitle_scale].
+			</description>
+		</method>
+		<method name="get_ui_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.ui_scale].
+			</description>
+		</method>
+		<method name="is_reducing_motion" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.reduce_motion].
+			</description>
+		</method>
+		<method name="is_reducing_transparency" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.reduce_transparency].
+			</description>
+		</method>
+		<method name="is_screen_reader_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [method DisplayServer.accessibility_screen_reader_active] reports an active screen reader. Returns [code]false[/code] if the platform does not know it (builds without AccessKit, Android, iOS, Web).
+			</description>
+		</method>
+		<method name="is_speaking_focused_controls" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.speak_focused_controls].
+			</description>
+		</method>
+		<method name="is_subtitles_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.subtitles_enabled].
+			</description>
+		</method>
+		<method name="scale_font_size" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="size" type="int" />
+			<description>
+				Returns [param size] multiplied with [member AccessibilitySettings.font_size_factor], rounded, at least [code]1[/code]. Use it for font sizes that the game sets in code or in its own themes; the built-in types of the default theme are scaled by the overlay theme.
+			</description>
+		</method>
+		<method name="scale_subtitle_font_size" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="size" type="int" />
+			<description>
+				Returns [param size] multiplied with [member AccessibilitySettings.font_size_factor] and [member AccessibilitySettings.subtitle_scale], rounded, at least [code]1[/code].
+			</description>
+		</method>
+		<method name="set_color_scheme">
+			<return type="void" />
+			<param index="0" name="scheme" type="int" enum="AccessibilitySettingsServer.ColorScheme" />
+			<description>
+				Sets [member AccessibilitySettings.color_scheme]. With [constant SettingsServer.APPLY_MODE_IMMEDIATE] the overlay theme of the root window changes at once and [signal color_scheme_changed] is emitted.
+			</description>
+		</method>
+		<method name="set_colorblind_mode">
+			<return type="void" />
+			<param index="0" name="mode" type="int" enum="AccessibilitySettingsServer.ColorblindMode" />
+			<description>
+				Sets [member AccessibilitySettings.colorblind_mode]. A game-side value: the engine applies no filter.
+			</description>
+		</method>
+		<method name="set_custom_color_scheme_path">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Sets [member AccessibilitySettings.custom_color_scheme_path]: the [AccessibilityColorScheme] used with [constant COLOR_SCHEME_CUSTOM].
+			</description>
+		</method>
+		<method name="set_focus_outline_width">
+			<return type="void" />
+			<param index="0" name="width" type="int" />
+			<description>
+				Sets [member AccessibilitySettings.focus_outline_width].
+			</description>
+		</method>
+		<method name="set_font_size_factor">
+			<return type="void" />
+			<param index="0" name="factor" type="float" />
+			<description>
+				Sets [member AccessibilitySettings.font_size_factor].
+			</description>
+		</method>
+		<method name="set_reduce_motion">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member AccessibilitySettings.reduce_motion]. A game-side value: see [method get_animation_duration] and [method get_motion_scale].
+			</description>
+		</method>
+		<method name="set_reduce_transparency">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member AccessibilitySettings.reduce_transparency]. A game-side value.
+			</description>
+		</method>
+		<method name="set_speak_focused_controls">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member AccessibilitySettings.speak_focused_controls]. When it is applied, the domain connects to [signal Viewport.gui_focus_changed] of the root window (or disconnects).
+			</description>
+		</method>
+		<method name="set_speech_persona">
+			<return type="void" />
+			<param index="0" name="persona" type="String" />
+			<description>
+				Sets [member AccessibilitySettings.speech_persona].
+			</description>
+		</method>
+		<method name="set_subtitle_scale">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Sets [member AccessibilitySettings.subtitle_scale]. A game-side value: see [method scale_subtitle_font_size].
+			</description>
+		</method>
+		<method name="set_subtitles_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member AccessibilitySettings.subtitles_enabled]. A game-side value.
+			</description>
+		</method>
+		<method name="set_ui_scale">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Sets [member AccessibilitySettings.ui_scale]. With [constant SettingsServer.APPLY_MODE_IMMEDIATE] the root window is scaled at once.
+			</description>
+		</method>
+		<method name="speak_control">
+			<return type="int" />
+			<param index="0" name="control" type="Control" />
+			<description>
+				Speaks the text of [param control] (see [method get_control_speech_text]) with [TTSServer] and the persona [member AccessibilitySettings.speech_persona] (the default persona if it is empty or unknown). Stops what is still spoken first. Works whether [member AccessibilitySettings.speak_focused_controls] is on or not, for example for a "read aloud" button. Returns the utterance ID, or [code]-1[/code] if there is no text or no voice.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="color_scheme_changed">
+			<param index="0" name="scheme" type="AccessibilityColorScheme" />
+			<description>
+				Emitted when the applied color scheme changes. [param scheme] is the new scheme, or [code]null[/code] for [constant COLOR_SCHEME_DEFAULT]. See [method get_scheme_color].
+			</description>
+		</signal>
+		<signal name="colorblind_mode_changed">
+			<param index="0" name="mode" type="int" enum="AccessibilitySettingsServer.ColorblindMode" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.colorblind_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to switch the color filter or the palette of the game.
+			</description>
+		</signal>
+		<signal name="focus_outline_width_changed">
+			<param index="0" name="width" type="int" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.focus_outline_width] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for custom focus indicators.
+			</description>
+		</signal>
+		<signal name="font_size_factor_changed">
+			<param index="0" name="factor" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.font_size_factor] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for text that does not use the theme, for example [Label3D] or text drawn in [method CanvasItem._draw].
+			</description>
+		</signal>
+		<signal name="reduce_motion_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.reduce_motion] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to switch off screen shake, parallax or flashing effects.
+			</description>
+		</signal>
+		<signal name="reduce_transparency_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.reduce_transparency] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to make translucent panels opaque.
+			</description>
+		</signal>
+		<signal name="speak_focused_controls_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.speak_focused_controls] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="subtitle_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.subtitle_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to resize the subtitles.
+			</description>
+		</signal>
+		<signal name="subtitles_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.subtitles_enabled] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to show or hide the subtitles.
+			</description>
+		</signal>
+		<signal name="ui_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.ui_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to scale UI that is not under the root window, for example a [SubViewport] or a separate [Window].
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="COLOR_SCHEME_DEFAULT" value="0" enum="ColorScheme">
+			The colors of the project's themes; no colors are overlaid.
+		</constant>
+		<constant name="COLOR_SCHEME_HIGH_CONTRAST_DARK" value="1" enum="ColorScheme">
+			White text on black surfaces with white borders and a yellow focus outline ([method AccessibilityColorScheme.create_high_contrast_dark]).
+		</constant>
+		<constant name="COLOR_SCHEME_HIGH_CONTRAST_LIGHT" value="2" enum="ColorScheme">
+			Black text on white surfaces with black borders and a blue focus outline ([method AccessibilityColorScheme.create_high_contrast_light]).
+		</constant>
+		<constant name="COLOR_SCHEME_CUSTOM" value="3" enum="ColorScheme">
+			The [AccessibilityColorScheme] at [member AccessibilitySettings.custom_color_scheme_path].
+		</constant>
+		<constant name="COLOR_SCHEME_MAX" value="4" enum="ColorScheme">
+			Represents the size of the [enum ColorScheme] enum.
+		</constant>
+		<constant name="COLORBLIND_MODE_NONE" value="0" enum="ColorblindMode">
+			No color vision deficiency.
+		</constant>
+		<constant name="COLORBLIND_MODE_PROTANOPIA" value="1" enum="ColorblindMode">
+			Red-blind (protanopia).
+		</constant>
+		<constant name="COLORBLIND_MODE_DEUTERANOPIA" value="2" enum="ColorblindMode">
+			Green-blind (deuteranopia).
+		</constant>
+		<constant name="COLORBLIND_MODE_TRITANOPIA" value="3" enum="ColorblindMode">
+			Blue-blind (tritanopia).
+		</constant>
+		<constant name="COLORBLIND_MODE_ACHROMATOPSIA" value="4" enum="ColorblindMode">
+			No color vision (achromatopsia).
+		</constant>
+		<constant name="COLORBLIND_MODE_MAX" value="5" enum="ColorblindMode">
+			Represents the size of the [enum ColorblindMode] enum.
+		</constant>
+	</constants>
+</class>

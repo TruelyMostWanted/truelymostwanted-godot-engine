@@ -3104,6 +3104,9 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("environment_set_sdfgi_frames_to_update_light", "frames"), &RenderingServer::environment_set_sdfgi_frames_to_update_light);
 	ClassDB::bind_method(D_METHOD("environment_set_volumetric_fog_volume_size", "size", "depth"), &RenderingServer::environment_set_volumetric_fog_volume_size);
 	ClassDB::bind_method(D_METHOD("environment_set_volumetric_fog_filter_active", "active"), &RenderingServer::environment_set_volumetric_fog_filter_active);
+	ClassDB::bind_method(D_METHOD("environment_set_global_effect_disabled", "effect", "disabled"), &RenderingServer::environment_set_global_effect_disabled);
+	ClassDB::bind_method(D_METHOD("environment_set_global_adjustment", "brightness", "contrast", "saturation"), &RenderingServer::environment_set_global_adjustment);
+	ClassDB::bind_method(D_METHOD("environment_set_ignore_global_overrides", "env", "ignore"), &RenderingServer::environment_set_ignore_global_overrides);
 
 	ClassDB::bind_method(D_METHOD("environment_bake_panorama", "environment", "bake_irradiance", "size"), &RenderingServer::environment_bake_panorama);
 
@@ -3163,6 +3166,14 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(RSE::ENV_SDFGI_Y_SCALE_50_PERCENT);
 	BIND_ENUM_CONSTANT(RSE::ENV_SDFGI_Y_SCALE_75_PERCENT);
 	BIND_ENUM_CONSTANT(RSE::ENV_SDFGI_Y_SCALE_100_PERCENT);
+
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_GLOW);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_SSAO);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_SSIL);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_SSR);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_FOG);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_VOLUMETRIC_FOG);
+	BIND_ENUM_CONSTANT(RSE::ENV_EFFECT_MAX);
 
 	BIND_ENUM_CONSTANT(RSE::ENV_SDFGI_RAY_COUNT_4);
 	BIND_ENUM_CONSTANT(RSE::ENV_SDFGI_RAY_COUNT_8);

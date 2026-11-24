@@ -48,6 +48,9 @@ class TTSServer : public Object {
 	mutable Mutex mutex;
 	HashMap<StringName, Ref<TTSPersona>> personas;
 	StringName default_persona_name;
+	// The player's versions of personas (TTSPersonaSettingsServer): seen before the personas of the game.
+	HashMap<StringName, Ref<TTSPersona>> persona_overrides;
+	StringName default_persona_override;
 	mutable Ref<TTSPersona> builtin_persona;
 	HashSet<int64_t> pending;
 	int64_t next_utterance_id = 1;
@@ -56,6 +59,8 @@ class TTSServer : public Object {
 	static bool _language_matches(const String &p_voice_language, const String &p_language);
 	static String _find_voice_for_language(const TypedArray<Dictionary> &p_voices, const String &p_language);
 	String _get_unavailable_reason() const;
+	Ref<TTSPersona> _get_persona_locked(const StringName &p_name) const;
+	StringName _get_default_persona_name_locked() const;
 	Ref<TTSPersona> _get_default_persona_locked() const;
 
 	void _emit_utterance_event(int p_event, int64_t p_id, int p_char_pos);
@@ -71,6 +76,7 @@ public:
 
 	// Speech.
 	int64_t speak(const String &p_text, const Ref<TTSPersona> &p_persona = Ref<TTSPersona>());
+	int64_t speak_with_persona(const String &p_text, const StringName &p_persona_name);
 	void stop();
 	void pause();
 	void resume();
@@ -90,6 +96,18 @@ public:
 	void set_default_persona(const StringName &p_name);
 	Ref<TTSPersona> get_default_persona() const;
 	StringName get_default_persona_name() const;
+
+	// The player's overrides (stored by TTSPersonaSettingsServer).
+	void set_persona_override(const Ref<TTSPersona> &p_persona);
+	void remove_persona_override(const StringName &p_name);
+	bool has_persona_override(const StringName &p_name) const;
+	Ref<TTSPersona> get_persona_override(const StringName &p_name) const;
+	TypedArray<TTSPersona> get_persona_overrides() const;
+	void clear_persona_overrides();
+	Ref<TTSPersona> get_base_persona(const StringName &p_name) const;
+
+	void set_default_persona_override(const StringName &p_name);
+	StringName get_default_persona_override() const;
 
 	// Voices.
 	TypedArray<Dictionary> get_voices(const String &p_language = String()) const;

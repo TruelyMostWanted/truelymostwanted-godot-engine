@@ -35,9 +35,9 @@
 
 // Data of the audio settings domains (#16). No engine dependency: the servers push the values to AudioServer.
 
-// Settings of the `audio` domain (AudioSettingsServer): the output and the input device.
-class AudioSettings : public Resource {
-	GDCLASS(AudioSettings, Resource);
+// Settings of the `audio_device` domain (AudioDeviceSettingsServer): the output and the input device.
+class AudioDeviceSettings : public Resource {
+	GDCLASS(AudioDeviceSettings, Resource);
 
 	String output_device = "Default";
 	String input_device = "Default";
@@ -52,7 +52,7 @@ public:
 	String get_input_device() const;
 };
 
-// One bus of the `audio_buses` domain (AudioBusSettingsServer), identified by its name.
+// One bus of the `audio_bus` domain (AudioBusSettingsServer), identified by its name.
 class AudioBusSettings : public Resource {
 	GDCLASS(AudioBusSettings, Resource);
 
@@ -80,7 +80,7 @@ public:
 	bool is_solo() const;
 };
 
-// Settings of the `audio_buses` domain: one entry per bus. It holds nothing but the list, so it can be stored as CSV.
+// Settings of the `audio_bus` domain: one entry per player bus. In `res://` it is also a preset (AudioBusSettingsServer::apply_preset()).
 class AudioBusListSettings : public Resource {
 	GDCLASS(AudioBusListSettings, Resource);
 
@@ -92,4 +92,64 @@ protected:
 public:
 	void set_buses(const TypedArray<AudioBusSettings> &p_buses);
 	TypedArray<AudioBusSettings> get_buses() const;
+};
+
+// One row of the file of the `audio_bus` domain: the storage form of an AudioBusSettings (#185).
+// Only the values that the project stores (`settings/audio_bus/store_*`) are written; while a file is read, every
+// value is accepted, and the row remembers which values the file had.
+class AudioBusSettingsRow : public Resource {
+	GDCLASS(AudioBusSettingsRow, Resource);
+
+public:
+	enum StoredValue {
+		STORED_VOLUME = 1,
+		STORED_MUTE = 2,
+		STORED_SOLO = 4,
+		STORED_ALL = STORED_VOLUME | STORED_MUTE | STORED_SOLO,
+	};
+
+private:
+	// The values written to a file (AudioBusSettingsServer sets it while it saves). Static: the CSV writer takes
+	// its columns from a new instance of the row class.
+	static uint32_t written_values;
+
+	String bus_name;
+	float volume_db = 0.0f;
+	bool mute = false;
+	bool solo = false;
+	uint32_t present = 0; // The values set since the row was created (by the reader of a file).
+
+protected:
+	static void _bind_methods();
+	void _validate_property(PropertyInfo &p_property) const;
+
+public:
+	static void set_written_values(uint32_t p_values);
+	static uint32_t get_written_values();
+
+	void set_bus_name(const String &p_name);
+	String get_bus_name() const;
+	void set_volume_db(float p_volume_db);
+	float get_volume_db() const;
+	void set_mute(bool p_mute);
+	bool is_mute() const;
+	void set_solo(bool p_solo);
+	bool is_solo() const;
+
+	// True if the value was set (for a row read from a file: the file has the value).
+	bool has_value(StoredValue p_value) const;
+};
+
+// The file of the `audio_bus` domain: one AudioBusSettingsRow per bus (CSV: one line per bus).
+class AudioBusSettingsRows : public Resource {
+	GDCLASS(AudioBusSettingsRows, Resource);
+
+	TypedArray<AudioBusSettingsRow> buses;
+
+protected:
+	static void _bind_methods();
+
+public:
+	void set_buses(const TypedArray<AudioBusSettingsRow> &p_buses);
+	TypedArray<AudioBusSettingsRow> get_buses() const;
 };

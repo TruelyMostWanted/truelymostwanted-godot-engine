@@ -112,7 +112,12 @@ public:
 
 	// INI.
 	static Error write_ini(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
-	static Error parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error);
+	// On error, r_error_line (if given) is the 1-based line of the problem.
+	static Error parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error, int *r_error_line = nullptr);
+	// One INI value as text: Godot Variant syntax (strings quoted), or plain text other tools can read.
+	static String ini_value_to_text(const Variant &p_value, bool p_plain);
+	// Reads an INI value written by ini_value_to_text() in either mode.
+	static Variant ini_text_to_value(const String &p_text);
 	// The tree of an INI text, in the layout of encode_resource(), without creating a resource.
 	static Error parse_ini_tree(const String &p_text, Dictionary &r_tree, String &r_error);
 	static Error parse_ini(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error);
@@ -122,6 +127,10 @@ public:
 	static Error write_csv(const Ref<Resource> &p_resource, const Options &p_options, String &r_text, String &r_error);
 	static Error parse_csv(const String &p_text, const String &p_type_hint, const Options &p_options, Ref<Resource> &r_resource, String &r_error);
 	static Vector<Vector<String>> parse_csv_rows(const String &p_text, char32_t p_delimiter);
+	// Like parse_csv_rows(), but fails with ERR_PARSE_ERROR on a quote that is not closed (r_error_line is 1-based).
+	static Error parse_csv_rows(const String &p_text, char32_t p_delimiter, Vector<Vector<String>> &r_rows, String &r_error, int &r_error_line);
+	// The delimiter of the options: one character, ',' if the option is empty, longer or a quote or line break.
+	static char32_t get_csv_delimiter(const Options &p_options);
 	static String write_csv_row(const Vector<String> &p_cells, char32_t p_delimiter);
 
 	// XML: one element per resource (`<resource type="..." format_version="1">`), one child element per property.
