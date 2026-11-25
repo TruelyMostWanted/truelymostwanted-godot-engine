@@ -46,6 +46,8 @@ class OptionButton;
 class SpinBox;
 class Tree;
 class SpriteSheetEditor;
+class TextureRegionEditor;
+class TreeItem;
 
 // Undoable changes of the regions of a SpriteSheet: every change is a snapshot of `regions` and `margins`
 // (do: the new state, undo: the old state), so deletes, renames and sorting restore the order as well.
@@ -59,6 +61,9 @@ public:
 	static void add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
 	// Text "x, y, width, height" to a rectangle.
 	static bool parse_rect(const String &p_text, Rect2i &r_rect);
+	// The rectangle of the region editor dialog (float) in whole pixels inside the texture (no clamping if
+	// p_texture_size is empty). False if nothing of it is left.
+	static bool rect_from_region_editor(const Rect2 &p_rect, const Size2i &p_texture_size, Rect2i &r_rect);
 	// A warning for the inspector and the dock, empty if the texture is usable.
 	static String get_texture_warning(const Ref<SpriteSheet> &p_atlas);
 };
@@ -77,6 +82,9 @@ class SpriteSheetRegionList : public VBoxContainer {
 	void _atlas_changed();
 	void _item_edited();
 	void _multi_selected(Object *p_item, int p_column, bool p_selected);
+	void _button_clicked(Object *p_item, int p_column, int p_id, MouseButton p_button);
+	void _icon_double_clicked();
+	void _edit_region(TreeItem *p_item);
 	void _emit_selection_changed();
 	Variant _get_drag_data_fw(const Point2 &p_point, Control *p_from);
 
@@ -177,7 +185,16 @@ class SpriteSheetEditor : public EditorDock {
 	EditorFileDialog *export_dialog = nullptr;
 	EditorFileDialog *frames_dialog = nullptr;
 
+	// One region editor dialog for all regions, created on first use.
+	TextureRegionEditor *region_dialog = nullptr;
+	Ref<SpriteSheet> region_dialog_atlas;
+	StringName region_dialog_name;
+	Ref<AtlasTexture> region_dialog_texture;
+
 	void _atlas_changed();
+	void _region_dialog_confirmed();
+	void _region_dialog_visibility_changed();
+	void _region_dialog_release();
 	void _list_selection_changed();
 	void _snap_changed(int p_index);
 	void _grid_value_changed(double p_value);
@@ -213,6 +230,8 @@ public:
 	Vector2i get_grid_step() const;
 	Vector2i get_grid_offset() const;
 	String make_new_region_name() const;
+	// Opens Godot's region editor dialog for one region; OK writes the rectangle back with one undo step.
+	void edit_region(const Ref<SpriteSheet> &p_atlas, const StringName &p_name);
 
 	SpriteSheetEditor();
 	~SpriteSheetEditor();
@@ -242,7 +261,7 @@ class EditorInspectorPluginSpriteSheet : public EditorInspectorPlugin {
 
 public:
 	virtual bool can_handle(Object *p_object) override;
-	virtual void parse_begin(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
 };
 
 class SpriteSheetEditorPlugin : public EditorPlugin {

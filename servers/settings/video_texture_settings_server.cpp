@@ -190,23 +190,26 @@ Variant VideoTextureSettingsServer::_get_effective_value(const StringName &p_nam
 }
 
 void VideoTextureSettingsServer::_apply_to_viewport(Viewport *p_viewport, const StringName &p_name, const Variant &p_value) const {
+#ifndef _3D_DISABLED
 	if (p_name == SNAME("anisotropic_filtering_level")) {
 		p_viewport->set_anisotropic_filtering_level(Viewport::AnisotropicFiltering(int(p_value)));
 	} else if (p_name == SNAME("texture_mipmap_bias")) {
 		p_viewport->set_texture_mipmap_bias(float(p_value));
-	} else if (p_name == SNAME("canvas_item_default_texture_filter")) {
-		p_viewport->set_default_canvas_item_texture_filter(Viewport::DefaultCanvasItemTextureFilter(int(p_value)));
-	} else if (p_name == SNAME("canvas_item_default_texture_repeat")) {
-		p_viewport->set_default_canvas_item_texture_repeat(Viewport::DefaultCanvasItemTextureRepeat(int(p_value)));
-	} else if (p_name == SNAME("snap_2d_transforms_to_pixel")) {
-		p_viewport->set_snap_2d_transforms_to_pixel(bool(p_value));
-	} else if (p_name == SNAME("snap_2d_vertices_to_pixel")) {
-		p_viewport->set_snap_2d_vertices_to_pixel(bool(p_value));
-	} else if (p_name == SNAME("sdf_oversize")) {
-		p_viewport->set_sdf_oversize(Viewport::SDFOversize(int(p_value)));
-	} else if (p_name == SNAME("sdf_scale")) {
-		p_viewport->set_sdf_scale(Viewport::SDFScale(int(p_value)));
-	}
+	} else
+#endif // _3D_DISABLED
+		if (p_name == SNAME("canvas_item_default_texture_filter")) {
+			p_viewport->set_default_canvas_item_texture_filter(Viewport::DefaultCanvasItemTextureFilter(int(p_value)));
+		} else if (p_name == SNAME("canvas_item_default_texture_repeat")) {
+			p_viewport->set_default_canvas_item_texture_repeat(Viewport::DefaultCanvasItemTextureRepeat(int(p_value)));
+		} else if (p_name == SNAME("snap_2d_transforms_to_pixel")) {
+			p_viewport->set_snap_2d_transforms_to_pixel(bool(p_value));
+		} else if (p_name == SNAME("snap_2d_vertices_to_pixel")) {
+			p_viewport->set_snap_2d_vertices_to_pixel(bool(p_value));
+		} else if (p_name == SNAME("sdf_oversize")) {
+			p_viewport->set_sdf_oversize(Viewport::SDFOversize(int(p_value)));
+		} else if (p_name == SNAME("sdf_scale")) {
+			p_viewport->set_sdf_scale(Viewport::SDFScale(int(p_value)));
+		}
 }
 
 void VideoTextureSettingsServer::_apply_all_to_viewport(Viewport *p_viewport) {
@@ -309,23 +312,26 @@ Variant VideoTextureSettingsServer::_pull_texture_value(const StringName &p_name
 		// RenderingServer has no getters for the global values; skipped values stay as stored.
 		return _get_current(p_name);
 	}
+#ifndef _3D_DISABLED
 	if (p_name == SNAME("anisotropic_filtering_level")) {
 		return int(root->get_anisotropic_filtering_level());
 	} else if (p_name == SNAME("texture_mipmap_bias")) {
 		return root->get_texture_mipmap_bias();
-	} else if (p_name == SNAME("canvas_item_default_texture_filter")) {
-		return int(root->get_default_canvas_item_texture_filter());
-	} else if (p_name == SNAME("canvas_item_default_texture_repeat")) {
-		return int(root->get_default_canvas_item_texture_repeat());
-	} else if (p_name == SNAME("snap_2d_transforms_to_pixel")) {
-		return root->is_snap_2d_transforms_to_pixel_enabled();
-	} else if (p_name == SNAME("snap_2d_vertices_to_pixel")) {
-		return root->is_snap_2d_vertices_to_pixel_enabled();
-	} else if (p_name == SNAME("sdf_oversize")) {
-		return int(root->get_sdf_oversize());
-	} else if (p_name == SNAME("sdf_scale")) {
-		return int(root->get_sdf_scale());
-	}
+	} else
+#endif // _3D_DISABLED
+		if (p_name == SNAME("canvas_item_default_texture_filter")) {
+			return int(root->get_default_canvas_item_texture_filter());
+		} else if (p_name == SNAME("canvas_item_default_texture_repeat")) {
+			return int(root->get_default_canvas_item_texture_repeat());
+		} else if (p_name == SNAME("snap_2d_transforms_to_pixel")) {
+			return root->is_snap_2d_transforms_to_pixel_enabled();
+		} else if (p_name == SNAME("snap_2d_vertices_to_pixel")) {
+			return root->is_snap_2d_vertices_to_pixel_enabled();
+		} else if (p_name == SNAME("sdf_oversize")) {
+			return int(root->get_sdf_oversize());
+		} else if (p_name == SNAME("sdf_scale")) {
+			return int(root->get_sdf_scale());
+		}
 	return _get_current(p_name);
 }
 
@@ -541,7 +547,29 @@ int VideoTextureSettingsServer::get_canvas_shadow_atlas_size() const {
 	return get_value(SNAME("canvas_shadow_atlas_size"));
 }
 
+void VideoTextureSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"anisotropic_filtering_level",
+		"texture_mipmap_bias",
+		"canvas_item_default_texture_filter",
+		"canvas_item_default_texture_repeat",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoTextureSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("anisotropic_filtering_level_changed", PropertyInfo(Variant::INT, "level", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.AnisotropicFiltering")));
+	ADD_SIGNAL(MethodInfo("texture_mipmap_bias_changed", PropertyInfo(Variant::FLOAT, "bias")));
+	ADD_SIGNAL(MethodInfo("canvas_item_default_texture_filter_changed", PropertyInfo(Variant::INT, "filter", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.DefaultCanvasItemTextureFilter")));
+	ADD_SIGNAL(MethodInfo("canvas_item_default_texture_repeat_changed", PropertyInfo(Variant::INT, "repeat", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.DefaultCanvasItemTextureRepeat")));
+
 	ClassDB::bind_method(D_METHOD("set_anisotropic_filtering_level", "level"), &VideoTextureSettingsServer::set_anisotropic_filtering_level);
 	ClassDB::bind_method(D_METHOD("get_anisotropic_filtering_level"), &VideoTextureSettingsServer::get_anisotropic_filtering_level);
 	ClassDB::bind_method(D_METHOD("set_texture_mipmap_bias", "bias"), &VideoTextureSettingsServer::set_texture_mipmap_bias);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Godot
 {
@@ -194,6 +195,85 @@ namespace Godot
         public T GetParentOrNull<T>() where T : class
         {
             return GetParent() as T;
+        }
+
+        /// <summary>
+        /// Returns the direct children of this node that are of type <typeparamref name="T"/>
+        /// or inherit from it, in the order of the scene tree.
+        /// <typeparamref name="T"/> can be any class or interface, also a C# class without
+        /// <c>[GlobalClass]</c>.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// List&lt;Button&gt; buttons = GetNode("Menu").GetChildren&lt;Button&gt;();
+        /// </code>
+        /// </example>
+        /// <param name="includeInternal">If <see langword="true"/>, internal children are included.</param>
+        /// <typeparam name="T">The type of the children to return.</typeparam>
+        /// <returns>The children that are <typeparamref name="T"/>.</returns>
+        public List<T> GetChildren<T>(bool includeInternal = false) where T : class
+        {
+            var result = new List<T>();
+            int count = GetChildCount(includeInternal);
+            for (int i = 0; i < count; i++)
+            {
+                if (GetChild(i, includeInternal) is T child)
+                {
+                    result.Add(child);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Returns the descendants of this node that are of type <typeparamref name="T"/>
+        /// or inherit from it, in tree order (each child before its own children),
+        /// like <see cref="FindChildren(string, string, bool, bool)"/> with a type.
+        /// <typeparamref name="T"/> can be any class or interface, also a C# class without
+        /// <c>[GlobalClass]</c>.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// foreach (IDamageable target in GetNode("Level").FindChildren&lt;IDamageable&gt;())
+        /// {
+        ///     target.TakeDamage(10);
+        /// }
+        /// </code>
+        /// </example>
+        /// <param name="recursive">If <see langword="false"/>, only direct children are checked.</param>
+        /// <param name="owned">
+        /// If <see langword="true"/>, only nodes with an <see cref="Owner"/> are checked (and searched).
+        /// The default <see langword="false"/> includes the nodes of instanced scenes.
+        /// </param>
+        /// <param name="includeInternal">If <see langword="true"/>, internal children are included.</param>
+        /// <typeparam name="T">The type of the nodes to return.</typeparam>
+        /// <returns>The descendants that are <typeparamref name="T"/>.</returns>
+        public List<T> FindChildren<T>(bool recursive = true, bool owned = false, bool includeInternal = false) where T : class
+        {
+            var result = new List<T>();
+            CollectChildren(this, result, recursive, owned, includeInternal);
+            return result;
+        }
+
+        private static void CollectChildren<T>(Node parent, List<T> result, bool recursive, bool owned, bool includeInternal) where T : class
+        {
+            int count = parent.GetChildCount(includeInternal);
+            for (int i = 0; i < count; i++)
+            {
+                Node child = parent.GetChild(i, includeInternal);
+                if (owned && child.Owner == null)
+                {
+                    continue;
+                }
+                if (child is T match)
+                {
+                    result.Add(match);
+                }
+                if (recursive)
+                {
+                    CollectChildren(child, result, true, owned, includeInternal);
+                }
+            }
         }
     }
 }

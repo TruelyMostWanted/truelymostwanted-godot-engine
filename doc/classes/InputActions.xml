@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputActions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A collection of [InputAction]s with lookup by action name.
+	</brief_description>
+	<description>
+		An [InputActions] resource holds a list of [InputAction]s whose names are unique. The [InputMap] references two of them as its layers ([method InputMap.get_input_actions]), and it is the settings resource of [InputMapSettingsServer]. It emits [signal Resource.changed] when its list or one of its actions changes. Adding an action with a name that is already in the list replaces the old one in its place. Looking up an action by name is fast, also for hundreds of actions.
+		The list is the typed array [member actions], so it can be edited in the Inspector and saved as [code].tres[/code] or [code].res[/code] with the events as sub-resources. [InputMapSettingsServer] writes it to its settings file as records with named fields, one per action and one per event.
+		[codeblocks]
+		[gdscript]
+		var actions = InputActions.new()
+		var jump = InputAction.new()
+		jump.action = &amp;"jump"
+		jump.events = InputMapSettingsServer.text_to_events("KeyboardLabel:Space; Gamepad:A")
+		actions.add_action(jump)
+		InputMap.set_input_actions(actions)
+		print(actions.has_action(&amp;"jump")) # Prints true
+		[/gdscript]
+		[csharp]
+		var actions = new InputActions();
+		var jump = new InputAction();
+		jump.Action = "jump";
+		jump.Events = InputMapSettingsServer.TextToEvents("KeyboardLabel:Space; Gamepad:A");
+		actions.AddAction(jump);
+		InputMap.Singleton.SetInputActions(actions);
+		GD.Print(actions.HasAction("jump")); // Prints True
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_action">
+			<return type="void" />
+			<param index="0" name="action" type="InputAction" />
+			<description>
+				Adds [param action] at the end of [member actions]. If an action with the same [member InputAction.action] is already in the list, it is replaced by [param action] in its place. Fails with an error if [param action] is [code]null[/code] or has no name.
+			</description>
+		</method>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes all actions.
+			</description>
+		</method>
+		<method name="get_action" qualifiers="const">
+			<return type="InputAction" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns the action named [param action], or [code]null[/code] if the list has none. The returned action is the one in the list, not a copy.
+			</description>
+		</method>
+		<method name="get_action_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of actions in the list.
+			</description>
+		</method>
+		<method name="get_action_names" qualifiers="const">
+			<return type="StringName[]" />
+			<description>
+				Returns the names of all actions, in the order of [member actions].
+			</description>
+		</method>
+		<method name="has_action" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the list has an action named [param action].
+			</description>
+		</method>
+		<method name="remove_action">
+			<return type="bool" />
+			<param index="0" name="action" type="StringName" />
+			<description>
+				Removes the action named [param action]. Returns [code]true[/code] if an action was removed, [code]false[/code] if the list has none with that name.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="actions" type="InputAction[]" setter="set_actions" getter="get_actions" default="[]">
+			The actions of the list. If several entries have the same name, the last one wins.
+		</member>
+	</members>
+</class>

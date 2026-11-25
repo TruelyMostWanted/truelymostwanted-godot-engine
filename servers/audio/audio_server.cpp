@@ -1983,6 +1983,8 @@ AudioServer::~AudioServer() {
 	// Cleanup resources while we still have an active AudioServer singleton,
 	// for resources that depend on the singleton still existing.
 	_cleanup_lists();
+	// Bus details wait one frame in each graveyard; the mix thread has stopped, so free both generations.
+	_cleanup_lists();
 
 	singleton = nullptr;
 }

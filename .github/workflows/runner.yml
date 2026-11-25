@@ -1,9 +1,11 @@
 name: 🔗 GHA
 # truely-godot-engine: the full CI runs only after merges into truely-godot-engine (one run per batch,
-# older runs are cancelled by the concurrency group) and on demand. Feature branches are tested locally.
+# older runs are cancelled by the concurrency group), on pushes to the release branch
+# truely-godot-engine-releases (a green run there starts the release workflow) and on demand.
+# Feature branches are tested locally.
 on:
   push:
-    branches: [truely-godot-engine]
+    branches: [truely-godot-engine, truely-godot-engine-releases]
   workflow_dispatch:
 
 concurrency:

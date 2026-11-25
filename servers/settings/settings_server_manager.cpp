@@ -98,8 +98,8 @@ Error SettingsServerManager::register_server(SettingsServer *p_server) {
 		}
 	}
 	ERR_FAIL_COND_V_MSG(duplicate, ERR_ALREADY_EXISTS, vformat("A settings server for the domain \"%s\" is already registered.", domain));
-	// `settings/paths/<domain>_settings_path`: engine domains register in the editor too, so their path shows up in the project settings.
-	SettingsServer::register_path_setting(domain, Object::cast_to<ListSettingsServer>(p_server) != nullptr);
+	// `settings/<domain>/*` (file name and format): engine domains register in the editor too, so their group shows up in the project settings.
+	SettingsServer::register_domain_settings(domain, Object::cast_to<ListSettingsServer>(p_server) != nullptr);
 	// Registered after its startup phase (for example by a module or a GDExtension at scene level).
 	if (enabled && phase != SettingsServer::APPLY_PHASE_NONE && int(p_server->get_apply_phase()) <= int(phase)) {
 		p_server->startup();
