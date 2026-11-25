@@ -2970,7 +2970,8 @@ void TileMapLayer::convert_cell_coordinates(TileSet::TileLayout p_from_layout, T
 		int alternative_tile;
 	};
 	Vector<Cell> cells;
-	for (const Vector2i &coords : get_used_cells()) {
+	for (const Variant &cell : get_used_cells()) {
+		const Vector2i coords = cell;
 		cells.push_back({ tile_set->convert_map_coords(coords, p_from_layout, p_from_axes), get_cell_source_id(coords), get_cell_atlas_coords(coords), get_cell_alternative_tile(coords) });
 	}
 	clear();
