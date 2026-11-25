@@ -1,0 +1,104 @@
+/**************************************************************************/
+/*  subtitle_editor_plugin.h                                              */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#pragma once
+
+#include "editor/inspector/editor_inspector.h"
+#include "editor/plugins/editor_plugin.h"
+#include "scene/gui/box_container.h"
+#include "servers/subtitle/subtitle.h"
+
+class Button;
+class Label;
+class Tree;
+
+// Pure helpers of the Subtitle Inspector, unit-tested without editor state.
+class SubtitleEditorHelper {
+public:
+	// The offset that moves a subtitle exported from a video editor (first segment at one hour or later) to zero:
+	// minus the whole hours of the first start time. Zero if the first segment starts before one hour.
+	static double get_suggested_time_offset(const Ref<Subtitle> &p_subtitle);
+	// The segments sorted by start time, then end time, without changing `p_subtitle`.
+	static TypedArray<SubtitleSegment> get_sorted_segments(const Ref<Subtitle> &p_subtitle);
+	// The segments with a new two-second segment after the last one.
+	static TypedArray<SubtitleSegment> get_segments_with_new_segment(const Ref<Subtitle> &p_subtitle);
+	// "Dialog", "Sound", …
+	static String get_kind_name(SubtitleSegment::Kind p_kind);
+};
+
+// The segments of a `Subtitle` as a table under its class header in the Inspector.
+class SubtitleEditor : public VBoxContainer {
+	GDCLASS(SubtitleEditor, VBoxContainer);
+
+	Ref<Subtitle> subtitle;
+	Vector<Ref<SubtitleSegment>> watched_segments;
+	bool update_queued = false;
+
+	Label *summary_label = nullptr;
+	HBoxContainer *offset_box = nullptr;
+	Label *offset_label = nullptr;
+	Button *offset_button = nullptr;
+	Button *add_button = nullptr;
+	Button *sort_button = nullptr;
+	Tree *tree = nullptr;
+
+	void _queue_update();
+	void _update();
+	void _watch_segments();
+	void _commit_segments(const String &p_action, const TypedArray<SubtitleSegment> &p_segments);
+	void _apply_suggested_offset();
+	void _add_segment();
+	void _sort_segments();
+	void _item_activated();
+
+protected:
+	void _notification(int p_what);
+
+public:
+	SubtitleEditor(const Ref<Subtitle> &p_subtitle);
+	~SubtitleEditor();
+};
+
+class EditorInspectorPluginSubtitle : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginSubtitle, EditorInspectorPlugin);
+
+public:
+	virtual bool can_handle(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
+};
+
+class SubtitleEditorPlugin : public EditorPlugin {
+	GDCLASS(SubtitleEditorPlugin, EditorPlugin);
+
+public:
+	virtual String get_plugin_name() const override { return "Subtitle"; }
+
+	SubtitleEditorPlugin();
+};

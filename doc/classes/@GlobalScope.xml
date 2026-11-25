@@ -1713,6 +1713,9 @@
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
 		</member>
+		<member name="SubtitleServer" type="SubtitleServer" setter="" getter="">
+			The [SubtitleServer] singleton.
+		</member>
 		<member name="TTSPersonaSettingsServer" type="TTSPersonaSettingsServer" setter="" getter="">
 			The [TTSPersonaSettingsServer] singleton.
 		</member>

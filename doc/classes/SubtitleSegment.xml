@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitleSegment" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One timed text of a [Subtitle]: a time range, the text and what kind of text it is.
+	</brief_description>
+	<description>
+		A [SubtitleSegment] is shown from [member start_time] until [member end_time]. [member text] holds the text without decoration: a sound is stored as [code]Applause[/code], and [SubtitleServer] shows it as [code][Applause][/code] (see [method SubtitleServer.get_display_text]). This keeps translations clean and lets players turn closed captions off separately from speech ([member SubtitleServer.captions_enabled]).
+		Times are segment times in seconds ([code]1.5[/code] is 1500 ms). When a [Subtitle] is played, its [member Subtitle.time_offset] is added.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="contains_time" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Returns [code]true[/code] if [param time] is in the range [member start_time] (included) to [member end_time] (excluded). [param time] is a segment time, without [member Subtitle.time_offset].
+			</description>
+		</method>
+		<method name="get_duration" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns [member end_time] minus [member start_time], at least [code]0.0[/code].
+			</description>
+		</method>
+		<method name="is_caption" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] for closed captions rather than speech: [constant KIND_SOUND], [constant KIND_REACTION], [constant KIND_MUSIC] and [constant KIND_LYRICS].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="end_time" type="float" setter="set_end_time" getter="get_end_time" default="0.0">
+			The time in seconds at which the segment disappears.
+		</member>
+		<member name="kind" type="int" setter="set_kind" getter="get_kind" enum="SubtitleSegment.Kind" default="0">
+			What kind of text the segment holds. It decides the decoration in [method SubtitleServer.get_display_text] and whether the segment is a closed caption ([method is_caption]).
+		</member>
+		<member name="off_screen" type="bool" setter="set_off_screen" getter="is_off_screen" default="false">
+			If [code]true[/code], the speaker is not visible, for example a voice on the phone. Usually shown in italics. SubRip files mark it with [code]&lt;i&gt;[/code] around the whole text.
+		</member>
+		<member name="placement" type="int" setter="set_placement" getter="get_placement" enum="SubtitleSegment.Placement" default="0">
+			Where the game should show the segment. [constant PLACEMENT_TOP] keeps text away from something important at the bottom of the screen. The engine stores the value; the game applies it.
+		</member>
+		<member name="speaker" type="StringName" setter="set_speaker" getter="get_speaker" default="&amp;&quot;&quot;">
+			Who speaks, for example to color the text or to show the name. SubRip files mark it with a leading name in capitals ([code]JOHN: Hello[/code]).
+		</member>
+		<member name="start_time" type="float" setter="set_start_time" getter="get_start_time" default="0.0">
+			The time in seconds at which the segment appears.
+		</member>
+		<member name="text" type="String" setter="set_text" getter="get_text" default="&quot;&quot;">
+			The text, without decoration. It can have several lines. If [member Subtitle.auto_translate] is enabled, it is a translation key or a source text for [TranslationServer].
+		</member>
+		<member name="translation_context" type="StringName" setter="set_translation_context" getter="get_translation_context" default="&amp;&quot;&quot;">
+			The context passed to [method TranslationServer.translate] when [member Subtitle.auto_translate] is enabled. Use it when the same text needs different translations.
+		</member>
+	</members>
+	<constants>
+		<constant name="KIND_DIALOG" value="0" enum="Kind">
+			Spoken text of a character.
+		</constant>
+		<constant name="KIND_NARRATION" value="1" enum="Kind">
+			A narrator. Shown in italics with BBCode.
+		</constant>
+		<constant name="KIND_SOUND" value="2" enum="Kind">
+			A sound, for example [code]Applause[/code] or [code]Door creaks[/code]. Shown in brackets: [code][Applause][/code].
+		</constant>
+		<constant name="KIND_REACTION" value="3" enum="Kind">
+			A sound a character makes, for example [code]laughs[/code] or [code]sighs[/code]. Shown in brackets.
+		</constant>
+		<constant name="KIND_MUSIC" value="4" enum="Kind">
+			A description of music, for example [code]calm music[/code]. Shown between music notes: [code]♪ calm music ♪[/code].
+		</constant>
+		<constant name="KIND_LYRICS" value="5" enum="Kind">
+			Words of a song. Shown between music notes, line by line.
+		</constant>
+		<constant name="KIND_ON_SCREEN_TEXT" value="6" enum="Kind">
+			Text that appears in the picture, for example a sign or a letter.
+		</constant>
+		<constant name="KIND_MAX" value="7" enum="Kind">
+			Represents the size of the [enum Kind] enum.
+		</constant>
+		<constant name="PLACEMENT_AUTO" value="0" enum="Placement">
+			The game decides, usually at the bottom.
+		</constant>
+		<constant name="PLACEMENT_BOTTOM" value="1" enum="Placement">
+			At the bottom of the screen.
+		</constant>
+		<constant name="PLACEMENT_TOP" value="2" enum="Placement">
+			At the top of the screen.
+		</constant>
+		<constant name="PLACEMENT_MAX" value="3" enum="Placement">
+			Represents the size of the [enum Placement] enum.
+		</constant>
+	</constants>
+</class>
