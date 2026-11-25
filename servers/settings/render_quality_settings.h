@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_quality_settings.h                                              */
+/*  render_quality_settings.h                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -34,11 +34,11 @@
 #include "scene/main/viewport.h"
 #include "servers/rendering/rendering_server.h"
 
-// Data of the `video_quality` settings domain (#21): 3D scaling (mode, scale, FSR sharpness), mesh LOD,
+// Data of the `render_quality` settings domain (#21): 3D scaling (mode, scale, FSR sharpness), mesh LOD,
 // anti-aliasing (MSAA 2D/3D, FXAA/SMAA, TAA, debanding), variable rate shading and occlusion culling.
-// VideoQualitySettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
-class VideoQualitySettings : public Resource {
-	GDCLASS(VideoQualitySettings, Resource);
+// RenderQualitySettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
+class RenderQualitySettings : public Resource {
+	GDCLASS(RenderQualitySettings, Resource);
 
 	Viewport::Scaling3DMode scaling_3d_mode = Viewport::SCALING_3D_MODE_BILINEAR;
 	float scaling_3d_scale = 1.0;

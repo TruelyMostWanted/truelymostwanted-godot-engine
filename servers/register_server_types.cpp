@@ -95,6 +95,8 @@
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
+#include "servers/settings/render_quality_settings.h"
+#include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/tts_persona_settings.h"
@@ -104,8 +106,6 @@
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
-#include "servers/settings/video_quality_settings.h"
-#include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_shadow_settings.h"
 #include "servers/settings/video_shadow_settings_server.h"
 #include "servers/settings/video_texture_settings.h"
@@ -206,7 +206,7 @@ static InputSettingsServer *input_settings_server = nullptr;
 static InputMapSettingsServer *input_map_settings_server = nullptr;
 static WindowSettingsServer *window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
-static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
+static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
 static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
@@ -305,11 +305,11 @@ void register_server_types() {
 	engine_settings_server = memnew(EngineSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineSettingsServer", EngineSettingsServer::get_singleton(), "EngineSettingsServer"));
 	settings_server_manager->register_server(engine_settings_server);
-	GDREGISTER_CLASS(VideoQualitySettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoQualitySettingsServer);
-	video_quality_settings_server = memnew(VideoQualitySettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoQualitySettingsServer", VideoQualitySettingsServer::get_singleton(), "VideoQualitySettingsServer"));
-	settings_server_manager->register_server(video_quality_settings_server);
+	GDREGISTER_CLASS(RenderQualitySettings);
+	GDREGISTER_ABSTRACT_CLASS(RenderQualitySettingsServer);
+	render_quality_settings_server = memnew(RenderQualitySettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderQualitySettingsServer", RenderQualitySettingsServer::get_singleton(), "RenderQualitySettingsServer"));
+	settings_server_manager->register_server(render_quality_settings_server);
 	GDREGISTER_CLASS(VideoShadowSettings);
 	GDREGISTER_ABSTRACT_CLASS(VideoShadowSettingsServer);
 	video_shadow_settings_server = memnew(VideoShadowSettingsServer);
@@ -634,8 +634,8 @@ void unregister_server_types() {
 	video_texture_settings_server = nullptr;
 	memdelete(video_shadow_settings_server);
 	video_shadow_settings_server = nullptr;
-	memdelete(video_quality_settings_server);
-	video_quality_settings_server = nullptr;
+	memdelete(render_quality_settings_server);
+	render_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
 	engine_settings_server = nullptr;
 	memdelete(window_settings_server);

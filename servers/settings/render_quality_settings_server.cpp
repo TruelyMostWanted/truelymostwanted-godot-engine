@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_quality_settings_server.cpp                                     */
+/*  render_quality_settings_server.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_quality_settings_server.h"
+#include "render_quality_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/math/math_funcs.h"
@@ -37,8 +37,8 @@
 #include "core/os/os.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
+#include "servers/settings/render_quality_settings.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_quality_settings.h"
 
 #include "modules/modules_enabled.gen.h" // For raycast.
 
@@ -46,8 +46,8 @@
 #include "servers/rendering/rendering_device.h"
 #endif
 
-// The values of the domain, in the order of VideoQualitySettings.
-static const char *video_quality_setting_names[] = {
+// The values of the domain, in the order of RenderQualitySettings.
+static const char *render_quality_setting_names[] = {
 	"scaling_3d_mode",
 	"scaling_3d_scale",
 	"fsr_sharpness",
@@ -63,9 +63,9 @@ static const char *video_quality_setting_names[] = {
 	"occlusion_culling_build_quality",
 };
 
-static constexpr const char *VIDEO_QUALITY_VIEWPORT_GROUP = "video_quality_settings";
+static constexpr const char *RENDER_QUALITY_VIEWPORT_GROUP = "render_quality_settings";
 
-static Variant video_quality_project_setting(const String &p_name, const Variant &p_default) {
+static Variant render_quality_project_setting(const String &p_name, const Variant &p_default) {
 	const ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	if (project_settings == nullptr || !project_settings->has_setting(p_name)) {
 		return p_default;
@@ -75,14 +75,14 @@ static Variant video_quality_project_setting(const String &p_name, const Variant
 }
 
 #ifdef RD_ENABLED
-static bool video_quality_has_rd_feature(RenderingDevice::Features p_feature) {
+static bool render_quality_has_rd_feature(RenderingDevice::Features p_feature) {
 	const RenderingDevice *rd = RenderingDevice::get_singleton();
 	return rd != nullptr && rd->has_feature(p_feature);
 }
 #endif
 
 // The upper limit of an enum value, or 0 for settings that are no enum.
-static int video_quality_enum_size(const StringName &p_name) {
+static int render_quality_enum_size(const StringName &p_name) {
 	if (p_name == SNAME("scaling_3d_mode")) {
 		return Viewport::SCALING_3D_MODE_MAX;
 	} else if (p_name == SNAME("msaa_2d") || p_name == SNAME("msaa_3d")) {
@@ -97,7 +97,7 @@ static int video_quality_enum_size(const StringName &p_name) {
 	return 0;
 }
 
-static bool video_quality_range(const StringName &p_name, double &r_min, double &r_max, bool &r_integer) {
+static bool render_quality_range(const StringName &p_name, double &r_min, double &r_max, bool &r_integer) {
 	r_integer = false;
 	if (p_name == SNAME("scaling_3d_scale")) {
 		// What Viewport::set_scaling_3d_scale() accepts.
@@ -119,25 +119,25 @@ static bool video_quality_range(const StringName &p_name, double &r_min, double 
 	return true;
 }
 
-VideoQualitySettingsServer *VideoQualitySettingsServer::singleton = nullptr;
+RenderQualitySettingsServer *RenderQualitySettingsServer::singleton = nullptr;
 
-VideoQualitySettingsServer *VideoQualitySettingsServer::get_singleton() {
+RenderQualitySettingsServer *RenderQualitySettingsServer::get_singleton() {
 	return singleton;
 }
 
-StringName VideoQualitySettingsServer::get_viewport_group() {
-	return VIDEO_QUALITY_VIEWPORT_GROUP;
+StringName RenderQualitySettingsServer::get_viewport_group() {
+	return RENDER_QUALITY_VIEWPORT_GROUP;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Renderer support.
 
-String VideoQualitySettingsServer::_get_rendering_method() {
+String RenderQualitySettingsServer::_get_rendering_method() {
 	const OS *os = OS::get_singleton();
 	return os != nullptr ? os->get_current_rendering_method() : String();
 }
 
-bool VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::Scaling3DMode p_mode) {
+bool RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::Scaling3DMode p_mode) {
 	const String method = _get_rendering_method();
 	const bool compatibility = method == "gl_compatibility";
 	const bool mobile = method == "mobile";
@@ -153,14 +153,14 @@ bool VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::Scaling3
 		}
 		case Viewport::SCALING_3D_MODE_METALFX_SPATIAL: {
 #ifdef RD_ENABLED
-			return !compatibility && video_quality_has_rd_feature(RenderingDevice::SUPPORTS_METALFX_SPATIAL);
+			return !compatibility && render_quality_has_rd_feature(RenderingDevice::SUPPORTS_METALFX_SPATIAL);
 #else
 			return false;
 #endif
 		}
 		case Viewport::SCALING_3D_MODE_METALFX_TEMPORAL: {
 #ifdef RD_ENABLED
-			return !compatibility && !mobile && video_quality_has_rd_feature(RenderingDevice::SUPPORTS_METALFX_TEMPORAL);
+			return !compatibility && !mobile && render_quality_has_rd_feature(RenderingDevice::SUPPORTS_METALFX_TEMPORAL);
 #else
 			return false;
 #endif
@@ -171,7 +171,7 @@ bool VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::Scaling3
 	}
 }
 
-bool VideoQualitySettingsServer::is_renderer_supported(const StringName &p_name) {
+bool RenderQualitySettingsServer::is_renderer_supported(const StringName &p_name) {
 	const String method = _get_rendering_method();
 	const bool compatibility = method == "gl_compatibility";
 	const bool mobile = method == "mobile";
@@ -185,7 +185,7 @@ bool VideoQualitySettingsServer::is_renderer_supported(const StringName &p_name)
 		return !compatibility && !mobile;
 	} else if (p_name == SNAME("vrs_mode")) {
 #ifdef RD_ENABLED
-		return !compatibility && video_quality_has_rd_feature(RenderingDevice::SUPPORTS_ATTACHMENT_VRS);
+		return !compatibility && render_quality_has_rd_feature(RenderingDevice::SUPPORTS_ATTACHMENT_VRS);
 #else
 		return false;
 #endif
@@ -203,53 +203,53 @@ bool VideoQualitySettingsServer::is_renderer_supported(const StringName &p_name)
 /////////////////////////////////////////////////////////////////////////////
 // Engine targets.
 
-Variant VideoQualitySettingsServer::_get_project_value(const StringName &p_name) {
+Variant RenderQualitySettingsServer::_get_project_value(const StringName &p_name) {
 	// What Viewport, SceneTree and RenderingServer read from the project settings.
 	if (p_name == SNAME("scaling_3d_mode")) {
-		return int(video_quality_project_setting("rendering/scaling_3d/mode", int(Viewport::SCALING_3D_MODE_BILINEAR)));
+		return int(render_quality_project_setting("rendering/scaling_3d/mode", int(Viewport::SCALING_3D_MODE_BILINEAR)));
 	} else if (p_name == SNAME("scaling_3d_scale")) {
-		return float(video_quality_project_setting("rendering/scaling_3d/scale", 1.0));
+		return float(render_quality_project_setting("rendering/scaling_3d/scale", 1.0));
 	} else if (p_name == SNAME("fsr_sharpness")) {
-		return float(video_quality_project_setting("rendering/scaling_3d/fsr_sharpness", 0.2));
+		return float(render_quality_project_setting("rendering/scaling_3d/fsr_sharpness", 0.2));
 	} else if (p_name == SNAME("mesh_lod_threshold")) {
-		return float(video_quality_project_setting("rendering/mesh_lod/lod_change/threshold_pixels", 1.0));
+		return float(render_quality_project_setting("rendering/mesh_lod/lod_change/threshold_pixels", 1.0));
 	} else if (p_name == SNAME("msaa_2d")) {
-		return int(video_quality_project_setting("rendering/anti_aliasing/quality/msaa_2d", int(Viewport::MSAA_DISABLED)));
+		return int(render_quality_project_setting("rendering/anti_aliasing/quality/msaa_2d", int(Viewport::MSAA_DISABLED)));
 	} else if (p_name == SNAME("msaa_3d")) {
-		return int(video_quality_project_setting("rendering/anti_aliasing/quality/msaa_3d", int(Viewport::MSAA_DISABLED)));
+		return int(render_quality_project_setting("rendering/anti_aliasing/quality/msaa_3d", int(Viewport::MSAA_DISABLED)));
 	} else if (p_name == SNAME("screen_space_aa")) {
-		return int(video_quality_project_setting("rendering/anti_aliasing/quality/screen_space_aa", int(Viewport::SCREEN_SPACE_AA_DISABLED)));
+		return int(render_quality_project_setting("rendering/anti_aliasing/quality/screen_space_aa", int(Viewport::SCREEN_SPACE_AA_DISABLED)));
 	} else if (p_name == SNAME("use_taa")) {
-		return bool(video_quality_project_setting("rendering/anti_aliasing/quality/use_taa", false));
+		return bool(render_quality_project_setting("rendering/anti_aliasing/quality/use_taa", false));
 	} else if (p_name == SNAME("use_debanding")) {
-		return bool(video_quality_project_setting("rendering/anti_aliasing/quality/use_debanding", false));
+		return bool(render_quality_project_setting("rendering/anti_aliasing/quality/use_debanding", false));
 	} else if (p_name == SNAME("vrs_mode")) {
-		return int(video_quality_project_setting("rendering/vrs/mode", int(Viewport::VRS_DISABLED)));
+		return int(render_quality_project_setting("rendering/vrs/mode", int(Viewport::VRS_DISABLED)));
 	} else if (p_name == SNAME("use_occlusion_culling")) {
-		return bool(video_quality_project_setting("rendering/occlusion_culling/use_occlusion_culling", false));
+		return bool(render_quality_project_setting("rendering/occlusion_culling/use_occlusion_culling", false));
 	} else if (p_name == SNAME("occlusion_rays_per_thread")) {
-		return int(video_quality_project_setting("rendering/occlusion_culling/occlusion_rays_per_thread", 512));
+		return int(render_quality_project_setting("rendering/occlusion_culling/occlusion_rays_per_thread", 512));
 	} else if (p_name == SNAME("occlusion_culling_build_quality")) {
-		return int(video_quality_project_setting("rendering/occlusion_culling/bvh_build_quality", int(RenderingServerEnums::VIEWPORT_OCCLUSION_BUILD_QUALITY_HIGH)));
+		return int(render_quality_project_setting("rendering/occlusion_culling/bvh_build_quality", int(RenderingServerEnums::VIEWPORT_OCCLUSION_BUILD_QUALITY_HIGH)));
 	}
 	return Variant();
 }
 
-bool VideoQualitySettingsServer::_is_global_setting(const StringName &p_name) {
+bool RenderQualitySettingsServer::_is_global_setting(const StringName &p_name) {
 	return p_name == SNAME("occlusion_rays_per_thread") || p_name == SNAME("occlusion_culling_build_quality");
 }
 
-Viewport *VideoQualitySettingsServer::_get_root() {
+Viewport *RenderQualitySettingsServer::_get_root() {
 	SceneTree *tree = SceneTree::get_singleton();
 	return tree != nullptr ? tree->get_root().ptr() : nullptr;
 }
 
-Variant VideoQualitySettingsServer::_get_current(const StringName &p_name) const {
+Variant RenderQualitySettingsServer::_get_current(const StringName &p_name) const {
 	const Variant *value = pushed_values.getptr(p_name);
 	return value != nullptr ? *value : _get_project_value(p_name);
 }
 
-Variant VideoQualitySettingsServer::_get_effective_value(const StringName &p_name, const Variant &p_value) {
+Variant RenderQualitySettingsServer::_get_effective_value(const StringName &p_name, const Variant &p_value) {
 	// What reaches the engine: the value, a fallback, or nothing (Variant()) if the renderer ignores it.
 	String skipped_as;
 	Variant effective = p_value;
@@ -269,12 +269,12 @@ Variant VideoQualitySettingsServer::_get_effective_value(const StringName &p_nam
 		// The player's (or the game's) choice, not the project value: worth a warning, once.
 		warned.insert(p_name);
 		const String method = _get_rendering_method();
-		WARN_PRINT(vformat("Video quality settings: \"%s\" = %s is not supported by the current renderer (\"%s\"), hardware or build; %s. See VideoQualitySettingsServer.is_value_supported().", p_name, p_value, method, skipped_as));
+		WARN_PRINT(vformat("Render quality settings: \"%s\" = %s is not supported by the current renderer (\"%s\"), hardware or build; %s. See RenderQualitySettingsServer.is_value_supported().", p_name, p_value, method, skipped_as));
 	}
 	return effective;
 }
 
-void VideoQualitySettingsServer::_apply_to_viewport(Viewport *p_viewport, const StringName &p_name, const Variant &p_value) const {
+void RenderQualitySettingsServer::_apply_to_viewport(Viewport *p_viewport, const StringName &p_name, const Variant &p_value) const {
 #ifndef _3D_DISABLED
 	if (p_name == SNAME("scaling_3d_mode")) {
 		p_viewport->set_scaling_3d_mode(Viewport::Scaling3DMode(int(p_value)));
@@ -303,8 +303,8 @@ void VideoQualitySettingsServer::_apply_to_viewport(Viewport *p_viewport, const 
 		}
 }
 
-void VideoQualitySettingsServer::_apply_all_to_viewport(Viewport *p_viewport) {
-	for (const char *setting_name : video_quality_setting_names) {
+void RenderQualitySettingsServer::_apply_all_to_viewport(Viewport *p_viewport) {
+	for (const char *setting_name : render_quality_setting_names) {
 		const StringName name_key = setting_name;
 		if (_is_global_setting(name_key)) {
 			continue;
@@ -316,7 +316,7 @@ void VideoQualitySettingsServer::_apply_all_to_viewport(Viewport *p_viewport) {
 	}
 }
 
-void VideoQualitySettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
+void RenderQualitySettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
 	const Variant effective = _get_effective_value(p_name, p_value);
 	if (effective.get_type() == Variant::NIL) {
 		return;
@@ -359,7 +359,7 @@ void VideoQualitySettingsServer::_deliver(const StringName &p_name, const Varian
 	}
 }
 
-void VideoQualitySettingsServer::_deliver_undelivered() {
+void RenderQualitySettingsServer::_deliver_undelivered() {
 	const bool has_root = _get_root() != nullptr;
 	const bool has_rendering_server = RenderingServer::get_singleton() != nullptr;
 	LocalVector<StringName> names;
@@ -374,7 +374,7 @@ void VideoQualitySettingsServer::_deliver_undelivered() {
 	}
 }
 
-void VideoQualitySettingsServer::_push_quality_value(const Variant &p_value, const StringName &p_name) {
+void RenderQualitySettingsServer::_push_quality_value(const Variant &p_value, const StringName &p_name) {
 	pushed_values[p_name] = p_value;
 	const bool deliverable = _is_global_setting(p_name) ? RenderingServer::get_singleton() != nullptr : _get_root() != nullptr;
 	if (deliverable) {
@@ -387,7 +387,7 @@ void VideoQualitySettingsServer::_push_quality_value(const Variant &p_value, con
 	_connect_tree();
 }
 
-Variant VideoQualitySettingsServer::_pull_quality_value(const StringName &p_name) {
+Variant RenderQualitySettingsServer::_pull_quality_value(const StringName &p_name) {
 	if (!defaults_captured) {
 		// The defaults: the project values, not the engine state (which a game may have changed already).
 		return _get_project_value(p_name);
@@ -434,18 +434,18 @@ Variant VideoQualitySettingsServer::_pull_quality_value(const StringName &p_name
 	return _get_current(p_name);
 }
 
-void VideoQualitySettingsServer::_connect_tree() {
+void RenderQualitySettingsServer::_connect_tree() {
 	SceneTree *tree = SceneTree::get_singleton();
 	if (tree == nullptr) {
 		return;
 	}
-	const Callable callback = callable_mp(this, &VideoQualitySettingsServer::_on_node_added);
+	const Callable callback = callable_mp(this, &RenderQualitySettingsServer::_on_node_added);
 	if (!tree->is_connected(SNAME("node_added"), callback)) {
 		tree->connect(SNAME("node_added"), callback);
 	}
 }
 
-void VideoQualitySettingsServer::_on_node_added(Node *p_node) {
+void RenderQualitySettingsServer::_on_node_added(Node *p_node) {
 	Viewport *viewport = Object::cast_to<Viewport>(p_node);
 	if (viewport == nullptr || viewport == _get_root() || has_viewport(viewport) || !viewport->is_in_group(get_viewport_group())) {
 		return;
@@ -453,7 +453,7 @@ void VideoQualitySettingsServer::_on_node_added(Node *p_node) {
 	_apply_all_to_viewport(viewport);
 }
 
-void VideoQualitySettingsServer::_on_startup_applied(ApplyPhase p_phase) {
+void RenderQualitySettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		// After SceneTree has set the project values of the root viewport.
 		_deliver_undelivered();
@@ -464,39 +464,43 @@ void VideoQualitySettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName VideoQualitySettingsServer::get_domain() const {
-	return SNAME("video_quality");
+StringName RenderQualitySettingsServer::get_domain() const {
+	return SNAME("render_quality");
 }
 
-SettingsServer::ApplyPhase VideoQualitySettingsServer::get_apply_phase() const {
+String RenderQualitySettingsServer::_get_legacy_file_name() const {
+	return "video_quality";
+}
+
+SettingsServer::ApplyPhase RenderQualitySettingsServer::get_apply_phase() const {
 	// The root viewport exists and has its project values; the main scene is not loaded yet.
 	return APPLY_PHASE_SCENE;
 }
 
-Ref<Resource> VideoQualitySettingsServer::_create_default_settings() const {
-	Ref<VideoQualitySettings> default_settings;
+Ref<Resource> RenderQualitySettingsServer::_create_default_settings() const {
+	Ref<RenderQualitySettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-void VideoQualitySettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+void RenderQualitySettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	SettingsServer::_read_settings_from_engine(p_settings);
 	// The first read fills the defaults; later ones read the engine.
 	defaults_captured = true;
 }
 
-Variant VideoQualitySettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant RenderQualitySettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (value.get_type() != Variant::INT && value.get_type() != Variant::FLOAT) {
 		return value;
 	}
 
-	const int enum_size = video_quality_enum_size(p_name);
+	const int enum_size = render_quality_enum_size(p_name);
 	if (enum_size > 0) {
 		const double number = value;
 		if (Math::is_nan(number) || number < 0 || number >= enum_size) {
 			const Variant default_value = get_default_value(p_name);
-			WARN_PRINT(vformat("Video quality settings: %s is not a valid value for \"%s\"; %s is used.", value, p_name, default_value));
+			WARN_PRINT(vformat("Render quality settings: %s is not a valid value for \"%s\"; %s is used.", value, p_name, default_value));
 			return default_value;
 		}
 		return int64_t(number);
@@ -505,28 +509,28 @@ Variant VideoQualitySettingsServer::_validate_setting(const StringName &p_name, 
 	double min_value = 0.0;
 	double max_value = 0.0;
 	bool integer = false;
-	if (video_quality_range(p_name, min_value, max_value, integer)) {
+	if (render_quality_range(p_name, min_value, max_value, integer)) {
 		const double number = value;
 		if (Math::is_nan(number)) {
-			WARN_PRINT(vformat("Video quality settings: \"%s\" is not a number; the default is used.", p_name));
+			WARN_PRINT(vformat("Render quality settings: \"%s\" is not a number; the default is used.", p_name));
 			return get_default_value(p_name);
 		}
 		const double clamped = CLAMP(number, min_value, max_value);
 		if (clamped != number) {
-			WARN_PRINT(vformat("Video quality settings: %s is out of range for \"%s\" (%s to %s); %s is used.", value, p_name, Variant(min_value), Variant(max_value), Variant(clamped)));
+			WARN_PRINT(vformat("Render quality settings: %s is out of range for \"%s\" (%s to %s); %s is used.", value, p_name, Variant(min_value), Variant(max_value), Variant(clamped)));
 		}
 		return integer ? Variant(int64_t(Math::round(clamped))) : Variant(clamped);
 	}
 	return value;
 }
 
-bool VideoQualitySettingsServer::is_value_supported(const StringName &p_name) const {
+bool RenderQualitySettingsServer::is_value_supported(const StringName &p_name) const {
 	return SettingsServer::is_value_supported(p_name) && is_renderer_supported(p_name);
 }
 
-PackedStringArray VideoQualitySettingsServer::get_unsupported_setting_names() const {
+PackedStringArray RenderQualitySettingsServer::get_unsupported_setting_names() const {
 	PackedStringArray names;
-	for (const char *setting_name : video_quality_setting_names) {
+	for (const char *setting_name : render_quality_setting_names) {
 		if (!is_value_supported(setting_name)) {
 			names.push_back(setting_name);
 		}
@@ -537,7 +541,7 @@ PackedStringArray VideoQualitySettingsServer::get_unsupported_setting_names() co
 /////////////////////////////////////////////////////////////////////////////
 // Further viewports.
 
-void VideoQualitySettingsServer::add_viewport(Viewport *p_viewport) {
+void RenderQualitySettingsServer::add_viewport(Viewport *p_viewport) {
 	ERR_FAIL_NULL(p_viewport);
 	if (has_viewport(p_viewport)) {
 		return;
@@ -546,123 +550,123 @@ void VideoQualitySettingsServer::add_viewport(Viewport *p_viewport) {
 	_apply_all_to_viewport(p_viewport);
 }
 
-void VideoQualitySettingsServer::remove_viewport(Viewport *p_viewport) {
+void RenderQualitySettingsServer::remove_viewport(Viewport *p_viewport) {
 	ERR_FAIL_NULL(p_viewport);
 	extra_viewports.erase(p_viewport->get_instance_id());
 }
 
-bool VideoQualitySettingsServer::has_viewport(Viewport *p_viewport) const {
+bool RenderQualitySettingsServer::has_viewport(Viewport *p_viewport) const {
 	return p_viewport != nullptr && extra_viewports.has(p_viewport->get_instance_id());
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-void VideoQualitySettingsServer::set_scaling_3d_mode(Viewport::Scaling3DMode p_mode) {
+void RenderQualitySettingsServer::set_scaling_3d_mode(Viewport::Scaling3DMode p_mode) {
 	set_value(SNAME("scaling_3d_mode"), int(p_mode));
 }
 
-Viewport::Scaling3DMode VideoQualitySettingsServer::get_scaling_3d_mode() const {
+Viewport::Scaling3DMode RenderQualitySettingsServer::get_scaling_3d_mode() const {
 	return Viewport::Scaling3DMode(int(get_value(SNAME("scaling_3d_mode"))));
 }
 
-void VideoQualitySettingsServer::set_scaling_3d_scale(float p_scale) {
+void RenderQualitySettingsServer::set_scaling_3d_scale(float p_scale) {
 	set_value(SNAME("scaling_3d_scale"), p_scale);
 }
 
-float VideoQualitySettingsServer::get_scaling_3d_scale() const {
+float RenderQualitySettingsServer::get_scaling_3d_scale() const {
 	return get_value(SNAME("scaling_3d_scale"));
 }
 
-void VideoQualitySettingsServer::set_fsr_sharpness(float p_sharpness) {
+void RenderQualitySettingsServer::set_fsr_sharpness(float p_sharpness) {
 	set_value(SNAME("fsr_sharpness"), p_sharpness);
 }
 
-float VideoQualitySettingsServer::get_fsr_sharpness() const {
+float RenderQualitySettingsServer::get_fsr_sharpness() const {
 	return get_value(SNAME("fsr_sharpness"));
 }
 
-void VideoQualitySettingsServer::set_mesh_lod_threshold(float p_pixels) {
+void RenderQualitySettingsServer::set_mesh_lod_threshold(float p_pixels) {
 	set_value(SNAME("mesh_lod_threshold"), p_pixels);
 }
 
-float VideoQualitySettingsServer::get_mesh_lod_threshold() const {
+float RenderQualitySettingsServer::get_mesh_lod_threshold() const {
 	return get_value(SNAME("mesh_lod_threshold"));
 }
 
-void VideoQualitySettingsServer::set_msaa_2d(Viewport::MSAA p_msaa) {
+void RenderQualitySettingsServer::set_msaa_2d(Viewport::MSAA p_msaa) {
 	set_value(SNAME("msaa_2d"), int(p_msaa));
 }
 
-Viewport::MSAA VideoQualitySettingsServer::get_msaa_2d() const {
+Viewport::MSAA RenderQualitySettingsServer::get_msaa_2d() const {
 	return Viewport::MSAA(int(get_value(SNAME("msaa_2d"))));
 }
 
-void VideoQualitySettingsServer::set_msaa_3d(Viewport::MSAA p_msaa) {
+void RenderQualitySettingsServer::set_msaa_3d(Viewport::MSAA p_msaa) {
 	set_value(SNAME("msaa_3d"), int(p_msaa));
 }
 
-Viewport::MSAA VideoQualitySettingsServer::get_msaa_3d() const {
+Viewport::MSAA RenderQualitySettingsServer::get_msaa_3d() const {
 	return Viewport::MSAA(int(get_value(SNAME("msaa_3d"))));
 }
 
-void VideoQualitySettingsServer::set_screen_space_aa(Viewport::ScreenSpaceAA p_screen_space_aa) {
+void RenderQualitySettingsServer::set_screen_space_aa(Viewport::ScreenSpaceAA p_screen_space_aa) {
 	set_value(SNAME("screen_space_aa"), int(p_screen_space_aa));
 }
 
-Viewport::ScreenSpaceAA VideoQualitySettingsServer::get_screen_space_aa() const {
+Viewport::ScreenSpaceAA RenderQualitySettingsServer::get_screen_space_aa() const {
 	return Viewport::ScreenSpaceAA(int(get_value(SNAME("screen_space_aa"))));
 }
 
-void VideoQualitySettingsServer::set_use_taa(bool p_use_taa) {
+void RenderQualitySettingsServer::set_use_taa(bool p_use_taa) {
 	set_value(SNAME("use_taa"), p_use_taa);
 }
 
-bool VideoQualitySettingsServer::is_using_taa() const {
+bool RenderQualitySettingsServer::is_using_taa() const {
 	return get_value(SNAME("use_taa"));
 }
 
-void VideoQualitySettingsServer::set_use_debanding(bool p_use_debanding) {
+void RenderQualitySettingsServer::set_use_debanding(bool p_use_debanding) {
 	set_value(SNAME("use_debanding"), p_use_debanding);
 }
 
-bool VideoQualitySettingsServer::is_using_debanding() const {
+bool RenderQualitySettingsServer::is_using_debanding() const {
 	return get_value(SNAME("use_debanding"));
 }
 
-void VideoQualitySettingsServer::set_vrs_mode(Viewport::VRSMode p_vrs_mode) {
+void RenderQualitySettingsServer::set_vrs_mode(Viewport::VRSMode p_vrs_mode) {
 	set_value(SNAME("vrs_mode"), int(p_vrs_mode));
 }
 
-Viewport::VRSMode VideoQualitySettingsServer::get_vrs_mode() const {
+Viewport::VRSMode RenderQualitySettingsServer::get_vrs_mode() const {
 	return Viewport::VRSMode(int(get_value(SNAME("vrs_mode"))));
 }
 
-void VideoQualitySettingsServer::set_use_occlusion_culling(bool p_use_occlusion_culling) {
+void RenderQualitySettingsServer::set_use_occlusion_culling(bool p_use_occlusion_culling) {
 	set_value(SNAME("use_occlusion_culling"), p_use_occlusion_culling);
 }
 
-bool VideoQualitySettingsServer::is_using_occlusion_culling() const {
+bool RenderQualitySettingsServer::is_using_occlusion_culling() const {
 	return get_value(SNAME("use_occlusion_culling"));
 }
 
-void VideoQualitySettingsServer::set_occlusion_rays_per_thread(int p_rays_per_thread) {
+void RenderQualitySettingsServer::set_occlusion_rays_per_thread(int p_rays_per_thread) {
 	set_value(SNAME("occlusion_rays_per_thread"), p_rays_per_thread);
 }
 
-int VideoQualitySettingsServer::get_occlusion_rays_per_thread() const {
+int RenderQualitySettingsServer::get_occlusion_rays_per_thread() const {
 	return get_value(SNAME("occlusion_rays_per_thread"));
 }
 
-void VideoQualitySettingsServer::set_occlusion_culling_build_quality(RenderingServerEnums::ViewportOcclusionCullingBuildQuality p_quality) {
+void RenderQualitySettingsServer::set_occlusion_culling_build_quality(RenderingServerEnums::ViewportOcclusionCullingBuildQuality p_quality) {
 	set_value(SNAME("occlusion_culling_build_quality"), int(p_quality));
 }
 
-RenderingServerEnums::ViewportOcclusionCullingBuildQuality VideoQualitySettingsServer::get_occlusion_culling_build_quality() const {
+RenderingServerEnums::ViewportOcclusionCullingBuildQuality RenderQualitySettingsServer::get_occlusion_culling_build_quality() const {
 	return RenderingServerEnums::ViewportOcclusionCullingBuildQuality(int(get_value(SNAME("occlusion_culling_build_quality"))));
 }
 
-void VideoQualitySettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+void RenderQualitySettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
 	SettingsServer::_notify_value_applied(p_name, p_value);
 	// The values with a typed signal `<value>_changed` (see the class reference).
 	static const char *const SIGNAL_VALUES[] = {
@@ -684,7 +688,7 @@ void VideoQualitySettingsServer::_notify_value_applied(const StringName &p_name,
 	}
 }
 
-void VideoQualitySettingsServer::_bind_methods() {
+void RenderQualitySettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("scaling_3d_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.Scaling3DMode")));
 	ADD_SIGNAL(MethodInfo("scaling_3d_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
 	ADD_SIGNAL(MethodInfo("fsr_sharpness_changed", PropertyInfo(Variant::FLOAT, "sharpness")));
@@ -695,58 +699,58 @@ void VideoQualitySettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("use_taa_changed", PropertyInfo(Variant::BOOL, "enabled")));
 	ADD_SIGNAL(MethodInfo("use_debanding_changed", PropertyInfo(Variant::BOOL, "enabled")));
 
-	ClassDB::bind_method(D_METHOD("set_scaling_3d_mode", "mode"), &VideoQualitySettingsServer::set_scaling_3d_mode);
-	ClassDB::bind_method(D_METHOD("get_scaling_3d_mode"), &VideoQualitySettingsServer::get_scaling_3d_mode);
-	ClassDB::bind_method(D_METHOD("set_scaling_3d_scale", "scale"), &VideoQualitySettingsServer::set_scaling_3d_scale);
-	ClassDB::bind_method(D_METHOD("get_scaling_3d_scale"), &VideoQualitySettingsServer::get_scaling_3d_scale);
-	ClassDB::bind_method(D_METHOD("set_fsr_sharpness", "sharpness"), &VideoQualitySettingsServer::set_fsr_sharpness);
-	ClassDB::bind_method(D_METHOD("get_fsr_sharpness"), &VideoQualitySettingsServer::get_fsr_sharpness);
-	ClassDB::bind_method(D_METHOD("set_mesh_lod_threshold", "pixels"), &VideoQualitySettingsServer::set_mesh_lod_threshold);
-	ClassDB::bind_method(D_METHOD("get_mesh_lod_threshold"), &VideoQualitySettingsServer::get_mesh_lod_threshold);
-	ClassDB::bind_method(D_METHOD("set_msaa_2d", "msaa"), &VideoQualitySettingsServer::set_msaa_2d);
-	ClassDB::bind_method(D_METHOD("get_msaa_2d"), &VideoQualitySettingsServer::get_msaa_2d);
-	ClassDB::bind_method(D_METHOD("set_msaa_3d", "msaa"), &VideoQualitySettingsServer::set_msaa_3d);
-	ClassDB::bind_method(D_METHOD("get_msaa_3d"), &VideoQualitySettingsServer::get_msaa_3d);
-	ClassDB::bind_method(D_METHOD("set_screen_space_aa", "screen_space_aa"), &VideoQualitySettingsServer::set_screen_space_aa);
-	ClassDB::bind_method(D_METHOD("get_screen_space_aa"), &VideoQualitySettingsServer::get_screen_space_aa);
-	ClassDB::bind_method(D_METHOD("set_use_taa", "enable"), &VideoQualitySettingsServer::set_use_taa);
-	ClassDB::bind_method(D_METHOD("is_using_taa"), &VideoQualitySettingsServer::is_using_taa);
-	ClassDB::bind_method(D_METHOD("set_use_debanding", "enable"), &VideoQualitySettingsServer::set_use_debanding);
-	ClassDB::bind_method(D_METHOD("is_using_debanding"), &VideoQualitySettingsServer::is_using_debanding);
-	ClassDB::bind_method(D_METHOD("set_vrs_mode", "mode"), &VideoQualitySettingsServer::set_vrs_mode);
-	ClassDB::bind_method(D_METHOD("get_vrs_mode"), &VideoQualitySettingsServer::get_vrs_mode);
-	ClassDB::bind_method(D_METHOD("set_use_occlusion_culling", "enable"), &VideoQualitySettingsServer::set_use_occlusion_culling);
-	ClassDB::bind_method(D_METHOD("is_using_occlusion_culling"), &VideoQualitySettingsServer::is_using_occlusion_culling);
-	ClassDB::bind_method(D_METHOD("set_occlusion_rays_per_thread", "rays_per_thread"), &VideoQualitySettingsServer::set_occlusion_rays_per_thread);
-	ClassDB::bind_method(D_METHOD("get_occlusion_rays_per_thread"), &VideoQualitySettingsServer::get_occlusion_rays_per_thread);
-	ClassDB::bind_method(D_METHOD("set_occlusion_culling_build_quality", "quality"), &VideoQualitySettingsServer::set_occlusion_culling_build_quality);
-	ClassDB::bind_method(D_METHOD("get_occlusion_culling_build_quality"), &VideoQualitySettingsServer::get_occlusion_culling_build_quality);
+	ClassDB::bind_method(D_METHOD("set_scaling_3d_mode", "mode"), &RenderQualitySettingsServer::set_scaling_3d_mode);
+	ClassDB::bind_method(D_METHOD("get_scaling_3d_mode"), &RenderQualitySettingsServer::get_scaling_3d_mode);
+	ClassDB::bind_method(D_METHOD("set_scaling_3d_scale", "scale"), &RenderQualitySettingsServer::set_scaling_3d_scale);
+	ClassDB::bind_method(D_METHOD("get_scaling_3d_scale"), &RenderQualitySettingsServer::get_scaling_3d_scale);
+	ClassDB::bind_method(D_METHOD("set_fsr_sharpness", "sharpness"), &RenderQualitySettingsServer::set_fsr_sharpness);
+	ClassDB::bind_method(D_METHOD("get_fsr_sharpness"), &RenderQualitySettingsServer::get_fsr_sharpness);
+	ClassDB::bind_method(D_METHOD("set_mesh_lod_threshold", "pixels"), &RenderQualitySettingsServer::set_mesh_lod_threshold);
+	ClassDB::bind_method(D_METHOD("get_mesh_lod_threshold"), &RenderQualitySettingsServer::get_mesh_lod_threshold);
+	ClassDB::bind_method(D_METHOD("set_msaa_2d", "msaa"), &RenderQualitySettingsServer::set_msaa_2d);
+	ClassDB::bind_method(D_METHOD("get_msaa_2d"), &RenderQualitySettingsServer::get_msaa_2d);
+	ClassDB::bind_method(D_METHOD("set_msaa_3d", "msaa"), &RenderQualitySettingsServer::set_msaa_3d);
+	ClassDB::bind_method(D_METHOD("get_msaa_3d"), &RenderQualitySettingsServer::get_msaa_3d);
+	ClassDB::bind_method(D_METHOD("set_screen_space_aa", "screen_space_aa"), &RenderQualitySettingsServer::set_screen_space_aa);
+	ClassDB::bind_method(D_METHOD("get_screen_space_aa"), &RenderQualitySettingsServer::get_screen_space_aa);
+	ClassDB::bind_method(D_METHOD("set_use_taa", "enable"), &RenderQualitySettingsServer::set_use_taa);
+	ClassDB::bind_method(D_METHOD("is_using_taa"), &RenderQualitySettingsServer::is_using_taa);
+	ClassDB::bind_method(D_METHOD("set_use_debanding", "enable"), &RenderQualitySettingsServer::set_use_debanding);
+	ClassDB::bind_method(D_METHOD("is_using_debanding"), &RenderQualitySettingsServer::is_using_debanding);
+	ClassDB::bind_method(D_METHOD("set_vrs_mode", "mode"), &RenderQualitySettingsServer::set_vrs_mode);
+	ClassDB::bind_method(D_METHOD("get_vrs_mode"), &RenderQualitySettingsServer::get_vrs_mode);
+	ClassDB::bind_method(D_METHOD("set_use_occlusion_culling", "enable"), &RenderQualitySettingsServer::set_use_occlusion_culling);
+	ClassDB::bind_method(D_METHOD("is_using_occlusion_culling"), &RenderQualitySettingsServer::is_using_occlusion_culling);
+	ClassDB::bind_method(D_METHOD("set_occlusion_rays_per_thread", "rays_per_thread"), &RenderQualitySettingsServer::set_occlusion_rays_per_thread);
+	ClassDB::bind_method(D_METHOD("get_occlusion_rays_per_thread"), &RenderQualitySettingsServer::get_occlusion_rays_per_thread);
+	ClassDB::bind_method(D_METHOD("set_occlusion_culling_build_quality", "quality"), &RenderQualitySettingsServer::set_occlusion_culling_build_quality);
+	ClassDB::bind_method(D_METHOD("get_occlusion_culling_build_quality"), &RenderQualitySettingsServer::get_occlusion_culling_build_quality);
 
-	ClassDB::bind_method(D_METHOD("get_unsupported_setting_names"), &VideoQualitySettingsServer::get_unsupported_setting_names);
-	ClassDB::bind_method(D_METHOD("add_viewport", "viewport"), &VideoQualitySettingsServer::add_viewport);
-	ClassDB::bind_method(D_METHOD("remove_viewport", "viewport"), &VideoQualitySettingsServer::remove_viewport);
-	ClassDB::bind_method(D_METHOD("has_viewport", "viewport"), &VideoQualitySettingsServer::has_viewport);
+	ClassDB::bind_method(D_METHOD("get_unsupported_setting_names"), &RenderQualitySettingsServer::get_unsupported_setting_names);
+	ClassDB::bind_method(D_METHOD("add_viewport", "viewport"), &RenderQualitySettingsServer::add_viewport);
+	ClassDB::bind_method(D_METHOD("remove_viewport", "viewport"), &RenderQualitySettingsServer::remove_viewport);
+	ClassDB::bind_method(D_METHOD("has_viewport", "viewport"), &RenderQualitySettingsServer::has_viewport);
 
-	ClassDB::bind_static_method("VideoQualitySettingsServer", D_METHOD("get_viewport_group"), &VideoQualitySettingsServer::get_viewport_group);
-	ClassDB::bind_static_method("VideoQualitySettingsServer", D_METHOD("is_scaling_3d_mode_supported", "mode"), &VideoQualitySettingsServer::is_scaling_3d_mode_supported);
-	ClassDB::bind_static_method("VideoQualitySettingsServer", D_METHOD("is_renderer_supported", "name"), &VideoQualitySettingsServer::is_renderer_supported);
+	ClassDB::bind_static_method("RenderQualitySettingsServer", D_METHOD("get_viewport_group"), &RenderQualitySettingsServer::get_viewport_group);
+	ClassDB::bind_static_method("RenderQualitySettingsServer", D_METHOD("is_scaling_3d_mode_supported", "mode"), &RenderQualitySettingsServer::is_scaling_3d_mode_supported);
+	ClassDB::bind_static_method("RenderQualitySettingsServer", D_METHOD("is_renderer_supported", "name"), &RenderQualitySettingsServer::is_renderer_supported);
 }
 
-VideoQualitySettingsServer::VideoQualitySettingsServer() {
+RenderQualitySettingsServer::RenderQualitySettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
-	for (const char *setting_name : video_quality_setting_names) {
+	for (const char *setting_name : render_quality_setting_names) {
 		const StringName bound_name = setting_name;
-		bind_setting_callbacks(bound_name, callable_mp(this, &VideoQualitySettingsServer::_push_quality_value).bind(bound_name), callable_mp(this, &VideoQualitySettingsServer::_pull_quality_value).bind(bound_name));
+		bind_setting_callbacks(bound_name, callable_mp(this, &RenderQualitySettingsServer::_push_quality_value).bind(bound_name), callable_mp(this, &RenderQualitySettingsServer::_pull_quality_value).bind(bound_name));
 	}
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	if (manager != nullptr) {
-		manager->connect(SNAME("startup_applied"), callable_mp(this, &VideoQualitySettingsServer::_on_startup_applied));
+		manager->connect(SNAME("startup_applied"), callable_mp(this, &RenderQualitySettingsServer::_on_startup_applied));
 	}
 }
 
-VideoQualitySettingsServer::~VideoQualitySettingsServer() {
+RenderQualitySettingsServer::~RenderQualitySettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}
