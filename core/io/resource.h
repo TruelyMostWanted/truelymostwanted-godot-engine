@@ -207,16 +207,34 @@ class ResourceCache {
 	static void clear();
 	friend void register_core_types();
 
-	template <typename F>
-	static void _get_cached_paths_filtered(List<String> *r_paths, const F &p_filter);
+	// Calls p_visit(path, resource) for every live cached resource of one of `p_kinds` that matches p_filter.
+	template <typename F, typename V>
+	static void _visit_cached(uint32_t p_kinds, const F &p_filter, const V &p_visit);
 
 public:
+	// Kinds of cached resources (bit flags), see ResourceLoader.CachedResourceKind.
+	enum CachedKind : uint32_t {
+		CACHED_KIND_FILE = 1, // Saved in its own file, not imported (.tres, .tscn, .res, ...).
+		CACHED_KIND_IMPORTED = 2, // Loaded through an importer (Resource::get_import_path() is set).
+		CACHED_KIND_BUILT_IN = 4, // A built-in sub-resource ("res://a.tscn::Gradient_x1y2z").
+		CACHED_KIND_ALL = 7,
+	};
+	static uint32_t get_cached_kind(const String &p_path, const Resource *p_resource);
+	// The most derived named class: the first global script class name, else the native class.
+	static StringName get_cached_class_name(const Resource *p_resource);
+
 	static bool has(const String &p_path);
 	static Ref<Resource> get_ref(const String &p_path);
 	static void get_cached_resources(List<Ref<Resource>> *p_resources);
-	static void get_cached_paths(List<String> *r_paths);
-	static void get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths);
-	static void get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths);
-	static void get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths);
+	static void get_cached_paths(List<String> *r_paths, uint32_t p_kinds = CACHED_KIND_ALL);
+	static void get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths, uint32_t p_kinds = CACHED_KIND_ALL);
+	static void get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths, uint32_t p_kinds = CACHED_KIND_ALL);
+	static void get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths, uint32_t p_kinds = CACHED_KIND_ALL);
+	static int get_cached_count(uint32_t p_kinds = CACHED_KIND_ALL);
+	static int get_cached_count_for_type(const StringName &p_type, bool p_exact, uint32_t p_kinds = CACHED_KIND_ALL);
+	static int get_cached_count_with_extension(const String &p_extension, uint32_t p_kinds = CACHED_KIND_ALL);
+	static int get_cached_count_in_directory(const String &p_directory, bool p_recursive, uint32_t p_kinds = CACHED_KIND_ALL);
+	static void get_cached_resources_for_type(const StringName &p_type, bool p_exact, List<Ref<Resource>> *r_resources, uint32_t p_kinds = CACHED_KIND_ALL);
+	static void get_cached_type_counts(HashMap<StringName, int> *r_counts, uint32_t p_kinds = CACHED_KIND_ALL);
 	static int get_cached_resource_count();
 };
