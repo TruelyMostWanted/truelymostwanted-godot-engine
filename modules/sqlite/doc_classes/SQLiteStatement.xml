@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SQLiteStatement" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A prepared SQL statement of an [SQLiteDatabase].
+	</brief_description>
+	<description>
+		An [SQLiteStatement] is compiled once with [method SQLiteDatabase.prepare] and can then be bound and run many times, which is faster than passing the same SQL to [method SQLiteDatabase.execute] again and again.
+		[codeblock]
+		var insert = db.prepare("INSERT INTO items (name, weight) VALUES (?1, ?2);")
+		for item in items:
+			insert.bind_text(1, item.name)
+			insert.bind_float(2, item.weight)
+			insert.step()
+			insert.reset()
+
+		var select = db.prepare("SELECT name, weight FROM items;")
+		while select.step() == SQLiteStatement.STEP_RESULT_ROW:
+			print(select.get_column_text(0), " ", select.get_column_float(1))
+		[/codeblock]
+		Parameter indices start at [code]1[/code] (as in SQL's [code]?1[/code]), column indices start at [code]0[/code]. Errors are reported through the [enum Error] return values and [method SQLiteDatabase.get_last_error_message] of the database. A statement keeps its database object alive, but stops working when the database is closed.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="bind_blob">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="PackedByteArray" />
+			<description>
+				Binds [param value] as a BLOB to the parameter at [param index]. Returns [constant ERR_INVALID_PARAMETER] if [param index] is out of range.
+			</description>
+		</method>
+		<method name="bind_float">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Binds [param value] as a REAL to the parameter at [param index].
+			</description>
+		</method>
+		<method name="bind_int">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="int" />
+			<description>
+				Binds [param value] as an INTEGER to the parameter at [param index].
+			</description>
+		</method>
+		<method name="bind_null">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Binds NULL to the parameter at [param index].
+			</description>
+		</method>
+		<method name="bind_text">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="String" />
+			<description>
+				Binds [param value] as TEXT (UTF-8) to the parameter at [param index].
+			</description>
+		</method>
+		<method name="bind_value">
+			<return type="int" enum="Error" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Binds [param value] to the parameter at [param index], choosing the SQLite type from the [Variant] type as described in [SQLiteDatabase]. Returns [constant ERR_INVALID_PARAMETER] for unsupported types.
+			</description>
+		</method>
+		<method name="bind_values">
+			<return type="int" enum="Error" />
+			<param index="0" name="params" type="Variant" />
+			<description>
+				Binds all parameters at once: an [Array] binds by position and must have one value per parameter, a [Dictionary] binds named parameters by their name without the prefix.
+			</description>
+		</method>
+		<method name="clear_bindings">
+			<return type="int" enum="Error" />
+			<description>
+				Sets all parameters to NULL. [method reset] keeps the bound values.
+			</description>
+		</method>
+		<method name="get_bind_parameter_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of parameters of the statement (the largest parameter index).
+			</description>
+		</method>
+		<method name="get_bind_parameter_index" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the index of the named parameter [param name], including its prefix (for example [code]":id"[/code]), or [code]0[/code] if there is no such parameter.
+			</description>
+		</method>
+		<method name="get_column_blob" qualifiers="const">
+			<return type="PackedByteArray" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the value of [param column] in the current row as bytes.
+			</description>
+		</method>
+		<method name="get_column_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of columns in the result rows, [code]0[/code] for statements that return no rows.
+			</description>
+		</method>
+		<method name="get_column_float" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the value of [param column] in the current row as a [float].
+			</description>
+		</method>
+		<method name="get_column_int" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the value of [param column] in the current row as an [int].
+			</description>
+		</method>
+		<method name="get_column_name" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the name of [param column] (its alias if the query uses [code]AS[/code]).
+			</description>
+		</method>
+		<method name="get_column_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the value of [param column] in the current row as a [String].
+			</description>
+		</method>
+		<method name="get_column_type" qualifiers="const">
+			<return type="int" enum="SQLiteStatement.ColumnType" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the type of the value of [param column] in the current row. SQLite stores a type per value, so the type can change from row to row.
+			</description>
+		</method>
+		<method name="get_column_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the value of [param column] in the current row as an [int], [float], [String], [PackedByteArray] or [code]null[/code], depending on its type.
+			</description>
+		</method>
+		<method name="get_row" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns the current row as a [Dictionary] that maps column names to values, like a row of [method SQLiteDatabase.query].
+			</description>
+		</method>
+		<method name="get_sql" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the SQL text of the statement.
+			</description>
+		</method>
+		<method name="reset">
+			<return type="int" enum="Error" />
+			<description>
+				Resets the statement so that it can run again from the start with [method step]. The bound parameter values are kept.
+			</description>
+		</method>
+		<method name="step">
+			<return type="int" enum="SQLiteStatement.StepResult" />
+			<description>
+				Runs the statement until the next result row. Returns [constant STEP_RESULT_ROW] when a row is available through the [code]get_column_*[/code] methods, [constant STEP_RESULT_DONE] when the statement has finished, and [constant STEP_RESULT_ERROR] on failure (see [method SQLiteDatabase.get_last_error_message]). Call [method reset] before running the statement again.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="STEP_RESULT_ROW" value="0" enum="StepResult">
+			A result row is available.
+		</constant>
+		<constant name="STEP_RESULT_DONE" value="1" enum="StepResult">
+			The statement has finished.
+		</constant>
+		<constant name="STEP_RESULT_ERROR" value="2" enum="StepResult">
+			The statement failed.
+		</constant>
+		<constant name="COLUMN_TYPE_INTEGER" value="0" enum="ColumnType">
+			A 64-bit signed integer.
+		</constant>
+		<constant name="COLUMN_TYPE_FLOAT" value="1" enum="ColumnType">
+			A 64-bit floating-point number.
+		</constant>
+		<constant name="COLUMN_TYPE_TEXT" value="2" enum="ColumnType">
+			A UTF-8 string.
+		</constant>
+		<constant name="COLUMN_TYPE_BLOB" value="3" enum="ColumnType">
+			Raw bytes.
+		</constant>
+		<constant name="COLUMN_TYPE_NULL" value="4" enum="ColumnType">
+			NULL.
+		</constant>
+	</constants>
+</class>

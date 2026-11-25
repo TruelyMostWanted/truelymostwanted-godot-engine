@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+Import("env")
+Import("env_modules")
+
+env_sqlite = env_modules.Clone()
+
+# SQLite configuration, shared by the amalgamation and the module code.
+# No OS layer: all file access goes through the FileAccess VFS in sqlite_vfs.cpp.
+env_sqlite.Append(
+    CPPDEFINES=[
+        ("SQLITE_OS_OTHER", 1),
+        ("SQLITE_THREADSAFE", 1 if env["threads"] else 0),
+        "SQLITE_ENABLE_FTS5",
+        "SQLITE_ENABLE_MATH_FUNCTIONS",
+        "SQLITE_OMIT_LOAD_EXTENSION",
+        "SQLITE_OMIT_WAL",
+        "SQLITE_OMIT_DEPRECATED",
+        "SQLITE_OMIT_SHARED_CACHE",
+        ("SQLITE_DEFAULT_MEMSTATUS", 0),
+        ("SQLITE_TEMP_STORE", 2),
+        ("SQLITE_DEFAULT_FOREIGN_KEYS", 1),
+    ]
+)
+
+# Thirdparty source files
+
+thirdparty_obj = []
+
+thirdparty_dir = "#thirdparty/sqlite/"
+thirdparty_sources = [thirdparty_dir + "sqlite3.c"]
+
+env_sqlite.Prepend(CPPPATH=[thirdparty_dir])
+
+env_thirdparty = env_sqlite.Clone()
+env_thirdparty.disable_warnings()
+env_thirdparty.add_source_files(thirdparty_obj, thirdparty_sources)
+env.modules_sources += thirdparty_obj
+
+# Godot source files
+
+module_obj = []
+
+env_sqlite.add_source_files(module_obj, "*.cpp")
+env.modules_sources += module_obj
+
+# Needed to force rebuilding the module files when the thirdparty library is updated.
+env.Depends(module_obj, thirdparty_obj)
