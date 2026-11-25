@@ -41,7 +41,7 @@ class ProjectSettings : public Object {
 	GDCLASS(ProjectSettings, Object);
 	_THREAD_SAFE_CLASS_
 	friend class TestProjectSettingsInternalsAccessor;
-	friend class PckPackageServer;
+	friend class PCKPackageServer;
 
 	bool is_changed = false;
 

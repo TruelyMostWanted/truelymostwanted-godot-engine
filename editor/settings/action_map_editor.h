@@ -108,6 +108,7 @@ private:
 	void drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 
 	void _set_show_builtin_actions(bool p_show);
+	void _on_input_icons_changed();
 
 protected:
 	void _notification(int p_what);

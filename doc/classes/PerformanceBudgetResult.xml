@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PerformanceBudgetResult" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Result of a [PerformanceBudget] check.
+	</brief_description>
+	<description>
+		A [PerformanceBudgetResult] is returned by [method PerformanceBudget.check_summary] and [method PerformanceRecorder.check_budget]. It passes if no rule failed. In automated runs (test project, CI, [code]--quit-after[/code]), end the run with [method get_exit_code]:
+		[codeblocks]
+		[gdscript]
+		var result = PerformanceRecorder.check_budget(load("res://perf/budget.tres"))
+		for failure in result.get_failures():
+			printerr(failure.get_message())
+		get_tree().quit(result.get_exit_code())
+		[/gdscript]
+		[csharp]
+		var result = PerformanceRecorder.CheckBudget(GD.Load&lt;PerformanceBudget&gt;("res://perf/budget.tres"));
+		foreach (var failure in result.GetFailures())
+		{
+			GD.PrintErr(failure.GetMessage());
+		}
+		GetTree().Quit(result.GetExitCode());
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_checked_rule_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of rules that were checked (empty entries of [member PerformanceBudget.rules] are not counted).
+			</description>
+		</method>
+		<method name="get_exit_code" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns [code]0[/code] if the budget passed and [code]1[/code] if it failed, for [method SceneTree.quit].
+			</description>
+		</method>
+		<method name="get_failure_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of failed rules.
+			</description>
+		</method>
+		<method name="get_failures" qualifiers="const">
+			<return type="PerformanceBudgetFailure[]" />
+			<description>
+				Returns the failed rules, in the order of [member PerformanceBudget.rules].
+			</description>
+		</method>
+		<method name="is_passed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if no rule failed.
+			</description>
+		</method>
+		<method name="to_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns a readable report: [code]"Performance budget passed (3 rules)."[/code], or a first line with the number of failed rules followed by one line per failure ([method PerformanceBudgetFailure.get_message]).
+			</description>
+		</method>
+	</methods>
+</class>

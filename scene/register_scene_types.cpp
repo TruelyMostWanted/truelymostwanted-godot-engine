@@ -104,6 +104,7 @@
 #include "scene/main/canvas_layer.h"
 #include "scene/main/http_request.h"
 #include "scene/main/http_response.h"
+#include "scene/main/input_icon_server.h"
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
@@ -146,6 +147,7 @@
 #include "scene/resources/image_texture.h"
 #include "scene/resources/image_texture_resource_format.h"
 #include "scene/resources/immediate_mesh.h"
+#include "scene/resources/input_icon_set.h"
 #include "scene/resources/label_settings.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh_data_tool.h"
@@ -391,6 +393,7 @@
 #endif // PHYSICS_3D_DISABLED
 
 static AudioMixerServer *audio_mixer_server = nullptr;
+static InputIconServer *input_icon_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
 static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
@@ -1071,6 +1074,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(StyleBoxFlat);
 	GDREGISTER_CLASS(StyleBoxLine);
 	GDREGISTER_CLASS(Theme);
+	GDREGISTER_CLASS(InputIconSet);
 
 	GDREGISTER_CLASS(BitMap);
 	GDREGISTER_CLASS(Gradient);
@@ -1416,6 +1420,11 @@ void unregister_scene_types() {
 		audio_mixer_server = nullptr;
 	}
 
+	if (input_icon_server) {
+		memdelete(input_icon_server);
+		input_icon_server = nullptr;
+	}
+
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
 		resource_saver_audio_stream_wav.unref();
@@ -1511,6 +1520,10 @@ void register_scene_singletons() {
 	GDREGISTER_CLASS(AudioMixerServer);
 	audio_mixer_server = memnew(AudioMixerServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioMixerServer", AudioMixerServer::get_singleton()));
+
+	GDREGISTER_CLASS(InputIconServer);
+	input_icon_server = memnew(InputIconServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("InputIconServer", InputIconServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }

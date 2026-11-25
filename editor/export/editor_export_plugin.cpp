@@ -31,6 +31,8 @@
 #include "editor_export_plugin.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include "editor/export/editor_export_platform.h"
 
@@ -147,6 +149,76 @@ void EditorExportPlugin::add_macos_plugin_file(const String &p_path) {
 
 const Vector<String> &EditorExportPlugin::get_macos_plugin_files() const {
 	return macos_plugin_files;
+}
+
+bool EditorExportPlugin::is_valid_bundle_target(const String &p_target) {
+	// A relative path below the bundle resources: no drive, scheme, `.` or `..` segments, no empty segments.
+	if (p_target.is_empty() || p_target.begins_with("/") || p_target.contains_char(':') || p_target.contains_char('\\')) {
+		return false;
+	}
+	const Vector<String> parts = p_target.split("/");
+	for (const String &part : parts) {
+		if (part.is_empty() || part == "." || part == "..") {
+			return false;
+		}
+	}
+	return true;
+}
+
+void EditorExportPlugin::add_bundle_resource(const String &p_path, const String &p_target) {
+	String source = p_path.strip_edges().replace_char('\\', '/');
+	while (source.length() > 1 && source.ends_with("/") && !source.ends_with("://") && !source.ends_with(":/")) {
+		source = source.left(-1);
+	}
+	ERR_FAIL_COND_MSG(source.is_empty(), "The path of a bundle resource must not be empty.");
+
+	String target = p_target.strip_edges().replace_char('\\', '/');
+	while (target.ends_with("/")) {
+		target = target.left(-1);
+	}
+	if (target.is_empty()) {
+		target = source.get_file();
+	}
+	ERR_FAIL_COND_MSG(!is_valid_bundle_target(target), vformat("Invalid target \"%s\" for the bundle resource \"%s\": it must be a relative path without \".\" or \"..\" segments.", target, source));
+
+	BundleResource resource;
+	resource.path = source;
+	resource.target = target;
+	bundle_resources.push_back(resource);
+}
+
+const Vector<EditorExportPlugin::BundleResource> &EditorExportPlugin::get_bundle_resources() const {
+	return bundle_resources;
+}
+
+Error EditorExportPlugin::copy_bundle_resources(const String &p_dest_dir, String &r_failed_path) const {
+	for (const BundleResource &resource : bundle_resources) {
+		String source = resource.path;
+		if (source.begins_with("res://") || source.begins_with("user://")) {
+			source = ProjectSettings::get_singleton()->globalize_path(source);
+		}
+		const String dest = p_dest_dir.path_join(resource.target);
+
+		Error err = OK;
+		if (DirAccess::dir_exists_absolute(source)) {
+			// Folders are copied recursively and unchanged.
+			Ref<DirAccess> da = DirAccess::open(source);
+			err = da.is_valid() ? da->copy_dir(source, dest) : ERR_CANT_OPEN;
+		} else if (FileAccess::exists(source)) {
+			err = DirAccess::make_dir_recursive_absolute(dest.get_base_dir());
+			if (err == OK) {
+				err = DirAccess::copy_absolute(source, dest);
+			}
+		} else {
+			err = ERR_FILE_NOT_FOUND;
+		}
+
+		if (err != OK) {
+			r_failed_path = resource.path;
+			return err;
+		}
+	}
+	return OK;
 }
 
 void EditorExportPlugin::add_apple_embedded_platform_project_static_lib(const String &p_path) {
@@ -383,6 +455,7 @@ void EditorExportPlugin::_bind_methods() {
 #endif
 
 	ClassDB::bind_method(D_METHOD("add_macos_plugin_file", "path"), &EditorExportPlugin::add_macos_plugin_file);
+	ClassDB::bind_method(D_METHOD("add_bundle_resource", "path", "target"), &EditorExportPlugin::add_bundle_resource, DEFVAL(String()));
 	ClassDB::bind_method(D_METHOD("skip"), &EditorExportPlugin::skip);
 	ClassDB::bind_method(D_METHOD("get_option", "name"), &EditorExportPlugin::get_option);
 

@@ -81,7 +81,7 @@ public:
 	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const;
 	// True if recognize_path() matches only the suffixes from get_recognized_extensions(). ResourceLoader then finds
 	// the loader through its extension index (the list is read when the loader is added, when
-	// `ResourceLoader::refresh_format_index()` is called, and for C++ lists when ClassDB's resource extensions change);
+	// `ResourceLoader::rebuild_extension_index()` is called, and for C++ lists when ClassDB's resource extensions change);
 	// otherwise the loader is asked for every path.
 	virtual bool recognizes_path_by_extension() const;
 	// True if the loader is implemented by a script, C# or GDExtension, so its extension list comes from script code.
@@ -353,7 +353,7 @@ public:
 	// The registered loaders and their extension index, for tests and diagnostics.
 	static ResourceLoaderFormatSnapshot get_format_snapshot() { return _get_loaders(); }
 	// Reads the extension lists of all registered loaders again and rebuilds the index.
-	static void refresh_format_index();
+	static void rebuild_extension_index();
 	static void remove_resource_format_loader(Ref<ResourceFormatLoader> p_format_loader);
 	static void get_classes_used(const String &p_path, HashSet<StringName> *r_classes);
 	static String get_resource_type(const String &p_path);

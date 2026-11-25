@@ -207,7 +207,7 @@ void LanguageSettingsServer::_on_loaded() {
 	}
 }
 
-void LanguageSettingsServer::_on_startup_applied(int p_phase) {
+void LanguageSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		_push_pending_root_values();
 	}
@@ -279,7 +279,29 @@ Node::AutoTranslateMode LanguageSettingsServer::get_root_auto_translate_mode() c
 	return Node::AutoTranslateMode(int(get_value(SNAME("root_auto_translate_mode"))));
 }
 
+void LanguageSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"locale",
+		"pseudolocalization_enabled",
+		"layout_direction",
+		"root_auto_translate_mode",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void LanguageSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("locale_changed", PropertyInfo(Variant::STRING, "locale")));
+	ADD_SIGNAL(MethodInfo("pseudolocalization_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("layout_direction_changed", PropertyInfo(Variant::INT, "direction", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.LayoutDirection")));
+	ADD_SIGNAL(MethodInfo("root_auto_translate_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Node.AutoTranslateMode")));
+
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &LanguageSettingsServer::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &LanguageSettingsServer::get_locale);
 	ClassDB::bind_method(D_METHOD("set_pseudolocalization_enabled", "enabled"), &LanguageSettingsServer::set_pseudolocalization_enabled);

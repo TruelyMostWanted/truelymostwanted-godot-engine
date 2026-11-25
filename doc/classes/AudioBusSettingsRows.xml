@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioBusSettingsRows" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The settings file of [AudioBusSettingsServer]: one row per bus.
+	</brief_description>
+	<description>
+		The storage form of an [AudioBusListSettings]: what [AudioBusSettingsServer] writes to its settings file and reads back from it. It holds nothing but the list, so the file can also be a CSV file with one line per bus.
+		Games do not need this class: use [AudioBusSettingsServer] and [AudioBusListSettings].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="buses" type="AudioBusSettingsRow[]" setter="set_buses" getter="get_buses" default="[]">
+			The rows, one per bus, identified by [member AudioBusSettingsRow.bus_name].
+		</member>
+	</members>
+</class>

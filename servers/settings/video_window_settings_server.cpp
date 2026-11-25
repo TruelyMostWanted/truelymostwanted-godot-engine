@@ -37,6 +37,7 @@
 #include "core/templates/local_vector.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
+#include "servers/settings/accessibility_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_window_settings.h"
 
@@ -331,7 +332,8 @@ void VideoWindowSettingsServer::_deliver(const StringName &p_name, const Variant
 	} else if (p_name == SNAME("content_scale_stretch")) {
 		root->set_content_scale_stretch(Window::ContentScaleStretch(int(p_value)));
 	} else if (p_name == SNAME("content_scale_factor")) {
-		root->set_content_scale_factor(MAX(real_t(p_value), real_t(0.01)));
+		// Times the UI scale of the accessibility domain (#27), which owns that part of the factor.
+		root->set_content_scale_factor(MAX(real_t(p_value), real_t(0.01)) * AccessibilitySettingsServer::get_root_ui_scale());
 	} else if (p_name == SNAME("hdr_output_requested")) {
 		root->set_hdr_output_requested(bool(p_value));
 	} else if (p_name == SNAME("hdr_reference_luminance")) {
@@ -381,7 +383,7 @@ Variant VideoWindowSettingsServer::_pull_window_value(const StringName &p_name) 
 		} else if (p_name == SNAME("content_scale_stretch") && root != nullptr) {
 			return int(root->get_content_scale_stretch());
 		} else if (p_name == SNAME("content_scale_factor") && root != nullptr) {
-			return float(root->get_content_scale_factor());
+			return float(root->get_content_scale_factor() / MAX(AccessibilitySettingsServer::get_root_ui_scale(), 0.01f));
 		} else if (p_name == SNAME("hdr_output_requested") && root != nullptr && display_server != nullptr) {
 			return root->is_hdr_output_requested();
 		} else if (p_name == SNAME("hdr_reference_luminance") && display_server != nullptr) {
@@ -638,7 +640,7 @@ void VideoWindowSettingsServer::_on_loaded() {
 	}
 }
 
-void VideoWindowSettingsServer::_on_startup_applied(int p_phase) {
+void VideoWindowSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		// After Main::start() and SceneTree have set the project values of the root window.
 		_deliver_undelivered(TARGET_SCENE);
@@ -857,7 +859,39 @@ void VideoWindowSettingsServer::place_main_window() {
 	_place_main_window();
 }
 
+void VideoWindowSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"window_mode",
+		"window_size",
+		"screen",
+		"borderless",
+		"vsync_mode",
+		"content_scale_mode",
+		"content_scale_aspect",
+		"content_scale_factor",
+		"hdr_output_requested",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoWindowSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("window_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "DisplayServer.WindowMode")));
+	ADD_SIGNAL(MethodInfo("window_size_changed", PropertyInfo(Variant::VECTOR2I, "size")));
+	ADD_SIGNAL(MethodInfo("screen_changed", PropertyInfo(Variant::INT, "screen")));
+	ADD_SIGNAL(MethodInfo("borderless_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("vsync_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "DisplayServer.VSyncMode")));
+	ADD_SIGNAL(MethodInfo("content_scale_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.ContentScaleMode")));
+	ADD_SIGNAL(MethodInfo("content_scale_aspect_changed", PropertyInfo(Variant::INT, "aspect", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.ContentScaleAspect")));
+	ADD_SIGNAL(MethodInfo("content_scale_factor_changed", PropertyInfo(Variant::FLOAT, "factor")));
+	ADD_SIGNAL(MethodInfo("hdr_output_requested_changed", PropertyInfo(Variant::BOOL, "requested")));
+
 	ClassDB::bind_method(D_METHOD("set_window_mode", "mode"), &VideoWindowSettingsServer::set_window_mode);
 	ClassDB::bind_method(D_METHOD("get_window_mode"), &VideoWindowSettingsServer::get_window_mode);
 	ClassDB::bind_method(D_METHOD("set_window_size", "size"), &VideoWindowSettingsServer::set_window_size);
@@ -929,7 +963,7 @@ VideoWindowSettingsServer::VideoWindowSettingsServer() {
 	};
 	for (const char *bound_name : bound_names) {
 		const StringName setting_name = bound_name;
-		// Mode, size and screen can leave the player without a visible window: they wait for confirm_pending().
+		// Mode, size and screen can leave the player without a visible window: they wait for confirm_changes().
 		const bool confirm = setting_name == SNAME("window_mode") || setting_name == SNAME("window_size") || setting_name == SNAME("screen");
 		bind_setting_callbacks(setting_name, callable_mp(this, &VideoWindowSettingsServer::_push_window_value).bind(setting_name), callable_mp(this, &VideoWindowSettingsServer::_pull_window_value).bind(setting_name), confirm ? SETTING_FLAG_CONFIRM : SETTING_FLAG_NONE);
 	}

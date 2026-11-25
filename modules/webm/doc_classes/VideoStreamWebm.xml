@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoStreamWebm" inherits="VideoStream" api_type="core" experimental="" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		[VideoStream] resource for WebM videos.
+	</brief_description>
+	<description>
+		[VideoStream] resource handling the [url=https://www.webmproject.org/]WebM[/url] video format with [code].webm[/code] extension. WebM is currently decoded on the CPU, but decoding its video may be hardware-accelerated in the future.
+		The supported video codec is VP9, and the supported audio codecs are Opus and Vorbis.
+		WebM is more efficient than [VideoStreamTheora], but is more intensive to decode on the CPU.
+		[b]Note:[/b] The VP8, AV1 and AV2 video codecs are not supported, and will result in a blank video.
+		[b]Note:[/b] Unlike [VideoStreamTheora], an alpha channel (also known as transparency) is supported. This means WebM videos may contain transparent areas.
+		[b]Runtime loading:[/b] [code].webm[/code] files are not imported. [method ResourceLoader.load] returns a [VideoStreamWebm] for any [code].webm[/code] path, also outside the project (for example in [code]user://[/code], in a mod folder, at an absolute path or in a PCK), with the resource cache, [method ResourceLoader.load_threaded_request] and [method ResourceLoader.exists]. Any base class works as type hint ([VideoStream], [Resource]). The resource only stores the path in [member VideoStream.file]: each playback opens the file and streams it, so the video is never held in memory as a whole, and the file must stay in place while it plays. Loading checks only that the file starts with an EBML header (otherwise it fails with [constant ERR_FILE_UNRECOGNIZED]); the codec headers are read when playback starts. If an editor import plugin imports [code].webm[/code] files (a [code].import[/code] file next to the video), those files are loaded through their importer, unless the import mode is "Keep File" or "Skip File".
+		[b]Note:[/b] [method ResourceSaver.save] cannot write [code].webm[/code] files, because the engine has no WebM encoder.
+		[codeblocks]
+		[gdscript]
+		var video = ResourceLoader.load("user://videos/intro.webm") as VideoStreamWebm
+		$VideoStreamPlayer.stream = video
+		$VideoStreamPlayer.play()
+		[/gdscript]
+		[csharp]
+		var video = ResourceLoader.Load&lt;VideoStreamWebm&gt;("user://videos/intro.webm");
+		GetNode&lt;VideoStreamPlayer&gt;("VideoStreamPlayer").Stream = video;
+		GetNode&lt;VideoStreamPlayer&gt;("VideoStreamPlayer").Play();
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

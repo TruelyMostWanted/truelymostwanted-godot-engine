@@ -95,10 +95,13 @@ private:
 
 	void _on_node_added(Node *p_node);
 	void _on_loaded();
-	void _on_startup_applied(int p_phase);
+	void _on_startup_applied(ApplyPhase p_phase);
 
 protected:
 	static void _bind_methods();
+
+	// Emits the typed `<value>_changed` signal of an applied value.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;

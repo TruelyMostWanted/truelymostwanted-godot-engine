@@ -194,7 +194,9 @@ Dictionary OS_Unix::get_process_memory_info() const {
 
 	struct rusage usage = {};
 	if (getrusage(RUSAGE_SELF, &usage) == 0 && usage.ru_maxrss > 0) {
-		meminfo["peak"] = (int64_t)usage.ru_maxrss * 1024; // Kilobytes on Linux, Android and the BSDs.
+		// Kilobytes on Linux, Android and the BSDs. The kernel updates the high-water mark lazily
+		// (per-thread RSS counters are folded in later), so it can lag behind the current value.
+		meminfo["peak"] = MAX((int64_t)usage.ru_maxrss * 1024, (int64_t)resident);
 	}
 
 #ifdef GODOT_HAS_MALLINFO

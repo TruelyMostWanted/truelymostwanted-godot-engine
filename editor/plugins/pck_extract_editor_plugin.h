@@ -34,11 +34,11 @@
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 
-class PckExtractDialog;
+class PCKExtractDialog;
 
 // "Extract Pack…" in the context menu of a single `.pck` file in the FileSystem dock.
-class EditorContextMenuPluginPck : public EditorContextMenuPlugin {
-	GDCLASS(EditorContextMenuPluginPck, EditorContextMenuPlugin);
+class EditorContextMenuPluginPCK : public EditorContextMenuPlugin {
+	GDCLASS(EditorContextMenuPluginPCK, EditorContextMenuPlugin);
 
 	void _extract(const Dictionary &p_data);
 
@@ -47,25 +47,25 @@ public:
 	virtual void get_options(const OptionsData &p_data) override;
 };
 
-// An "Extract…" button in the Inspector of a `PckPackage` opened from a `.pck` file.
-class EditorInspectorPluginPckExtract : public EditorInspectorPlugin {
-	GDCLASS(EditorInspectorPluginPckExtract, EditorInspectorPlugin);
+// An "Extract…" button in the Inspector of a `PCKPackage` opened from a `.pck` file.
+class EditorInspectorPluginPCKExtract : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginPCKExtract, EditorInspectorPlugin);
 
 	void _extract_pressed(Object *p_package);
 
 public:
 	virtual bool can_handle(Object *p_object) override;
-	virtual void parse_begin(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
 };
 
-class PckExtractEditorPlugin : public EditorPlugin {
-	GDCLASS(PckExtractEditorPlugin, EditorPlugin);
+class PCKExtractEditorPlugin : public EditorPlugin {
+	GDCLASS(PCKExtractEditorPlugin, EditorPlugin);
 
-	PckExtractDialog *dialog = nullptr;
-	Ref<EditorContextMenuPluginPck> context_menu_plugin;
+	PCKExtractDialog *dialog = nullptr;
+	Ref<EditorContextMenuPluginPCK> context_menu_plugin;
 
 public:
-	virtual String get_plugin_name() const override { return "PckExtract"; }
+	virtual String get_plugin_name() const override { return "PCKExtract"; }
 
-	PckExtractEditorPlugin();
+	PCKExtractEditorPlugin();
 };

@@ -285,7 +285,7 @@ TEST_CASE("[StreamingAssetsServer] Command line override") {
 
 TEST_CASE("[StreamingAssetsServer] Pack mode") {
 	Server *server = Server::get_singleton();
-	PckPackageServer *pck_server = PckPackageServer::get_singleton();
+	PCKPackageServer *pck_server = PCKPackageServer::get_singleton();
 	PackedData *packed_data = PackedData::get_singleton();
 	REQUIRE(packed_data != nullptr);
 
