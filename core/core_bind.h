@@ -62,6 +62,14 @@ public:
 		THREAD_LOAD_LOADED
 	};
 
+	// Kinds of cached resources (bit flags), see ResourceCache::CachedKind.
+	enum CachedResourceKind {
+		CACHED_RESOURCE_KIND_FILE = 1,
+		CACHED_RESOURCE_KIND_IMPORTED = 2,
+		CACHED_RESOURCE_KIND_BUILT_IN = 4,
+		CACHED_RESOURCE_KIND_ALL = 7,
+	};
+
 	enum CacheMode {
 		CACHE_MODE_IGNORE,
 		CACHE_MODE_REUSE,
@@ -85,10 +93,16 @@ public:
 	PackedStringArray get_dependencies(const String &p_path);
 	bool has_cached(const String &p_path);
 	Ref<Resource> get_cached_ref(const String &p_path);
-	PackedStringArray get_cached_paths();
-	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact_type = false);
-	PackedStringArray get_cached_paths_with_extension(const String &p_extension);
-	PackedStringArray get_cached_paths_in_directory(const String &p_directory, bool p_recursive = true);
+	PackedStringArray get_cached_paths(BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	PackedStringArray get_cached_paths_for_type(const StringName &p_type, bool p_exact_type = false, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	PackedStringArray get_cached_paths_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	PackedStringArray get_cached_paths_in_directory(const String &p_directory, bool p_recursive = true, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	int get_cached_count(BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	int get_cached_count_for_type(const StringName &p_type, bool p_exact_type = false, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	int get_cached_count_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	int get_cached_count_in_directory(const String &p_directory, bool p_recursive = true, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	TypedArray<Resource> get_cached_resources_for_type(const StringName &p_type, bool p_exact_type = false, BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
+	Dictionary get_cached_type_counts(BitField<CachedResourceKind> p_kinds = CACHED_RESOURCE_KIND_ALL);
 	bool exists(const String &p_path, const String &p_type_hint = "");
 	ResourceUID::ID get_resource_uid(const String &p_path);
 	String get_resource_type(const String &p_path);
@@ -742,6 +756,7 @@ public:
 VARIANT_ENUM_CAST(CoreBind::Logger::ErrorType);
 VARIANT_ENUM_CAST(CoreBind::ResourceLoader::ThreadLoadStatus);
 VARIANT_ENUM_CAST(CoreBind::ResourceLoader::CacheMode);
+VARIANT_BITFIELD_CAST(CoreBind::ResourceLoader::CachedResourceKind);
 
 VARIANT_BITFIELD_CAST(CoreBind::ResourceSaver::SaverFlags);
 
