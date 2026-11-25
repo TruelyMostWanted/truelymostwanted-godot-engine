@@ -31,13 +31,13 @@
 #pragma once
 
 #include "core/io/resource.h"
-#include "servers/settings/video_effect_settings.h"
-#include "servers/settings/video_quality_settings.h"
-#include "servers/settings/video_shadow_settings.h"
-#include "servers/settings/video_texture_settings.h"
+#include "servers/settings/render_effect_settings.h"
+#include "servers/settings/render_quality_settings.h"
+#include "servers/settings/shadow_settings.h"
+#include "servers/settings/texture_settings.h"
 
-// A graphics preset (#25): a name and one settings resource per video settings domain (`video_quality`,
-// `video_texture`, `video_shadow`, `video_effect`), the same classes the domains store. A domain resource sets
+// A graphics preset (#25): a name and one settings resource per video settings domain (`render_quality`,
+// `texture`, `shadow`, `render_effect`), the same classes the domains store. A domain resource sets
 // all values of its domain; a null resource leaves the domain as it is.
 // VideoPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
 // replace presets with `.tres` files (project setting `settings/video_preset/presets`).
@@ -45,10 +45,10 @@ class VideoPreset : public Resource {
 	GDCLASS(VideoPreset, Resource);
 
 	String preset_name;
-	Ref<VideoQualitySettings> video_quality;
-	Ref<VideoTextureSettings> video_texture;
-	Ref<VideoShadowSettings> video_shadow;
-	Ref<VideoEffectSettings> video_effect;
+	Ref<RenderQualitySettings> render_quality;
+	Ref<TextureSettings> texture;
+	Ref<ShadowSettings> shadow;
+	Ref<RenderEffectSettings> render_effect;
 
 protected:
 	static void _bind_methods();
@@ -60,14 +60,14 @@ public:
 	void set_preset_name(const String &p_name);
 	String get_preset_name() const;
 
-	void set_video_quality(const Ref<VideoQualitySettings> &p_settings);
-	Ref<VideoQualitySettings> get_video_quality() const;
-	void set_video_texture(const Ref<VideoTextureSettings> &p_settings);
-	Ref<VideoTextureSettings> get_video_texture() const;
-	void set_video_shadow(const Ref<VideoShadowSettings> &p_settings);
-	Ref<VideoShadowSettings> get_video_shadow() const;
-	void set_video_effect(const Ref<VideoEffectSettings> &p_settings);
-	Ref<VideoEffectSettings> get_video_effect() const;
+	void set_render_quality(const Ref<RenderQualitySettings> &p_settings);
+	Ref<RenderQualitySettings> get_render_quality() const;
+	void set_texture(const Ref<TextureSettings> &p_settings);
+	Ref<TextureSettings> get_texture() const;
+	void set_shadow(const Ref<ShadowSettings> &p_settings);
+	Ref<ShadowSettings> get_shadow() const;
+	void set_render_effect(const Ref<RenderEffectSettings> &p_settings);
+	Ref<RenderEffectSettings> get_render_effect() const;
 
 	// Generic access by domain name (one of get_domains()); `p_settings` must be the class of the domain or null.
 	void set_domain_settings(const StringName &p_domain, const Ref<Resource> &p_settings);

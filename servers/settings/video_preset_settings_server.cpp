@@ -59,41 +59,41 @@ struct VideoPresetBuiltinValue {
 // Enum values are the values of the engine enums (see the hints of the domain resources).
 static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	// Resolution scale (bilinear), mesh LOD threshold in pixels.
-	{ "video_quality", "scaling_3d_scale", Variant::FLOAT, { 0.75, 1.0, 1.0, 1.0 } },
-	{ "video_quality", "mesh_lod_threshold", Variant::FLOAT, { 4.0, 2.0, 1.0, 0.5 } },
+	{ "render_quality", "scaling_3d_scale", Variant::FLOAT, { 0.75, 1.0, 1.0, 1.0 } },
+	{ "render_quality", "mesh_lod_threshold", Variant::FLOAT, { 4.0, 2.0, 1.0, 0.5 } },
 	// MSAA 3D: Disabled, Disabled, 2x, 4x. Screen-space AA: FXAA, FXAA, Disabled, Disabled.
-	{ "video_quality", "msaa_3d", Variant::INT, { 0, 0, 1, 2 } },
-	{ "video_quality", "screen_space_aa", Variant::INT, { 1, 1, 0, 0 } },
-	{ "video_quality", "use_taa", Variant::BOOL, { 0, 0, 0, 1 } },
-	{ "video_quality", "use_debanding", Variant::BOOL, { 0, 0, 1, 1 } },
+	{ "render_quality", "msaa_3d", Variant::INT, { 0, 0, 1, 2 } },
+	{ "render_quality", "screen_space_aa", Variant::INT, { 1, 1, 0, 0 } },
+	{ "render_quality", "use_taa", Variant::BOOL, { 0, 0, 0, 1 } },
+	{ "render_quality", "use_debanding", Variant::BOOL, { 0, 0, 1, 1 } },
 	// Anisotropic filtering: 2x, 4x, 8x, 16x. 2D SDF scale: 25%, 50%, 50%, 100%.
-	{ "video_texture", "anisotropic_filtering_level", Variant::INT, { 1, 2, 3, 4 } },
-	{ "video_texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
-	{ "video_texture", "canvas_shadow_atlas_size", Variant::INT, { 1024, 2048, 2048, 4096 } },
+	{ "texture", "anisotropic_filtering_level", Variant::INT, { 1, 2, 3, 4 } },
+	{ "texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
+	{ "texture", "canvas_shadow_atlas_size", Variant::INT, { 1024, 2048, 2048, 4096 } },
 	// Shadow atlas sizes; filter quality: Soft Very Low, Soft Low, Soft Medium, Soft High.
-	{ "video_shadow", "directional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
-	{ "video_shadow", "directional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
-	{ "video_shadow", "positional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
-	{ "video_shadow", "positional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
+	{ "shadow", "directional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
+	{ "shadow", "directional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
+	{ "shadow", "positional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
+	{ "shadow", "positional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
 	// SSAO and SSIL quality: Very Low, Low, Medium, High.
-	{ "video_effect", "ssao_quality", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "ssao_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
-	{ "video_effect", "ssil_quality", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "ssil_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
+	{ "render_effect", "ssao_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "ssao_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
+	{ "render_effect", "ssil_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "ssil_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
 	// SDFGI rays: 4, 8, 16, 32. VoxelGI: Low, Low, High, High.
-	{ "video_effect", "sdfgi_ray_count", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "voxel_gi_quality", Variant::INT, { 0, 0, 1, 1 } },
-	{ "video_effect", "volumetric_fog_volume_size", Variant::INT, { 48, 64, 64, 128 } },
-	{ "video_effect", "volumetric_fog_volume_depth", Variant::INT, { 48, 64, 64, 128 } },
-	{ "video_effect", "volumetric_fog_use_filter", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "sdfgi_ray_count", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "voxel_gi_quality", Variant::INT, { 0, 0, 1, 1 } },
+	{ "render_effect", "volumetric_fog_volume_size", Variant::INT, { 48, 64, 64, 128 } },
+	{ "render_effect", "volumetric_fog_volume_depth", Variant::INT, { 48, 64, 64, 128 } },
+	{ "render_effect", "volumetric_fog_use_filter", Variant::BOOL, { 0, 1, 1, 1 } },
 	// Subsurface scattering: Low, Low, Medium, High. Depth of field blur: Very Low, Low, Medium, High.
-	{ "video_effect", "sss_quality", Variant::INT, { 1, 1, 2, 3 } },
-	{ "video_effect", "dof_blur_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "sss_quality", Variant::INT, { 1, 1, 2, 3 } },
+	{ "render_effect", "dof_blur_quality", Variant::INT, { 0, 1, 2, 3 } },
 	// Low turns the most expensive environment effects off.
-	{ "video_effect", "allow_ssao", Variant::BOOL, { 0, 1, 1, 1 } },
-	{ "video_effect", "allow_ssil", Variant::BOOL, { 0, 0, 1, 1 } },
-	{ "video_effect", "allow_ssr", Variant::BOOL, { 0, 1, 1, 1 } },
-	{ "video_effect", "allow_volumetric_fog", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_ssao", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_ssil", Variant::BOOL, { 0, 0, 1, 1 } },
+	{ "render_effect", "allow_ssr", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_volumetric_fog", Variant::BOOL, { 0, 1, 1, 1 } },
 };
 
 static Variant video_preset_builtin_value(const VideoPresetBuiltinValue &p_value, int p_level) {
@@ -129,14 +129,14 @@ static bool video_preset_values_equal(const Variant &p_a, const Variant &p_b) {
 // if the domain is not registered.
 static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 	Ref<Resource> base;
-	if (p_domain == "video_quality") {
-		base = Ref<Resource>(memnew(VideoQualitySettings));
-	} else if (p_domain == "video_texture") {
-		base = Ref<Resource>(memnew(VideoTextureSettings));
-	} else if (p_domain == "video_shadow") {
-		base = Ref<Resource>(memnew(VideoShadowSettings));
-	} else if (p_domain == "video_effect") {
-		base = Ref<Resource>(memnew(VideoEffectSettings));
+	if (p_domain == "render_quality") {
+		base = Ref<Resource>(memnew(RenderQualitySettings));
+	} else if (p_domain == "texture") {
+		base = Ref<Resource>(memnew(TextureSettings));
+	} else if (p_domain == "shadow") {
+		base = Ref<Resource>(memnew(ShadowSettings));
+	} else if (p_domain == "render_effect") {
+		base = Ref<Resource>(memnew(RenderEffectSettings));
 	}
 	ERR_FAIL_COND_V(base.is_null(), base);
 
