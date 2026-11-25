@@ -125,6 +125,10 @@ class Subtitle : public Resource {
 public:
 	enum Format {
 		FORMAT_SRT,
+		FORMAT_VTT,
+		FORMAT_TTML,
+		FORMAT_ASS,
+		FORMAT_SBV,
 		FORMAT_MAX,
 	};
 
@@ -169,6 +173,12 @@ public:
 	Error load_from_text(const String &p_text, Format p_format);
 	Error load_from_file(const String &p_path);
 	Error save_to_file(const String &p_path) const;
+
+	// The format of a file extension ("srt", "vtt", "ttml", "dfxp", "ass", "ssa", "sbv"), or FORMAT_MAX.
+	static Format get_format_for_extension(const String &p_extension);
+	static PackedStringArray get_recognized_extensions();
+	// Reads `p_text` in `p_format`. `r_language` is set by formats that store a language (TTML).
+	static Error parse_text(const String &p_text, Format p_format, Vector<Ref<SubtitleSegment>> &r_segments, int *r_skipped = nullptr, String *r_language = nullptr);
 
 	// Segments as they are stored, for the formats and the server (no copy of the array).
 	const Vector<Ref<SubtitleSegment>> &get_segment_list() const { return segments; }

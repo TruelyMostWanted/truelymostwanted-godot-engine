@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include "core/io/resource_loader.h"
-#include "core/io/resource_saver.h"
 #include "servers/subtitle/subtitle.h"
 
 // SubRip (.srt) without formatting. Reading removes formatting tags and recognizes kinds and speakers;
@@ -52,27 +50,14 @@ public:
 	static bool parse_time(const String &p_text, double &r_seconds);
 	// Removes `<i>`, `<b>`, `<u>`, `<font …>`, `<c.…>`, `<v …>` and `{\…}` tags; a lone `<` stays.
 	static String strip_tags(const String &p_text);
-	// Fills text, kind, speaker and off_screen of `r_segment` from the raw text of a cue.
+	// Fills text, kind, speaker, off_screen and placement of `r_segment` from the raw text of a cue.
+	// Shared by the formats: tags are removed, `[…]`/`(…)` is a sound, `♪ … ♪` is music, `NAME:` in capitals
+	// is the speaker, `<i>` around everything is off-screen, `{\an7}` to `{\an9}` is the top placement.
 	static void read_cue_text(const String &p_raw_text, const Ref<SubtitleSegment> &r_segment);
-	// The text of a cue for a segment: decorations by kind, speaker prefix, `<i>` for off-screen.
+	// The text with the decoration of its kind (`[Sound]`, `♪ Music ♪`), without speaker or italics.
+	static String decorate_text(const Ref<SubtitleSegment> &p_segment);
+	// The text of a SubRip cue: `{\an8}` for the top, speaker prefix in capitals, decorations, `<i>` for off-screen.
 	static String make_cue_text(const Ref<SubtitleSegment> &p_segment);
-};
-
-class ResourceFormatLoaderSubtitleSRT : public ResourceFormatLoader {
-	GDSOFTCLASS(ResourceFormatLoaderSubtitleSRT, ResourceFormatLoader);
-
-public:
-	virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = nullptr, bool p_use_sub_threads = false, float *r_progress = nullptr, CacheMode p_cache_mode = CACHE_MODE_REUSE) override;
-	virtual void get_recognized_extensions(List<String> *p_extensions) const override;
-	virtual bool handles_type(const String &p_type) const override;
-	virtual String get_resource_type(const String &p_path) const override;
-};
-
-class ResourceFormatSaverSubtitleSRT : public ResourceFormatSaver {
-	GDSOFTCLASS(ResourceFormatSaverSubtitleSRT, ResourceFormatSaver);
-
-public:
-	virtual Error save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags = 0) override;
-	virtual void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const override;
-	virtual bool recognize(const Ref<Resource> &p_resource) const override;
+	// "&amp;", "&lt;", "&gt;", "&quot;", "&apos;", "&nbsp;", "&lrm;", "&rlm;" in cue texts of WebVTT and TTML.
+	static String decode_entities(const String &p_text);
 };
