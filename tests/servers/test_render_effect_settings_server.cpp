@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_effect_settings_server.cpp                                 */
+/*  test_render_effect_settings_server.cpp                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_effect_settings_server)
+TEST_FORCE_LINK(test_render_effect_settings_server)
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -42,9 +42,9 @@ TEST_FORCE_LINK(test_video_effect_settings_server)
 #include "scene/resources/environment.h"
 #include "servers/rendering/rendering_method.h"
 #include "servers/rendering/rendering_server_globals.h"
+#include "servers/settings/render_effect_settings.h"
+#include "servers/settings/render_effect_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_effect_settings.h"
-#include "servers/settings/video_effect_settings_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -52,7 +52,7 @@ TEST_FORCE_LINK(test_video_effect_settings_server)
 #include "scene/3d/world_environment.h"
 #endif // _3D_DISABLED
 
-namespace TestVideoEffectSettingsServer {
+namespace TestRenderEffectSettingsServer {
 
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
@@ -79,7 +79,7 @@ struct OverrideReset {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_effect_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("render_effect_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -87,17 +87,17 @@ static String temp_file(const String &p_name) {
 	return path;
 }
 
-TEST_CASE("[VideoEffectSettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[RenderEffectSettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	VideoEffectSettingsServer *server = VideoEffectSettingsServer::get_singleton();
+	RenderEffectSettingsServer *server = RenderEffectSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoEffectSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_effect") == server);
-	CHECK(server->get_domain() == StringName("video_effect"));
+	CHECK(Engine::get_singleton()->has_singleton("RenderEffectSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("render_effect") == server);
+	CHECK(server->get_domain() == StringName("render_effect"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SERVERS);
-	CHECK(server->get_file_path() == "user://settings/video_effect.ini");
-	CHECK(Object::cast_to<VideoEffectSettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(VideoEffectSettingsServer::get_ignore_group() == StringName("ignore_quality_settings"));
+	CHECK(server->get_file_path() == "user://settings/render_effect.ini");
+	CHECK(Object::cast_to<RenderEffectSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(RenderEffectSettingsServer::get_ignore_group() == StringName("ignore_quality_settings"));
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 34);
@@ -115,7 +115,7 @@ TEST_CASE("[VideoEffectSettingsServer] The domain is an engine singleton registe
 	}
 }
 
-TEST_CASE("[VideoEffectSettingsServer] Defaults are the project settings") {
+TEST_CASE("[RenderEffectSettingsServer] Defaults are the project settings") {
 	TestSetup setup;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	const Variant old_quality = project_settings->get_setting("rendering/environment/ssao/quality", 2);
@@ -125,7 +125,7 @@ TEST_CASE("[VideoEffectSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/environment/volumetric_fog/volume_size", 128);
 	project_settings->set_setting("rendering/environment/volumetric_fog/use_filter", 0);
 
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	CHECK(server->get_ssao_quality() == RenderingServerEnums::ENV_SSAO_QUALITY_ULTRA);
 	CHECK(server->get_volumetric_fog_volume_size() == 128);
@@ -145,9 +145,9 @@ TEST_CASE("[VideoEffectSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/environment/volumetric_fog/use_filter", old_filter);
 }
 
-TEST_CASE("[VideoEffectSettingsServer] Values out of range are clamped with a warning") {
+TEST_CASE("[RenderEffectSettingsServer] Values out of range are clamped with a warning") {
 	TestSetup setup;
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -184,11 +184,11 @@ TEST_CASE("[VideoEffectSettingsServer] Values out of range are clamped with a wa
 	memdelete(server);
 }
 
-TEST_CASE("[VideoEffectSettingsServer] Values are saved and loaded") {
+TEST_CASE("[RenderEffectSettingsServer] Values are saved and loaded") {
 	TestSetup setup;
-	const String path = temp_file("video_effect.ini");
+	const String path = temp_file("render_effect.ini");
 	{
-		VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+		RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_ssao_quality(RenderingServerEnums::ENV_SSAO_QUALITY_HIGH);
@@ -210,7 +210,7 @@ TEST_CASE("[VideoEffectSettingsServer] Values are saved and loaded") {
 		memdelete(server);
 	}
 
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	ERR_PRINT_OFF;
@@ -232,14 +232,14 @@ TEST_CASE("[VideoEffectSettingsServer] Values are saved and loaded") {
 	memdelete(server);
 }
 
-TEST_CASE("[VideoEffectSettingsServer] Supported values follow the renderer") {
+TEST_CASE("[RenderEffectSettingsServer] Supported values follow the renderer") {
 	TestSetup setup;
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("supported.ini"));
 
 	const PackedStringArray unsupported = server->get_unsupported_setting_names();
 	for (const String &name : server->get_setting_names()) {
-		CHECK_MESSAGE(server->is_value_supported(name) == VideoEffectSettingsServer::is_renderer_supported(name), name);
+		CHECK_MESSAGE(server->is_value_supported(name) == RenderEffectSettingsServer::is_renderer_supported(name), name);
 		CHECK_MESSAGE(unsupported.has(name) == !server->is_value_supported(name), name);
 	}
 	CHECK_FALSE(server->is_value_supported("missing"));
@@ -263,11 +263,11 @@ TEST_CASE("[VideoEffectSettingsServer] Supported values follow the renderer") {
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoEffectSettingsServer] Environment overrides apply at render time and keep the authored values") {
+TEST_CASE("[SceneTree][RenderEffectSettingsServer] Environment overrides apply at render time and keep the authored values") {
 	TestSetup setup;
 	OverrideReset reset;
 	REQUIRE(RSG::scene != nullptr);
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("overrides.ini"));
 
 	Ref<Environment> authored;
@@ -314,11 +314,11 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] Environment overrides apply at
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoEffectSettingsServer] Brightness, contrast and saturation multiply the authored adjustment") {
+TEST_CASE("[SceneTree][RenderEffectSettingsServer] Brightness, contrast and saturation multiply the authored adjustment") {
 	TestSetup setup;
 	OverrideReset reset;
 	REQUIRE(RSG::scene != nullptr);
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("adjustment.ini"));
 
 	Ref<Environment> plain; // The author did not enable adjustments.
@@ -353,10 +353,10 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] Brightness, contrast and satur
 }
 
 #ifndef _3D_DISABLED
-TEST_CASE("[SceneTree][VideoEffectSettingsServer] WorldEnvironment nodes in the ignore group are excluded") {
+TEST_CASE("[SceneTree][RenderEffectSettingsServer] WorldEnvironment nodes in the ignore group are excluded") {
 	TestSetup setup;
 	OverrideReset reset;
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_file_path(temp_file("ignore_group.ini"));
 	server->set_allow_ssr(false); // Pushes a value: the server watches the scene tree from now on.
 
@@ -365,7 +365,7 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] WorldEnvironment nodes in the 
 	menu_environment->set_glow_enabled(true);
 	WorldEnvironment *world_environment = memnew(WorldEnvironment);
 	world_environment->set_environment(menu_environment);
-	world_environment->add_to_group(VideoEffectSettingsServer::get_ignore_group());
+	world_environment->add_to_group(RenderEffectSettingsServer::get_ignore_group());
 	SceneTree::get_singleton()->get_root()->add_child(world_environment);
 	CHECK(server->is_environment_ignored(menu_environment));
 
@@ -389,9 +389,9 @@ TEST_CASE("[SceneTree][VideoEffectSettingsServer] WorldEnvironment nodes in the 
 }
 #endif // _3D_DISABLED
 
-TEST_CASE("[VideoEffectSettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[RenderEffectSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	VideoEffectSettingsServer *server = memnew(VideoEffectSettingsServer);
+	RenderEffectSettingsServer *server = memnew(RenderEffectSettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "brightness_changed");
 
@@ -423,4 +423,4 @@ TEST_CASE("[VideoEffectSettingsServer] Typed signals fire once per applied chang
 	memdelete(server);
 }
 
-} // namespace TestVideoEffectSettingsServer
+} // namespace TestRenderEffectSettingsServer

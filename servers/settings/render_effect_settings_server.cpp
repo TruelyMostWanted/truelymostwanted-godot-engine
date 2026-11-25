@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_effect_settings_server.cpp                                      */
+/*  render_effect_settings_server.cpp                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_effect_settings_server.h"
+#include "render_effect_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/math/math_funcs.h"
@@ -38,16 +38,16 @@
 #include "core/templates/local_vector.h"
 #include "scene/main/node.h"
 #include "scene/main/scene_tree.h"
+#include "servers/settings/render_effect_settings.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_effect_settings.h"
 
 #ifndef _3D_DISABLED
 #include "scene/3d/camera_3d.h"
 #include "scene/3d/world_environment.h"
 #endif // _3D_DISABLED
 
-// The values of the domain, in the order of VideoEffectSettings.
-static const char *video_effect_setting_names[] = {
+// The values of the domain, in the order of RenderEffectSettings.
+static const char *render_effect_setting_names[] = {
 	"ssao_quality",
 	"ssao_half_size",
 	"ssao_adaptive_target",
@@ -85,7 +85,7 @@ static const char *video_effect_setting_names[] = {
 };
 
 // Type, project setting and valid range of a value.
-struct VideoEffectSettingInfo {
+struct RenderEffectSettingInfo {
 	const char *name = nullptr;
 	const char *project_setting = nullptr; // nullptr: an environment override (no project setting).
 	Variant::Type type = Variant::NIL;
@@ -95,7 +95,7 @@ struct VideoEffectSettingInfo {
 	int enum_size = 0; // > 0: an enum with the values 0 to enum_size - 1 (min_value/max_value unused).
 };
 
-static const VideoEffectSettingInfo video_effect_setting_infos[] = {
+static const RenderEffectSettingInfo render_effect_setting_infos[] = {
 	{ "ssao_quality", "rendering/environment/ssao/quality", Variant::INT, 2, 0, 0, RenderingServerEnums::ENV_SSAO_QUALITY_ULTRA + 1 },
 	{ "ssao_half_size", "rendering/environment/ssao/half_size", Variant::BOOL, 1, 0, 0, 0 },
 	{ "ssao_adaptive_target", "rendering/environment/ssao/adaptive_target", Variant::FLOAT, 0.5, 0.0, 1.0, 0 },
@@ -133,10 +133,10 @@ static const VideoEffectSettingInfo video_effect_setting_infos[] = {
 	{ "saturation", nullptr, Variant::FLOAT, 1.0, 0.01, 8.0, 0 },
 };
 
-static constexpr const char *VIDEO_EFFECT_IGNORE_GROUP = "ignore_quality_settings";
+static constexpr const char *RENDER_EFFECT_IGNORE_GROUP = "ignore_quality_settings";
 
-static const VideoEffectSettingInfo *video_effect_find_info(const StringName &p_name) {
-	for (const VideoEffectSettingInfo &info : video_effect_setting_infos) {
+static const RenderEffectSettingInfo *render_effect_find_info(const StringName &p_name) {
+	for (const RenderEffectSettingInfo &info : render_effect_setting_infos) {
 		if (p_name == info.name) {
 			return &info;
 		}
@@ -144,7 +144,7 @@ static const VideoEffectSettingInfo *video_effect_find_info(const StringName &p_
 	return nullptr;
 }
 
-static Variant video_effect_typed(Variant::Type p_type, const Variant &p_value) {
+static Variant render_effect_typed(Variant::Type p_type, const Variant &p_value) {
 	switch (p_type) {
 		case Variant::BOOL:
 			return bool(p_value);
@@ -158,7 +158,7 @@ static Variant video_effect_typed(Variant::Type p_type, const Variant &p_value) 
 }
 
 // The effect that an `allow_*` value turns off, or ENV_EFFECT_MAX.
-static RenderingServerEnums::EnvironmentEffect video_effect_override_effect(const StringName &p_name) {
+static RenderingServerEnums::EnvironmentEffect render_effect_override_effect(const StringName &p_name) {
 	if (p_name == SNAME("allow_glow")) {
 		return RenderingServerEnums::ENV_EFFECT_GLOW;
 	} else if (p_name == SNAME("allow_ssao")) {
@@ -175,25 +175,25 @@ static RenderingServerEnums::EnvironmentEffect video_effect_override_effect(cons
 	return RenderingServerEnums::ENV_EFFECT_MAX;
 }
 
-VideoEffectSettingsServer *VideoEffectSettingsServer::singleton = nullptr;
+RenderEffectSettingsServer *RenderEffectSettingsServer::singleton = nullptr;
 
-VideoEffectSettingsServer *VideoEffectSettingsServer::get_singleton() {
+RenderEffectSettingsServer *RenderEffectSettingsServer::get_singleton() {
 	return singleton;
 }
 
-StringName VideoEffectSettingsServer::get_ignore_group() {
-	return VIDEO_EFFECT_IGNORE_GROUP;
+StringName RenderEffectSettingsServer::get_ignore_group() {
+	return RENDER_EFFECT_IGNORE_GROUP;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Renderer support.
 
-String VideoEffectSettingsServer::_get_rendering_method() {
+String RenderEffectSettingsServer::_get_rendering_method() {
 	const OS *os = OS::get_singleton();
 	return os != nullptr ? os->get_current_rendering_method() : String();
 }
 
-bool VideoEffectSettingsServer::is_renderer_supported(const StringName &p_name) {
+bool RenderEffectSettingsServer::is_renderer_supported(const StringName &p_name) {
 	const String method = _get_rendering_method();
 	const bool compatibility = method == "gl_compatibility";
 	const bool mobile = method == "mobile";
@@ -213,9 +213,9 @@ bool VideoEffectSettingsServer::is_renderer_supported(const StringName &p_name) 
 /////////////////////////////////////////////////////////////////////////////
 // Engine targets.
 
-Variant VideoEffectSettingsServer::_get_project_value(const StringName &p_name) {
+Variant RenderEffectSettingsServer::_get_project_value(const StringName &p_name) {
 	// What the renderers read from the project settings at startup.
-	const VideoEffectSettingInfo *info = video_effect_find_info(p_name);
+	const RenderEffectSettingInfo *info = render_effect_find_info(p_name);
 	if (info == nullptr) {
 		return Variant();
 	}
@@ -225,15 +225,15 @@ Variant VideoEffectSettingsServer::_get_project_value(const StringName &p_name) 
 		// With the feature overrides (`.mobile`, `.web`, ...), like the renderers read them.
 		value = project_settings->get_setting_with_override(info->project_setting);
 	}
-	return video_effect_typed(info->type, value);
+	return render_effect_typed(info->type, value);
 }
 
-Variant VideoEffectSettingsServer::_get_current(const StringName &p_name) const {
+Variant RenderEffectSettingsServer::_get_current(const StringName &p_name) const {
 	const Variant *value = pushed_values.getptr(p_name);
 	return value != nullptr ? *value : _get_project_value(p_name);
 }
 
-bool VideoEffectSettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
+bool RenderEffectSettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
 	// Returns false if RenderingServer does not exist yet.
 	RenderingServer *rendering_server = RenderingServer::get_singleton();
 	if (rendering_server == nullptr) {
@@ -243,7 +243,7 @@ bool VideoEffectSettingsServer::_deliver(const StringName &p_name, const Variant
 		if (!warned.has(p_name) && !values_equal(p_value, _get_project_value(p_name))) {
 			// The player's (or the game's) choice, not the project value: worth a warning, once.
 			warned.insert(p_name);
-			WARN_PRINT(vformat("Video effect settings: \"%s\" = %s is not supported by the current renderer (\"%s\"); the value is not applied. See VideoEffectSettingsServer.is_value_supported().", p_name, p_value, _get_rendering_method()));
+			WARN_PRINT(vformat("Render effect settings: \"%s\" = %s is not supported by the current renderer (\"%s\"); the value is not applied. See RenderEffectSettingsServer.is_value_supported().", p_name, p_value, _get_rendering_method()));
 		}
 		return true;
 	}
@@ -277,7 +277,7 @@ bool VideoEffectSettingsServer::_deliver(const StringName &p_name, const Variant
 	} else if (p_name == SNAME("brightness") || p_name == SNAME("contrast") || p_name == SNAME("saturation")) {
 		rendering_server->environment_set_global_adjustment(_get_current(SNAME("brightness")), _get_current(SNAME("contrast")), _get_current(SNAME("saturation")));
 	} else {
-		const RenderingServerEnums::EnvironmentEffect effect = video_effect_override_effect(p_name);
+		const RenderingServerEnums::EnvironmentEffect effect = render_effect_override_effect(p_name);
 		if (effect != RenderingServerEnums::ENV_EFFECT_MAX) {
 			rendering_server->environment_set_global_effect_disabled(effect, !bool(p_value));
 		}
@@ -285,7 +285,7 @@ bool VideoEffectSettingsServer::_deliver(const StringName &p_name, const Variant
 	return true;
 }
 
-void VideoEffectSettingsServer::_deliver_undelivered() {
+void RenderEffectSettingsServer::_deliver_undelivered() {
 	LocalVector<StringName> names;
 	for (const StringName &undelivered_name : undelivered) {
 		names.push_back(undelivered_name);
@@ -297,7 +297,7 @@ void VideoEffectSettingsServer::_deliver_undelivered() {
 	}
 }
 
-void VideoEffectSettingsServer::_push_effect_value(const Variant &p_value, const StringName &p_name) {
+void RenderEffectSettingsServer::_push_effect_value(const Variant &p_value, const StringName &p_name) {
 	pushed_values[p_name] = p_value;
 	if (_deliver(p_name, p_value)) {
 		undelivered.erase(p_name);
@@ -308,7 +308,7 @@ void VideoEffectSettingsServer::_push_effect_value(const Variant &p_value, const
 	_connect_tree();
 }
 
-Variant VideoEffectSettingsServer::_pull_effect_value(const StringName &p_name) {
+Variant RenderEffectSettingsServer::_pull_effect_value(const StringName &p_name) {
 	if (!defaults_captured) {
 		// The defaults: the project values, not the engine state (which a game may have changed already).
 		return _get_project_value(p_name);
@@ -321,12 +321,12 @@ Variant VideoEffectSettingsServer::_pull_effect_value(const StringName &p_name) 
 	return _get_current(p_name);
 }
 
-void VideoEffectSettingsServer::_connect_tree() {
+void RenderEffectSettingsServer::_connect_tree() {
 	SceneTree *tree = SceneTree::get_singleton();
 	if (tree == nullptr) {
 		return;
 	}
-	const Callable callback = callable_mp(this, &VideoEffectSettingsServer::_on_node_added);
+	const Callable callback = callable_mp(this, &RenderEffectSettingsServer::_on_node_added);
 	if (tree->is_connected(SNAME("node_added"), callback)) {
 		return;
 	}
@@ -337,7 +337,7 @@ void VideoEffectSettingsServer::_connect_tree() {
 	}
 }
 
-void VideoEffectSettingsServer::_ignore_node_environment(Node *p_node) {
+void RenderEffectSettingsServer::_ignore_node_environment(Node *p_node) {
 #ifndef _3D_DISABLED
 	Ref<Environment> environment;
 	if (const WorldEnvironment *world_environment = Object::cast_to<WorldEnvironment>(p_node)) {
@@ -351,13 +351,13 @@ void VideoEffectSettingsServer::_ignore_node_environment(Node *p_node) {
 #endif // _3D_DISABLED
 }
 
-void VideoEffectSettingsServer::_on_node_added(Node *p_node) {
+void RenderEffectSettingsServer::_on_node_added(Node *p_node) {
 	if (p_node != nullptr && p_node->is_in_group(get_ignore_group())) {
 		_ignore_node_environment(p_node);
 	}
 }
 
-void VideoEffectSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
+void RenderEffectSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SERVERS) {
 		_deliver_undelivered();
 	}
@@ -370,33 +370,37 @@ void VideoEffectSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName VideoEffectSettingsServer::get_domain() const {
-	return SNAME("video_effect");
+StringName RenderEffectSettingsServer::get_domain() const {
+	return SNAME("render_effect");
 }
 
-SettingsServer::ApplyPhase VideoEffectSettingsServer::get_apply_phase() const {
+String RenderEffectSettingsServer::_get_legacy_file_name() const {
+	return "video_effect";
+}
+
+SettingsServer::ApplyPhase RenderEffectSettingsServer::get_apply_phase() const {
 	// RenderingServer exists and the renderer has read the project settings.
 	return APPLY_PHASE_SERVERS;
 }
 
-Ref<Resource> VideoEffectSettingsServer::_create_default_settings() const {
-	Ref<VideoEffectSettings> default_settings;
+Ref<Resource> RenderEffectSettingsServer::_create_default_settings() const {
+	Ref<RenderEffectSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-void VideoEffectSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+void RenderEffectSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	SettingsServer::_read_settings_from_engine(p_settings);
 	// The first read fills the defaults; later ones read the engine.
 	defaults_captured = true;
 }
 
-Variant VideoEffectSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant RenderEffectSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (value.get_type() != Variant::INT && value.get_type() != Variant::FLOAT) {
 		return value;
 	}
-	const VideoEffectSettingInfo *info = video_effect_find_info(p_name);
+	const RenderEffectSettingInfo *info = render_effect_find_info(p_name);
 	if (info == nullptr || info->type == Variant::BOOL) {
 		return value;
 	}
@@ -405,29 +409,29 @@ Variant VideoEffectSettingsServer::_validate_setting(const StringName &p_name, c
 	if (info->enum_size > 0) {
 		if (Math::is_nan(number) || number < 0 || number >= info->enum_size) {
 			const Variant default_value = get_default_value(p_name);
-			WARN_PRINT(vformat("Video effect settings: %s is not a valid value for \"%s\"; %s is used.", value, p_name, default_value));
+			WARN_PRINT(vformat("Render effect settings: %s is not a valid value for \"%s\"; %s is used.", value, p_name, default_value));
 			return default_value;
 		}
 		return int64_t(number);
 	}
 	if (Math::is_nan(number)) {
-		WARN_PRINT(vformat("Video effect settings: \"%s\" is not a number; the default is used.", p_name));
+		WARN_PRINT(vformat("Render effect settings: \"%s\" is not a number; the default is used.", p_name));
 		return get_default_value(p_name);
 	}
 	const double clamped = CLAMP(number, info->min_value, info->max_value);
 	if (clamped != number) {
-		WARN_PRINT(vformat("Video effect settings: %s is out of range for \"%s\" (%s to %s); %s is used.", value, p_name, Variant(info->min_value), Variant(info->max_value), Variant(clamped)));
+		WARN_PRINT(vformat("Render effect settings: %s is out of range for \"%s\" (%s to %s); %s is used.", value, p_name, Variant(info->min_value), Variant(info->max_value), Variant(clamped)));
 	}
 	return info->type == Variant::INT ? Variant(int64_t(Math::round(clamped))) : Variant(clamped);
 }
 
-bool VideoEffectSettingsServer::is_value_supported(const StringName &p_name) const {
+bool RenderEffectSettingsServer::is_value_supported(const StringName &p_name) const {
 	return SettingsServer::is_value_supported(p_name) && is_renderer_supported(p_name);
 }
 
-PackedStringArray VideoEffectSettingsServer::get_unsupported_setting_names() const {
+PackedStringArray RenderEffectSettingsServer::get_unsupported_setting_names() const {
 	PackedStringArray names;
-	for (const char *setting_name : video_effect_setting_names) {
+	for (const char *setting_name : render_effect_setting_names) {
 		if (!is_value_supported(setting_name)) {
 			names.push_back(setting_name);
 		}
@@ -438,7 +442,7 @@ PackedStringArray VideoEffectSettingsServer::get_unsupported_setting_names() con
 /////////////////////////////////////////////////////////////////////////////
 // Exclusions.
 
-void VideoEffectSettingsServer::set_environment_ignored(const Ref<Environment> &p_environment, bool p_ignored) {
+void RenderEffectSettingsServer::set_environment_ignored(const Ref<Environment> &p_environment, bool p_ignored) {
 	ERR_FAIL_COND(p_environment.is_null());
 	if (p_ignored) {
 		ignored_environments.insert(p_environment->get_instance_id());
@@ -451,286 +455,286 @@ void VideoEffectSettingsServer::set_environment_ignored(const Ref<Environment> &
 	}
 }
 
-bool VideoEffectSettingsServer::is_environment_ignored(const Ref<Environment> &p_environment) const {
+bool RenderEffectSettingsServer::is_environment_ignored(const Ref<Environment> &p_environment) const {
 	return p_environment.is_valid() && ignored_environments.has(p_environment->get_instance_id());
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-void VideoEffectSettingsServer::set_ssao_quality(RenderingServerEnums::EnvironmentSSAOQuality p_quality) {
+void RenderEffectSettingsServer::set_ssao_quality(RenderingServerEnums::EnvironmentSSAOQuality p_quality) {
 	set_value(SNAME("ssao_quality"), int(p_quality));
 }
 
-RenderingServerEnums::EnvironmentSSAOQuality VideoEffectSettingsServer::get_ssao_quality() const {
+RenderingServerEnums::EnvironmentSSAOQuality RenderEffectSettingsServer::get_ssao_quality() const {
 	return RenderingServerEnums::EnvironmentSSAOQuality(int(get_value(SNAME("ssao_quality"))));
 }
 
-void VideoEffectSettingsServer::set_ssao_half_size(bool p_enabled) {
+void RenderEffectSettingsServer::set_ssao_half_size(bool p_enabled) {
 	set_value(SNAME("ssao_half_size"), p_enabled);
 }
 
-bool VideoEffectSettingsServer::is_ssao_half_size_enabled() const {
+bool RenderEffectSettingsServer::is_ssao_half_size_enabled() const {
 	return get_value(SNAME("ssao_half_size"));
 }
 
-void VideoEffectSettingsServer::set_ssao_adaptive_target(float p_target) {
+void RenderEffectSettingsServer::set_ssao_adaptive_target(float p_target) {
 	set_value(SNAME("ssao_adaptive_target"), p_target);
 }
 
-float VideoEffectSettingsServer::get_ssao_adaptive_target() const {
+float RenderEffectSettingsServer::get_ssao_adaptive_target() const {
 	return get_value(SNAME("ssao_adaptive_target"));
 }
 
-void VideoEffectSettingsServer::set_ssao_blur_passes(int p_passes) {
+void RenderEffectSettingsServer::set_ssao_blur_passes(int p_passes) {
 	set_value(SNAME("ssao_blur_passes"), p_passes);
 }
 
-int VideoEffectSettingsServer::get_ssao_blur_passes() const {
+int RenderEffectSettingsServer::get_ssao_blur_passes() const {
 	return get_value(SNAME("ssao_blur_passes"));
 }
 
-void VideoEffectSettingsServer::set_ssao_fadeout_from(float p_distance) {
+void RenderEffectSettingsServer::set_ssao_fadeout_from(float p_distance) {
 	set_value(SNAME("ssao_fadeout_from"), p_distance);
 }
 
-float VideoEffectSettingsServer::get_ssao_fadeout_from() const {
+float RenderEffectSettingsServer::get_ssao_fadeout_from() const {
 	return get_value(SNAME("ssao_fadeout_from"));
 }
 
-void VideoEffectSettingsServer::set_ssao_fadeout_to(float p_distance) {
+void RenderEffectSettingsServer::set_ssao_fadeout_to(float p_distance) {
 	set_value(SNAME("ssao_fadeout_to"), p_distance);
 }
 
-float VideoEffectSettingsServer::get_ssao_fadeout_to() const {
+float RenderEffectSettingsServer::get_ssao_fadeout_to() const {
 	return get_value(SNAME("ssao_fadeout_to"));
 }
 
-void VideoEffectSettingsServer::set_ssil_quality(RenderingServerEnums::EnvironmentSSILQuality p_quality) {
+void RenderEffectSettingsServer::set_ssil_quality(RenderingServerEnums::EnvironmentSSILQuality p_quality) {
 	set_value(SNAME("ssil_quality"), int(p_quality));
 }
 
-RenderingServerEnums::EnvironmentSSILQuality VideoEffectSettingsServer::get_ssil_quality() const {
+RenderingServerEnums::EnvironmentSSILQuality RenderEffectSettingsServer::get_ssil_quality() const {
 	return RenderingServerEnums::EnvironmentSSILQuality(int(get_value(SNAME("ssil_quality"))));
 }
 
-void VideoEffectSettingsServer::set_ssil_half_size(bool p_enabled) {
+void RenderEffectSettingsServer::set_ssil_half_size(bool p_enabled) {
 	set_value(SNAME("ssil_half_size"), p_enabled);
 }
 
-bool VideoEffectSettingsServer::is_ssil_half_size_enabled() const {
+bool RenderEffectSettingsServer::is_ssil_half_size_enabled() const {
 	return get_value(SNAME("ssil_half_size"));
 }
 
-void VideoEffectSettingsServer::set_ssil_adaptive_target(float p_target) {
+void RenderEffectSettingsServer::set_ssil_adaptive_target(float p_target) {
 	set_value(SNAME("ssil_adaptive_target"), p_target);
 }
 
-float VideoEffectSettingsServer::get_ssil_adaptive_target() const {
+float RenderEffectSettingsServer::get_ssil_adaptive_target() const {
 	return get_value(SNAME("ssil_adaptive_target"));
 }
 
-void VideoEffectSettingsServer::set_ssil_blur_passes(int p_passes) {
+void RenderEffectSettingsServer::set_ssil_blur_passes(int p_passes) {
 	set_value(SNAME("ssil_blur_passes"), p_passes);
 }
 
-int VideoEffectSettingsServer::get_ssil_blur_passes() const {
+int RenderEffectSettingsServer::get_ssil_blur_passes() const {
 	return get_value(SNAME("ssil_blur_passes"));
 }
 
-void VideoEffectSettingsServer::set_ssil_fadeout_from(float p_distance) {
+void RenderEffectSettingsServer::set_ssil_fadeout_from(float p_distance) {
 	set_value(SNAME("ssil_fadeout_from"), p_distance);
 }
 
-float VideoEffectSettingsServer::get_ssil_fadeout_from() const {
+float RenderEffectSettingsServer::get_ssil_fadeout_from() const {
 	return get_value(SNAME("ssil_fadeout_from"));
 }
 
-void VideoEffectSettingsServer::set_ssil_fadeout_to(float p_distance) {
+void RenderEffectSettingsServer::set_ssil_fadeout_to(float p_distance) {
 	set_value(SNAME("ssil_fadeout_to"), p_distance);
 }
 
-float VideoEffectSettingsServer::get_ssil_fadeout_to() const {
+float RenderEffectSettingsServer::get_ssil_fadeout_to() const {
 	return get_value(SNAME("ssil_fadeout_to"));
 }
 
-void VideoEffectSettingsServer::set_sdfgi_ray_count(RenderingServerEnums::EnvironmentSDFGIRayCount p_ray_count) {
+void RenderEffectSettingsServer::set_sdfgi_ray_count(RenderingServerEnums::EnvironmentSDFGIRayCount p_ray_count) {
 	set_value(SNAME("sdfgi_ray_count"), int(p_ray_count));
 }
 
-RenderingServerEnums::EnvironmentSDFGIRayCount VideoEffectSettingsServer::get_sdfgi_ray_count() const {
+RenderingServerEnums::EnvironmentSDFGIRayCount RenderEffectSettingsServer::get_sdfgi_ray_count() const {
 	return RenderingServerEnums::EnvironmentSDFGIRayCount(int(get_value(SNAME("sdfgi_ray_count"))));
 }
 
-void VideoEffectSettingsServer::set_sdfgi_frames_to_converge(RenderingServerEnums::EnvironmentSDFGIFramesToConverge p_frames) {
+void RenderEffectSettingsServer::set_sdfgi_frames_to_converge(RenderingServerEnums::EnvironmentSDFGIFramesToConverge p_frames) {
 	set_value(SNAME("sdfgi_frames_to_converge"), int(p_frames));
 }
 
-RenderingServerEnums::EnvironmentSDFGIFramesToConverge VideoEffectSettingsServer::get_sdfgi_frames_to_converge() const {
+RenderingServerEnums::EnvironmentSDFGIFramesToConverge RenderEffectSettingsServer::get_sdfgi_frames_to_converge() const {
 	return RenderingServerEnums::EnvironmentSDFGIFramesToConverge(int(get_value(SNAME("sdfgi_frames_to_converge"))));
 }
 
-void VideoEffectSettingsServer::set_sdfgi_frames_to_update_light(RenderingServerEnums::EnvironmentSDFGIFramesToUpdateLight p_frames) {
+void RenderEffectSettingsServer::set_sdfgi_frames_to_update_light(RenderingServerEnums::EnvironmentSDFGIFramesToUpdateLight p_frames) {
 	set_value(SNAME("sdfgi_frames_to_update_light"), int(p_frames));
 }
 
-RenderingServerEnums::EnvironmentSDFGIFramesToUpdateLight VideoEffectSettingsServer::get_sdfgi_frames_to_update_light() const {
+RenderingServerEnums::EnvironmentSDFGIFramesToUpdateLight RenderEffectSettingsServer::get_sdfgi_frames_to_update_light() const {
 	return RenderingServerEnums::EnvironmentSDFGIFramesToUpdateLight(int(get_value(SNAME("sdfgi_frames_to_update_light"))));
 }
 
-void VideoEffectSettingsServer::set_voxel_gi_quality(RenderingServerEnums::VoxelGIQuality p_quality) {
+void RenderEffectSettingsServer::set_voxel_gi_quality(RenderingServerEnums::VoxelGIQuality p_quality) {
 	set_value(SNAME("voxel_gi_quality"), int(p_quality));
 }
 
-RenderingServerEnums::VoxelGIQuality VideoEffectSettingsServer::get_voxel_gi_quality() const {
+RenderingServerEnums::VoxelGIQuality RenderEffectSettingsServer::get_voxel_gi_quality() const {
 	return RenderingServerEnums::VoxelGIQuality(int(get_value(SNAME("voxel_gi_quality"))));
 }
 
-void VideoEffectSettingsServer::set_volumetric_fog_volume_size(int p_size) {
+void RenderEffectSettingsServer::set_volumetric_fog_volume_size(int p_size) {
 	set_value(SNAME("volumetric_fog_volume_size"), p_size);
 }
 
-int VideoEffectSettingsServer::get_volumetric_fog_volume_size() const {
+int RenderEffectSettingsServer::get_volumetric_fog_volume_size() const {
 	return get_value(SNAME("volumetric_fog_volume_size"));
 }
 
-void VideoEffectSettingsServer::set_volumetric_fog_volume_depth(int p_depth) {
+void RenderEffectSettingsServer::set_volumetric_fog_volume_depth(int p_depth) {
 	set_value(SNAME("volumetric_fog_volume_depth"), p_depth);
 }
 
-int VideoEffectSettingsServer::get_volumetric_fog_volume_depth() const {
+int RenderEffectSettingsServer::get_volumetric_fog_volume_depth() const {
 	return get_value(SNAME("volumetric_fog_volume_depth"));
 }
 
-void VideoEffectSettingsServer::set_volumetric_fog_use_filter(bool p_enabled) {
+void RenderEffectSettingsServer::set_volumetric_fog_use_filter(bool p_enabled) {
 	set_value(SNAME("volumetric_fog_use_filter"), p_enabled);
 }
 
-bool VideoEffectSettingsServer::is_volumetric_fog_using_filter() const {
+bool RenderEffectSettingsServer::is_volumetric_fog_using_filter() const {
 	return get_value(SNAME("volumetric_fog_use_filter"));
 }
 
-void VideoEffectSettingsServer::set_sss_quality(RenderingServerEnums::SubSurfaceScatteringQuality p_quality) {
+void RenderEffectSettingsServer::set_sss_quality(RenderingServerEnums::SubSurfaceScatteringQuality p_quality) {
 	set_value(SNAME("sss_quality"), int(p_quality));
 }
 
-RenderingServerEnums::SubSurfaceScatteringQuality VideoEffectSettingsServer::get_sss_quality() const {
+RenderingServerEnums::SubSurfaceScatteringQuality RenderEffectSettingsServer::get_sss_quality() const {
 	return RenderingServerEnums::SubSurfaceScatteringQuality(int(get_value(SNAME("sss_quality"))));
 }
 
-void VideoEffectSettingsServer::set_sss_scale(float p_scale) {
+void RenderEffectSettingsServer::set_sss_scale(float p_scale) {
 	set_value(SNAME("sss_scale"), p_scale);
 }
 
-float VideoEffectSettingsServer::get_sss_scale() const {
+float RenderEffectSettingsServer::get_sss_scale() const {
 	return get_value(SNAME("sss_scale"));
 }
 
-void VideoEffectSettingsServer::set_sss_depth_scale(float p_scale) {
+void RenderEffectSettingsServer::set_sss_depth_scale(float p_scale) {
 	set_value(SNAME("sss_depth_scale"), p_scale);
 }
 
-float VideoEffectSettingsServer::get_sss_depth_scale() const {
+float RenderEffectSettingsServer::get_sss_depth_scale() const {
 	return get_value(SNAME("sss_depth_scale"));
 }
 
-void VideoEffectSettingsServer::set_dof_bokeh_shape(RenderingServerEnums::DOFBokehShape p_shape) {
+void RenderEffectSettingsServer::set_dof_bokeh_shape(RenderingServerEnums::DOFBokehShape p_shape) {
 	set_value(SNAME("dof_bokeh_shape"), int(p_shape));
 }
 
-RenderingServerEnums::DOFBokehShape VideoEffectSettingsServer::get_dof_bokeh_shape() const {
+RenderingServerEnums::DOFBokehShape RenderEffectSettingsServer::get_dof_bokeh_shape() const {
 	return RenderingServerEnums::DOFBokehShape(int(get_value(SNAME("dof_bokeh_shape"))));
 }
 
-void VideoEffectSettingsServer::set_dof_blur_quality(RenderingServerEnums::DOFBlurQuality p_quality) {
+void RenderEffectSettingsServer::set_dof_blur_quality(RenderingServerEnums::DOFBlurQuality p_quality) {
 	set_value(SNAME("dof_blur_quality"), int(p_quality));
 }
 
-RenderingServerEnums::DOFBlurQuality VideoEffectSettingsServer::get_dof_blur_quality() const {
+RenderingServerEnums::DOFBlurQuality RenderEffectSettingsServer::get_dof_blur_quality() const {
 	return RenderingServerEnums::DOFBlurQuality(int(get_value(SNAME("dof_blur_quality"))));
 }
 
-void VideoEffectSettingsServer::set_dof_use_jitter(bool p_enabled) {
+void RenderEffectSettingsServer::set_dof_use_jitter(bool p_enabled) {
 	set_value(SNAME("dof_use_jitter"), p_enabled);
 }
 
-bool VideoEffectSettingsServer::is_dof_using_jitter() const {
+bool RenderEffectSettingsServer::is_dof_using_jitter() const {
 	return get_value(SNAME("dof_use_jitter"));
 }
 
-void VideoEffectSettingsServer::set_allow_glow(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_glow(bool p_allowed) {
 	set_value(SNAME("allow_glow"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_glow_allowed() const {
+bool RenderEffectSettingsServer::is_glow_allowed() const {
 	return get_value(SNAME("allow_glow"));
 }
 
-void VideoEffectSettingsServer::set_allow_ssao(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_ssao(bool p_allowed) {
 	set_value(SNAME("allow_ssao"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_ssao_allowed() const {
+bool RenderEffectSettingsServer::is_ssao_allowed() const {
 	return get_value(SNAME("allow_ssao"));
 }
 
-void VideoEffectSettingsServer::set_allow_ssil(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_ssil(bool p_allowed) {
 	set_value(SNAME("allow_ssil"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_ssil_allowed() const {
+bool RenderEffectSettingsServer::is_ssil_allowed() const {
 	return get_value(SNAME("allow_ssil"));
 }
 
-void VideoEffectSettingsServer::set_allow_ssr(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_ssr(bool p_allowed) {
 	set_value(SNAME("allow_ssr"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_ssr_allowed() const {
+bool RenderEffectSettingsServer::is_ssr_allowed() const {
 	return get_value(SNAME("allow_ssr"));
 }
 
-void VideoEffectSettingsServer::set_allow_fog(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_fog(bool p_allowed) {
 	set_value(SNAME("allow_fog"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_fog_allowed() const {
+bool RenderEffectSettingsServer::is_fog_allowed() const {
 	return get_value(SNAME("allow_fog"));
 }
 
-void VideoEffectSettingsServer::set_allow_volumetric_fog(bool p_allowed) {
+void RenderEffectSettingsServer::set_allow_volumetric_fog(bool p_allowed) {
 	set_value(SNAME("allow_volumetric_fog"), p_allowed);
 }
 
-bool VideoEffectSettingsServer::is_volumetric_fog_allowed() const {
+bool RenderEffectSettingsServer::is_volumetric_fog_allowed() const {
 	return get_value(SNAME("allow_volumetric_fog"));
 }
 
-void VideoEffectSettingsServer::set_brightness(float p_brightness) {
+void RenderEffectSettingsServer::set_brightness(float p_brightness) {
 	set_value(SNAME("brightness"), p_brightness);
 }
 
-float VideoEffectSettingsServer::get_brightness() const {
+float RenderEffectSettingsServer::get_brightness() const {
 	return get_value(SNAME("brightness"));
 }
 
-void VideoEffectSettingsServer::set_contrast(float p_contrast) {
+void RenderEffectSettingsServer::set_contrast(float p_contrast) {
 	set_value(SNAME("contrast"), p_contrast);
 }
 
-float VideoEffectSettingsServer::get_contrast() const {
+float RenderEffectSettingsServer::get_contrast() const {
 	return get_value(SNAME("contrast"));
 }
 
-void VideoEffectSettingsServer::set_saturation(float p_saturation) {
+void RenderEffectSettingsServer::set_saturation(float p_saturation) {
 	set_value(SNAME("saturation"), p_saturation);
 }
 
-float VideoEffectSettingsServer::get_saturation() const {
+float RenderEffectSettingsServer::get_saturation() const {
 	return get_value(SNAME("saturation"));
 }
 
-void VideoEffectSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+void RenderEffectSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
 	SettingsServer::_notify_value_applied(p_name, p_value);
 	// The values with a typed signal `<value>_changed` (see the class reference).
 	static const char *const SIGNAL_VALUES[] = {
@@ -752,7 +756,7 @@ void VideoEffectSettingsServer::_notify_value_applied(const StringName &p_name, 
 	}
 }
 
-void VideoEffectSettingsServer::_bind_methods() {
+void RenderEffectSettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("allow_glow_changed", PropertyInfo(Variant::BOOL, "allowed")));
 	ADD_SIGNAL(MethodInfo("allow_ssao_changed", PropertyInfo(Variant::BOOL, "allowed")));
 	ADD_SIGNAL(MethodInfo("allow_ssil_changed", PropertyInfo(Variant::BOOL, "allowed")));
@@ -763,98 +767,98 @@ void VideoEffectSettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("contrast_changed", PropertyInfo(Variant::FLOAT, "contrast")));
 	ADD_SIGNAL(MethodInfo("saturation_changed", PropertyInfo(Variant::FLOAT, "saturation")));
 
-	ClassDB::bind_method(D_METHOD("set_ssao_quality", "quality"), &VideoEffectSettingsServer::set_ssao_quality);
-	ClassDB::bind_method(D_METHOD("get_ssao_quality"), &VideoEffectSettingsServer::get_ssao_quality);
-	ClassDB::bind_method(D_METHOD("set_ssao_half_size", "enabled"), &VideoEffectSettingsServer::set_ssao_half_size);
-	ClassDB::bind_method(D_METHOD("is_ssao_half_size_enabled"), &VideoEffectSettingsServer::is_ssao_half_size_enabled);
-	ClassDB::bind_method(D_METHOD("set_ssao_adaptive_target", "target"), &VideoEffectSettingsServer::set_ssao_adaptive_target);
-	ClassDB::bind_method(D_METHOD("get_ssao_adaptive_target"), &VideoEffectSettingsServer::get_ssao_adaptive_target);
-	ClassDB::bind_method(D_METHOD("set_ssao_blur_passes", "passes"), &VideoEffectSettingsServer::set_ssao_blur_passes);
-	ClassDB::bind_method(D_METHOD("get_ssao_blur_passes"), &VideoEffectSettingsServer::get_ssao_blur_passes);
-	ClassDB::bind_method(D_METHOD("set_ssao_fadeout_from", "distance"), &VideoEffectSettingsServer::set_ssao_fadeout_from);
-	ClassDB::bind_method(D_METHOD("get_ssao_fadeout_from"), &VideoEffectSettingsServer::get_ssao_fadeout_from);
-	ClassDB::bind_method(D_METHOD("set_ssao_fadeout_to", "distance"), &VideoEffectSettingsServer::set_ssao_fadeout_to);
-	ClassDB::bind_method(D_METHOD("get_ssao_fadeout_to"), &VideoEffectSettingsServer::get_ssao_fadeout_to);
-	ClassDB::bind_method(D_METHOD("set_ssil_quality", "quality"), &VideoEffectSettingsServer::set_ssil_quality);
-	ClassDB::bind_method(D_METHOD("get_ssil_quality"), &VideoEffectSettingsServer::get_ssil_quality);
-	ClassDB::bind_method(D_METHOD("set_ssil_half_size", "enabled"), &VideoEffectSettingsServer::set_ssil_half_size);
-	ClassDB::bind_method(D_METHOD("is_ssil_half_size_enabled"), &VideoEffectSettingsServer::is_ssil_half_size_enabled);
-	ClassDB::bind_method(D_METHOD("set_ssil_adaptive_target", "target"), &VideoEffectSettingsServer::set_ssil_adaptive_target);
-	ClassDB::bind_method(D_METHOD("get_ssil_adaptive_target"), &VideoEffectSettingsServer::get_ssil_adaptive_target);
-	ClassDB::bind_method(D_METHOD("set_ssil_blur_passes", "passes"), &VideoEffectSettingsServer::set_ssil_blur_passes);
-	ClassDB::bind_method(D_METHOD("get_ssil_blur_passes"), &VideoEffectSettingsServer::get_ssil_blur_passes);
-	ClassDB::bind_method(D_METHOD("set_ssil_fadeout_from", "distance"), &VideoEffectSettingsServer::set_ssil_fadeout_from);
-	ClassDB::bind_method(D_METHOD("get_ssil_fadeout_from"), &VideoEffectSettingsServer::get_ssil_fadeout_from);
-	ClassDB::bind_method(D_METHOD("set_ssil_fadeout_to", "distance"), &VideoEffectSettingsServer::set_ssil_fadeout_to);
-	ClassDB::bind_method(D_METHOD("get_ssil_fadeout_to"), &VideoEffectSettingsServer::get_ssil_fadeout_to);
-	ClassDB::bind_method(D_METHOD("set_sdfgi_ray_count", "ray_count"), &VideoEffectSettingsServer::set_sdfgi_ray_count);
-	ClassDB::bind_method(D_METHOD("get_sdfgi_ray_count"), &VideoEffectSettingsServer::get_sdfgi_ray_count);
-	ClassDB::bind_method(D_METHOD("set_sdfgi_frames_to_converge", "frames"), &VideoEffectSettingsServer::set_sdfgi_frames_to_converge);
-	ClassDB::bind_method(D_METHOD("get_sdfgi_frames_to_converge"), &VideoEffectSettingsServer::get_sdfgi_frames_to_converge);
-	ClassDB::bind_method(D_METHOD("set_sdfgi_frames_to_update_light", "frames"), &VideoEffectSettingsServer::set_sdfgi_frames_to_update_light);
-	ClassDB::bind_method(D_METHOD("get_sdfgi_frames_to_update_light"), &VideoEffectSettingsServer::get_sdfgi_frames_to_update_light);
-	ClassDB::bind_method(D_METHOD("set_voxel_gi_quality", "quality"), &VideoEffectSettingsServer::set_voxel_gi_quality);
-	ClassDB::bind_method(D_METHOD("get_voxel_gi_quality"), &VideoEffectSettingsServer::get_voxel_gi_quality);
-	ClassDB::bind_method(D_METHOD("set_volumetric_fog_volume_size", "size"), &VideoEffectSettingsServer::set_volumetric_fog_volume_size);
-	ClassDB::bind_method(D_METHOD("get_volumetric_fog_volume_size"), &VideoEffectSettingsServer::get_volumetric_fog_volume_size);
-	ClassDB::bind_method(D_METHOD("set_volumetric_fog_volume_depth", "depth"), &VideoEffectSettingsServer::set_volumetric_fog_volume_depth);
-	ClassDB::bind_method(D_METHOD("get_volumetric_fog_volume_depth"), &VideoEffectSettingsServer::get_volumetric_fog_volume_depth);
-	ClassDB::bind_method(D_METHOD("set_volumetric_fog_use_filter", "enabled"), &VideoEffectSettingsServer::set_volumetric_fog_use_filter);
-	ClassDB::bind_method(D_METHOD("is_volumetric_fog_using_filter"), &VideoEffectSettingsServer::is_volumetric_fog_using_filter);
-	ClassDB::bind_method(D_METHOD("set_sss_quality", "quality"), &VideoEffectSettingsServer::set_sss_quality);
-	ClassDB::bind_method(D_METHOD("get_sss_quality"), &VideoEffectSettingsServer::get_sss_quality);
-	ClassDB::bind_method(D_METHOD("set_sss_scale", "scale"), &VideoEffectSettingsServer::set_sss_scale);
-	ClassDB::bind_method(D_METHOD("get_sss_scale"), &VideoEffectSettingsServer::get_sss_scale);
-	ClassDB::bind_method(D_METHOD("set_sss_depth_scale", "scale"), &VideoEffectSettingsServer::set_sss_depth_scale);
-	ClassDB::bind_method(D_METHOD("get_sss_depth_scale"), &VideoEffectSettingsServer::get_sss_depth_scale);
-	ClassDB::bind_method(D_METHOD("set_dof_bokeh_shape", "shape"), &VideoEffectSettingsServer::set_dof_bokeh_shape);
-	ClassDB::bind_method(D_METHOD("get_dof_bokeh_shape"), &VideoEffectSettingsServer::get_dof_bokeh_shape);
-	ClassDB::bind_method(D_METHOD("set_dof_blur_quality", "quality"), &VideoEffectSettingsServer::set_dof_blur_quality);
-	ClassDB::bind_method(D_METHOD("get_dof_blur_quality"), &VideoEffectSettingsServer::get_dof_blur_quality);
-	ClassDB::bind_method(D_METHOD("set_dof_use_jitter", "enabled"), &VideoEffectSettingsServer::set_dof_use_jitter);
-	ClassDB::bind_method(D_METHOD("is_dof_using_jitter"), &VideoEffectSettingsServer::is_dof_using_jitter);
-	ClassDB::bind_method(D_METHOD("set_allow_glow", "allowed"), &VideoEffectSettingsServer::set_allow_glow);
-	ClassDB::bind_method(D_METHOD("is_glow_allowed"), &VideoEffectSettingsServer::is_glow_allowed);
-	ClassDB::bind_method(D_METHOD("set_allow_ssao", "allowed"), &VideoEffectSettingsServer::set_allow_ssao);
-	ClassDB::bind_method(D_METHOD("is_ssao_allowed"), &VideoEffectSettingsServer::is_ssao_allowed);
-	ClassDB::bind_method(D_METHOD("set_allow_ssil", "allowed"), &VideoEffectSettingsServer::set_allow_ssil);
-	ClassDB::bind_method(D_METHOD("is_ssil_allowed"), &VideoEffectSettingsServer::is_ssil_allowed);
-	ClassDB::bind_method(D_METHOD("set_allow_ssr", "allowed"), &VideoEffectSettingsServer::set_allow_ssr);
-	ClassDB::bind_method(D_METHOD("is_ssr_allowed"), &VideoEffectSettingsServer::is_ssr_allowed);
-	ClassDB::bind_method(D_METHOD("set_allow_fog", "allowed"), &VideoEffectSettingsServer::set_allow_fog);
-	ClassDB::bind_method(D_METHOD("is_fog_allowed"), &VideoEffectSettingsServer::is_fog_allowed);
-	ClassDB::bind_method(D_METHOD("set_allow_volumetric_fog", "allowed"), &VideoEffectSettingsServer::set_allow_volumetric_fog);
-	ClassDB::bind_method(D_METHOD("is_volumetric_fog_allowed"), &VideoEffectSettingsServer::is_volumetric_fog_allowed);
-	ClassDB::bind_method(D_METHOD("set_brightness", "brightness"), &VideoEffectSettingsServer::set_brightness);
-	ClassDB::bind_method(D_METHOD("get_brightness"), &VideoEffectSettingsServer::get_brightness);
-	ClassDB::bind_method(D_METHOD("set_contrast", "contrast"), &VideoEffectSettingsServer::set_contrast);
-	ClassDB::bind_method(D_METHOD("get_contrast"), &VideoEffectSettingsServer::get_contrast);
-	ClassDB::bind_method(D_METHOD("set_saturation", "saturation"), &VideoEffectSettingsServer::set_saturation);
-	ClassDB::bind_method(D_METHOD("get_saturation"), &VideoEffectSettingsServer::get_saturation);
+	ClassDB::bind_method(D_METHOD("set_ssao_quality", "quality"), &RenderEffectSettingsServer::set_ssao_quality);
+	ClassDB::bind_method(D_METHOD("get_ssao_quality"), &RenderEffectSettingsServer::get_ssao_quality);
+	ClassDB::bind_method(D_METHOD("set_ssao_half_size", "enabled"), &RenderEffectSettingsServer::set_ssao_half_size);
+	ClassDB::bind_method(D_METHOD("is_ssao_half_size_enabled"), &RenderEffectSettingsServer::is_ssao_half_size_enabled);
+	ClassDB::bind_method(D_METHOD("set_ssao_adaptive_target", "target"), &RenderEffectSettingsServer::set_ssao_adaptive_target);
+	ClassDB::bind_method(D_METHOD("get_ssao_adaptive_target"), &RenderEffectSettingsServer::get_ssao_adaptive_target);
+	ClassDB::bind_method(D_METHOD("set_ssao_blur_passes", "passes"), &RenderEffectSettingsServer::set_ssao_blur_passes);
+	ClassDB::bind_method(D_METHOD("get_ssao_blur_passes"), &RenderEffectSettingsServer::get_ssao_blur_passes);
+	ClassDB::bind_method(D_METHOD("set_ssao_fadeout_from", "distance"), &RenderEffectSettingsServer::set_ssao_fadeout_from);
+	ClassDB::bind_method(D_METHOD("get_ssao_fadeout_from"), &RenderEffectSettingsServer::get_ssao_fadeout_from);
+	ClassDB::bind_method(D_METHOD("set_ssao_fadeout_to", "distance"), &RenderEffectSettingsServer::set_ssao_fadeout_to);
+	ClassDB::bind_method(D_METHOD("get_ssao_fadeout_to"), &RenderEffectSettingsServer::get_ssao_fadeout_to);
+	ClassDB::bind_method(D_METHOD("set_ssil_quality", "quality"), &RenderEffectSettingsServer::set_ssil_quality);
+	ClassDB::bind_method(D_METHOD("get_ssil_quality"), &RenderEffectSettingsServer::get_ssil_quality);
+	ClassDB::bind_method(D_METHOD("set_ssil_half_size", "enabled"), &RenderEffectSettingsServer::set_ssil_half_size);
+	ClassDB::bind_method(D_METHOD("is_ssil_half_size_enabled"), &RenderEffectSettingsServer::is_ssil_half_size_enabled);
+	ClassDB::bind_method(D_METHOD("set_ssil_adaptive_target", "target"), &RenderEffectSettingsServer::set_ssil_adaptive_target);
+	ClassDB::bind_method(D_METHOD("get_ssil_adaptive_target"), &RenderEffectSettingsServer::get_ssil_adaptive_target);
+	ClassDB::bind_method(D_METHOD("set_ssil_blur_passes", "passes"), &RenderEffectSettingsServer::set_ssil_blur_passes);
+	ClassDB::bind_method(D_METHOD("get_ssil_blur_passes"), &RenderEffectSettingsServer::get_ssil_blur_passes);
+	ClassDB::bind_method(D_METHOD("set_ssil_fadeout_from", "distance"), &RenderEffectSettingsServer::set_ssil_fadeout_from);
+	ClassDB::bind_method(D_METHOD("get_ssil_fadeout_from"), &RenderEffectSettingsServer::get_ssil_fadeout_from);
+	ClassDB::bind_method(D_METHOD("set_ssil_fadeout_to", "distance"), &RenderEffectSettingsServer::set_ssil_fadeout_to);
+	ClassDB::bind_method(D_METHOD("get_ssil_fadeout_to"), &RenderEffectSettingsServer::get_ssil_fadeout_to);
+	ClassDB::bind_method(D_METHOD("set_sdfgi_ray_count", "ray_count"), &RenderEffectSettingsServer::set_sdfgi_ray_count);
+	ClassDB::bind_method(D_METHOD("get_sdfgi_ray_count"), &RenderEffectSettingsServer::get_sdfgi_ray_count);
+	ClassDB::bind_method(D_METHOD("set_sdfgi_frames_to_converge", "frames"), &RenderEffectSettingsServer::set_sdfgi_frames_to_converge);
+	ClassDB::bind_method(D_METHOD("get_sdfgi_frames_to_converge"), &RenderEffectSettingsServer::get_sdfgi_frames_to_converge);
+	ClassDB::bind_method(D_METHOD("set_sdfgi_frames_to_update_light", "frames"), &RenderEffectSettingsServer::set_sdfgi_frames_to_update_light);
+	ClassDB::bind_method(D_METHOD("get_sdfgi_frames_to_update_light"), &RenderEffectSettingsServer::get_sdfgi_frames_to_update_light);
+	ClassDB::bind_method(D_METHOD("set_voxel_gi_quality", "quality"), &RenderEffectSettingsServer::set_voxel_gi_quality);
+	ClassDB::bind_method(D_METHOD("get_voxel_gi_quality"), &RenderEffectSettingsServer::get_voxel_gi_quality);
+	ClassDB::bind_method(D_METHOD("set_volumetric_fog_volume_size", "size"), &RenderEffectSettingsServer::set_volumetric_fog_volume_size);
+	ClassDB::bind_method(D_METHOD("get_volumetric_fog_volume_size"), &RenderEffectSettingsServer::get_volumetric_fog_volume_size);
+	ClassDB::bind_method(D_METHOD("set_volumetric_fog_volume_depth", "depth"), &RenderEffectSettingsServer::set_volumetric_fog_volume_depth);
+	ClassDB::bind_method(D_METHOD("get_volumetric_fog_volume_depth"), &RenderEffectSettingsServer::get_volumetric_fog_volume_depth);
+	ClassDB::bind_method(D_METHOD("set_volumetric_fog_use_filter", "enabled"), &RenderEffectSettingsServer::set_volumetric_fog_use_filter);
+	ClassDB::bind_method(D_METHOD("is_volumetric_fog_using_filter"), &RenderEffectSettingsServer::is_volumetric_fog_using_filter);
+	ClassDB::bind_method(D_METHOD("set_sss_quality", "quality"), &RenderEffectSettingsServer::set_sss_quality);
+	ClassDB::bind_method(D_METHOD("get_sss_quality"), &RenderEffectSettingsServer::get_sss_quality);
+	ClassDB::bind_method(D_METHOD("set_sss_scale", "scale"), &RenderEffectSettingsServer::set_sss_scale);
+	ClassDB::bind_method(D_METHOD("get_sss_scale"), &RenderEffectSettingsServer::get_sss_scale);
+	ClassDB::bind_method(D_METHOD("set_sss_depth_scale", "scale"), &RenderEffectSettingsServer::set_sss_depth_scale);
+	ClassDB::bind_method(D_METHOD("get_sss_depth_scale"), &RenderEffectSettingsServer::get_sss_depth_scale);
+	ClassDB::bind_method(D_METHOD("set_dof_bokeh_shape", "shape"), &RenderEffectSettingsServer::set_dof_bokeh_shape);
+	ClassDB::bind_method(D_METHOD("get_dof_bokeh_shape"), &RenderEffectSettingsServer::get_dof_bokeh_shape);
+	ClassDB::bind_method(D_METHOD("set_dof_blur_quality", "quality"), &RenderEffectSettingsServer::set_dof_blur_quality);
+	ClassDB::bind_method(D_METHOD("get_dof_blur_quality"), &RenderEffectSettingsServer::get_dof_blur_quality);
+	ClassDB::bind_method(D_METHOD("set_dof_use_jitter", "enabled"), &RenderEffectSettingsServer::set_dof_use_jitter);
+	ClassDB::bind_method(D_METHOD("is_dof_using_jitter"), &RenderEffectSettingsServer::is_dof_using_jitter);
+	ClassDB::bind_method(D_METHOD("set_allow_glow", "allowed"), &RenderEffectSettingsServer::set_allow_glow);
+	ClassDB::bind_method(D_METHOD("is_glow_allowed"), &RenderEffectSettingsServer::is_glow_allowed);
+	ClassDB::bind_method(D_METHOD("set_allow_ssao", "allowed"), &RenderEffectSettingsServer::set_allow_ssao);
+	ClassDB::bind_method(D_METHOD("is_ssao_allowed"), &RenderEffectSettingsServer::is_ssao_allowed);
+	ClassDB::bind_method(D_METHOD("set_allow_ssil", "allowed"), &RenderEffectSettingsServer::set_allow_ssil);
+	ClassDB::bind_method(D_METHOD("is_ssil_allowed"), &RenderEffectSettingsServer::is_ssil_allowed);
+	ClassDB::bind_method(D_METHOD("set_allow_ssr", "allowed"), &RenderEffectSettingsServer::set_allow_ssr);
+	ClassDB::bind_method(D_METHOD("is_ssr_allowed"), &RenderEffectSettingsServer::is_ssr_allowed);
+	ClassDB::bind_method(D_METHOD("set_allow_fog", "allowed"), &RenderEffectSettingsServer::set_allow_fog);
+	ClassDB::bind_method(D_METHOD("is_fog_allowed"), &RenderEffectSettingsServer::is_fog_allowed);
+	ClassDB::bind_method(D_METHOD("set_allow_volumetric_fog", "allowed"), &RenderEffectSettingsServer::set_allow_volumetric_fog);
+	ClassDB::bind_method(D_METHOD("is_volumetric_fog_allowed"), &RenderEffectSettingsServer::is_volumetric_fog_allowed);
+	ClassDB::bind_method(D_METHOD("set_brightness", "brightness"), &RenderEffectSettingsServer::set_brightness);
+	ClassDB::bind_method(D_METHOD("get_brightness"), &RenderEffectSettingsServer::get_brightness);
+	ClassDB::bind_method(D_METHOD("set_contrast", "contrast"), &RenderEffectSettingsServer::set_contrast);
+	ClassDB::bind_method(D_METHOD("get_contrast"), &RenderEffectSettingsServer::get_contrast);
+	ClassDB::bind_method(D_METHOD("set_saturation", "saturation"), &RenderEffectSettingsServer::set_saturation);
+	ClassDB::bind_method(D_METHOD("get_saturation"), &RenderEffectSettingsServer::get_saturation);
 
-	ClassDB::bind_method(D_METHOD("get_unsupported_setting_names"), &VideoEffectSettingsServer::get_unsupported_setting_names);
-	ClassDB::bind_method(D_METHOD("set_environment_ignored", "environment", "ignored"), &VideoEffectSettingsServer::set_environment_ignored);
-	ClassDB::bind_method(D_METHOD("is_environment_ignored", "environment"), &VideoEffectSettingsServer::is_environment_ignored);
+	ClassDB::bind_method(D_METHOD("get_unsupported_setting_names"), &RenderEffectSettingsServer::get_unsupported_setting_names);
+	ClassDB::bind_method(D_METHOD("set_environment_ignored", "environment", "ignored"), &RenderEffectSettingsServer::set_environment_ignored);
+	ClassDB::bind_method(D_METHOD("is_environment_ignored", "environment"), &RenderEffectSettingsServer::is_environment_ignored);
 
-	ClassDB::bind_static_method("VideoEffectSettingsServer", D_METHOD("get_ignore_group"), &VideoEffectSettingsServer::get_ignore_group);
-	ClassDB::bind_static_method("VideoEffectSettingsServer", D_METHOD("is_renderer_supported", "name"), &VideoEffectSettingsServer::is_renderer_supported);
+	ClassDB::bind_static_method("RenderEffectSettingsServer", D_METHOD("get_ignore_group"), &RenderEffectSettingsServer::get_ignore_group);
+	ClassDB::bind_static_method("RenderEffectSettingsServer", D_METHOD("is_renderer_supported", "name"), &RenderEffectSettingsServer::is_renderer_supported);
 }
 
-VideoEffectSettingsServer::VideoEffectSettingsServer() {
+RenderEffectSettingsServer::RenderEffectSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
-	for (const char *setting_name : video_effect_setting_names) {
+	for (const char *setting_name : render_effect_setting_names) {
 		const StringName bound_name = setting_name;
-		bind_setting_callbacks(bound_name, callable_mp(this, &VideoEffectSettingsServer::_push_effect_value).bind(bound_name), callable_mp(this, &VideoEffectSettingsServer::_pull_effect_value).bind(bound_name));
+		bind_setting_callbacks(bound_name, callable_mp(this, &RenderEffectSettingsServer::_push_effect_value).bind(bound_name), callable_mp(this, &RenderEffectSettingsServer::_pull_effect_value).bind(bound_name));
 	}
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	if (manager != nullptr) {
-		manager->connect(SNAME("startup_applied"), callable_mp(this, &VideoEffectSettingsServer::_on_startup_applied));
+		manager->connect(SNAME("startup_applied"), callable_mp(this, &RenderEffectSettingsServer::_on_startup_applied));
 	}
 }
 
-VideoEffectSettingsServer::~VideoEffectSettingsServer() {
+RenderEffectSettingsServer::~RenderEffectSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}

@@ -4,20 +4,20 @@
 		A graphics preset: a name and the settings it sets in the four video settings domains.
 	</brief_description>
 	<description>
-		A [VideoPreset] bundles the settings that [method VideoPresetSettingsServer.apply_preset] sets in the settings domains [code]"render_quality"[/code] ([RenderQualitySettingsServer]), [code]"texture"[/code] ([TextureSettingsServer]), [code]"shadow"[/code] ([ShadowSettingsServer]) and [code]"video_effect"[/code] ([VideoEffectSettingsServer]). Each domain has a typed resource of the class the domain stores ([RenderQualitySettings], [TextureSettings], [ShadowSettings], [VideoEffectSettings]), so the Inspector shows its enums and ranges. A domain resource sets [i]all[/i] values of its domain; a [code]null[/code] resource leaves the domain as it is, so a preset can cover only some domains.
+		A [VideoPreset] bundles the settings that [method VideoPresetSettingsServer.apply_preset] sets in the settings domains [code]"render_quality"[/code] ([RenderQualitySettingsServer]), [code]"texture"[/code] ([TextureSettingsServer]), [code]"shadow"[/code] ([ShadowSettingsServer]) and [code]"render_effect"[/code] ([RenderEffectSettingsServer]). Each domain has a typed resource of the class the domain stores ([RenderQualitySettings], [TextureSettings], [ShadowSettings], [RenderEffectSettings]), so the Inspector shows its enums and ranges. A domain resource sets [i]all[/i] values of its domain; a [code]null[/code] resource leaves the domain as it is, so a preset can cover only some domains.
 		The four built-in presets are created with [method VideoPresetSettingsServer.create_builtin_preset]. To replace or add presets, save a [VideoPreset] as a [code].tres[/code] file and add it to [member ProjectSettings.settings/video_preset/presets], or call [method VideoPresetSettingsServer.add_preset] at runtime. The window settings ([WindowSettingsServer]) are not part of a preset.
 		[codeblocks]
 		[gdscript]
 		var preset = VideoPresetSettingsServer.create_builtin_preset("High")
 		preset.preset_name = "Cinematic"
-		preset.video_effect.dof_blur_quality = RenderingServer.DOF_BLUR_QUALITY_HIGH
+		preset.render_effect.dof_blur_quality = RenderingServer.DOF_BLUR_QUALITY_HIGH
 		preset.render_quality.scaling_3d_scale = 1.5
 		VideoPresetSettingsServer.add_preset(preset)
 		[/gdscript]
 		[csharp]
 		VideoPreset preset = VideoPresetSettingsServer.CreateBuiltinPreset("High");
 		preset.PresetName = "Cinematic";
-		preset.VideoEffect.DofBlurQuality = RenderingServer.DofBlurQuality.High;
+		preset.RenderEffect.DofBlurQuality = RenderingServer.DofBlurQuality.High;
 		preset.RenderQuality.Scaling3DScale = 1.5f;
 		VideoPresetSettingsServer.AddPreset(preset);
 		[/csharp]
@@ -37,7 +37,7 @@
 		<method name="get_domains" qualifiers="static">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the settings domains a preset covers, in the order [method VideoPresetSettingsServer.apply_preset] applies them: [code]["render_quality", "texture", "shadow", "video_effect"][/code].
+				Returns the settings domains a preset covers, in the order [method VideoPresetSettingsServer.apply_preset] applies them: [code]["render_quality", "texture", "shadow", "render_effect"][/code].
 			</description>
 		</method>
 		<method name="has_domain_settings" qualifiers="const">
@@ -60,6 +60,9 @@
 		<member name="preset_name" type="String" setter="set_preset_name" getter="get_preset_name" default="&quot;&quot;">
 			The name of the preset, for example [code]"High"[/code]. [VideoPresetSettingsServer] finds presets by this name and stores it as the player's choice. It can't be empty or [code]"Custom"[/code] (see [method VideoPresetSettingsServer.get_custom_preset_name]). Translate it in the user interface with [method Object.tr].
 		</member>
+		<member name="render_effect" type="RenderEffectSettings" setter="set_render_effect" getter="get_render_effect">
+			The settings of the domain [code]"render_effect"[/code] ([RenderEffectSettingsServer]): all its values are set when the preset is applied. If [code]null[/code], the preset leaves the domain as it is.
+		</member>
 		<member name="render_quality" type="RenderQualitySettings" setter="set_render_quality" getter="get_render_quality">
 			The settings of the domain [code]"render_quality"[/code] ([RenderQualitySettingsServer]): all its values are set when the preset is applied. If [code]null[/code], the preset leaves the domain as it is.
 		</member>
@@ -68,9 +71,6 @@
 		</member>
 		<member name="texture" type="TextureSettings" setter="set_texture" getter="get_texture">
 			The settings of the domain [code]"texture"[/code] ([TextureSettingsServer]): all its values are set when the preset is applied. If [code]null[/code], the preset leaves the domain as it is.
-		</member>
-		<member name="video_effect" type="VideoEffectSettings" setter="set_video_effect" getter="get_video_effect">
-			The settings of the domain [code]"video_effect"[/code] ([VideoEffectSettingsServer]): all its values are set when the preset is applied. If [code]null[/code], the preset leaves the domain as it is.
 		</member>
 	</members>
 </class>

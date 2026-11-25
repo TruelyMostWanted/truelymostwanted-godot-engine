@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_effect_settings_server.h                                        */
+/*  render_effect_settings_server.h                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -38,9 +38,9 @@
 
 class Node;
 
-// Settings domain `video_effect` (#24): the global quality of SSAO, SSIL, SDFGI, VoxelGI, volumetric fog,
+// Settings domain `render_effect` (#24): the global quality of SSAO, SSIL, SDFGI, VoxelGI, volumetric fog,
 // subsurface scattering and depth of field, and the environment overrides: effects the player turned off
-// (`allow_*`) and brightness, contrast and saturation (VideoEffectSettings).
+// (`allow_*`) and brightness, contrast and saturation (RenderEffectSettings).
 // Everything goes to RenderingServer and takes effect at once. The overrides are applied at render time
 // (RenderingServer.environment_set_global_effect_disabled() and environment_set_global_adjustment()): the
 // Environment resources keep their authored values, and environments of scenes loaded later are covered too.
@@ -49,10 +49,10 @@ class Node;
 // Applied in APPLY_PHASE_SERVERS, after the renderer has read the project settings.
 // Values the current renderer ignores are stored, but not pushed (is_value_supported()).
 // Defaults are the project settings; the overrides default to "allowed" and 1.0. Precedence: player's file > project settings.
-class VideoEffectSettingsServer : public SettingsServer {
-	GDCLASS(VideoEffectSettingsServer, SettingsServer);
+class RenderEffectSettingsServer : public SettingsServer {
+	GDCLASS(RenderEffectSettingsServer, SettingsServer);
 
-	static VideoEffectSettingsServer *singleton;
+	static RenderEffectSettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -88,8 +88,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_effect`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoEffectSettingsServer *get_singleton();
+	static RenderEffectSettingsServer *get_singleton();
 
 	// The group of WorldEnvironment and Camera3D nodes whose environments are not affected by the overrides.
 	static StringName get_ignore_group();
@@ -189,6 +192,6 @@ public:
 	void set_environment_ignored(const Ref<Environment> &p_environment, bool p_ignored);
 	bool is_environment_ignored(const Ref<Environment> &p_environment) const;
 
-	VideoEffectSettingsServer();
-	~VideoEffectSettingsServer();
+	RenderEffectSettingsServer();
+	~RenderEffectSettingsServer();
 };

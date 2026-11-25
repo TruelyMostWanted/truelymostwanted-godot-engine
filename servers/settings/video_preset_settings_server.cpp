@@ -76,24 +76,24 @@ static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	{ "shadow", "positional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
 	{ "shadow", "positional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
 	// SSAO and SSIL quality: Very Low, Low, Medium, High.
-	{ "video_effect", "ssao_quality", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "ssao_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
-	{ "video_effect", "ssil_quality", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "ssil_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
+	{ "render_effect", "ssao_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "ssao_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
+	{ "render_effect", "ssil_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "ssil_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
 	// SDFGI rays: 4, 8, 16, 32. VoxelGI: Low, Low, High, High.
-	{ "video_effect", "sdfgi_ray_count", Variant::INT, { 0, 1, 2, 3 } },
-	{ "video_effect", "voxel_gi_quality", Variant::INT, { 0, 0, 1, 1 } },
-	{ "video_effect", "volumetric_fog_volume_size", Variant::INT, { 48, 64, 64, 128 } },
-	{ "video_effect", "volumetric_fog_volume_depth", Variant::INT, { 48, 64, 64, 128 } },
-	{ "video_effect", "volumetric_fog_use_filter", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "sdfgi_ray_count", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "voxel_gi_quality", Variant::INT, { 0, 0, 1, 1 } },
+	{ "render_effect", "volumetric_fog_volume_size", Variant::INT, { 48, 64, 64, 128 } },
+	{ "render_effect", "volumetric_fog_volume_depth", Variant::INT, { 48, 64, 64, 128 } },
+	{ "render_effect", "volumetric_fog_use_filter", Variant::BOOL, { 0, 1, 1, 1 } },
 	// Subsurface scattering: Low, Low, Medium, High. Depth of field blur: Very Low, Low, Medium, High.
-	{ "video_effect", "sss_quality", Variant::INT, { 1, 1, 2, 3 } },
-	{ "video_effect", "dof_blur_quality", Variant::INT, { 0, 1, 2, 3 } },
+	{ "render_effect", "sss_quality", Variant::INT, { 1, 1, 2, 3 } },
+	{ "render_effect", "dof_blur_quality", Variant::INT, { 0, 1, 2, 3 } },
 	// Low turns the most expensive environment effects off.
-	{ "video_effect", "allow_ssao", Variant::BOOL, { 0, 1, 1, 1 } },
-	{ "video_effect", "allow_ssil", Variant::BOOL, { 0, 0, 1, 1 } },
-	{ "video_effect", "allow_ssr", Variant::BOOL, { 0, 1, 1, 1 } },
-	{ "video_effect", "allow_volumetric_fog", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_ssao", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_ssil", Variant::BOOL, { 0, 0, 1, 1 } },
+	{ "render_effect", "allow_ssr", Variant::BOOL, { 0, 1, 1, 1 } },
+	{ "render_effect", "allow_volumetric_fog", Variant::BOOL, { 0, 1, 1, 1 } },
 };
 
 static Variant video_preset_builtin_value(const VideoPresetBuiltinValue &p_value, int p_level) {
@@ -135,8 +135,8 @@ static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 		base = Ref<Resource>(memnew(TextureSettings));
 	} else if (p_domain == "shadow") {
 		base = Ref<Resource>(memnew(ShadowSettings));
-	} else if (p_domain == "video_effect") {
-		base = Ref<Resource>(memnew(VideoEffectSettings));
+	} else if (p_domain == "render_effect") {
+		base = Ref<Resource>(memnew(RenderEffectSettings));
 	}
 	ERR_FAIL_COND_V(base.is_null(), base);
 
