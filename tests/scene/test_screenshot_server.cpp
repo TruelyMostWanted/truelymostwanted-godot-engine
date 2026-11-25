@@ -71,6 +71,13 @@ TEST_CASE("[ScreenshotServer] Saving in every format, never overwriting") {
 	const String folder = TestUtils::get_temp_path("screenshots_test");
 	Ref<DirAccess> dir = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
 	for (const char *extension : { "png", "jpg", "webp" }) {
+		// Minimal builds (e.g. without the jpg or webp module) cannot save every format.
+		const bool available = (String(extension) == "png" && Image::save_png_func) ||
+				(String(extension) == "jpg" && Image::save_jpg_func) ||
+				(String(extension) == "webp" && Image::save_webp_func);
+		if (!available) {
+			continue;
+		}
 		const String path = folder.path_join(String("shot.") + extension);
 		if (FileAccess::exists(path)) {
 			dir->remove(path);
