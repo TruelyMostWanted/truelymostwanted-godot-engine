@@ -4447,7 +4447,7 @@ void TileMapLayerEditor::_draw_overlay() {
 				}
 			}
 
-			// The direction of the map coordinates (TileSet.coordinate_axes): +X and +Y from cell (0, 0).
+			// The direction of the map coordinates (coordinate system of the TileSet): +X and +Y from cell (0, 0).
 			const Vector2 axis_origin = xform.xform(tile_set->map_to_local(Vector2i()));
 			const Color axis_colors[2] = { Color(0.96, 0.32, 0.37), Color(0.53, 0.84, 0.01) };
 			const Ref<Font> axis_font = get_theme_font(SceneStringName(font), SNAME("Label"));
@@ -4596,15 +4596,15 @@ void TileMapLayerEditor::_check_coordinate_settings() {
 	}
 	const bool same_tile_set = known_tile_set_id == tile_set->get_instance_id();
 	const TileSet::TileLayout old_layout = known_tile_layout;
-	const TileSet::CoordinateAxes old_axes = known_coordinate_axes;
+	const TileSet::CoordinateSystem old_system = known_coordinate_system;
 	known_tile_set_id = tile_set->get_instance_id();
 	known_tile_layout = tile_set->get_tile_layout();
-	known_coordinate_axes = tile_set->get_coordinate_axes();
-	if (!same_tile_set || (old_layout == known_tile_layout && old_axes == known_coordinate_axes)) {
+	known_coordinate_system = tile_set->get_coordinate_system();
+	if (!same_tile_set || (old_layout == known_tile_layout && old_system == known_coordinate_system)) {
 		return;
 	}
 	// A different layout only matters for shapes other than squares.
-	if (old_axes == known_coordinate_axes && tile_set->get_tile_shape() == TileSet::TILE_SHAPE_SQUARE) {
+	if (old_system == known_coordinate_system && tile_set->get_tile_shape() == TileSet::TILE_SHAPE_SQUARE) {
 		return;
 	}
 	const int layer_count = _get_layers_with_tile_set(tile_set).size();
@@ -4612,7 +4612,7 @@ void TileMapLayerEditor::_check_coordinate_settings() {
 		return;
 	}
 	convert_from_layout = old_layout;
-	convert_from_axes = old_axes;
+	convert_from_system = old_system;
 	convert_cells_dialog->set_text(vformat(TTR("The coordinate settings of the TileSet changed. Painted cells keep their coordinates, so the map now looks different.\nConvert the cells of %d layer(s) in this scene, so the map keeps its look?"), layer_count));
 	convert_cells_dialog->popup_centered();
 }
@@ -4624,7 +4624,7 @@ void TileMapLayerEditor::_convert_cells_confirmed() {
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(TTR("Convert Tile Coordinates"));
 	for (TileMapLayer *layer : layers) {
-		undo_redo->add_do_method(layer, "convert_cell_coordinates", convert_from_layout, convert_from_axes);
+		undo_redo->add_do_method(layer, "convert_cell_coordinates", convert_from_layout, convert_from_system.swap_x_and_y_axis, convert_from_system.flip_x, convert_from_system.flip_y);
 		undo_redo->add_undo_property(layer, "tile_map_data", layer->get("tile_map_data"));
 	}
 	undo_redo->commit_action();

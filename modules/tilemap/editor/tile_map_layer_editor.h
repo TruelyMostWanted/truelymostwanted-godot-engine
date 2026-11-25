@@ -378,12 +378,12 @@ class TileMapLayerEditor : public EditorDock {
 private:
 	bool tile_map_layer_changed_needs_update = false;
 
-	// truely-godot-engine: converting painted cells after `tile_layout` or `coordinate_axes` of the TileSet changed.
+	// truely-godot-engine: converting painted cells after `tile_layout` or the coordinate system of the TileSet changed.
 	ObjectID known_tile_set_id;
 	TileSet::TileLayout known_tile_layout = TileSet::TILE_LAYOUT_STACKED;
-	TileSet::CoordinateAxes known_coordinate_axes = TileSet::COORDINATE_AXES_DEFAULT;
+	TileSet::CoordinateSystem known_coordinate_system;
 	TileSet::TileLayout convert_from_layout = TileSet::TILE_LAYOUT_STACKED;
-	TileSet::CoordinateAxes convert_from_axes = TileSet::COORDINATE_AXES_DEFAULT;
+	TileSet::CoordinateSystem convert_from_system;
 	ConfirmationDialog *convert_cells_dialog = nullptr;
 	Vector<TileMapLayer *> _get_layers_with_tile_set(const Ref<TileSet> &p_tile_set) const;
 	void _check_coordinate_settings();
