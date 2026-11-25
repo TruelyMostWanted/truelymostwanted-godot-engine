@@ -1704,6 +1704,9 @@
 		<member name="ResourceUID" type="ResourceUID" setter="" getter="">
 			The [ResourceUID] singleton.
 		</member>
+		<member name="ScreenshotServer" type="ScreenshotServer" setter="" getter="">
+			The [ScreenshotServer] singleton.
+		</member>
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
 		</member>

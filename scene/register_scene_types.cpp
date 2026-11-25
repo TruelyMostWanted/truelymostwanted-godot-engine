@@ -110,6 +110,7 @@
 #include "scene/main/multiplayer_api.h"
 #include "scene/main/resource_preloader.h"
 #include "scene/main/scene_tree.h"
+#include "scene/main/screenshot_server.h"
 #include "scene/main/shader_globals_override.h"
 #include "scene/main/status_indicator.h"
 #include "scene/main/timer.h"
@@ -393,6 +394,7 @@
 #endif // PHYSICS_3D_DISABLED
 
 static AudioMixerServer *audio_mixer_server = nullptr;
+static ScreenshotServer *screenshot_server = nullptr;
 static InputIconServer *input_icon_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
@@ -1415,6 +1417,10 @@ void unregister_scene_types() {
 
 	SceneDebugger::deinitialize();
 
+	if (screenshot_server) {
+		memdelete(screenshot_server);
+		screenshot_server = nullptr;
+	}
 	if (audio_mixer_server) {
 		memdelete(audio_mixer_server);
 		audio_mixer_server = nullptr;
@@ -1520,6 +1526,10 @@ void register_scene_singletons() {
 	GDREGISTER_CLASS(AudioMixerServer);
 	audio_mixer_server = memnew(AudioMixerServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioMixerServer", AudioMixerServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ScreenshotServer);
+	screenshot_server = memnew(ScreenshotServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ScreenshotServer", ScreenshotServer::get_singleton()));
 
 	GDREGISTER_CLASS(InputIconServer);
 	input_icon_server = memnew(InputIconServer);
