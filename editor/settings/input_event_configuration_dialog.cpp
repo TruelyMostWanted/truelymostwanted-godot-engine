@@ -41,6 +41,7 @@
 #include "scene/gui/option_button.h"
 #include "scene/gui/separator.h"
 #include "scene/gui/tree.h"
+#include "scene/main/input_icon_server.h"
 
 void InputEventConfigurationDialog::_set_event(const Ref<InputEvent> &p_event, const Ref<InputEvent> &p_original_event, bool p_update_input_list_selection) {
 	if (p_event.is_valid()) {
@@ -301,6 +302,18 @@ void InputEventConfigurationDialog::_search_term_updated(const String &) {
 	_update_input_list();
 }
 
+// Sets the custom icon of the project's InputIconSet (#198) on an item of the input list, if there is one.
+static void _set_custom_input_icon(TreeItem *p_item, const Ref<InputEvent> &p_event, int p_icon_size) {
+	if (InputIconServer::get_singleton() == nullptr) {
+		return;
+	}
+	const Ref<Texture2D> custom_icon = InputIconServer::get_singleton()->get_icon(p_event);
+	if (custom_icon.is_valid()) {
+		p_item->set_icon(0, custom_icon);
+		p_item->set_icon_max_width(0, p_icon_size);
+	}
+}
+
 void InputEventConfigurationDialog::_update_input_list() {
 	input_list_tree->clear();
 
@@ -308,6 +321,8 @@ void InputEventConfigurationDialog::_update_input_list() {
 	String search_term = input_list_search->get_text();
 
 	bool collapse = input_list_search->get_text().is_empty();
+	// The editor's class icon size; the list is also built before the theme is available.
+	const int icon_size = 16 * EDSCALE;
 
 	if (allowed_input_types & INPUT_KEY) {
 		TreeItem *kb_root = input_list_tree->create_item(root);
@@ -333,6 +348,10 @@ void InputEventConfigurationDialog::_update_input_list() {
 			TreeItem *item = input_list_tree->create_item(kb_root);
 			item->set_text(0, name);
 			item->set_meta("__keycode", keycode);
+			Ref<InputEventKey> key_event;
+			key_event.instantiate();
+			key_event->set_physical_keycode(Key(keycode));
+			_set_custom_input_icon(item, key_event, icon_size);
 			keycodes_found.insert(keycode);
 		}
 	}
@@ -359,6 +378,7 @@ void InputEventConfigurationDialog::_update_input_list() {
 			TreeItem *item = input_list_tree->create_item(mouse_root);
 			item->set_text(0, desc);
 			item->set_icon(0, mouse_icons[i]);
+			_set_custom_input_icon(item, mb, icon_size);
 			item->set_meta("__index", mouse_buttons[i]);
 		}
 	}
@@ -383,6 +403,7 @@ void InputEventConfigurationDialog::_update_input_list() {
 			TreeItem *item = input_list_tree->create_item(joyb_root);
 			item->set_text(0, desc);
 			item->set_meta("__index", i);
+			_set_custom_input_icon(item, joyb, icon_size);
 		}
 	}
 
@@ -410,6 +431,7 @@ void InputEventConfigurationDialog::_update_input_list() {
 			item->set_text(0, desc);
 			item->set_meta("__axis", i >> 1);
 			item->set_meta("__value", (i & 1) ? 1 : -1);
+			_set_custom_input_icon(item, joym, icon_size);
 		}
 	}
 }

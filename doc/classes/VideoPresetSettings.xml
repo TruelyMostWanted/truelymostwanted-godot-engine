@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoPresetSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [VideoPresetSettingsServer]: the name of the chosen graphics preset.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"video_preset"[/code]. [VideoPresetSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_preset.ini[/code]. The values of the preset itself are stored by the video domains ([RenderQualitySettingsServer], [TextureSettingsServer], [VideoShadowSettingsServer], [VideoEffectSettingsServer]), so a [code]"Custom"[/code] state keeps its values without duplicates.
+		Change the preset with [method VideoPresetSettingsServer.apply_preset], not on the resource.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="preset" type="String" setter="set_preset" getter="get_preset" default="&quot;&quot;">
+			The name of the preset the player picked, [code]"Custom"[/code] after a change of a single value, or empty if no preset was picked yet (then [method VideoPresetSettingsServer.get_current_preset] detects it from the values).
+		</member>
+	</members>
+</class>

@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitleServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Plays [Subtitle]s on tracks and reports which texts are visible.
+	</brief_description>
+	<description>
+		[method play] starts a track for a [Subtitle] and returns its ID. Each frame, the server reads the time of every track and reports which [SubtitleSegment]s start and end. The time comes from a time source, a [Callable] that returns seconds (for example [method AudioStreamPlayer.get_playback_position] or [member VideoStreamPlayer.stream_position]), or from the track's own clock, which runs in real time and can be paused and moved.
+		Signals are emitted on the main thread, from [method play], [method seek], [method stop] and once per frame, in this order: [signal segment_ended], [signal segment_started], [signal text_changed], then [signal track_finished]. To show subtitles, connect [signal text_changed] to a [Label] or [RichTextLabel]: it carries the text of all visible segments of a track.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+		    SubtitleServer.text_changed.connect(_on_text_changed)
+		    SubtitleServer.track_finished.connect(_on_track_finished)
+		    var track_id = SubtitleServer.play(load("res://intro.srt"), $Voice.get_playback_position)
+		    $Voice.play()
+
+		func _on_text_changed(_track_id, text):
+		    $SubtitleLabel.text = text
+
+		func _on_track_finished(_track_id):
+		    $SubtitleLabel.text = ""
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    SubtitleServer.Singleton.TextChanged += (trackId, text) =&gt; GetNode&lt;Label&gt;("SubtitleLabel").Text = text;
+		    SubtitleServer.Singleton.TrackFinished += trackId =&gt; GetNode&lt;Label&gt;("SubtitleLabel").Text = "";
+		    var voice = GetNode&lt;AudioStreamPlayer&gt;("Voice");
+		    SubtitleServer.Play(GD.Load&lt;Subtitle&gt;("res://intro.srt"), new Callable(voice, AudioStreamPlayer.MethodName.GetPlaybackPosition));
+		    voice.Play();
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] A track with a time source follows it: [method seek] is not allowed, and the track finishes when the time passes [method Subtitle.get_end_time]. If the source stops early (a player that is stopped returns [code]0.0[/code]), call [method stop]. If the object of the time source is freed, the track is canceled.
+		[b]Note:[/b] Segments shorter than one frame can be missed.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_active_segments" qualifiers="const">
+			<return type="SubtitleSegment[]" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns the segments of track [param track_id] that are visible now, in the order of the subtitle.
+			</description>
+		</method>
+		<method name="get_display_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="subtitle" type="Subtitle" />
+			<param index="1" name="segment" type="SubtitleSegment" />
+			<param index="2" name="bbcode" type="bool" default="false" />
+			<description>
+				Returns the text to show for [param segment]: translated if [member Subtitle.auto_translate] of [param subtitle] is enabled, then decorated by [member SubtitleSegment.kind] ([code][Applause][/code] for sounds and reactions, [code]♪ … ♪[/code] for music and lyrics, line by line). With [param bbcode], brackets in the text are escaped for [RichTextLabel], and off-screen and narration segments are put in [code][i][/code]. [param subtitle] may be [code]null[/code].
+			</description>
+		</method>
+		<method name="get_track_ids" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<description>
+				Returns the IDs of all tracks, in ascending order.
+			</description>
+		</method>
+		<method name="get_track_subtitle" qualifiers="const">
+			<return type="Subtitle" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns the subtitle of track [param track_id].
+			</description>
+		</method>
+		<method name="get_track_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns the display text of all visible segments of track [param track_id], one per line: the text of the last [signal text_changed].
+			</description>
+		</method>
+		<method name="get_track_time" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns the time of track [param track_id] at the last update, in seconds.
+			</description>
+		</method>
+		<method name="is_paused" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns [code]true[/code] if track [param track_id] exists and is paused.
+			</description>
+		</method>
+		<method name="is_playing" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Returns [code]true[/code] if track [param track_id] exists (also when it is paused).
+			</description>
+		</method>
+		<method name="pause">
+			<return type="void" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Stops updating track [param track_id]: its own clock stands still, a time source is not read, the visible segments stay. Emits [signal track_paused].
+			</description>
+		</method>
+		<method name="play">
+			<return type="int" />
+			<param index="0" name="subtitle" type="Subtitle" />
+			<param index="1" name="time_source" type="Callable" default="Callable()" />
+			<param index="2" name="from_time" type="float" default="0.0" />
+			<description>
+				Starts a track for [param subtitle] and returns its ID, or [constant INVALID_TRACK] if [param subtitle] is [code]null[/code] or [param time_source] does not return a number. Emits [signal track_started], then the segments visible at the start.
+				[param time_source] is called once per frame without arguments and must return the time in seconds. Without it, the track has its own clock, which starts at [param from_time].
+			</description>
+		</method>
+		<method name="resume">
+			<return type="void" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Continues a paused track. Emits [signal track_resumed].
+			</description>
+		</method>
+		<method name="seek">
+			<return type="void" />
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="time" type="float" />
+			<description>
+				Moves the own clock of track [param track_id] to [param time] and updates the visible segments at once. Emits [signal track_seeked]. Not allowed for a track with a time source: seek the source instead.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Ends track [param track_id]: [signal segment_ended] for its visible segments, [signal text_changed] with an empty text if text was visible, then [signal track_canceled].
+			</description>
+		</method>
+		<method name="stop_all">
+			<return type="void" />
+			<description>
+				Stops every track, like [method stop].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="captions_enabled" type="bool" setter="set_captions_enabled" getter="is_captions_enabled">
+			If [code]false[/code], closed captions ([method SubtitleSegment.is_caption]: sounds, reactions, music, lyrics) are skipped; speech is still shown. Changing it updates all tracks at once.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled">
+			If [code]false[/code], no segment is shown: tracks keep running and finish, but emit no [signal segment_started]. Changing it updates all tracks at once. Connect it to [member AccessibilitySettings.subtitles_enabled] to follow the player's setting.
+		</member>
+	</members>
+	<signals>
+		<signal name="segment_ended">
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when [param segment] is no longer visible on track [param track_id]: its time is over, the track was moved or stopped, or it is hidden by [member enabled] or [member captions_enabled].
+			</description>
+		</signal>
+		<signal name="segment_started">
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="segment" type="SubtitleSegment" />
+			<param index="2" name="text" type="String" />
+			<description>
+				Emitted when [param segment] becomes visible on track [param track_id]. [param text] is its display text (see [method get_display_text]).
+			</description>
+		</signal>
+		<signal name="text_changed">
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="text" type="String" />
+			<description>
+				Emitted when the visible text of track [param track_id] changed. [param text] holds the display texts of all visible segments, one per line, and is empty when nothing is visible. The easiest way to show subtitles.
+			</description>
+		</signal>
+		<signal name="track_canceled">
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Emitted when track [param track_id] ended before its end: [method stop], [method stop_all], or the object of its time source was freed.
+			</description>
+		</signal>
+		<signal name="track_finished">
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Emitted when the time of track [param track_id] passed the end of its subtitle and the track was removed.
+			</description>
+		</signal>
+		<signal name="track_paused">
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Emitted when track [param track_id] was paused with [method pause].
+			</description>
+		</signal>
+		<signal name="track_resumed">
+			<param index="0" name="track_id" type="int" />
+			<description>
+				Emitted when track [param track_id] continues after [method resume].
+			</description>
+		</signal>
+		<signal name="track_seeked">
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="time" type="float" />
+			<description>
+				Emitted when the time of track [param track_id] jumped to [param time]: [method seek] was called, or its time source went backwards.
+			</description>
+		</signal>
+		<signal name="track_started">
+			<param index="0" name="track_id" type="int" />
+			<param index="1" name="subtitle" type="Subtitle" />
+			<description>
+				Emitted by [method play] for the new track [param track_id], before its first segments.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="INVALID_TRACK" value="0">
+			Returned by [method play] when no track could be started. Track IDs start at [code]1[/code].
+		</constant>
+	</constants>
+</class>

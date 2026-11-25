@@ -61,6 +61,28 @@
 				Clears all cells.
 			</description>
 		</method>
+		<method name="convert_cell_coordinates">
+			<return type="void" />
+			<param index="0" name="from_layout" type="int" enum="TileSet.TileLayout" />
+			<param index="1" name="from_axes" type="int" enum="TileSet.CoordinateAxes" />
+			<description>
+				Moves every cell so the map keeps its look after [member TileSet.tile_layout] or [member TileSet.coordinate_axes] of [member tile_set] changed. [param from_layout] and [param from_axes] are the values the cells were painted with. See [method TileSet.convert_map_coords].
+				[codeblocks]
+				[gdscript]
+				var old_layout = tile_set.tile_layout
+				var old_axes = tile_set.coordinate_axes
+				tile_set.coordinate_axes = TileSet.COORDINATE_AXES_SWAP
+				$TileMapLayer.convert_cell_coordinates(old_layout, old_axes)
+				[/gdscript]
+				[csharp]
+				var oldLayout = TileSet.TileLayout;
+				var oldAxes = TileSet.CoordinateAxes;
+				TileSet.CoordinateAxes = TileSet.CoordinateAxesEnum.Swap;
+				GetNode&lt;TileMapLayer&gt;("TileMapLayer").ConvertCellCoordinates(oldLayout, oldAxes);
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="erase_cell">
 			<return type="void" />
 			<param index="0" name="coords" type="Vector2i" />
