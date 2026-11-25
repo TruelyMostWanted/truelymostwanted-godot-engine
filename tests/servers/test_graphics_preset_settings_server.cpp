@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_preset_settings_server.cpp                                 */
+/*  test_graphics_preset_settings_server.cpp                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_preset_settings_server)
+TEST_FORCE_LINK(test_graphics_preset_settings_server)
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -39,17 +39,17 @@ TEST_FORCE_LINK(test_video_preset_settings_server)
 #include "core/io/resource_saver.h"
 #include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
+#include "servers/settings/graphics_preset.h"
+#include "servers/settings/graphics_preset_settings.h"
+#include "servers/settings/graphics_preset_settings_server.h"
 #include "servers/settings/render_effect_settings_server.h"
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/shadow_settings_server.h"
 #include "servers/settings/texture_settings_server.h"
-#include "servers/settings/video_preset.h"
-#include "servers/settings/video_preset_settings.h"
-#include "servers/settings/video_preset_settings_server.h"
 #include "tests/test_utils.h"
 
-namespace TestVideoPresetSettingsServer {
+namespace TestGraphicsPresetSettingsServer {
 
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
@@ -58,13 +58,13 @@ struct TestSetup {
 	}
 	~TestSetup() {
 		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/video_preset/presets", PackedStringArray());
-		ProjectSettings::get_singleton()->set_setting("settings/video_preset/use_builtin_presets", true);
+		ProjectSettings::get_singleton()->set_setting("settings/graphics_preset/presets", PackedStringArray());
+		ProjectSettings::get_singleton()->set_setting("settings/graphics_preset/use_builtin_presets", true);
 	}
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_preset_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("graphics_preset_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -74,7 +74,7 @@ static String temp_file(const String &p_name) {
 
 // A preset server with its own four video domains (not the registered engine singletons).
 struct Servers {
-	VideoPresetSettingsServer *preset = nullptr;
+	GraphicsPresetSettingsServer *preset = nullptr;
 	SettingsServer *domains[4] = {};
 
 	explicit Servers(const String &p_suffix = String(), bool p_remove_files = true) {
@@ -82,8 +82,8 @@ struct Servers {
 		domains[1] = memnew(TextureSettingsServer);
 		domains[2] = memnew(ShadowSettingsServer);
 		domains[3] = memnew(RenderEffectSettingsServer);
-		preset = memnew(VideoPresetSettingsServer);
-		preset->set_file_path(_path("video_preset" + p_suffix + ".ini", p_remove_files));
+		preset = memnew(GraphicsPresetSettingsServer);
+		preset->set_file_path(_path("graphics_preset" + p_suffix + ".ini", p_remove_files));
 		for (SettingsServer *domain : domains) {
 			domain->set_file_path(_path(String(domain->get_domain()) + p_suffix + ".ini", p_remove_files));
 			preset->set_domain_server(domain->get_domain(), domain);
@@ -109,7 +109,7 @@ struct Servers {
 		if (p_remove) {
 			return temp_file(p_name);
 		}
-		return TestUtils::get_temp_path("video_preset_settings_server").path_join(p_name);
+		return TestUtils::get_temp_path("graphics_preset_settings_server").path_join(p_name);
 	}
 };
 
@@ -121,7 +121,7 @@ static bool preset_value_equal(const Variant &p_a, const Variant &p_b) {
 }
 
 // The stored value names of a domain resource of a preset (empty for a null resource).
-static PackedStringArray preset_value_names(const Ref<VideoPreset> &p_preset, const String &p_domain) {
+static PackedStringArray preset_value_names(const Ref<GraphicsPreset> &p_preset, const String &p_domain) {
 	PackedStringArray names;
 	const Ref<Resource> domain_settings = p_preset->get_domain_settings(p_domain);
 	if (domain_settings.is_null()) {
@@ -135,14 +135,14 @@ static PackedStringArray preset_value_names(const Ref<VideoPreset> &p_preset, co
 	return names;
 }
 
-static Variant preset_value(const Ref<VideoPreset> &p_preset, const String &p_domain, const StringName &p_name) {
+static Variant preset_value(const Ref<GraphicsPreset> &p_preset, const String &p_domain, const StringName &p_name) {
 	const Ref<Resource> domain_settings = p_preset->get_domain_settings(p_domain);
 	return domain_settings.is_valid() ? domain_settings->get(p_name) : Variant();
 }
 
 // True if every supported value of `p_preset` is set in the domains of `p_servers`.
-static bool domains_have_preset(const Servers &p_servers, const Ref<VideoPreset> &p_preset) {
-	for (const String &domain : VideoPreset::get_domains()) {
+static bool domains_have_preset(const Servers &p_servers, const Ref<GraphicsPreset> &p_preset) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		const SettingsServer *server = p_servers.get(domain);
 		for (const String &setting_name : preset_value_names(p_preset, domain)) {
 			if (server->is_value_supported(setting_name) && !preset_value_equal(server->get_value(setting_name), preset_value(p_preset, domain, setting_name))) {
@@ -161,38 +161,38 @@ static void on_preset_changed(const String &p_name) {
 	preset_changed_name = p_name;
 }
 
-TEST_CASE("[VideoPresetSettingsServer] The domain is an engine singleton registered with the manager") {
-	VideoPresetSettingsServer *server = VideoPresetSettingsServer::get_singleton();
+TEST_CASE("[GraphicsPresetSettingsServer] The domain is an engine singleton registered with the manager") {
+	GraphicsPresetSettingsServer *server = GraphicsPresetSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoPresetSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_preset") == server);
-	CHECK(server->get_domain() == StringName("video_preset"));
+	CHECK(Engine::get_singleton()->has_singleton("GraphicsPresetSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("graphics_preset") == server);
+	CHECK(server->get_domain() == StringName("graphics_preset"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(Object::cast_to<VideoPresetSettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(ProjectSettings::get_singleton()->has_setting("settings/video_preset/presets"));
-	CHECK(ProjectSettings::get_singleton()->has_setting("settings/video_preset/use_builtin_presets"));
+	CHECK(Object::cast_to<GraphicsPresetSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(ProjectSettings::get_singleton()->has_setting("settings/graphics_preset/presets"));
+	CHECK(ProjectSettings::get_singleton()->has_setting("settings/graphics_preset/use_builtin_presets"));
 }
 
-TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
+TEST_CASE("[GraphicsPresetSettingsServer] Built-in presets") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 
-	CHECK(VideoPresetSettingsServer::get_custom_preset_name() == "Custom");
-	const PackedStringArray builtin = VideoPresetSettingsServer::get_builtin_preset_names();
+	CHECK(GraphicsPresetSettingsServer::get_custom_preset_name() == "Custom");
+	const PackedStringArray builtin = GraphicsPresetSettingsServer::get_builtin_preset_names();
 	REQUIRE(builtin.size() == 4);
 	CHECK(builtin[0] == "Low");
 	CHECK(builtin[3] == "Ultra");
 	CHECK(server->get_preset_names() == builtin);
 	CHECK(server->get_presets().size() == 4);
 
-	const Ref<VideoPreset> low = VideoPresetSettingsServer::create_builtin_preset("Low");
-	const Ref<VideoPreset> ultra = VideoPresetSettingsServer::create_builtin_preset("Ultra");
+	const Ref<GraphicsPreset> low = GraphicsPresetSettingsServer::create_builtin_preset("Low");
+	const Ref<GraphicsPreset> ultra = GraphicsPresetSettingsServer::create_builtin_preset("Ultra");
 	REQUIRE(low.is_valid());
 	REQUIRE(ultra.is_valid());
 	CHECK(low->get_preset_name() == "Low");
 	// Every domain gets a typed resource; the values grow from Low to Ultra.
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		CHECK(low->has_domain_settings(domain));
 		CHECK(low->get_domain_settings(domain) != ultra->get_domain_settings(domain));
 	}
@@ -204,7 +204,7 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 	CHECK(low->get_render_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
 
 	// Every value of a built-in preset exists in its domain.
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
 		for (const String &setting_name : preset_value_names(ultra, domain)) {
 			CHECK_MESSAGE(domain_server->has_setting(setting_name), vformat("%s/%s", domain, setting_name));
@@ -212,15 +212,15 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 	}
 
 	ERR_PRINT_OFF;
-	CHECK(VideoPresetSettingsServer::create_builtin_preset("Custom").is_null());
-	CHECK(VideoPresetSettingsServer::create_builtin_preset("Potato").is_null());
+	CHECK(GraphicsPresetSettingsServer::create_builtin_preset("Custom").is_null());
+	CHECK(GraphicsPresetSettingsServer::create_builtin_preset("Potato").is_null());
 	ERR_PRINT_ON;
 }
 
-TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the four domains in one step") {
+TEST_CASE("[GraphicsPresetSettingsServer] apply_preset() sets every value of the four domains in one step") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 	// One domain in manual mode keeps the values pending; the others apply them at once.
 	SettingsServer *texture = servers.get("texture");
 	texture->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
@@ -261,14 +261,14 @@ TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the fo
 	CHECK(server->get_current_preset() == "Ultra");
 }
 
-TEST_CASE("[VideoPresetSettingsServer] Values the renderer does not support keep their value") {
+TEST_CASE("[GraphicsPresetSettingsServer] Values the renderer does not support keep their value") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
-	const Ref<VideoPreset> low = server->get_preset("Low");
+	GraphicsPresetSettingsServer *server = servers.preset;
+	const Ref<GraphicsPreset> low = server->get_preset("Low");
 
 	HashMap<String, Variant> before;
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
 		for (const String &setting_name : preset_value_names(low, domain)) {
 			before[domain + "/" + setting_name] = domain_server->get_value(setting_name);
@@ -277,7 +277,7 @@ TEST_CASE("[VideoPresetSettingsServer] Values the renderer does not support keep
 	ERR_PRINT_OFF;
 	CHECK(server->apply_preset("Low") == OK);
 	ERR_PRINT_ON;
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		const SettingsServer *domain_server = servers.get(domain);
 		for (const String &setting_name : preset_value_names(low, domain)) {
 			const Variant value = domain_server->get_value(setting_name);
@@ -290,11 +290,11 @@ TEST_CASE("[VideoPresetSettingsServer] Values the renderer does not support keep
 	}
 }
 
-TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and loading keeps it") {
+TEST_CASE("[GraphicsPresetSettingsServer] A single change gives Custom; saving and loading keeps it") {
 	TestSetup setup;
 	{
 		Servers servers("_custom");
-		VideoPresetSettingsServer *server = servers.preset;
+		GraphicsPresetSettingsServer *server = servers.preset;
 		SettingsServer *shadow = servers.get("shadow");
 		ERR_PRINT_OFF;
 		CHECK(server->apply_preset("High") == OK);
@@ -329,7 +329,7 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 	}
 
 	Servers servers("_custom", false);
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 	ERR_PRINT_OFF;
 	for (SettingsServer *domain : servers.domains) {
 		domain->load();
@@ -341,16 +341,16 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 	CHECK(int(servers.get("shadow")->get_value("positional_shadow_atlas_quad_0")) == int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_16));
 }
 
-TEST_CASE("[VideoPresetSettingsServer] Without a picked preset, the values decide") {
+TEST_CASE("[GraphicsPresetSettingsServer] Without a picked preset, the values decide") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 	CHECK(server->get_value("preset") == Variant(""));
 
 	// The values of "Medium" set by hand, value by value.
-	const Ref<VideoPreset> medium = server->get_preset("Medium");
+	const Ref<GraphicsPreset> medium = server->get_preset("Medium");
 	ERR_PRINT_OFF;
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		SettingsServer *domain_server = servers.get(domain);
 		for (const String &setting_name : preset_value_names(medium, domain)) {
 			domain_server->set_value(setting_name, preset_value(medium, domain, setting_name));
@@ -362,12 +362,12 @@ TEST_CASE("[VideoPresetSettingsServer] Without a picked preset, the values decid
 	CHECK(server->get_value("preset") == Variant(""));
 }
 
-TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
+TEST_CASE("[GraphicsPresetSettingsServer] Projects replace and add presets") {
 	TestSetup setup;
 	const String high_path = temp_file("project_high.tres");
 	const String potato_path = temp_file("project_potato.tres");
 
-	Ref<VideoPreset> high;
+	Ref<GraphicsPreset> high;
 	high.instantiate();
 	high->set_preset_name("High");
 	Ref<ShadowSettings> high_shadow;
@@ -376,7 +376,7 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	high->set_shadow(high_shadow);
 	CHECK(ResourceSaver::save(high, high_path) == OK);
 
-	Ref<VideoPreset> potato;
+	Ref<GraphicsPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
 	Ref<TextureSettings> potato_texture;
@@ -392,17 +392,17 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	PackedStringArray paths;
 	paths.push_back(high_path);
 	paths.push_back(potato_path);
-	ProjectSettings::get_singleton()->set_setting("settings/video_preset/presets", paths);
+	ProjectSettings::get_singleton()->set_setting("settings/graphics_preset/presets", paths);
 
 	{
 		Servers servers;
-		VideoPresetSettingsServer *server = servers.preset;
+		GraphicsPresetSettingsServer *server = servers.preset;
 		const PackedStringArray names = server->get_preset_names();
 		REQUIRE(names.size() == 5);
 		CHECK(names[2] == "High"); // Replaced in place.
 		CHECK(names[4] == "Potato");
 		// The domain resources are loaded from the `.tres` file (sub-resources) with their types.
-		const Ref<VideoPreset> loaded_high = server->get_preset("High");
+		const Ref<GraphicsPreset> loaded_high = server->get_preset("High");
 		REQUIRE(loaded_high->get_shadow().is_valid());
 		CHECK(loaded_high->get_shadow()->get_directional_shadow_atlas_size() == 16384);
 		CHECK_FALSE(loaded_high->has_domain_settings("render_effect"));
@@ -431,7 +431,7 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		CHECK(server->get_current_preset() == "Custom");
 	}
 
-	ProjectSettings::get_singleton()->set_setting("settings/video_preset/use_builtin_presets", false);
+	ProjectSettings::get_singleton()->set_setting("settings/graphics_preset/use_builtin_presets", false);
 	{
 		Servers servers;
 		const PackedStringArray names = servers.preset->get_preset_names();
@@ -441,12 +441,12 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	}
 }
 
-TEST_CASE("[VideoPresetSettingsServer] Presets are added and removed at runtime") {
+TEST_CASE("[GraphicsPresetSettingsServer] Presets are added and removed at runtime") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 
-	Ref<VideoPreset> potato;
+	Ref<GraphicsPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
 	Ref<RenderEffectSettings> potato_effect;
@@ -461,7 +461,7 @@ TEST_CASE("[VideoPresetSettingsServer] Presets are added and removed at runtime"
 	CHECK_FALSE(server->has_preset("Ultra"));
 	CHECK(server->get_preset_names().size() == 4);
 
-	Ref<VideoPreset> custom;
+	Ref<GraphicsPreset> custom;
 	custom.instantiate();
 	custom->set_preset_name("Custom");
 	ERR_PRINT_OFF;
@@ -475,21 +475,21 @@ TEST_CASE("[VideoPresetSettingsServer] Presets are added and removed at runtime"
 	CHECK_FALSE(server->has_preset("Potato"));
 }
 
-TEST_CASE("[VideoPresetSettingsServer] suggest_preset() names an existing preset") {
+TEST_CASE("[GraphicsPresetSettingsServer] suggest_preset() names an existing preset") {
 	TestSetup setup;
 	Servers servers;
-	VideoPresetSettingsServer *server = servers.preset;
+	GraphicsPresetSettingsServer *server = servers.preset;
 	const String suggestion = server->suggest_preset();
 	CHECK(server->has_preset(suggestion));
 	CHECK(suggestion != "Ultra");
 }
 
-TEST_CASE("[VideoPreset] Typed settings per domain") {
-	Ref<VideoPreset> preset;
+TEST_CASE("[GraphicsPreset] Typed settings per domain") {
+	Ref<GraphicsPreset> preset;
 	preset.instantiate();
-	CHECK(VideoPreset::get_domains().size() == 4);
+	CHECK(GraphicsPreset::get_domains().size() == 4);
 	// A new preset touches no domain.
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		CHECK_FALSE(preset->has_domain_settings(domain));
 		CHECK(preset->get_domain_settings(domain).is_null());
 	}
@@ -520,4 +520,4 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 	CHECK_FALSE(preset->has_domain_settings("render_effect"));
 }
 
-} // namespace TestVideoPresetSettingsServer
+} // namespace TestGraphicsPresetSettingsServer

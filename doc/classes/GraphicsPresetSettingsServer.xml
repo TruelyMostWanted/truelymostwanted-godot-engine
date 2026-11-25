@@ -1,50 +1,50 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="VideoPresetSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="GraphicsPresetSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Settings server for graphics presets (Low, Medium, High, Ultra, Custom) over the four video settings domains.
 	</brief_description>
 	<description>
-		[VideoPresetSettingsServer] is the settings domain [code]"video_preset"[/code]: one call of [method apply_preset] sets the values of a [VideoPreset] in [RenderQualitySettingsServer], [TextureSettingsServer], [ShadowSettingsServer] and [RenderEffectSettingsServer]: all values of each domain the preset has a settings resource for ([member VideoPreset.render_quality], ...); a [code]null[/code] resource leaves its domain as it is. Changing a single value in one of these domains afterwards makes the current preset [code]"Custom"[/code] ([method get_current_preset]). The domain stores only the name of the chosen preset ([VideoPresetSettings], file [code]user://settings/video_preset.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code])); the values stay in the files of the video domains. Window settings ([WindowSettingsServer]) are not part of a preset.
-		[b]Presets:[/b] the four built-in presets [code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] and [code]"Ultra"[/code] ([method create_builtin_preset]) and the [code].tres[/code] files of [member ProjectSettings.settings/video_preset/presets]. A project preset with the name of a built-in preset replaces it; [member ProjectSettings.settings/video_preset/use_builtin_presets] removes the built-in presets. At runtime, [method add_preset] and [method remove_preset] change the list.
+		[GraphicsPresetSettingsServer] is the settings domain [code]"graphics_preset"[/code]: one call of [method apply_preset] sets the values of a [GraphicsPreset] in [RenderQualitySettingsServer], [TextureSettingsServer], [ShadowSettingsServer] and [RenderEffectSettingsServer]: all values of each domain the preset has a settings resource for ([member GraphicsPreset.render_quality], ...); a [code]null[/code] resource leaves its domain as it is. Changing a single value in one of these domains afterwards makes the current preset [code]"Custom"[/code] ([method get_current_preset]). The domain stores only the name of the chosen preset ([GraphicsPresetSettings], file [code]user://settings/graphics_preset.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code])); the values stay in the files of the video domains. If it does not exist yet, the file of the former domain name ([code]user://settings/video_preset.ini[/code]) is read once at startup and written under the new name; the old file is kept. Window settings ([WindowSettingsServer]) are not part of a preset.
+		[b]Presets:[/b] the four built-in presets [code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] and [code]"Ultra"[/code] ([method create_builtin_preset]) and the [code].tres[/code] files of [member ProjectSettings.settings/graphics_preset/presets]. A project preset with the name of a built-in preset replaces it; [member ProjectSettings.settings/graphics_preset/use_builtin_presets] removes the built-in presets. At runtime, [method add_preset] and [method remove_preset] change the list.
 		[b]One step per domain:[/b] [method apply_preset] sets all values of a domain first and applies them with one [method SettingsServer.apply] if the domain is in [constant SettingsServer.APPLY_MODE_IMMEDIATE]: one [signal SettingsServer.applied] signal, one autosave and, for values with [constant SettingsServer.SETTING_FLAG_CONFIRM], one confirmation per domain. In [constant SettingsServer.APPLY_MODE_MANUAL], the values stay pending until the game calls [method SettingsServer.apply] of that domain.
 		[b]Renderers:[/b] values a domain doesn't support on the current renderer, hardware or build ([method SettingsServer.is_value_supported]) are skipped and keep their value; they don't count when presets are compared either. On the Compatibility renderer (default in the Web export), for example, the presets' screen-space anti-aliasing, TAA, SSAO, SSIL and SDFGI values are skipped.
 		[b]Custom:[/b] after a change in a video domain that is not part of [method apply_preset], the server compares the pending values with the chosen preset. If they no longer match, the first other preset that matches becomes the current one, else [code]"Custom"[/code]. A [method SettingsServer.revert] or a cancelled confirmation that restores the values gives the preset back. Domains a preset doesn't touch ([code]null[/code] resource) don't matter. Numbers are compared approximately.
 		[codeblocks]
 		[gdscript]
 		func _ready():
-			for preset_name in VideoPresetSettingsServer.get_preset_names():
+			for preset_name in GraphicsPresetSettingsServer.get_preset_names():
 				$Preset.add_item(tr(preset_name))
-			VideoPresetSettingsServer.preset_changed.connect(_on_preset_changed)
-			_on_preset_changed(VideoPresetSettingsServer.get_current_preset())
+			GraphicsPresetSettingsServer.preset_changed.connect(_on_preset_changed)
+			_on_preset_changed(GraphicsPresetSettingsServer.get_current_preset())
 
 		func _on_preset_item_selected(index):
-			VideoPresetSettingsServer.apply_preset(VideoPresetSettingsServer.get_preset_names()[index])
+			GraphicsPresetSettingsServer.apply_preset(GraphicsPresetSettingsServer.get_preset_names()[index])
 
 		func _on_preset_changed(preset_name):
-			$CustomLabel.visible = VideoPresetSettingsServer.is_custom()
-			$Preset.selected = VideoPresetSettingsServer.get_preset_names().find(preset_name)
+			$CustomLabel.visible = GraphicsPresetSettingsServer.is_custom()
+			$Preset.selected = GraphicsPresetSettingsServer.get_preset_names().find(preset_name)
 		[/gdscript]
 		[csharp]
 		public override void _Ready()
 		{
 		    var presetButton = GetNode&lt;OptionButton&gt;("Preset");
-		    foreach (string presetName in VideoPresetSettingsServer.GetPresetNames())
+		    foreach (string presetName in GraphicsPresetSettingsServer.GetPresetNames())
 		    {
 		        presetButton.AddItem(Tr(presetName));
 		    }
-		    VideoPresetSettingsServer.PresetChanged += OnPresetChanged;
-		    OnPresetChanged(VideoPresetSettingsServer.GetCurrentPreset());
+		    GraphicsPresetSettingsServer.PresetChanged += OnPresetChanged;
+		    OnPresetChanged(GraphicsPresetSettingsServer.GetCurrentPreset());
 		}
 
 		private void OnPresetItemSelected(long index)
 		{
-		    VideoPresetSettingsServer.ApplyPreset(VideoPresetSettingsServer.GetPresetNames()[(int)index]);
+		    GraphicsPresetSettingsServer.ApplyPreset(GraphicsPresetSettingsServer.GetPresetNames()[(int)index]);
 		}
 
 		private void OnPresetChanged(string presetName)
 		{
-		    GetNode&lt;Label&gt;("CustomLabel").Visible = VideoPresetSettingsServer.IsCustom();
-		    GetNode&lt;OptionButton&gt;("Preset").Selected = System.Array.IndexOf(VideoPresetSettingsServer.GetPresetNames(), presetName);
+		    GetNode&lt;Label&gt;("CustomLabel").Visible = GraphicsPresetSettingsServer.IsCustom();
+		    GetNode&lt;OptionButton&gt;("Preset").Selected = System.Array.IndexOf(GraphicsPresetSettingsServer.GetPresetNames(), presetName);
 		}
 		[/csharp]
 		[/codeblocks]
@@ -56,9 +56,9 @@
 	<methods>
 		<method name="add_preset">
 			<return type="void" />
-			<param index="0" name="preset" type="VideoPreset" />
+			<param index="0" name="preset" type="GraphicsPreset" />
 			<description>
-				Adds [param preset] after the other presets, or replaces the preset with the same [member VideoPreset.preset_name]. The name can't be empty or [code]"Custom"[/code]. The change lasts until [method reload_presets] or the end of the game.
+				Adds [param preset] after the other presets, or replaces the preset with the same [member GraphicsPreset.preset_name]. The name can't be empty or [code]"Custom"[/code]. The change lasts until [method reload_presets] or the end of the game.
 			</description>
 		</method>
 		<method name="apply_preset">
@@ -70,10 +70,10 @@
 			</description>
 		</method>
 		<method name="create_builtin_preset" qualifiers="static">
-			<return type="VideoPreset" />
+			<return type="GraphicsPreset" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Returns a new [VideoPreset] with the values of the built-in preset [param name] ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] or [code]"Ultra"[/code]), or [code]null[/code] for another name. It has a settings resource for all four domains: a copy of the domain's defaults ([method SettingsServer.get_default_settings], from the project settings) with the quality values of the preset, so values like brightness or the default texture filter keep the project's choice. A starting point for project presets: change it and save it as a [code].tres[/code] file.
+				Returns a new [GraphicsPreset] with the values of the built-in preset [param name] ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] or [code]"Ultra"[/code]), or [code]null[/code] for another name. It has a settings resource for all four domains: a copy of the domain's defaults ([method SettingsServer.get_default_settings], from the project settings) with the quality values of the preset, so values like brightness or the default texture filter keep the project's choice. A starting point for project presets: change it and save it as a [code].tres[/code] file.
 				The built-in presets set: resolution scale, mesh LOD threshold, 3D MSAA, screen-space anti-aliasing, TAA and debanding ([RenderQualitySettings]); anisotropic filtering, 2D SDF scale and 2D shadow atlas size ([TextureSettings]); directional and positional shadow atlas size and soft shadow filter quality ([ShadowSettings]); SSAO, SSIL, SDFGI, VoxelGI, volumetric fog, subsurface scattering and depth of field quality, and on Low the switches for SSAO, SSIL, SSR and volumetric fog ([RenderEffectSettings]). "High" is close to the engine defaults.
 			</description>
 		</method>
@@ -102,7 +102,7 @@
 			</description>
 		</method>
 		<method name="get_preset" qualifiers="const">
-			<return type="VideoPreset" />
+			<return type="GraphicsPreset" />
 			<param index="0" name="name" type="String" />
 			<description>
 				Returns the preset [param name], or [code]null[/code]. The preset is the one in the list: changes to it take effect on the next [method apply_preset].
@@ -115,7 +115,7 @@
 			</description>
 		</method>
 		<method name="get_presets" qualifiers="const">
-			<return type="VideoPreset[]" />
+			<return type="GraphicsPreset[]" />
 			<description>
 				Returns all presets in the order of [method get_preset_names].
 			</description>
@@ -143,7 +143,7 @@
 		<method name="reload_presets">
 			<return type="void" />
 			<description>
-				Builds the list of presets again from the built-in presets and [member ProjectSettings.settings/video_preset/presets]. Presets added with [method add_preset] are dropped.
+				Builds the list of presets again from the built-in presets and [member ProjectSettings.settings/graphics_preset/presets]. Presets added with [method add_preset] are dropped.
 			</description>
 		</method>
 		<method name="remove_preset">

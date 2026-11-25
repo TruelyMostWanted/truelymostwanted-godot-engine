@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_preset_settings_server.h                                        */
+/*  graphics_preset_settings_server.h                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -33,26 +33,26 @@
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
 #include "core/variant/typed_array.h"
+#include "servers/settings/graphics_preset.h"
 #include "servers/settings/settings_server.h"
-#include "servers/settings/video_preset.h"
 
-// Settings domain `video_preset` (#25): graphics presets ("Low", "Medium", "High", "Ultra" or the project's own)
+// Settings domain `graphics_preset` (#25): graphics presets ("Low", "Medium", "High", "Ultra" or the project's own)
 // over the video domains `render_quality`, `texture`, `shadow` and `render_effect`.
 // apply_preset() sets all values of each domain resource of a preset (RenderQualitySettings, ...) in one step (one
 // apply() and at most one confirmation per domain); a null resource leaves its domain as it is, and values a
 // domain does not support on the current renderer keep their value. The domain stores only
-// the name of the chosen preset (VideoPresetSettings); the values stay in the files of the video domains.
+// the name of the chosen preset (GraphicsPresetSettings); the values stay in the files of the video domains.
 // A change of a single value in a video domain makes the current preset "Custom" (unless the values then match
 // another preset). Window settings (#20) are not part of a preset.
 // Presets: the four built-in ones (create_builtin_preset()) and the `.tres` files of the project setting
-// `settings/video_preset/presets` (same name: replaces the built-in one).
+// `settings/graphics_preset/presets` (same name: replaces the built-in one).
 // Main-thread API: call it from the main thread only; signals are emitted on the main thread.
-class VideoPresetSettingsServer : public SettingsServer {
-	GDCLASS(VideoPresetSettingsServer, SettingsServer);
+class GraphicsPresetSettingsServer : public SettingsServer {
+	GDCLASS(GraphicsPresetSettingsServer, SettingsServer);
 
-	static VideoPresetSettingsServer *singleton;
+	static GraphicsPresetSettingsServer *singleton;
 
-	LocalVector<Ref<VideoPreset>> presets;
+	LocalVector<Ref<GraphicsPreset>> presets;
 	bool presets_loaded = false;
 	// Domain servers used instead of the registered ones (C++ only, for tests and custom setups).
 	HashMap<StringName, ObjectID> domain_overrides;
@@ -66,7 +66,7 @@ class VideoPresetSettingsServer : public SettingsServer {
 	SettingsServer *_get_domain_server(const StringName &p_domain) const;
 	void _connect_domain(SettingsServer *p_server);
 	void _connect_domains();
-	bool _matches(const Ref<VideoPreset> &p_preset) const;
+	bool _matches(const Ref<GraphicsPreset> &p_preset) const;
 	String _detect(const String &p_preferred) const;
 	void _set_stored_preset(const String &p_name);
 	void _update_current();
@@ -84,8 +84,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_preset`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoPresetSettingsServer *get_singleton();
+	static GraphicsPresetSettingsServer *get_singleton();
 	static void register_settings();
 
 	// The name of the current preset after a single change: "Custom". Reserved; no preset can have it.
@@ -93,17 +96,17 @@ public:
 	static PackedStringArray get_builtin_preset_names();
 	// A new preset with the values of the built-in preset `p_name` ("Low", "Medium", "High" or "Ultra"): all four
 	// domains, based on the domains' defaults (project settings) with the preset's quality values.
-	static Ref<VideoPreset> create_builtin_preset(const String &p_name);
+	static Ref<GraphicsPreset> create_builtin_preset(const String &p_name);
 
 	virtual StringName get_domain() const override;
 	virtual ApplyPhase get_apply_phase() const override;
 
 	// Presets.
-	TypedArray<VideoPreset> get_presets() const;
+	TypedArray<GraphicsPreset> get_presets() const;
 	PackedStringArray get_preset_names() const;
-	Ref<VideoPreset> get_preset(const String &p_name) const;
+	Ref<GraphicsPreset> get_preset(const String &p_name) const;
 	bool has_preset(const String &p_name) const;
-	void add_preset(const Ref<VideoPreset> &p_preset);
+	void add_preset(const Ref<GraphicsPreset> &p_preset);
 	void remove_preset(const String &p_name);
 	void reload_presets();
 
@@ -119,6 +122,6 @@ public:
 	// (nullptr: the registered one again).
 	void set_domain_server(const StringName &p_domain, SettingsServer *p_server);
 
-	VideoPresetSettingsServer();
-	~VideoPresetSettingsServer();
+	GraphicsPresetSettingsServer();
+	~GraphicsPresetSettingsServer();
 };
