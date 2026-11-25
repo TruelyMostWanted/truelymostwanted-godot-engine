@@ -41,12 +41,12 @@ TEST_FORCE_LINK(test_video_preset_settings_server)
 #include "core/object/callable_mp.h"
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/shadow_settings_server.h"
 #include "servers/settings/texture_settings_server.h"
 #include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
-#include "servers/settings/video_shadow_settings_server.h"
 #include "tests/test_utils.h"
 
 namespace TestVideoPresetSettingsServer {
@@ -80,7 +80,7 @@ struct Servers {
 	explicit Servers(const String &p_suffix = String(), bool p_remove_files = true) {
 		domains[0] = memnew(RenderQualitySettingsServer);
 		domains[1] = memnew(TextureSettingsServer);
-		domains[2] = memnew(VideoShadowSettingsServer);
+		domains[2] = memnew(ShadowSettingsServer);
 		domains[3] = memnew(VideoEffectSettingsServer);
 		preset = memnew(VideoPresetSettingsServer);
 		preset->set_file_path(_path("video_preset" + p_suffix + ".ini", p_remove_files));
@@ -199,7 +199,7 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 	REQUIRE(low->get_render_quality().is_valid());
 	REQUIRE(ultra->get_texture().is_valid());
 	CHECK(int(low->get_texture()->get_anisotropic_filtering_level()) < int(ultra->get_texture()->get_anisotropic_filtering_level()));
-	CHECK(low->get_video_shadow()->get_directional_shadow_atlas_size() < ultra->get_video_shadow()->get_directional_shadow_atlas_size());
+	CHECK(low->get_shadow()->get_directional_shadow_atlas_size() < ultra->get_shadow()->get_directional_shadow_atlas_size());
 	CHECK(int(low->get_video_effect()->get_ssao_quality()) < int(ultra->get_video_effect()->get_ssao_quality()));
 	CHECK(low->get_render_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
 
@@ -241,7 +241,7 @@ TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the fo
 	CHECK(preset_changed_name == "Low");
 
 	CHECK_FALSE(servers.get("render_quality")->is_dirty());
-	CHECK_FALSE(servers.get("video_shadow")->is_dirty());
+	CHECK_FALSE(servers.get("shadow")->is_dirty());
 	CHECK_FALSE(servers.get("video_effect")->is_dirty());
 	CHECK(texture->is_dirty());
 	CHECK(texture->get_apply_mode() == SettingsServer::APPLY_MODE_MANUAL);
@@ -295,7 +295,7 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 	{
 		Servers servers("_custom");
 		VideoPresetSettingsServer *server = servers.preset;
-		SettingsServer *shadow = servers.get("video_shadow");
+		SettingsServer *shadow = servers.get("shadow");
 		ERR_PRINT_OFF;
 		CHECK(server->apply_preset("High") == OK);
 		ERR_PRINT_ON;
@@ -337,8 +337,8 @@ TEST_CASE("[VideoPresetSettingsServer] A single change gives Custom; saving and 
 	CHECK(server->load() == OK);
 	ERR_PRINT_ON;
 	CHECK(server->get_current_preset() == "Custom");
-	CHECK(int(servers.get("video_shadow")->get_value("directional_shadow_atlas_size")) == 2048);
-	CHECK(int(servers.get("video_shadow")->get_value("positional_shadow_atlas_quad_0")) == int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_16));
+	CHECK(int(servers.get("shadow")->get_value("directional_shadow_atlas_size")) == 2048);
+	CHECK(int(servers.get("shadow")->get_value("positional_shadow_atlas_quad_0")) == int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_16));
 }
 
 TEST_CASE("[VideoPresetSettingsServer] Without a picked preset, the values decide") {
@@ -370,10 +370,10 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	Ref<VideoPreset> high;
 	high.instantiate();
 	high->set_preset_name("High");
-	Ref<VideoShadowSettings> high_shadow;
+	Ref<ShadowSettings> high_shadow;
 	high_shadow.instantiate();
 	high_shadow->set_directional_shadow_atlas_size(16384);
-	high->set_video_shadow(high_shadow);
+	high->set_shadow(high_shadow);
 	CHECK(ResourceSaver::save(high, high_path) == OK);
 
 	Ref<VideoPreset> potato;
@@ -403,13 +403,13 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		CHECK(names[4] == "Potato");
 		// The domain resources are loaded from the `.tres` file (sub-resources) with their types.
 		const Ref<VideoPreset> loaded_high = server->get_preset("High");
-		REQUIRE(loaded_high->get_video_shadow().is_valid());
-		CHECK(loaded_high->get_video_shadow()->get_directional_shadow_atlas_size() == 16384);
+		REQUIRE(loaded_high->get_shadow().is_valid());
+		CHECK(loaded_high->get_shadow()->get_directional_shadow_atlas_size() == 16384);
 		CHECK_FALSE(loaded_high->has_domain_settings("video_effect"));
 		CHECK(loaded_high->get_video_effect().is_null());
 
-		// Potato leaves `video_shadow` and `video_effect` as they are.
-		SettingsServer *shadow = servers.get("video_shadow");
+		// Potato leaves `shadow` and `video_effect` as they are.
+		SettingsServer *shadow = servers.get("shadow");
 		ERR_PRINT_OFF;
 		shadow->set_value("directional_shadow_atlas_size", 1024);
 		CHECK(server->apply_preset("Potato") == OK);
@@ -508,8 +508,8 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 	preset->set_domain_settings("video_effect", effect);
 	CHECK(preset->get_video_effect() == effect);
 	ERR_PRINT_OFF;
-	preset->set_domain_settings("video_shadow", effect);
-	CHECK(preset->get_video_shadow().is_null());
+	preset->set_domain_settings("shadow", effect);
+	CHECK(preset->get_shadow().is_null());
 	preset->set_domain_settings("window", effect);
 	CHECK(preset->get_domain_settings("window").is_null());
 	ERR_PRINT_ON;

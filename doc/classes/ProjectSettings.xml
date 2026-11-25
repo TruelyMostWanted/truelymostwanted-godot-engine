@@ -3860,6 +3860,15 @@
 		<member name="settings/render_quality/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]) stores its file in [member settings/render_quality/format] instead of [member settings/general/default_format].
 		</member>
+		<member name="settings/shadow/file_name" type="String" setter="" getter="" default="&quot;shadow&quot;">
+			The name of the settings file of the [code]"shadow"[/code] domain ([ShadowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/shadow/format] with [member settings/shadow/override_format]). It may contain a relative subfolder, for example [code]profiles/shadow[/code] for [code]user://settings/profiles/shadow.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/shadow/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"shadow"[/code] domain ([ShadowSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/shadow/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/shadow/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"shadow"[/code] domain ([ShadowSettingsServer]) stores its file in [member settings/shadow/format] instead of [member settings/general/default_format].
+		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
 		</member>
@@ -3916,15 +3925,6 @@
 		</member>
 		<member name="settings/video_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [VideoPresetSettingsServer] starts with the four built-in presets ([method VideoPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/video_preset/presets] exist.
-		</member>
-		<member name="settings/video_shadow/file_name" type="String" setter="" getter="" default="&quot;video_shadow&quot;">
-			The name of the settings file of the [code]"video_shadow"[/code] domain ([VideoShadowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/video_shadow/format] with [member settings/video_shadow/override_format]). It may contain a relative subfolder, for example [code]profiles/video_shadow[/code] for [code]user://settings/profiles/video_shadow.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
-		</member>
-		<member name="settings/video_shadow/format" type="int" setter="" getter="" default="1">
-			The text format of the [code]"video_shadow"[/code] domain ([VideoShadowSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/video_shadow/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
-		</member>
-		<member name="settings/video_shadow/override_format" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], the [code]"video_shadow"[/code] domain ([VideoShadowSettingsServer]) stores its file in [member settings/video_shadow/format] instead of [member settings/general/default_format].
 		</member>
 		<member name="settings/window/file_name" type="String" setter="" getter="" default="&quot;window&quot;">
 			The name of the settings file of the [code]"window"[/code] domain ([WindowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/window/format] with [member settings/window/override_format]). It may contain a relative subfolder, for example [code]profiles/window[/code] for [code]user://settings/profiles/window.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.

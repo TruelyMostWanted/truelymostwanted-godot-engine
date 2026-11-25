@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_shadow_settings_server.cpp                                 */
+/*  test_shadow_settings_server.cpp                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_shadow_settings_server)
+TEST_FORCE_LINK(test_shadow_settings_server)
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -40,12 +40,12 @@ TEST_FORCE_LINK(test_video_shadow_settings_server)
 #include "scene/main/viewport.h"
 #include "scene/main/window.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_shadow_settings.h"
-#include "servers/settings/video_shadow_settings_server.h"
+#include "servers/settings/shadow_settings.h"
+#include "servers/settings/shadow_settings_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
-namespace TestVideoShadowSettingsServer {
+namespace TestShadowSettingsServer {
 
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
@@ -82,7 +82,7 @@ struct RootState {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_shadow_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("shadow_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -90,17 +90,17 @@ static String temp_file(const String &p_name) {
 	return path;
 }
 
-TEST_CASE("[VideoShadowSettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[ShadowSettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	VideoShadowSettingsServer *server = VideoShadowSettingsServer::get_singleton();
+	ShadowSettingsServer *server = ShadowSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoShadowSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_shadow") == server);
-	CHECK(server->get_domain() == StringName("video_shadow"));
+	CHECK(Engine::get_singleton()->has_singleton("ShadowSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("shadow") == server);
+	CHECK(server->get_domain() == StringName("shadow"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(server->get_file_path() == "user://settings/video_shadow.ini");
-	CHECK(Object::cast_to<VideoShadowSettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(VideoShadowSettingsServer::get_viewport_group() == StringName("video_shadow_settings"));
+	CHECK(server->get_file_path() == "user://settings/shadow.ini");
+	CHECK(Object::cast_to<ShadowSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(ShadowSettingsServer::get_viewport_group() == StringName("shadow_settings"));
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 10);
@@ -116,7 +116,7 @@ TEST_CASE("[VideoShadowSettingsServer] The domain is an engine singleton registe
 	CHECK_FALSE(server->is_value_supported("missing"));
 }
 
-TEST_CASE("[VideoShadowSettingsServer] Defaults are the project settings") {
+TEST_CASE("[ShadowSettingsServer] Defaults are the project settings") {
 	TestSetup setup;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	const Variant old_directional = project_settings->get_setting("rendering/lights_and_shadows/directional_shadow/size", 4096);
@@ -126,7 +126,7 @@ TEST_CASE("[VideoShadowSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality", int(RenderingServerEnums::SHADOW_QUALITY_SOFT_ULTRA));
 	project_settings->set_setting("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv", int(Viewport::SHADOW_ATLAS_QUADRANT_SUBDIV_1));
 
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	CHECK(server->get_directional_shadow_atlas_size() == 2048);
 	CHECK(server->get_positional_soft_shadow_filter_quality() == RenderingServerEnums::SHADOW_QUALITY_SOFT_ULTRA);
@@ -139,9 +139,9 @@ TEST_CASE("[VideoShadowSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv", old_quadrant);
 }
 
-TEST_CASE("[VideoShadowSettingsServer] Atlas sizes become powers of two in range, invalid enums the default") {
+TEST_CASE("[ShadowSettingsServer] Atlas sizes become powers of two in range, invalid enums the default") {
 	TestSetup setup;
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -188,11 +188,11 @@ TEST_CASE("[VideoShadowSettingsServer] Atlas sizes become powers of two in range
 	memdelete(server);
 }
 
-TEST_CASE("[VideoShadowSettingsServer] Values are saved and loaded") {
+TEST_CASE("[ShadowSettingsServer] Values are saved and loaded") {
 	TestSetup setup;
-	const String path = temp_file("video_shadow.ini");
+	const String path = temp_file("shadow.ini");
 	{
-		VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+		ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_directional_shadow_atlas_size(2048);
@@ -213,7 +213,7 @@ TEST_CASE("[VideoShadowSettingsServer] Values are saved and loaded") {
 		memdelete(server);
 	}
 
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	CHECK(server->load() == OK);
@@ -230,12 +230,12 @@ TEST_CASE("[VideoShadowSettingsServer] Values are saved and loaded") {
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoShadowSettingsServer] Each value reaches the engine at once") {
+TEST_CASE("[SceneTree][ShadowSettingsServer] Each value reaches the engine at once") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_file_path(temp_file("root.ini"));
 	server->set_positional_shadow_atlas_size(1024);
 	CHECK(root->get_positional_shadow_atlas_size() == 1024);
@@ -269,12 +269,12 @@ TEST_CASE("[SceneTree][VideoShadowSettingsServer] Each value reaches the engine 
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoShadowSettingsServer] Added viewports and viewports in the group get the positional atlas") {
+TEST_CASE("[SceneTree][ShadowSettingsServer] Added viewports and viewports in the group get the positional atlas") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_file_path(temp_file("viewports.ini"));
 	server->set_positional_shadow_atlas_size(1024);
 
@@ -292,7 +292,7 @@ TEST_CASE("[SceneTree][VideoShadowSettingsServer] Added viewports and viewports 
 
 	// In the group: gets the values when it enters the tree, and later changes while it is in it.
 	SubViewport *grouped = memnew(SubViewport);
-	grouped->add_to_group(VideoShadowSettingsServer::get_viewport_group());
+	grouped->add_to_group(ShadowSettingsServer::get_viewport_group());
 	root->add_child(grouped);
 	CHECK(grouped->get_positional_shadow_atlas_size() == 512);
 	server->set_positional_shadow_atlas_16_bits(false);
@@ -312,9 +312,9 @@ TEST_CASE("[SceneTree][VideoShadowSettingsServer] Added viewports and viewports 
 	memdelete(server);
 }
 
-TEST_CASE("[VideoShadowSettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[ShadowSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	VideoShadowSettingsServer *server = memnew(VideoShadowSettingsServer);
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "directional_shadow_atlas_size_changed");
 
@@ -346,4 +346,4 @@ TEST_CASE("[VideoShadowSettingsServer] Typed signals fire once per applied chang
 	memdelete(server);
 }
 
-} // namespace TestVideoShadowSettingsServer
+} // namespace TestShadowSettingsServer

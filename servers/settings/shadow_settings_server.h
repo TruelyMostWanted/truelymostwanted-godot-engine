@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_shadow_settings_server.h                                        */
+/*  shadow_settings_server.h                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -37,8 +37,8 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `video_shadow` (#23): the directional shadow atlas (size, 16-bit depth), the positional shadow
-// atlas (size, 16-bit depth, quadrant subdivisions) and the soft shadow filter quality (VideoShadowSettings).
+// Settings domain `shadow` (#23): the directional shadow atlas (size, 16-bit depth), the positional shadow
+// atlas (size, 16-bit depth, quadrant subdivisions) and the soft shadow filter quality (ShadowSettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
 // The positional atlas values also go to the viewports passed to add_viewport() and to every Viewport in the
 // group get_viewport_group() when it enters the tree. The directional atlas and both filter qualities are global
@@ -46,10 +46,10 @@
 // Atlas sizes are rounded up to a power of two (like the renderers do) and clamped to 256 to 16384; a positional
 // atlas size of 0 disables positional shadows.
 // Defaults are the project settings. Precedence: player's file > project settings.
-class VideoShadowSettingsServer : public SettingsServer {
-	GDCLASS(VideoShadowSettingsServer, SettingsServer);
+class ShadowSettingsServer : public SettingsServer {
+	GDCLASS(ShadowSettingsServer, SettingsServer);
 
-	static VideoShadowSettingsServer *singleton;
+	static ShadowSettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -85,8 +85,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_shadow`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoShadowSettingsServer *get_singleton();
+	static ShadowSettingsServer *get_singleton();
 
 	// The group of viewports that get the positional atlas values when they enter the tree.
 	static StringName get_viewport_group();
@@ -121,6 +124,6 @@ public:
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
 
-	VideoShadowSettingsServer();
-	~VideoShadowSettingsServer();
+	ShadowSettingsServer();
+	~ShadowSettingsServer();
 };

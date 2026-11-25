@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_shadow_settings.h                                               */
+/*  shadow_settings.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -34,12 +34,12 @@
 #include "scene/main/viewport.h"
 #include "servers/rendering/rendering_server.h"
 
-// Data of the `video_shadow` settings domain (#23): the directional shadow atlas (size, 16-bit depth), the
+// Data of the `shadow` settings domain (#23): the directional shadow atlas (size, 16-bit depth), the
 // positional shadow atlas (size, 16-bit depth, subdivision of the four quadrants) and the soft shadow filter
 // quality of directional and positional lights.
-// VideoShadowSettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
-class VideoShadowSettings : public Resource {
-	GDCLASS(VideoShadowSettings, Resource);
+// ShadowSettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
+class ShadowSettings : public Resource {
+	GDCLASS(ShadowSettings, Resource);
 
 	int directional_shadow_atlas_size = 4096;
 	bool directional_shadow_16_bits = true;

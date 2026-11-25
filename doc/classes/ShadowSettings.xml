@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="VideoShadowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="ShadowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings resource of [VideoShadowSettingsServer]: shadow atlases and soft shadow quality.
+		Settings resource of [ShadowSettingsServer]: shadow atlases and soft shadow quality.
 	</brief_description>
 	<description>
-		The data of the settings domain [code]"video_shadow"[/code]. [VideoShadowSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_shadow.ini[/code]. Change the values through the methods of [VideoShadowSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
-		The setters store values as they are; [VideoShadowSettingsServer] rounds atlas sizes up to a power of two, clamps them to [code]256[/code] to [code]16384[/code] and replaces invalid enum values with the default, with a warning, when they are set or loaded.
-		It can also be used as the project defaults of the domain: save a [VideoShadowSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/video_shadow[/code].
+		The data of the settings domain [code]"shadow"[/code]. [ShadowSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/shadow.ini[/code]. Change the values through the methods of [ShadowSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [ShadowSettingsServer] rounds atlas sizes up to a power of two, clamps them to [code]256[/code] to [code]16384[/code] and replaces invalid enum values with the default, with a warning, when they are set or loaded.
+		It can also be used as the project defaults of the domain: save a [ShadowSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/shadow[/code].
 	</description>
 	<tutorials>
 	</tutorials>

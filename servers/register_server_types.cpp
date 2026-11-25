@@ -99,6 +99,8 @@
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/shadow_settings.h"
+#include "servers/settings/shadow_settings_server.h"
 #include "servers/settings/texture_settings.h"
 #include "servers/settings/texture_settings_server.h"
 #include "servers/settings/texture_streaming_settings.h"
@@ -110,8 +112,6 @@
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
-#include "servers/settings/video_shadow_settings.h"
-#include "servers/settings/video_shadow_settings_server.h"
 #include "servers/settings/window_settings.h"
 #include "servers/settings/window_settings_server.h"
 #include "servers/settings/xr_settings.h"
@@ -207,7 +207,7 @@ static InputMapSettingsServer *input_map_settings_server = nullptr;
 static WindowSettingsServer *window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
 static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
-static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
+static ShadowSettingsServer *shadow_settings_server = nullptr;
 static TextureSettingsServer *texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
 static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
@@ -310,11 +310,11 @@ void register_server_types() {
 	render_quality_settings_server = memnew(RenderQualitySettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderQualitySettingsServer", RenderQualitySettingsServer::get_singleton(), "RenderQualitySettingsServer"));
 	settings_server_manager->register_server(render_quality_settings_server);
-	GDREGISTER_CLASS(VideoShadowSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoShadowSettingsServer);
-	video_shadow_settings_server = memnew(VideoShadowSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoShadowSettingsServer", VideoShadowSettingsServer::get_singleton(), "VideoShadowSettingsServer"));
-	settings_server_manager->register_server(video_shadow_settings_server);
+	GDREGISTER_CLASS(ShadowSettings);
+	GDREGISTER_ABSTRACT_CLASS(ShadowSettingsServer);
+	shadow_settings_server = memnew(ShadowSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ShadowSettingsServer", ShadowSettingsServer::get_singleton(), "ShadowSettingsServer"));
+	settings_server_manager->register_server(shadow_settings_server);
 	GDREGISTER_CLASS(TextureSettings);
 	GDREGISTER_ABSTRACT_CLASS(TextureSettingsServer);
 	texture_settings_server = memnew(TextureSettingsServer);
@@ -632,8 +632,8 @@ void unregister_server_types() {
 	accessibility_settings_server = nullptr;
 	memdelete(texture_settings_server);
 	texture_settings_server = nullptr;
-	memdelete(video_shadow_settings_server);
-	video_shadow_settings_server = nullptr;
+	memdelete(shadow_settings_server);
+	shadow_settings_server = nullptr;
 	memdelete(render_quality_settings_server);
 	render_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
