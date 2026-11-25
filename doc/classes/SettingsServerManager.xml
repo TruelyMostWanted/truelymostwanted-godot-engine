@@ -94,13 +94,13 @@
 		<method name="get_storage_folder" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the folder of the settings files: [member ProjectSettings.settings/storage/folder], by default [code]"user://settings"[/code].
+				Returns the folder of the settings files: [member ProjectSettings.settings/general/folder], by default [code]"user://settings"[/code].
 			</description>
 		</method>
 		<method name="get_storage_format" qualifiers="const">
 			<return type="int" enum="ResourceTextSerializer.Format" />
 			<description>
-				Returns the text format of the settings files: [member ProjectSettings.settings/storage/format]. A format name written by hand into [code]project.godot[/code] (such as [code]"json"[/code]) is accepted too; unknown values give [constant ResourceTextSerializer.FORMAT_INI]. A domain uses INI instead if it can't use the format: [constant ResourceTextSerializer.FORMAT_CSV] is only for a [ListSettingsServer] whose list fits into CSV, and a format whose module is missing is not available (see [method ResourceTextSerializer.is_format_available]).
+				Returns the default text format of the settings files: [member ProjectSettings.settings/general/default_format]. A domain with [code]settings/&lt;domain&gt;/override_format[/code] uses its own [code]settings/&lt;domain&gt;/format[/code] instead. A format name written by hand into [code]project.godot[/code] (such as [code]"json"[/code]) is accepted too; unknown values give [constant ResourceTextSerializer.FORMAT_INI]. A domain uses INI instead if it can't use the format: [constant ResourceTextSerializer.FORMAT_CSV] is only for a [ListSettingsServer] whose list fits into CSV, and a format whose module is missing is not available (see [method ResourceTextSerializer.is_format_available]).
 			</description>
 		</method>
 		<method name="has_dirty_servers" qualifiers="const">

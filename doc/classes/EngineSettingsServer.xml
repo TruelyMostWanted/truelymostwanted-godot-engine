@@ -4,7 +4,7 @@
 		Settings server for the frame rate limit, time scale, physics rate, audio speed and low-processor mode.
 	</brief_description>
 	<description>
-		[EngineSettingsServer] is the settings domain [code]"engine"[/code]: it stores the frame rate limit ([member Engine.max_fps]), the time scale ([member Engine.time_scale]), the physics rate and its limits ([member Engine.physics_ticks_per_second], [member Engine.max_physics_steps_per_frame], [member Engine.physics_jitter_fix]), physics interpolation ([member SceneTree.physics_interpolation]), the audio playback speed ([member AudioServer.playback_speed_scale]) and the low-processor mode ([member OS.low_processor_usage_mode], [member OS.low_processor_usage_mode_sleep_usec]) for the player. Every value takes effect at once. The settings resource is an [EngineSettings]; the file is [code]user://settings/engine.ini[/code] by default, in the format of [member ProjectSettings.settings/storage/format]; as a single record it is never stored as CSV.
+		[EngineSettingsServer] is the settings domain [code]"engine"[/code]: it stores the frame rate limit ([member Engine.max_fps]), the time scale ([member Engine.time_scale]), the physics rate and its limits ([member Engine.physics_ticks_per_second], [member Engine.max_physics_steps_per_frame], [member Engine.physics_jitter_fix]), physics interpolation ([member SceneTree.physics_interpolation]), the audio playback speed ([member AudioServer.playback_speed_scale]) and the low-processor mode ([member OS.low_processor_usage_mode], [member OS.low_processor_usage_mode_sleep_usec]) for the player. Every value takes effect at once. The settings resource is an [EngineSettings]; the file is [code]user://settings/engine.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]); as a single record it is never stored as CSV.
 		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the [SceneTree] exists and before the main scene is loaded. The defaults are the project settings ([member ProjectSettings.application/run/max_fps], [member ProjectSettings.physics/common/physics_ticks_per_second], [member ProjectSettings.application/run/low_processor_mode] and the others), and [code]1.0[/code] for the time scale and the audio speed.
 		[b]Simulation values:[/b] [code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code] change how the game behaves, not only how it looks: a different physics rate changes jump heights and collisions of fast bodies and breaks deterministic or networked games, a different speed can be a cheat. They stay at the project values unless [member ProjectSettings.settings/engine/allow_simulation_values] is enabled; a game that offers a speed option (accessibility, slow motion for tests) enables it. See [method is_simulation_locked].
 		Values out of range are clamped with a warning, whether they come from the API, a hand-edited file or the command line: [code]max_fps[/code] at least [code]0[/code], [code]time_scale[/code] [code]0.01[/code] to [code]100[/code], [code]physics_ticks_per_second[/code] [code]1[/code] to [code]1000[/code], [code]max_physics_steps_per_frame[/code] [code]1[/code] to [code]100[/code], [code]physics_jitter_fix[/code] [code]0[/code] to [code]2[/code], [code]audio_playback_speed_scale[/code] [code]0.01[/code] to [code]4[/code], [code]low_processor_mode_sleep_usec[/code] [code]0[/code] to [code]1000000[/code].
@@ -181,4 +181,38 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="low_processor_mode_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member EngineSettings.low_processor_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="max_fps_changed">
+			<param index="0" name="fps" type="int" />
+			<description>
+				Emitted once when a changed [member EngineSettings.max_fps] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to show the frame rate limit in the HUD.
+			</description>
+		</signal>
+		<signal name="physics_interpolation_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member EngineSettings.physics_interpolation] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="physics_ticks_per_second_changed">
+			<param index="0" name="ticks" type="int" />
+			<description>
+				Emitted once when a changed [member EngineSettings.physics_ticks_per_second] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="time_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member EngineSettings.time_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for timers that ignore [member Engine.time_scale].
+			</description>
+		</signal>
+	</signals>
 </class>

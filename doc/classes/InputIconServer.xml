@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputIconServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Returns the icon of an input event from one [InputIconSet] per device family.
+	</brief_description>
+	<description>
+		[InputIconServer] holds one [InputIconSet] per [enum InputIconFamily] (keyboard and mouse, generic gamepad, Xbox, PlayStation, Nintendo). The sets come from the project settings [code]input_devices/icons/keyboard_mouse[/code], [code]input_devices/icons/generic_gamepad[/code], [code]input_devices/icons/xbox[/code], [code]input_devices/icons/playstation[/code] and [code]input_devices/icons/nintendo[/code] (loaded on first use), or from [method set_icon_set] at runtime.
+		[method get_icon] picks the family from the event: keys and mouse buttons use [constant INPUT_ICON_FAMILY_KEYBOARD_MOUSE]; gamepad events use [member gamepad_family] if it is set, else the family of the event's device (joypad name and vendor id), else, for events of all devices, the family of the first connected gamepad, else [constant INPUT_ICON_FAMILY_GENERIC_GAMEPAD].
+		The editor's Input Map uses the same icons when they are set and the theme icons otherwise.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+		    InputIconServer.icon_set_changed.connect(_update_prompt)
+		    _update_prompt(InputIconServer.INPUT_ICON_FAMILY_AUTO)
+
+		func _update_prompt(_family):
+		    var events = InputMap.action_get_events("jump")
+		    if not events.is_empty():
+		        $Prompt.texture = InputIconServer.get_icon(events[0])
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    InputIconServer.IconSetChanged += family =&gt; UpdatePrompt();
+		    UpdatePrompt();
+		}
+
+		private void UpdatePrompt()
+		{
+		    var events = InputMap.ActionGetEvents("jump");
+		    if (events.Count &gt; 0)
+		    {
+		        GetNode&lt;TextureRect&gt;("Prompt").Texture = InputIconServer.GetIcon(events[0]);
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] No icon images are shipped with the engine; a project brings its own.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_device_family" qualifiers="const">
+			<return type="int" enum="InputIconServer.InputIconFamily" />
+			<param index="0" name="device" type="int" />
+			<description>
+				Returns the family of a connected joypad from its name and vendor id ([method Input.get_joy_name], [method Input.get_joy_info]). Returns [constant INPUT_ICON_FAMILY_GENERIC_GAMEPAD] if the joypad is unknown or not connected.
+			</description>
+		</method>
+		<method name="get_event_family" qualifiers="const">
+			<return type="int" enum="InputIconServer.InputIconFamily" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the family [method get_icon] uses for [param event] with [constant INPUT_ICON_FAMILY_AUTO].
+			</description>
+		</method>
+		<method name="get_family_for_joy_name" qualifiers="static">
+			<return type="int" enum="InputIconServer.InputIconFamily" />
+			<param index="0" name="joy_name" type="String" />
+			<param index="1" name="vendor_id" type="int" default="-1" />
+			<description>
+				Returns the family of a joypad name and USB vendor id. The vendor ids of Microsoft ([code]0x045E[/code]), Sony ([code]0x054C[/code]) and Nintendo ([code]0x057E[/code]) decide first, also as hex text in the name (the [code]Gamepad.id[/code] of browsers, for example [code]"054c-0ce6-Wireless Controller"[/code]); then names such as [code]Xbox[/code], [code]XInput[/code], [code]PS5[/code], [code]DualSense[/code], [code]Nintendo[/code] or [code]Joy-Con[/code]. Returns [constant INPUT_ICON_FAMILY_GENERIC_GAMEPAD] for other names.
+			</description>
+		</method>
+		<method name="get_icon">
+			<return type="Texture2D" />
+			<param index="0" name="event" type="InputEvent" />
+			<param index="1" name="family" type="int" enum="InputIconServer.InputIconFamily" default="-1" />
+			<description>
+				Returns the icon of [param event]. With [constant INPUT_ICON_FAMILY_AUTO], the family is chosen as described in the class description. The lookup order is: the icon of the event in the family's set, the icon in the [constant INPUT_ICON_FAMILY_GENERIC_GAMEPAD] set (for the Xbox, PlayStation and Nintendo families), the fallback icon of the event type in the same order. Returns [code]null[/code] if no set has an icon.
+			</description>
+		</method>
+		<method name="get_icon_for_text">
+			<return type="Texture2D" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="family" type="int" enum="InputIconServer.InputIconFamily" default="-1" />
+			<description>
+				Like [method get_icon] for the event of a text form of [method InputAction.text_to_event], for example [code]"Gamepad:A"[/code] or [code]"Keyboard:Space"[/code].
+			</description>
+		</method>
+		<method name="get_icon_set">
+			<return type="InputIconSet" />
+			<param index="0" name="family" type="int" enum="InputIconServer.InputIconFamily" />
+			<description>
+				Returns the set of a family: the set of [method set_icon_set], else the set of the project setting [code]input_devices/icons/&lt;family&gt;[/code], else [code]null[/code].
+			</description>
+		</method>
+		<method name="has_icon_set_override" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="family" type="int" enum="InputIconServer.InputIconFamily" />
+			<description>
+				Returns [code]true[/code] if the family's set was set with [method set_icon_set] and the project setting is ignored.
+			</description>
+		</method>
+		<method name="reset_icon_set">
+			<return type="void" />
+			<param index="0" name="family" type="int" enum="InputIconServer.InputIconFamily" />
+			<description>
+				Drops the set of [method set_icon_set]; the project setting applies again. Emits [signal icon_set_changed].
+			</description>
+		</method>
+		<method name="set_icon_set">
+			<return type="void" />
+			<param index="0" name="family" type="int" enum="InputIconServer.InputIconFamily" />
+			<param index="1" name="set" type="InputIconSet" />
+			<description>
+				Sets the set of a family at runtime, in place of the project setting. [code]null[/code] means no set for this family; use [method reset_icon_set] to return to the project setting. Emits [signal icon_set_changed].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="gamepad_family" type="int" setter="set_gamepad_family" getter="get_gamepad_family" enum="InputIconServer.InputIconFamily" default="-1">
+			If not [constant INPUT_ICON_FAMILY_AUTO], all gamepad events use this family, for example when the player chooses "PlayStation prompts" in the options.
+		</member>
+	</members>
+	<signals>
+		<signal name="icon_set_changed">
+			<param index="0" name="family" type="int" enum="InputIconServer.InputIconFamily" />
+			<description>
+				Emitted when the set of [param family] was replaced or reset, when its project setting changed, or when the set itself changed (for example when it is edited in the Inspector). Prompts should look up their icons again. When [member gamepad_family] changes, it is emitted with [constant INPUT_ICON_FAMILY_GENERIC_GAMEPAD].
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="INPUT_ICON_FAMILY_AUTO" value="-1" enum="InputIconFamily">
+			Chooses the family from the event and its device.
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_KEYBOARD_MOUSE" value="0" enum="InputIconFamily">
+			Icons for keys and mouse buttons.
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_GENERIC_GAMEPAD" value="1" enum="InputIconFamily">
+			Icons for gamepads of unknown make; also the second choice for the other gamepad families.
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_XBOX" value="2" enum="InputIconFamily">
+			Icons for Xbox and XInput gamepads.
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_PLAYSTATION" value="3" enum="InputIconFamily">
+			Icons for PlayStation gamepads.
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_NINTENDO" value="4" enum="InputIconFamily">
+			Icons for Nintendo gamepads (Switch Pro Controller, Joy-Con).
+		</constant>
+		<constant name="INPUT_ICON_FAMILY_MAX" value="5" enum="InputIconFamily">
+			Number of families.
+		</constant>
+	</constants>
+</class>

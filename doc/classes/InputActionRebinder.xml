@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputActionRebinder" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Captures the next input of the player, filters it and binds it to an action through [InputMapSettingsServer].
+	</brief_description>
+	<description>
+		[InputActionRebinder] is the "press a key now" flow of a rebinding menu. [method begin] picks an action and an event index, the menu forwards its input events to [method update], and the first usable event is bound at once through [InputMapSettingsServer]. Mouse motion, released keys and buttons, echo events, weak stick moves and a modifier key pressed on its own are not used. The event is stored like the server stores it (a pressed key by its physical keycode, a stick by its axis and direction, for all devices), so it is exactly what a save and load of the settings gives back.
+		If another action already uses the event, [member conflict_mode] decides: ask the menu ([constant CONFLICT_ASK], the default), refuse and wait for another input, swap the two events, or allow both actions to use it. Conflicts are looked up in the merged [InputMap]: the built-in and the custom actions, with the pending events of the actions that [InputMapSettingsServer] stores. Only events of the device class of [member device_filter] are compared.
+		The signals of this class describe the flow ([signal started], [signal conflict], [signal completed], [signal canceled]). The new events themselves are announced by the server: [signal InputMapSettingsServer.action_events_changed] is emitted for every action that changed (both actions on a swap) after the change is applied to the [InputMap] and before [signal completed]. There is no built-in cancel key, because Escape can be a binding; the menu calls [method cancel].
+		Several rebinders can run at the same time, for example one per player in local co-op with [member device_filter] [constant DEVICE_GAMEPAD] and their own [member gamepad_device]. Use it from the main thread.
+		[codeblocks]
+		[gdscript]
+		var rebinder := InputActionRebinder.new()
+
+		func _ready():
+			rebinder.device_filter = InputActionRebinder.DEVICE_KEYBOARD_MOUSE
+			rebinder.completed.connect(func(action, index, event): print("%s: %s" % [action, InputMapSettingsServer.get_event_label(event)]))
+
+		func _on_jump_button_pressed():
+			rebinder.begin(&amp;"jump", 0)
+
+		func _input(event):
+			if rebinder.update(event):
+				get_viewport().set_input_as_handled()
+		[/gdscript]
+		[csharp]
+		private InputActionRebinder _rebinder = new InputActionRebinder();
+
+		public override void _Ready()
+		{
+			_rebinder.DeviceFilter = InputActionRebinder.DeviceFilterEnum.KeyboardMouse;
+			_rebinder.Completed += (action, index, @event) =&gt; GD.Print($"{action}: {InputMapSettingsServer.GetEventLabel(@event)}");
+		}
+
+		private void OnJumpButtonPressed()
+		{
+			_rebinder.Begin("jump", 0);
+		}
+
+		public override void _Input(InputEvent @event)
+		{
+			if (_rebinder.Update(@event))
+			{
+				GetViewport().SetInputAsHandled();
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="begin">
+			<return type="int" enum="Error" />
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event_index" type="int" />
+			<description>
+				Starts waiting for the input that becomes event [param event_index] of [param action] and emits [signal started]. [param event_index] counts the events of the action in the device class of [member device_filter]: keys and mouse buttons together for [constant DEVICE_KEYBOARD_MOUSE], joypad buttons and axes for [constant DEVICE_GAMEPAD], all events for [constant DEVICE_ANY]. It matches a column of a menu such as "Keyboard 1", "Keyboard 2" and "Gamepad". An index behind the last event adds the event at the end. A session that is still active is canceled first ([signal canceled]).
+				Returns [constant ERR_DOES_NOT_EXIST] if there is no such action, [constant ERR_UNAVAILABLE] if [InputMapSettingsServer] does not store the action in its [member InputMapSettingsServer.save_mode] (a built-in [code]ui_*[/code] action in [constant InputMapSettingsServer.SAVE_MODE_CUSTOM_ONLY]), and [constant ERR_INVALID_PARAMETER] for a negative index.
+			</description>
+		</method>
+		<method name="cancel">
+			<return type="void" />
+			<description>
+				Ends the session without a change and emits [signal canceled]. Also closes an open conflict of [constant CONFLICT_ASK]. Does nothing if no session is active.
+			</description>
+		</method>
+		<method name="get_action" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Returns the action of the active session, or an empty [StringName] if no session is active.
+			</description>
+		</method>
+		<method name="get_conflict_event" qualifiers="const">
+			<return type="InputEvent" />
+			<description>
+				Returns the event of the last conflict of the active session in its stored form (see [method InputMapSettingsServer.get_event_label] for the text of a menu), or [code]null[/code] if there was none. Use it in [signal conflict] to show a question such as "Space is already used by Jump".
+			</description>
+		</method>
+		<method name="get_event_index" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the event index of the active session, or [code]-1[/code] if no session is active.
+			</description>
+		</method>
+		<method name="is_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] between [method begin] and the end of the session ([signal completed] or [signal canceled]).
+			</description>
+		</method>
+		<method name="is_conflict_pending" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if a conflict of [constant CONFLICT_ASK] waits for [method resolve_conflict_swap], [method resolve_conflict_allow] or [method cancel]. Meanwhile [method update] uses no events.
+			</description>
+		</method>
+		<method name="resolve_conflict_allow">
+			<return type="int" enum="Error" />
+			<description>
+				Answers an open conflict of [constant CONFLICT_ASK]: the event is bound and the other actions keep it too. Emits [signal completed].
+				Returns [constant ERR_UNCONFIGURED] if no conflict is open.
+			</description>
+		</method>
+		<method name="resolve_conflict_swap">
+			<return type="int" enum="Error" />
+			<description>
+				Answers an open conflict of [constant CONFLICT_ASK] by swapping, like [constant CONFLICT_SWAP]. Emits [signal completed].
+				Returns [constant ERR_UNCONFIGURED] if no conflict is open, and [constant ERR_UNAVAILABLE] if an action in conflict is not stored by [InputMapSettingsServer]; then the conflict stays open.
+			</description>
+		</method>
+		<method name="update">
+			<return type="bool" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Gives the rebinder an input event, usually from [method Node._input]. Returns [code]true[/code] if the event was used, so the caller can mark it as handled ([method Viewport.set_input_as_handled]).
+				Not used: events while no session is active or a conflict of [constant CONFLICT_ASK] is open, mouse motion and other events that can't be bound (touch, MIDI, actions), released keys and buttons, echo events, joypad motion weaker than [member axis_threshold], and events outside [member device_filter] or from another pad than [member gamepad_device].
+				A modifier key ([kbd]Shift[/kbd], [kbd]Ctrl[/kbd], [kbd]Alt[/kbd], [kbd]Meta[/kbd]) pressed on its own is used but not bound yet: if another key follows, the combination is bound ([code]Keyboard:Ctrl+S[/code]); if the modifier is released first, the modifier alone is bound.
+				A usable event without conflict is bound at once and [signal completed] is emitted. With a conflict, [member conflict_mode] decides.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="axis_threshold" type="float" setter="set_axis_threshold" getter="get_axis_threshold" default="0.5">
+			How far a stick or trigger must move (from [code]0.0[/code] to [code]1.0[/code]) before its motion is bound. The direction of the axis is part of the binding ([code]GamepadAxis:LeftStickUp[/code]).
+		</member>
+		<member name="conflict_mode" type="int" setter="set_conflict_mode" getter="get_conflict_mode" enum="InputActionRebinder.ConflictMode" default="0">
+			What happens if another action already uses the captured event.
+		</member>
+		<member name="device_filter" type="int" setter="set_device_filter" getter="get_device_filter" enum="InputActionRebinder.DeviceFilter" default="0">
+			Which devices are captured. It also decides how the event index of [method begin] counts and which events are compared for conflicts.
+		</member>
+		<member name="gamepad_device" type="int" setter="set_gamepad_device" getter="get_gamepad_device" default="-1">
+			The device id of the only joypad whose input is captured, or [code]-1[/code] for any joypad. The binding itself is stored for all joypads, like [method InputMapSettingsServer.rebind] stores it.
+		</member>
+		<member name="ignored_actions" type="PackedStringArray" setter="set_ignored_actions" getter="get_ignored_actions" default="PackedStringArray()">
+			Actions that never count as a conflict, for example the built-in [code]ui_*[/code] actions when the game does not mind that [kbd]Space[/kbd] also presses a focused button.
+		</member>
+	</members>
+	<signals>
+		<signal name="canceled">
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event_index" type="int" />
+			<description>
+				Emitted when [method cancel] ends the session, or [method begin] starts a new one while this one was active. Nothing was changed.
+			</description>
+		</signal>
+		<signal name="completed">
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event_index" type="int" />
+			<param index="2" name="event" type="InputEvent" />
+			<description>
+				Emitted when the session ended with [param event] bound to [param action]. [param event_index] is the index where the event is now, counted like in [method begin] (an index behind the last event becomes the index of the added event). [param event] is in the stored form of [InputMapSettingsServer].
+				It is emitted after the server changed the events and after [signal InputMapSettingsServer.action_events_changed] was emitted for every changed action (both actions on a swap). In [constant SettingsServer.APPLY_MODE_IMMEDIATE] the new binding is in [InputMap] already. Also emitted if the event was already in this slot (nothing changed, so the server emits nothing).
+			</description>
+		</signal>
+		<signal name="conflict">
+			<param index="0" name="source_action" type="StringName" />
+			<param index="1" name="source_event_index" type="int" />
+			<param index="2" name="dest_action" type="StringName" />
+			<param index="3" name="dest_event_index" type="int" />
+			<description>
+				Emitted once for each other action that uses the captured event, in [constant CONFLICT_ASK] and [constant CONFLICT_REJECT] (and in [constant CONFLICT_SWAP] if the other action can't be changed, which is then handled like [constant CONFLICT_REJECT]). [param source_action] and [param source_event_index] are the slot being rebound, [param dest_action] and [param dest_event_index] the slot of the other action that has the event, counted like in [method begin]. [method get_conflict_event] returns the event.
+			</description>
+		</signal>
+		<signal name="started">
+			<param index="0" name="action" type="StringName" />
+			<param index="1" name="event_index" type="int" />
+			<description>
+				Emitted by [method begin] when the rebinder starts waiting for the input of [param action]. A menu shows "Press a key..." here.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="DEVICE_ANY" value="0" enum="DeviceFilter">
+			Keys, mouse buttons, joypad buttons and joypad axes are captured. the event index of [method begin] counts all events of the action.
+		</constant>
+		<constant name="DEVICE_KEYBOARD_MOUSE" value="1" enum="DeviceFilter">
+			Only keys and mouse buttons are captured; the event index of [method begin] counts the key and mouse button events of the action together.
+		</constant>
+		<constant name="DEVICE_GAMEPAD" value="2" enum="DeviceFilter">
+			Only joypad buttons and axes are captured (of [member gamepad_device], if set); the event index of [method begin] counts the joypad events of the action.
+		</constant>
+		<constant name="CONFLICT_ASK" value="0" enum="ConflictMode">
+			[signal conflict] is emitted and the rebinder waits for the decision of the menu: [method resolve_conflict_swap], [method resolve_conflict_allow] or [method cancel].
+		</constant>
+		<constant name="CONFLICT_REJECT" value="1" enum="ConflictMode">
+			[signal conflict] is emitted, nothing is bound and the rebinder waits for another input.
+		</constant>
+		<constant name="CONFLICT_SWAP" value="2" enum="ConflictMode">
+			The event is bound, and the other action gets the old event of the slot in exchange (if the slot was empty, the other action only loses the event). Both actions change in one step of [InputMapSettingsServer]: one apply and one save. If more than one action uses the event, the first gets the old event and the others lose it. An action the server does not store can't be changed; then it is handled like [constant CONFLICT_REJECT].
+		</constant>
+		<constant name="CONFLICT_ALLOW" value="3" enum="ConflictMode">
+			The event is bound and the other actions keep it too; no [signal conflict] is emitted.
+		</constant>
+	</constants>
+</class>

@@ -290,6 +290,8 @@ TEST_CASE("[PathPrefixServer] Prefixes into res:// read from a mounted pack") {
 }
 
 TEST_CASE("[PathPrefixServer] Prefixes into user:// use the user:// access") {
+	// CI runners start without a user data folder; the editor and games create it on startup.
+	DirAccess::make_dir_recursive_absolute(OS::get_singleton()->get_user_data_dir());
 	PathPrefixServer *server = PathPrefixServer::get_singleton();
 	REQUIRE(server->register_prefix_folder("unittestuser://", "user://unittest_87") == OK);
 

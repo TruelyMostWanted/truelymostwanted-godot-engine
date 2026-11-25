@@ -368,6 +368,19 @@ int TextureRegionEditor::_get_overlapping_margin_line(const Point2 &p_mouse_pos,
 }
 
 void TextureRegionEditor::_commit_drag() {
+	if (!use_undo_redo) {
+		if (edited_margin >= 0 && res_stylebox.is_valid()) {
+			res_stylebox->emit_changed();
+		}
+		edited_margin = -1;
+		drag_index = -1;
+		_update_rect();
+		texture_overlay->queue_redraw();
+		drag = false;
+		creating = false;
+		moving = false;
+		return;
+	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	if (edited_margin >= 0) {
 		undo_redo->create_action(TTR("Set Margin"));
@@ -464,6 +477,13 @@ void TextureRegionEditor::_texture_overlay_input(const Ref<InputEvent> &p_input)
 									Rect2 r = _get_edited_object_region();
 									rect.expand_to(r.position);
 									rect.expand_to(r.get_end());
+								}
+
+								if (!use_undo_redo) {
+									_apply_rect(rect);
+									_update_rect();
+									texture_overlay->queue_redraw();
+									break;
 								}
 
 								undo_redo->create_action(TTR("Set Region Rect"));

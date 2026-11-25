@@ -396,7 +396,31 @@ int EngineSettingsServer::get_low_processor_mode_sleep_usec() const {
 	return get_value(SNAME("low_processor_mode_sleep_usec"));
 }
 
+void EngineSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"max_fps",
+		"time_scale",
+		"physics_ticks_per_second",
+		"physics_interpolation",
+		"low_processor_mode",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void EngineSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("max_fps_changed", PropertyInfo(Variant::INT, "fps")));
+	ADD_SIGNAL(MethodInfo("time_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
+	ADD_SIGNAL(MethodInfo("physics_ticks_per_second_changed", PropertyInfo(Variant::INT, "ticks")));
+	ADD_SIGNAL(MethodInfo("physics_interpolation_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("low_processor_mode_changed", PropertyInfo(Variant::BOOL, "enabled")));
+
 	ClassDB::bind_method(D_METHOD("set_max_fps", "max_fps"), &EngineSettingsServer::set_max_fps);
 	ClassDB::bind_method(D_METHOD("get_max_fps"), &EngineSettingsServer::get_max_fps);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "time_scale"), &EngineSettingsServer::set_time_scale);

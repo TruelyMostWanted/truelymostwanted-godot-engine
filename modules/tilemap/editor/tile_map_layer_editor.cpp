@@ -48,6 +48,7 @@
 #include "editor/settings/editor_command_palette.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
+#include "scene/gui/dialogs.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/split_container.h"
 #include "scene/main/scene_tree.h"
@@ -3767,6 +3768,7 @@ void TileMapLayerEditor::_notification(int p_what) {
 				_update_bottom_panel();
 				_update_layers_selector();
 				tabs_plugins[tabs_bar->get_current_tab()]->tile_set_changed();
+				_check_coordinate_settings();
 
 				const TileMapLayer *edited_layer = _get_edited_layer();
 				if (edited_layer && custom_overlay) {
@@ -4095,8 +4097,8 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 		Vector<Point2i> points;
 
 		bool transposed = tile_set->get_tile_offset_axis() == TileSet::TILE_OFFSET_AXIS_VERTICAL;
-		p_from_cell = TileSet::transform_coords_layout(p_from_cell, tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
-		p_to_cell = TileSet::transform_coords_layout(p_to_cell, tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
+		p_from_cell = TileSet::transform_coords_layout(tile_set->map_to_layout_coords(p_from_cell), tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
+		p_to_cell = TileSet::transform_coords_layout(tile_set->map_to_layout_coords(p_to_cell), tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
 		if (transposed) {
 			SWAP(p_from_cell.x, p_from_cell.y);
 			SWAP(p_to_cell.x, p_to_cell.y);
@@ -4107,7 +4109,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 		Vector2i sign = delta.sign();
 
 		Vector2i current = p_from_cell;
-		points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+		points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 
 		int err = 0;
 		if (Math::abs(delta.y) < Math::abs(delta.x)) {
@@ -4125,7 +4127,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 					current += Vector2i(sign.x, 0);
 					err += err_step.y;
 				}
-				points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+				points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 			}
 		} else {
 			Vector2i err_step = delta.abs();
@@ -4146,7 +4148,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 					}
 					err += err_step.y;
 				}
-				points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+				points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 			}
 		}
 
@@ -4444,6 +4446,25 @@ void TileMapLayerEditor::_draw_overlay() {
 					tile_set->draw_tile_shape(custom_overlay, xform * tile_xform, color, false);
 				}
 			}
+
+			// The direction of the map coordinates (TileSet.coordinate_axes): +X and +Y from cell (0, 0).
+			const Vector2 axis_origin = xform.xform(tile_set->map_to_local(Vector2i()));
+			const Color axis_colors[2] = { Color(0.96, 0.32, 0.37), Color(0.53, 0.84, 0.01) };
+			const Ref<Font> axis_font = get_theme_font(SceneStringName(font), SNAME("Label"));
+			for (int axis = 0; axis < 2; axis++) {
+				const Vector2 axis_target = xform.xform(tile_set->map_to_local(axis == 0 ? Vector2i(1, 0) : Vector2i(0, 1)));
+				if (axis_target.is_equal_approx(axis_origin)) {
+					continue;
+				}
+				Color color = axis_colors[axis];
+				color.a *= scale_fading;
+				const Vector2 direction = (axis_target - axis_origin).normalized();
+				const Vector2 normal = direction.orthogonal();
+				const real_t head = 8.0 * EDSCALE;
+				custom_overlay->draw_line(axis_origin, axis_target - direction * head, color, 2.0 * EDSCALE);
+				custom_overlay->draw_colored_polygon({ axis_target, axis_target - direction * head + normal * head * 0.5, axis_target - direction * head - normal * head * 0.5 }, color);
+				custom_overlay->draw_string(axis_font, axis_target + direction * 2.0 * EDSCALE + normal * head, axis == 0 ? "+X" : "+Y", HORIZONTAL_ALIGNMENT_LEFT, -1, int(12 * EDSCALE), color);
+			}
 		}
 
 		// Draw the IDs for debug.
@@ -4547,7 +4568,76 @@ void TileMapLayerEditor::update_layout(DockLayout p_layout, int p_slot) {
 	}
 }
 
+Vector<TileMapLayer *> TileMapLayerEditor::_get_layers_with_tile_set(const Ref<TileSet> &p_tile_set) const {
+	Vector<TileMapLayer *> layers;
+	Node *scene = EditorNode::get_singleton()->get_edited_scene();
+	if (scene == nullptr || p_tile_set.is_null()) {
+		return layers;
+	}
+	TypedArray<Node> nodes = scene->find_children("*", "TileMapLayer", true, false);
+	if (TileMapLayer *root_layer = Object::cast_to<TileMapLayer>(scene)) {
+		nodes.push_back(root_layer);
+	}
+	for (int i = 0; i < nodes.size(); i++) {
+		TileMapLayer *layer = Object::cast_to<TileMapLayer>(nodes[i]);
+		if (layer && layer->get_tile_set() == p_tile_set && !layer->get_used_cells().is_empty()) {
+			layers.push_back(layer);
+		}
+	}
+	return layers;
+}
+
+void TileMapLayerEditor::_check_coordinate_settings() {
+	const TileMapLayer *edited_layer = _get_edited_layer();
+	const Ref<TileSet> tile_set = edited_layer ? edited_layer->get_tile_set() : Ref<TileSet>();
+	if (tile_set.is_null()) {
+		known_tile_set_id = ObjectID();
+		return;
+	}
+	const bool same_tile_set = known_tile_set_id == tile_set->get_instance_id();
+	const TileSet::TileLayout old_layout = known_tile_layout;
+	const TileSet::CoordinateAxes old_axes = known_coordinate_axes;
+	known_tile_set_id = tile_set->get_instance_id();
+	known_tile_layout = tile_set->get_tile_layout();
+	known_coordinate_axes = tile_set->get_coordinate_axes();
+	if (!same_tile_set || (old_layout == known_tile_layout && old_axes == known_coordinate_axes)) {
+		return;
+	}
+	// A different layout only matters for shapes other than squares.
+	if (old_axes == known_coordinate_axes && tile_set->get_tile_shape() == TileSet::TILE_SHAPE_SQUARE) {
+		return;
+	}
+	const int layer_count = _get_layers_with_tile_set(tile_set).size();
+	if (layer_count == 0) {
+		return;
+	}
+	convert_from_layout = old_layout;
+	convert_from_axes = old_axes;
+	convert_cells_dialog->set_text(vformat(TTR("The coordinate settings of the TileSet changed. Painted cells keep their coordinates, so the map now looks different.\nConvert the cells of %d layer(s) in this scene, so the map keeps its look?"), layer_count));
+	convert_cells_dialog->popup_centered();
+}
+
+void TileMapLayerEditor::_convert_cells_confirmed() {
+	const TileMapLayer *edited_layer = _get_edited_layer();
+	ERR_FAIL_NULL(edited_layer);
+	const Vector<TileMapLayer *> layers = _get_layers_with_tile_set(edited_layer->get_tile_set());
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Convert Tile Coordinates"));
+	for (TileMapLayer *layer : layers) {
+		undo_redo->add_do_method(layer, "convert_cell_coordinates", convert_from_layout, convert_from_axes);
+		undo_redo->add_undo_property(layer, "tile_map_data", layer->get("tile_map_data"));
+	}
+	undo_redo->commit_action();
+}
+
 TileMapLayerEditor::TileMapLayerEditor() {
+	convert_cells_dialog = memnew(ConfirmationDialog);
+	convert_cells_dialog->set_title(TTR("Convert Tile Coordinates"));
+	convert_cells_dialog->set_ok_button_text(TTR("Convert"));
+	convert_cells_dialog->set_cancel_button_text(TTR("Keep Coordinates"));
+	convert_cells_dialog->connect(SceneStringName(confirmed), callable_mp(this, &TileMapLayerEditor::_convert_cells_confirmed));
+	add_child(convert_cells_dialog);
+
 	set_process_internal(true);
 	set_name(TTRC("TileMap"));
 	set_icon_name("TileMapDock");

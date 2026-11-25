@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XRSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for OpenXR: foveation, render scale, refresh rate, performance levels and hand tracking.
+	</brief_description>
+	<description>
+		[XRSettingsServer] is the settings domain [code]"xr"[/code]: it stores the OpenXR options a player or tester changes on a headset (foveation, render scale, refresh rate, variable rate shading, CPU and GPU performance levels, hand motion ranges, hand tracking) and pushes them to the [OpenXRInterface] of [XRServer]. The settings resource is an [XRSettings]; the file is [code]user://settings/xr.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]).
+		[b]Without a headset:[/b] values are stored, loaded and saved as usual. Values the interface can't take yet are listed by [method get_deferred_setting_names] and pushed when [XRServer] adds the OpenXR interface and again each time its session begins (foveation and the refresh rate need a running session). [member XRSettings.render_target_size_multiplier] goes to the interface as soon as it exists, before it is initialized, so it is used for the first session.
+		[b]Runtime support:[/b] values the runtime does not support (for example foveation on SteamVR) are stored but not pushed; [method get_unsupported_setting_names] lists them once the interface is initialized. Changing such a value prints a warning once.
+		[b]Changes during a session:[/b] foveation level and dynamic foveation, render scale, refresh rate, variable rate shading, performance levels and motion ranges take effect at once. [member XRSettings.foveation_with_subsampled_images] takes effect with the next session. [member XRSettings.hand_tracking_enabled] is a game-side value: the hand tracking extension itself is switched by the project setting [code]xr/openxr/extensions/hand_tracking[/code] at startup.
+		The defaults are the project settings [code]xr/openxr/foveation_level[/code], [code]xr/openxr/foveation_dynamic[/code] and [code]xr/openxr/foveation_with_subsampled_images[/code] and the runtime defaults for the other values. The domain is applied in [constant SettingsServer.APPLY_PHASE_SCENE]. Values out of range are clamped with a warning.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			var xr_settings = Engine.get_singleton("XRSettingsServer")
+			$Menu/RenderScale.value = xr_settings.get_render_target_size_multiplier()
+			# Hide what the runtime can't do.
+			for setting_name in xr_settings.get_unsupported_setting_names():
+				$Menu.get_node(setting_name.to_pascal_case()).hide()
+
+		func _on_foveation_item_selected(index):
+			Engine.get_singleton("XRSettingsServer").set_foveation_level(index)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    GetNode&lt;HSlider&gt;("Menu/RenderScale").Value = XRSettingsServer.GetRenderTargetSizeMultiplier();
+		    // Hide what the runtime can't do.
+		    foreach (string settingName in XRSettingsServer.GetUnsupportedSettingNames())
+		    {
+		        GetNode&lt;Control&gt;("Menu").GetNode&lt;Control&gt;(settingName.ToPascalCase()).Hide();
+		    }
+		}
+
+		private void OnFoveationItemSelected(long index)
+		{
+		    XRSettingsServer.SetFoveationLevel((XRSettings.FoveationLevel)index);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] This class only exists when the engine is built with the [code]openxr[/code] module (Windows, Linux, macOS, Android). It is missing in the Web export (WebXR is a different interface), on iOS and with [code]disable_xr=yes[/code]: check [code]Engine.has_singleton("XRSettingsServer")[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear_interface_override">
+			<return type="void" />
+			<description>
+				Drives the [OpenXRInterface] of [XRServer] again after [method set_interface_override]. Pushes the stored values to it.
+			</description>
+		</method>
+		<method name="get_available_display_refresh_rates" qualifiers="const">
+			<return type="PackedFloat64Array" />
+			<description>
+				Returns the refresh rates the runtime offers, sorted from low to high. Empty before the interface is initialized or if the runtime does not report its rates ([code]XR_FB_display_refresh_rate[/code] missing). Fill a menu with it.
+			</description>
+		</method>
+		<method name="get_cpu_level" qualifiers="const">
+			<return type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Returns the pending CPU performance level. See [member XRSettings.cpu_level].
+			</description>
+		</method>
+		<method name="get_deferred_setting_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the values that were applied but could not reach the OpenXR interface yet, because there is no interface or it is not initialized. They are pushed when [XRServer] adds the interface and again when its session begins. Without a headset or OpenXR runtime every value except [member XRSettings.hand_tracking_enabled] stays here.
+			</description>
+		</method>
+		<method name="get_display_refresh_rate" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending display refresh rate in Hz ([code]0[/code]: runtime default). See [member XRSettings.display_refresh_rate].
+			</description>
+		</method>
+		<method name="get_foveation_level" qualifiers="const">
+			<return type="int" enum="XRSettings.FoveationLevel" />
+			<description>
+				Returns the pending foveation level. See [member XRSettings.foveation_level].
+			</description>
+		</method>
+		<method name="get_gpu_level" qualifiers="const">
+			<return type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Returns the pending GPU performance level. See [member XRSettings.gpu_level].
+			</description>
+		</method>
+		<method name="get_interface" qualifiers="const">
+			<return type="Object" />
+			<description>
+				Returns the object the domain drives: the interface set with [method set_interface_override], else the [OpenXRInterface] of [XRServer] (the interface named [method get_interface_name]), or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="get_interface_name" qualifiers="static">
+			<return type="StringName" />
+			<description>
+				Returns the name of the [XRServer] interface the domain drives: [code]"OpenXR"[/code].
+			</description>
+		</method>
+		<method name="get_left_hand_motion_range" qualifiers="const">
+			<return type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Returns the pending motion range of the left hand. See [member XRSettings.left_hand_motion_range].
+			</description>
+		</method>
+		<method name="get_render_target_size_multiplier" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending render scale. See [member XRSettings.render_target_size_multiplier].
+			</description>
+		</method>
+		<method name="get_right_hand_motion_range" qualifiers="const">
+			<return type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Returns the pending motion range of the right hand. See [member XRSettings.right_hand_motion_range].
+			</description>
+		</method>
+		<method name="get_unsupported_setting_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the values the current OpenXR runtime does not support, for example [code]foveation_level[/code] on SteamVR. They are stored and saved, but not pushed; hide or disable them in the options menu. Empty before the interface is initialized: support is not known yet (see [method is_interface_ready]). See [method SettingsServer.is_value_supported].
+			</description>
+		</method>
+		<method name="get_vrs_min_radius" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending full-rate radius of variable rate shading. See [member XRSettings.vrs_min_radius].
+			</description>
+		</method>
+		<method name="get_vrs_strength" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the pending falloff strength of variable rate shading. See [member XRSettings.vrs_strength].
+			</description>
+		</method>
+		<method name="is_foveation_dynamic" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if dynamic foveation is pending. See [member XRSettings.foveation_dynamic].
+			</description>
+		</method>
+		<method name="is_foveation_with_subsampled_images" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if foveation with subsampled images is pending. See [member XRSettings.foveation_with_subsampled_images].
+			</description>
+		</method>
+		<method name="is_hand_tracking_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the player wants hand tracking (game-side value). See [member XRSettings.hand_tracking_enabled].
+			</description>
+		</method>
+		<method name="is_interface_ready" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the OpenXR interface exists and is initialized. Only then [method get_unsupported_setting_names] and [method get_available_display_refresh_rates] know the runtime.
+			</description>
+		</method>
+		<method name="is_session_running" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] between the [signal OpenXRInterface.session_begun] and [signal OpenXRInterface.session_stopping] signals of the interface.
+			</description>
+		</method>
+		<method name="set_cpu_level">
+			<return type="void" />
+			<param index="0" name="level" type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Sets [member XRSettings.cpu_level] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_display_refresh_rate">
+			<return type="void" />
+			<param index="0" name="rate" type="float" />
+			<description>
+				Sets [member XRSettings.display_refresh_rate] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_foveation_dynamic">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member XRSettings.foveation_dynamic] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_foveation_level">
+			<return type="void" />
+			<param index="0" name="level" type="int" enum="XRSettings.FoveationLevel" />
+			<description>
+				Sets [member XRSettings.foveation_level] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_foveation_with_subsampled_images">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member XRSettings.foveation_with_subsampled_images] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_gpu_level">
+			<return type="void" />
+			<param index="0" name="level" type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Sets [member XRSettings.gpu_level] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_hand_tracking_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member XRSettings.hand_tracking_enabled] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_interface_override">
+			<return type="void" />
+			<param index="0" name="interface" type="Object" />
+			<description>
+				Drives [param interface] instead of the [OpenXRInterface] of [XRServer], for example a test double or an interface of an extension with the same properties, methods and signals ([code]is_initialized[/code], [code]session_begun[/code], ...). Pushes the stored values to it. [code]null[/code] is the same as [method clear_interface_override].
+			</description>
+		</method>
+		<method name="set_left_hand_motion_range">
+			<return type="void" />
+			<param index="0" name="range" type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Sets [member XRSettings.left_hand_motion_range] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_render_target_size_multiplier">
+			<return type="void" />
+			<param index="0" name="multiplier" type="float" />
+			<description>
+				Sets [member XRSettings.render_target_size_multiplier] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_right_hand_motion_range">
+			<return type="void" />
+			<param index="0" name="range" type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Sets [member XRSettings.right_hand_motion_range] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_vrs_min_radius">
+			<return type="void" />
+			<param index="0" name="radius" type="float" />
+			<description>
+				Sets [member XRSettings.vrs_min_radius] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+		<method name="set_vrs_strength">
+			<return type="void" />
+			<param index="0" name="strength" type="float" />
+			<description>
+				Sets [member XRSettings.vrs_strength] (validated; applied at once in [constant SettingsServer.APPLY_MODE_IMMEDIATE], or by [method SettingsServer.apply]).
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="cpu_level_changed">
+			<param index="0" name="level" type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Emitted once when a changed [member XRSettings.cpu_level] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="display_refresh_rate_changed">
+			<param index="0" name="rate" type="float" />
+			<description>
+				Emitted once when a changed [member XRSettings.display_refresh_rate] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to adapt the physics tick rate to the refresh rate.
+			</description>
+		</signal>
+		<signal name="foveation_dynamic_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member XRSettings.foveation_dynamic] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="foveation_level_changed">
+			<param index="0" name="level" type="int" enum="XRSettings.FoveationLevel" />
+			<description>
+				Emitted once when a changed [member XRSettings.foveation_level] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="foveation_with_subsampled_images_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member XRSettings.foveation_with_subsampled_images] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="gpu_level_changed">
+			<param index="0" name="level" type="int" enum="XRSettings.PerformanceLevel" />
+			<description>
+				Emitted once when a changed [member XRSettings.gpu_level] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="hand_tracking_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member XRSettings.hand_tracking_enabled] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Show or hide the tracked hands of the game.
+			</description>
+		</signal>
+		<signal name="left_hand_motion_range_changed">
+			<param index="0" name="range" type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Emitted once when a changed [member XRSettings.left_hand_motion_range] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="render_target_size_multiplier_changed">
+			<param index="0" name="multiplier" type="float" />
+			<description>
+				Emitted once when a changed [member XRSettings.render_target_size_multiplier] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="right_hand_motion_range_changed">
+			<param index="0" name="range" type="int" enum="XRSettings.HandMotionRange" />
+			<description>
+				Emitted once when a changed [member XRSettings.right_hand_motion_range] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="vrs_min_radius_changed">
+			<param index="0" name="radius" type="float" />
+			<description>
+				Emitted once when a changed [member XRSettings.vrs_min_radius] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="vrs_strength_changed">
+			<param index="0" name="strength" type="float" />
+			<description>
+				Emitted once when a changed [member XRSettings.vrs_strength] was applied: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Also emitted while the value waits for the OpenXR interface ([method get_deferred_setting_names]) or the runtime does not support it ([method get_unsupported_setting_names]). Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
+</class>
