@@ -238,6 +238,22 @@ Error PerformanceRecorder::start(const Ref<PerformanceRecordingProfile> &p_profi
 	for (uint32_t i = 0; i < data.size(); i++) {
 		data[i] = Math::NaN;
 	}
+	// Summary: running statistics and a fixed-size histogram per column, allocated here as well.
+	statistics.resize(columns.size());
+	for (ColumnStatistics &statistic : statistics) {
+		statistic = ColumnStatistics();
+	}
+	histograms.resize(columns.size() * PerformanceColumnSummary::HISTOGRAM_BUCKETS);
+	if (!histograms.is_empty()) {
+		memset(histograms.ptr(), 0, sizeof(uint32_t) * histograms.size());
+	}
+	hitch_threshold_usec = (uint64_t)MAX(0, profile->get_hitch_threshold_usec());
+	hitch_count = 0;
+	hitch_frames.clear();
+	hitch_frames.reserve(MAX_HITCH_FRAMES);
+	write_summary_json = profile->is_write_summary_json();
+	stop_usec = 0;
+
 	write_buffer.clear();
 	write_buffer.reserve(MIN(capacity, (uint32_t)MAX(flush_interval, 1)) * MAX(1u, columns.size()) * 12 + 256);
 
@@ -273,9 +289,13 @@ void PerformanceRecorder::_stop(bool p_emit_signals) {
 		return;
 	}
 	recording = false;
+	stop_usec = OS::get_singleton()->get_ticks_usec();
 	uint64_t rows = 0;
 	if (!output_path.is_empty()) {
 		rows = _write_rows(0);
+		if (write_summary_json) {
+			_write_summary_json();
+		}
 	}
 	flush_pending = false;
 	_disable_gpu_measurement();
@@ -294,6 +314,22 @@ void PerformanceRecorder::stop() {
 
 void PerformanceRecorder::finish() {
 	_stop(false);
+	if (exit_budget.is_null()) {
+		return;
+	}
+	const Ref<PerformanceBudgetResult> result = check_budget(exit_budget);
+	exit_budget.unref();
+	// print_line() is already disabled in Main::cleanup(), so the result goes to OS::print() directly.
+	const CharString text = result->to_text().utf8();
+	if (result->is_passed()) {
+		OS::get_singleton()->print("PerformanceRecorder: %s\n", text.get_data());
+		return;
+	}
+	OS::get_singleton()->printerr("PerformanceRecorder: %s\n", text.get_data());
+	// Never hide an exit code that SceneTree.quit() or the engine already set.
+	if (OS::get_singleton()->get_exit_code() == EXIT_SUCCESS) {
+		OS::get_singleton()->set_exit_code(result->get_exit_code());
+	}
 }
 
 Error PerformanceRecorder::flush() {
@@ -313,6 +349,14 @@ bool PerformanceRecorder::is_recording() const {
 void PerformanceRecorder::_frame(uint64_t p_frame_usec, uint64_t p_process_usec, uint64_t p_physics_usec, int p_physics_steps) {
 	const uint64_t begin = OS::get_singleton()->get_ticks_usec();
 	frame_counter++;
+
+	// Hitches are checked on every frame, also between sampled rows.
+	if (hitch_threshold_usec > 0 && p_frame_usec > hitch_threshold_usec) {
+		hitch_count++;
+		if (hitch_frames.size() < (uint32_t)MAX_HITCH_FRAMES) {
+			hitch_frames.push_back((int64_t)Engine::get_singleton()->get_process_frames());
+		}
+	}
 
 	if (sample_interval <= 1 || (frame_counter - 1) % (uint64_t)sample_interval == 0) {
 		_record_row(begin, p_frame_usec, p_process_usec, p_physics_usec, p_physics_steps);
@@ -392,12 +436,16 @@ void PerformanceRecorder::_record_row(uint64_t p_begin_usec, uint64_t p_frame_us
 			} break;
 		}
 		data[c * capacity + row] = value;
+		if ((int)c != recorder_time_column) {
+			_add_statistic(c, value);
+		}
 	}
 
 	if (recorder_time_column >= 0) {
 		// Sampling of this row plus the flush work done since the previous row.
 		const uint64_t elapsed = OS::get_singleton()->get_ticks_usec() - p_begin_usec + pending_recorder_usec;
 		data[(uint32_t)recorder_time_column * capacity + row] = (double)elapsed;
+		_add_statistic((uint32_t)recorder_time_column, (double)elapsed);
 		pending_recorder_usec = 0;
 	}
 
@@ -405,6 +453,23 @@ void PerformanceRecorder::_record_row(uint64_t p_begin_usec, uint64_t p_frame_us
 	if (flush_interval > 0 && !output_path.is_empty() && !write_failed && rows_total - rows_written >= (uint64_t)flush_interval) {
 		flush_pending = true;
 	}
+}
+
+void PerformanceRecorder::_add_statistic(uint32_t p_column, double p_value) {
+	if (Math::is_nan(p_value)) {
+		return; // Empty cell.
+	}
+	ColumnStatistics &statistic = statistics[p_column];
+	if (statistic.count == 0) {
+		statistic.minimum = p_value;
+		statistic.maximum = p_value;
+	} else {
+		statistic.minimum = MIN(statistic.minimum, p_value);
+		statistic.maximum = MAX(statistic.maximum, p_value);
+	}
+	statistic.count++;
+	statistic.sum += p_value;
+	histograms[p_column * PerformanceColumnSummary::HISTOGRAM_BUCKETS + PerformanceColumnSummary::get_histogram_bucket(p_value)]++;
 }
 
 double PerformanceRecorder::_sample_builtin(int p_builtin, uint64_t p_frame_usec, uint64_t p_process_usec, uint64_t p_physics_usec, int p_physics_steps) {
@@ -725,12 +790,92 @@ String PerformanceRecorder::get_output_path() const {
 	return output_path;
 }
 
+/* Summary and budget */
+
+Ref<PerformanceSummary> PerformanceRecorder::get_summary() const {
+	Ref<PerformanceSummary> summary;
+	summary.instantiate();
+
+	// Exact percentiles while the whole run still fits in the ring buffer.
+	const bool exact = rows_total <= (uint64_t)capacity;
+	const uint64_t end_usec = recording ? OS::get_singleton()->get_ticks_usec() : stop_usec;
+	const int64_t duration = (start_usec > 0 && end_usec >= start_usec) ? (int64_t)(end_usec - start_usec) : 0;
+	summary->set_run((int64_t)frame_counter, (int64_t)rows_total, duration, exact);
+
+	PackedInt64Array frames;
+	frames.resize(hitch_frames.size());
+	for (uint32_t i = 0; i < hitch_frames.size(); i++) {
+		frames.set(i, hitch_frames[i]);
+	}
+	summary->set_hitches((int64_t)hitch_threshold_usec, (int64_t)hitch_count, frames);
+
+	const uint32_t column_count = MIN(columns.size(), statistics.size());
+	const uint64_t row_count = MIN(rows_total, (uint64_t)capacity);
+	for (uint32_t c = 0; c < column_count; c++) {
+		const ColumnStatistics &statistic = statistics[c];
+		PackedFloat64Array sorted_values;
+		if (exact && statistic.count > 0) {
+			sorted_values.resize((int64_t)statistic.count);
+			double *w = sorted_values.ptrw();
+			int64_t count = 0;
+			for (uint64_t i = 0; i < row_count && count < (int64_t)statistic.count; i++) {
+				const double value = data[c * capacity + (uint32_t)i];
+				if (!Math::is_nan(value)) {
+					w[count++] = value;
+				}
+			}
+			sorted_values.resize(count);
+			sorted_values.sort();
+		}
+		const uint32_t *histogram = nullptr;
+		if (histograms.size() >= (c + 1) * (uint32_t)PerformanceColumnSummary::HISTOGRAM_BUCKETS) {
+			histogram = histograms.ptr() + c * PerformanceColumnSummary::HISTOGRAM_BUCKETS;
+		}
+		Ref<PerformanceColumnSummary> column;
+		column.instantiate();
+		column->set_data(column_names[c], (int64_t)statistic.count, statistic.minimum, statistic.maximum, statistic.sum, histogram, sorted_values);
+		summary->add_column(column);
+	}
+	return summary;
+}
+
+Ref<PerformanceBudgetResult> PerformanceRecorder::check_budget(const Ref<PerformanceBudget> &p_budget) const {
+	ERR_FAIL_COND_V_MSG(p_budget.is_null(), Ref<PerformanceBudgetResult>(), "PerformanceRecorder.check_budget(): the budget is null.");
+	return p_budget->check_summary(get_summary());
+}
+
+void PerformanceRecorder::_write_summary_json() {
+	const String path = output_path.get_basename() + ".summary.json";
+	Error err = OK;
+	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE, &err);
+	if (file.is_null() || !file->store_string(get_summary()->to_text())) {
+		ERR_PRINT(vformat("PerformanceRecorder: cannot write the summary to \"%s\" (error %d).", path, err));
+	}
+}
+
 /* Start from the command line or the project settings */
 
-void PerformanceRecorder::start_from_settings(const String &p_cli_output_path, const String &p_cli_profile_path, bool p_use_project_settings) {
-	const bool enabled = !p_cli_output_path.is_empty() || (p_use_project_settings && bool(GLOBAL_GET("debug/performance_recording/enabled")));
+void PerformanceRecorder::start_from_settings(const String &p_cli_output_path, const String &p_cli_profile_path, const String &p_cli_budget_path, bool p_use_project_settings) {
+	// A budget from the command line records in memory, even without an output path.
+	const bool enabled = !p_cli_output_path.is_empty() || !p_cli_budget_path.is_empty() || (p_use_project_settings && bool(GLOBAL_GET("debug/performance_recording/enabled")));
 	if (!enabled) {
 		return;
+	}
+
+	String budget_path = p_cli_budget_path;
+	if (budget_path.is_empty() && p_use_project_settings) {
+		budget_path = GLOBAL_GET("debug/performance_recording/budget");
+	}
+	exit_budget.unref();
+	if (!budget_path.is_empty()) {
+		exit_budget = ResourceLoader::load(budget_path, "PerformanceBudget");
+		if (exit_budget.is_null()) {
+			ERR_PRINT(vformat("PerformanceRecorder: cannot load the performance budget \"%s\".", budget_path));
+			// A budget that cannot be loaded fails the run instead of passing silently.
+			if (OS::get_singleton()->get_exit_code() == EXIT_SUCCESS) {
+				OS::get_singleton()->set_exit_code(EXIT_FAILURE);
+			}
+		}
 	}
 
 	String profile_path = p_cli_profile_path;
@@ -780,6 +925,9 @@ void PerformanceRecorder::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_recorded_frame_count"), &PerformanceRecorder::get_recorded_frame_count);
 	ClassDB::bind_method(D_METHOD("get_output_path"), &PerformanceRecorder::get_output_path);
 
+	ClassDB::bind_method(D_METHOD("get_summary"), &PerformanceRecorder::get_summary);
+	ClassDB::bind_method(D_METHOD("check_budget", "budget"), &PerformanceRecorder::check_budget);
+
 	ADD_SIGNAL(MethodInfo("recording_started"));
 	ADD_SIGNAL(MethodInfo("recording_stopped", PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("flushed", PropertyInfo(Variant::INT, "rows")));
@@ -809,6 +957,7 @@ PerformanceRecorder::PerformanceRecorder() {
 		GLOBAL_DEF("debug/performance_recording/enabled", false);
 		GLOBAL_DEF(PropertyInfo(Variant::STRING, "debug/performance_recording/profile", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
 		GLOBAL_DEF(PropertyInfo(Variant::STRING, "debug/performance_recording/output_path", PROPERTY_HINT_SAVE_FILE, "*.csv"), "");
+		GLOBAL_DEF(PropertyInfo(Variant::STRING, "debug/performance_recording/budget", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
 	}
 }
 

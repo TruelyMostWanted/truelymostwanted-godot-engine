@@ -84,12 +84,11 @@
 #include "servers/settings/audio_bus_settings_server.h"
 #include "servers/settings/audio_device_settings_server.h"
 #include "servers/settings/audio_settings.h"
-#include "servers/settings/camera_settings.h"
-#include "servers/settings/camera_settings_server.h"
+#include "servers/settings/camera_3d_settings.h"
+#include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
-#include "servers/settings/input_map_action.h"
-#include "servers/settings/input_map_settings.h"
+#include "servers/settings/input_action_rebinder.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/input_settings.h"
 #include "servers/settings/input_settings_server.h"
@@ -115,6 +114,11 @@
 #include "servers/settings/video_texture_streaming_settings_server.h"
 #include "servers/settings/video_window_settings.h"
 #include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/xr_settings.h"
+#include "servers/settings/xr_settings_server.h"
+#include "servers/subtitle/subtitle.h"
+#include "servers/subtitle/subtitle_resource_format.h"
+#include "servers/subtitle/subtitle_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 #include "servers/text/text_server_extension.h"
@@ -191,6 +195,9 @@ static bool has_server_feature_callback(const String &p_feature) {
 
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
 static TTSServer *tts_server = nullptr;
+static SubtitleServer *subtitle_server = nullptr;
+static Ref<ResourceFormatLoaderSubtitle> resource_loader_subtitle;
+static Ref<ResourceFormatSaverSubtitle> resource_saver_subtitle;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioDeviceSettingsServer *audio_device_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
@@ -210,7 +217,10 @@ static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
 #endif
 #ifndef _3D_DISABLED
-static CameraSettingsServer *camera_settings_server = nullptr;
+static Camera3DSettingsServer *camera_3d_settings_server = nullptr;
+#endif
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+static XRSettingsServer *xr_settings_server = nullptr;
 #endif
 
 void register_server_types() {
@@ -233,6 +243,17 @@ void register_server_types() {
 	tts_server = memnew(TTSServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSServer", TTSServer::get_singleton(), "TTSServer"));
 
+	GDREGISTER_CLASS(SubtitleSegment);
+	GDREGISTER_CLASS(SubtitleValidation);
+	GDREGISTER_CLASS(Subtitle);
+	GDREGISTER_ABSTRACT_CLASS(SubtitleServer);
+	subtitle_server = memnew(SubtitleServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("SubtitleServer", SubtitleServer::get_singleton(), "SubtitleServer"));
+	resource_loader_subtitle.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_subtitle);
+	resource_saver_subtitle.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_subtitle);
+
 	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
 	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
 	GDREGISTER_ABSTRACT_CLASS(SettingsServerManager);
@@ -242,6 +263,8 @@ void register_server_types() {
 	GDREGISTER_CLASS(AudioDeviceSettings);
 	GDREGISTER_CLASS(AudioBusSettings);
 	GDREGISTER_CLASS(AudioBusListSettings);
+	GDREGISTER_CLASS(AudioBusSettingsRow);
+	GDREGISTER_CLASS(AudioBusSettingsRows);
 	GDREGISTER_ABSTRACT_CLASS(AudioDeviceSettingsServer);
 	GDREGISTER_ABSTRACT_CLASS(AudioBusSettingsServer);
 	audio_device_settings_server = memnew(AudioDeviceSettingsServer);
@@ -260,9 +283,15 @@ void register_server_types() {
 	input_settings_server = memnew(InputSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputSettingsServer", InputSettingsServer::get_singleton(), "InputSettingsServer"));
 	settings_server_manager->register_server(input_settings_server);
-	GDREGISTER_CLASS(InputMapAction);
-	GDREGISTER_CLASS(InputMapSettings);
+	GDREGISTER_CLASS(InputMapSettingsEvent);
+	GDREGISTER_CLASS(InputMapSettingsAction);
+	GDREGISTER_CLASS(InputMapSettingsActions);
+	GDREGISTER_CLASS(InputMapSettingsEventRow);
+	GDREGISTER_CLASS(InputMapSettingsEventRows);
+	GDREGISTER_CLASS(InputMapSettingsRow);
+	GDREGISTER_CLASS(InputMapSettingsRows);
 	GDREGISTER_ABSTRACT_CLASS(InputMapSettingsServer);
+	GDREGISTER_CLASS(InputActionRebinder);
 	input_map_settings_server = memnew(InputMapSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
 	settings_server_manager->register_server(input_map_settings_server);
@@ -325,11 +354,19 @@ void register_server_types() {
 #endif
 #ifndef _3D_DISABLED
 	// Not with disable_3d (#28): Camera3D is missing.
-	GDREGISTER_CLASS(CameraSettings);
-	GDREGISTER_ABSTRACT_CLASS(CameraSettingsServer);
-	camera_settings_server = memnew(CameraSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("CameraSettingsServer", CameraSettingsServer::get_singleton(), "CameraSettingsServer"));
-	settings_server_manager->register_server(camera_settings_server);
+	GDREGISTER_CLASS(Camera3DSettings);
+	GDREGISTER_ABSTRACT_CLASS(Camera3DSettingsServer);
+	camera_3d_settings_server = memnew(Camera3DSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("Camera3DSettingsServer", Camera3DSettingsServer::get_singleton(), "Camera3DSettingsServer"));
+	settings_server_manager->register_server(camera_3d_settings_server);
+#endif
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+	// Only with the openxr module (#30); otherwise the domain is missing.
+	GDREGISTER_CLASS(XRSettings);
+	GDREGISTER_ABSTRACT_CLASS(XRSettingsServer);
+	xr_settings_server = memnew(XRSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("XRSettingsServer", XRSettingsServer::get_singleton(), "XRSettingsServer"));
+	settings_server_manager->register_server(xr_settings_server);
 #endif
 
 	OS::get_singleton()->set_has_server_feature_callback(has_server_feature_callback);
@@ -564,12 +601,22 @@ void unregister_server_types() {
 
 	ServersDebugger::deinitialize();
 	memdelete(shader_types);
+	ResourceLoader::remove_resource_format_loader(resource_loader_subtitle);
+	resource_loader_subtitle.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_subtitle);
+	resource_saver_subtitle.unref();
+	memdelete(subtitle_server);
+	subtitle_server = nullptr;
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.
+#if defined(MODULE_OPENXR_ENABLED) && !defined(XR_DISABLED)
+	memdelete(xr_settings_server);
+	xr_settings_server = nullptr;
+#endif
 #ifndef _3D_DISABLED
-	memdelete(camera_settings_server);
-	camera_settings_server = nullptr;
+	memdelete(camera_3d_settings_server);
+	camera_3d_settings_server = nullptr;
 #endif
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	memdelete(video_texture_streaming_settings_server);

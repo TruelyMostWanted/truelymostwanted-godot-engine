@@ -1564,11 +1564,11 @@
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
 		</member>
+		<member name="Camera3DSettingsServer" type="Camera3DSettingsServer" setter="" getter="">
+			The [Camera3DSettingsServer] singleton.
+		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
-		</member>
-		<member name="CameraSettingsServer" type="CameraSettingsServer" setter="" getter="">
-			The [CameraSettingsServer] singleton.
 		</member>
 		<member name="ClassDB" type="ClassDB" setter="" getter="">
 			The [ClassDB] singleton.
@@ -1610,6 +1610,9 @@
 		</member>
 		<member name="Input" type="Input" setter="" getter="">
 			The [Input] singleton.
+		</member>
+		<member name="InputIconServer" type="InputIconServer" setter="" getter="">
+			The [InputIconServer] singleton.
 		</member>
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
@@ -1701,6 +1704,9 @@
 		<member name="ResourceUID" type="ResourceUID" setter="" getter="">
 			The [ResourceUID] singleton.
 		</member>
+		<member name="ScreenshotServer" type="ScreenshotServer" setter="" getter="">
+			The [ScreenshotServer] singleton.
+		</member>
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
 		</member>
@@ -1709,6 +1715,9 @@
 		</member>
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
+		</member>
+		<member name="SubtitleServer" type="SubtitleServer" setter="" getter="">
+			The [SubtitleServer] singleton.
 		</member>
 		<member name="TTSPersonaSettingsServer" type="TTSPersonaSettingsServer" setter="" getter="">
 			The [TTSPersonaSettingsServer] singleton.
@@ -1757,6 +1766,9 @@
 		</member>
 		<member name="XRServer" type="XRServer" setter="" getter="">
 			The [XRServer] singleton.
+		</member>
+		<member name="XRSettingsServer" type="XRSettingsServer" setter="" getter="">
+			The [XRSettingsServer] singleton.
 		</member>
 	</members>
 	<constants>

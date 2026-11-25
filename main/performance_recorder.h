@@ -34,7 +34,9 @@
 #include "core/os/mutex.h"
 #include "core/templates/local_vector.h"
 #include "core/templates/rid.h"
+#include "main/performance_budget.h"
 #include "main/performance_recording_profile.h"
+#include "main/performance_summary.h"
 
 #include <atomic>
 
@@ -74,6 +76,8 @@ public:
 	};
 
 	static constexpr int MAX_METRICS = 256;
+	// Hitch frame numbers kept per run; hitches after that are only counted.
+	static constexpr int MAX_HITCH_FRAMES = 1024;
 
 private:
 	static PerformanceRecorder *singleton;
@@ -95,6 +99,14 @@ private:
 	struct SourceEntry {
 		StringName name;
 		MetricSource *source = nullptr;
+	};
+
+	// Running statistics of one column over the whole run (the ring buffer only holds the last rows).
+	struct ColumnStatistics {
+		uint64_t count = 0;
+		double minimum = 0.0;
+		double maximum = 0.0;
+		double sum = 0.0;
 	};
 
 	struct ActiveSource {
@@ -127,6 +139,16 @@ private:
 	LocalVector<double> source_scratch;
 	int recorder_time_column = -1;
 
+	// Summary (main thread): kept after stop() until the next start().
+	LocalVector<ColumnStatistics> statistics;
+	LocalVector<uint32_t> histograms; // columns.size() * PerformanceColumnSummary::HISTOGRAM_BUCKETS.
+	uint64_t hitch_threshold_usec = 0;
+	uint64_t hitch_count = 0;
+	LocalVector<int64_t> hitch_frames;
+	uint64_t stop_usec = 0;
+	bool write_summary_json = false;
+	Ref<PerformanceBudget> exit_budget; // From --performance-budget or the project settings, checked in finish().
+
 	int sample_interval = 1;
 	int process_memory_interval = 30;
 	int flush_interval = 300;
@@ -155,6 +177,8 @@ private:
 	void _record_row(uint64_t p_begin_usec, uint64_t p_frame_usec, uint64_t p_process_usec, uint64_t p_physics_usec, int p_physics_steps);
 	double _sample_builtin(int p_builtin, uint64_t p_frame_usec, uint64_t p_process_usec, uint64_t p_physics_usec, int p_physics_steps);
 	double _sample_custom_monitor(int p_index) const;
+	void _add_statistic(uint32_t p_column, double p_value);
+	void _write_summary_json();
 	void _enable_gpu_measurement();
 	void _disable_gpu_measurement();
 
@@ -199,9 +223,14 @@ public:
 	int64_t get_recorded_frame_count() const;
 	String get_output_path() const;
 
+	// Summary and budget.
+	Ref<PerformanceSummary> get_summary() const;
+	Ref<PerformanceBudgetResult> check_budget(const Ref<PerformanceBudget> &p_budget) const;
+
 	// Starts recording from the command line options or the project settings (called by Main::start()).
-	void start_from_settings(const String &p_cli_output_path, const String &p_cli_profile_path, bool p_use_project_settings);
-	// Writes the remaining rows without emitting signals (called by Main::cleanup()).
+	void start_from_settings(const String &p_cli_output_path, const String &p_cli_profile_path, const String &p_cli_budget_path, bool p_use_project_settings);
+	// Writes the remaining rows without emitting signals, then checks the budget from the command line
+	// or the project settings and sets a failing exit code (called by Main::cleanup()).
 	void finish();
 
 	// Called once per frame by Main::iteration().

@@ -4,7 +4,7 @@
 		Settings server for texture filtering (anisotropic filtering, mipmap bias, projector and decal filter) and Canvas2D (texture filter, pixel snap, SDF, 2D shadow atlas).
 	</brief_description>
 	<description>
-		[VideoTextureSettingsServer] is the settings domain [code]"video_texture"[/code]: it stores the texture filtering ([member Viewport.anisotropic_filtering_level], [member Viewport.texture_mipmap_bias], [method RenderingServer.light_projectors_set_filter], [method RenderingServer.decals_set_filter]) and the Canvas2D options ([member Viewport.canvas_item_default_texture_filter], [member Viewport.canvas_item_default_texture_repeat], [member Viewport.snap_2d_transforms_to_pixel], [member Viewport.snap_2d_vertices_to_pixel], [member Viewport.sdf_oversize], [member Viewport.sdf_scale], [method RenderingServer.canvas_set_shadow_texture_size]) for the player. Every value takes effect at once. The settings resource is a [VideoTextureSettings]; the file is [code]user://settings/video_texture.ini[/code] by default, in the format of [member ProjectSettings.settings/storage/format].
+		[VideoTextureSettingsServer] is the settings domain [code]"video_texture"[/code]: it stores the texture filtering ([member Viewport.anisotropic_filtering_level], [member Viewport.texture_mipmap_bias], [method RenderingServer.light_projectors_set_filter], [method RenderingServer.decals_set_filter]) and the Canvas2D options ([member Viewport.canvas_item_default_texture_filter], [member Viewport.canvas_item_default_texture_repeat], [member Viewport.snap_2d_transforms_to_pixel], [member Viewport.snap_2d_vertices_to_pixel], [member Viewport.sdf_oversize], [member Viewport.sdf_scale], [method RenderingServer.canvas_set_shadow_texture_size]) for the player. Every value takes effect at once. The settings resource is a [VideoTextureSettings]; the file is [code]user://settings/video_texture.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]).
 		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the root viewport exists and before the main scene is loaded. Values set earlier wait until then. The defaults are the project settings ([member ProjectSettings.rendering/textures/default_filters/anisotropic_filtering_level], [member ProjectSettings.rendering/textures/default_filters/texture_mipmap_bias], [member ProjectSettings.rendering/textures/light_projectors/filter], [member ProjectSettings.rendering/textures/decals/filter], [member ProjectSettings.rendering/textures/canvas_textures/default_texture_filter], [member ProjectSettings.rendering/textures/canvas_textures/default_texture_repeat], [member ProjectSettings.rendering/2d/snap/snap_2d_transforms_to_pixel], [member ProjectSettings.rendering/2d/snap/snap_2d_vertices_to_pixel], [member ProjectSettings.rendering/2d/sdf/oversize], [member ProjectSettings.rendering/2d/sdf/scale], [member ProjectSettings.rendering/2d/shadow_atlas/size]), with their feature overrides such as [code].mobile[/code].
 		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and to every [Viewport] in the group [method get_viewport_group], for example a [SubViewport] that renders a pixel-art game at a low resolution.
 		[b]Renderers:[/b] every value works in every renderer, except the light projector filter and the decal filter, which the Compatibility renderer (default in the Web export) ignores. [method SettingsServer.is_value_supported] returns [code]false[/code] for them there and [method get_unsupported_setting_names] lists them, so that a settings menu can gray them out. Such values are still stored, but not pushed; a warning names them once.
@@ -228,4 +228,32 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="anisotropic_filtering_level_changed">
+			<param index="0" name="level" type="int" enum="Viewport.AnisotropicFiltering" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.anisotropic_filtering_level] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] that renders the game.
+			</description>
+		</signal>
+		<signal name="canvas_item_default_texture_filter_changed">
+			<param index="0" name="filter" type="int" enum="Viewport.DefaultCanvasItemTextureFilter" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.canvas_item_default_texture_filter] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for a [SubViewport] with 2D content.
+			</description>
+		</signal>
+		<signal name="canvas_item_default_texture_repeat_changed">
+			<param index="0" name="repeat" type="int" enum="Viewport.DefaultCanvasItemTextureRepeat" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.canvas_item_default_texture_repeat] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="texture_mipmap_bias_changed">
+			<param index="0" name="bias" type="float" />
+			<description>
+				Emitted once when a changed [member VideoTextureSettings.texture_mipmap_bias] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>

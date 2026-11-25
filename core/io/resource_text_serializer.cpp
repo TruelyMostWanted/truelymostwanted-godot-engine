@@ -430,6 +430,20 @@ static double _plain_float32(float p_value) {
 	return String::num_scientific(p_value).to_float();
 }
 
+// A plain float that is exactly a 32-bit float (a C++ `float` property read as a Variant, such as 0.2f read as
+// 0.20000000298023224) is written in its shortest 32-bit form (0.2), like the components of vectors. Other values,
+// such as 0.1 + 0.2, are 64-bit and written exactly. SerializerOptions.full_precision_floats writes every value exactly.
+static double _plain_float(double p_value) {
+	if (tls_full_precision_floats || !Math::is_finite(p_value)) {
+		return p_value;
+	}
+	const float as_float32 = float(p_value);
+	if (double(as_float32) != p_value) {
+		return p_value;
+	}
+	return String::num_scientific(as_float32).to_float();
+}
+
 static bool _is_math_type(Variant::Type p_type) {
 	switch (p_type) {
 		case Variant::VECTOR2:
@@ -1111,9 +1125,10 @@ Variant TreeEncoder::encode_value(const Variant &p_value, const PropertyInfo &p_
 	switch (type) {
 		case Variant::NIL:
 		case Variant::BOOL:
-		case Variant::FLOAT:
 		case Variant::STRING:
 			return p_value;
+		case Variant::FLOAT:
+			return _plain_float(p_value);
 		case Variant::INT: {
 			if (enums_as_names) {
 				LocalVector<EnumValue> values;

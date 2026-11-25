@@ -36,6 +36,7 @@
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/templates/local_vector.h"
+#include "scene/main/node.h"
 #include "scene/main/scene_tree.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_effect_settings.h"
@@ -729,7 +730,39 @@ float VideoEffectSettingsServer::get_saturation() const {
 	return get_value(SNAME("saturation"));
 }
 
+void VideoEffectSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"allow_glow",
+		"allow_ssao",
+		"allow_ssil",
+		"allow_ssr",
+		"allow_fog",
+		"allow_volumetric_fog",
+		"brightness",
+		"contrast",
+		"saturation",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoEffectSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("allow_glow_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("allow_ssao_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("allow_ssil_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("allow_ssr_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("allow_fog_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("allow_volumetric_fog_changed", PropertyInfo(Variant::BOOL, "allowed")));
+	ADD_SIGNAL(MethodInfo("brightness_changed", PropertyInfo(Variant::FLOAT, "brightness")));
+	ADD_SIGNAL(MethodInfo("contrast_changed", PropertyInfo(Variant::FLOAT, "contrast")));
+	ADD_SIGNAL(MethodInfo("saturation_changed", PropertyInfo(Variant::FLOAT, "saturation")));
+
 	ClassDB::bind_method(D_METHOD("set_ssao_quality", "quality"), &VideoEffectSettingsServer::set_ssao_quality);
 	ClassDB::bind_method(D_METHOD("get_ssao_quality"), &VideoEffectSettingsServer::get_ssao_quality);
 	ClassDB::bind_method(D_METHOD("set_ssao_half_size", "enabled"), &VideoEffectSettingsServer::set_ssao_half_size);

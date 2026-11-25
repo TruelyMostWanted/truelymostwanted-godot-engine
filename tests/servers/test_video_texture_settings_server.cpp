@@ -32,6 +32,9 @@
 
 TEST_FORCE_LINK(test_video_texture_settings_server)
 
+// The tested values are 3D viewport settings, which do not exist without 3D.
+#ifndef _3D_DISABLED
+
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
@@ -45,6 +48,7 @@ TEST_FORCE_LINK(test_video_texture_settings_server)
 #include "servers/settings/video_texture_settings_server.h"
 #include "servers/settings/video_texture_streaming_settings.h"
 #include "servers/settings/video_texture_streaming_settings_server.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
@@ -56,10 +60,10 @@ namespace TestVideoTextureSettingsServer {
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
 	TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	}
 };
 
@@ -451,4 +455,40 @@ TEST_CASE("[VideoTextureStreamingSettingsServer] Defaults, ranges, storage and r
 
 #endif // MODULE_TEXTURE_STREAMING_ENABLED
 
+TEST_CASE("[VideoTextureSettingsServer] Typed signals fire once per applied change") {
+	TestSetup setup;
+	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
+	SIGNAL_WATCH(server, "texture_mipmap_bias_changed");
+
+	// A pending change does not reach the engine: no signal.
+	server->set_value("texture_mipmap_bias", 0.5);
+	SIGNAL_CHECK_FALSE("texture_mipmap_bias_changed");
+
+	CHECK(server->apply() == OK);
+	const Array args = { { 0.5 } };
+	SIGNAL_CHECK("texture_mipmap_bias_changed", args);
+
+	// Nothing changed: apply() emits nothing.
+	CHECK(server->apply() == OK);
+	SIGNAL_CHECK_FALSE("texture_mipmap_bias_changed");
+
+	// Back to the default: the signal fires again with the default value.
+	const Variant default_value = server->get_default_value("texture_mipmap_bias");
+	server->reset_to_defaults();
+	SIGNAL_CHECK_FALSE("texture_mipmap_bias_changed");
+	CHECK(server->apply() == OK);
+	// Signal arguments: one call with one argument. Built explicitly, `{ { variant } }` collapses to one level.
+	Array default_call;
+	default_call.push_back(default_value);
+	Array default_args;
+	default_args.push_back(default_call);
+	SIGNAL_CHECK("texture_mipmap_bias_changed", default_args);
+
+	SIGNAL_UNWATCH(server, "texture_mipmap_bias_changed");
+	memdelete(server);
+}
+
 } // namespace TestVideoTextureSettingsServer
+
+#endif // _3D_DISABLED

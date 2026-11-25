@@ -275,29 +275,32 @@ Variant VideoQualitySettingsServer::_get_effective_value(const StringName &p_nam
 }
 
 void VideoQualitySettingsServer::_apply_to_viewport(Viewport *p_viewport, const StringName &p_name, const Variant &p_value) const {
+#ifndef _3D_DISABLED
 	if (p_name == SNAME("scaling_3d_mode")) {
 		p_viewport->set_scaling_3d_mode(Viewport::Scaling3DMode(int(p_value)));
 	} else if (p_name == SNAME("scaling_3d_scale")) {
 		p_viewport->set_scaling_3d_scale(float(p_value));
 	} else if (p_name == SNAME("fsr_sharpness")) {
 		p_viewport->set_fsr_sharpness(float(p_value));
-	} else if (p_name == SNAME("mesh_lod_threshold")) {
-		p_viewport->set_mesh_lod_threshold(float(p_value));
-	} else if (p_name == SNAME("msaa_2d")) {
-		p_viewport->set_msaa_2d(Viewport::MSAA(int(p_value)));
-	} else if (p_name == SNAME("msaa_3d")) {
-		p_viewport->set_msaa_3d(Viewport::MSAA(int(p_value)));
-	} else if (p_name == SNAME("screen_space_aa")) {
-		p_viewport->set_screen_space_aa(Viewport::ScreenSpaceAA(int(p_value)));
-	} else if (p_name == SNAME("use_taa")) {
-		p_viewport->set_use_taa(bool(p_value));
-	} else if (p_name == SNAME("use_debanding")) {
-		p_viewport->set_use_debanding(bool(p_value));
-	} else if (p_name == SNAME("vrs_mode")) {
-		p_viewport->set_vrs_mode(Viewport::VRSMode(int(p_value)));
-	} else if (p_name == SNAME("use_occlusion_culling")) {
-		p_viewport->set_use_occlusion_culling(bool(p_value));
-	}
+	} else
+#endif // _3D_DISABLED
+		if (p_name == SNAME("mesh_lod_threshold")) {
+			p_viewport->set_mesh_lod_threshold(float(p_value));
+		} else if (p_name == SNAME("msaa_2d")) {
+			p_viewport->set_msaa_2d(Viewport::MSAA(int(p_value)));
+		} else if (p_name == SNAME("msaa_3d")) {
+			p_viewport->set_msaa_3d(Viewport::MSAA(int(p_value)));
+		} else if (p_name == SNAME("screen_space_aa")) {
+			p_viewport->set_screen_space_aa(Viewport::ScreenSpaceAA(int(p_value)));
+		} else if (p_name == SNAME("use_taa")) {
+			p_viewport->set_use_taa(bool(p_value));
+		} else if (p_name == SNAME("use_debanding")) {
+			p_viewport->set_use_debanding(bool(p_value));
+		} else if (p_name == SNAME("vrs_mode")) {
+			p_viewport->set_vrs_mode(Viewport::VRSMode(int(p_value)));
+		} else if (p_name == SNAME("use_occlusion_culling")) {
+			p_viewport->set_use_occlusion_culling(bool(p_value));
+		}
 }
 
 void VideoQualitySettingsServer::_apply_all_to_viewport(Viewport *p_viewport) {
@@ -398,6 +401,7 @@ Variant VideoQualitySettingsServer::_pull_quality_value(const StringName &p_name
 		// RenderingServer has no getters for the global values; skipped values stay as stored.
 		return _get_current(p_name);
 	}
+#ifndef _3D_DISABLED
 	if (p_name == SNAME("scaling_3d_mode")) {
 		const Variant current = _get_current(p_name);
 		if (!is_scaling_3d_mode_supported(Viewport::Scaling3DMode(int(current)))) {
@@ -408,23 +412,25 @@ Variant VideoQualitySettingsServer::_pull_quality_value(const StringName &p_name
 		return root->get_scaling_3d_scale();
 	} else if (p_name == SNAME("fsr_sharpness")) {
 		return root->get_fsr_sharpness();
-	} else if (p_name == SNAME("mesh_lod_threshold")) {
-		return root->get_mesh_lod_threshold();
-	} else if (p_name == SNAME("msaa_2d")) {
-		return int(root->get_msaa_2d());
-	} else if (p_name == SNAME("msaa_3d")) {
-		return int(root->get_msaa_3d());
-	} else if (p_name == SNAME("screen_space_aa")) {
-		return int(root->get_screen_space_aa());
-	} else if (p_name == SNAME("use_taa")) {
-		return root->is_using_taa();
-	} else if (p_name == SNAME("use_debanding")) {
-		return root->is_using_debanding();
-	} else if (p_name == SNAME("vrs_mode")) {
-		return int(root->get_vrs_mode());
-	} else if (p_name == SNAME("use_occlusion_culling")) {
-		return root->is_using_occlusion_culling();
-	}
+	} else
+#endif // _3D_DISABLED
+		if (p_name == SNAME("mesh_lod_threshold")) {
+			return root->get_mesh_lod_threshold();
+		} else if (p_name == SNAME("msaa_2d")) {
+			return int(root->get_msaa_2d());
+		} else if (p_name == SNAME("msaa_3d")) {
+			return int(root->get_msaa_3d());
+		} else if (p_name == SNAME("screen_space_aa")) {
+			return int(root->get_screen_space_aa());
+		} else if (p_name == SNAME("use_taa")) {
+			return root->is_using_taa();
+		} else if (p_name == SNAME("use_debanding")) {
+			return root->is_using_debanding();
+		} else if (p_name == SNAME("vrs_mode")) {
+			return int(root->get_vrs_mode());
+		} else if (p_name == SNAME("use_occlusion_culling")) {
+			return root->is_using_occlusion_culling();
+		}
 	return _get_current(p_name);
 }
 
@@ -656,7 +662,39 @@ RenderingServerEnums::ViewportOcclusionCullingBuildQuality VideoQualitySettingsS
 	return RenderingServerEnums::ViewportOcclusionCullingBuildQuality(int(get_value(SNAME("occlusion_culling_build_quality"))));
 }
 
+void VideoQualitySettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"scaling_3d_mode",
+		"scaling_3d_scale",
+		"fsr_sharpness",
+		"mesh_lod_threshold",
+		"msaa_2d",
+		"msaa_3d",
+		"screen_space_aa",
+		"use_taa",
+		"use_debanding",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void VideoQualitySettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("scaling_3d_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.Scaling3DMode")));
+	ADD_SIGNAL(MethodInfo("scaling_3d_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
+	ADD_SIGNAL(MethodInfo("fsr_sharpness_changed", PropertyInfo(Variant::FLOAT, "sharpness")));
+	ADD_SIGNAL(MethodInfo("mesh_lod_threshold_changed", PropertyInfo(Variant::FLOAT, "threshold")));
+	ADD_SIGNAL(MethodInfo("msaa_2d_changed", PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.MSAA")));
+	ADD_SIGNAL(MethodInfo("msaa_3d_changed", PropertyInfo(Variant::INT, "msaa", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.MSAA")));
+	ADD_SIGNAL(MethodInfo("screen_space_aa_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Viewport.ScreenSpaceAA")));
+	ADD_SIGNAL(MethodInfo("use_taa_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("use_debanding_changed", PropertyInfo(Variant::BOOL, "enabled")));
+
 	ClassDB::bind_method(D_METHOD("set_scaling_3d_mode", "mode"), &VideoQualitySettingsServer::set_scaling_3d_mode);
 	ClassDB::bind_method(D_METHOD("get_scaling_3d_mode"), &VideoQualitySettingsServer::get_scaling_3d_mode);
 	ClassDB::bind_method(D_METHOD("set_scaling_3d_scale", "scale"), &VideoQualitySettingsServer::set_scaling_3d_scale);

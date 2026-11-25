@@ -540,6 +540,7 @@ String VideoPresetSettingsServer::suggest_preset() const {
 	} else if (method == "mobile") {
 		level = 1;
 	} else {
+#ifdef RD_ENABLED
 		const RenderingServer *rendering_server = RenderingServer::get_singleton();
 		if (rendering_server != nullptr) {
 			switch (rendering_server->get_video_adapter_type()) {
@@ -554,6 +555,7 @@ String VideoPresetSettingsServer::suggest_preset() const {
 					break;
 			}
 		}
+#endif // RD_ENABLED
 	}
 	for (int i = level; i >= 0; i--) {
 		if (has_preset(video_preset_builtin_names[i])) {

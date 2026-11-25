@@ -43,14 +43,17 @@
 #include "core/os/os.h"
 #include "servers/settings/settings_server_manager.h"
 
-static constexpr const char *SETTING_STORAGE_FOLDER = "settings/storage/folder";
-static constexpr const char *SETTING_STORAGE_FORMAT = "settings/storage/format";
-static constexpr const char *SETTING_ONLY_CHANGED = "settings/storage/only_changed_values";
-static constexpr const char *SETTING_AUTOSAVE = "settings/storage/autosave";
-static constexpr const char *SETTING_CONFIRMATION_TIMEOUT = "settings/apply/confirmation_timeout";
+static constexpr const char *SETTING_GENERAL_FOLDER = "settings/general/folder";
+static constexpr const char *SETTING_GENERAL_DEFAULT_FORMAT = "settings/general/default_format";
+static constexpr const char *SETTING_ONLY_CHANGED = "settings/general/only_changed_values";
+static constexpr const char *SETTING_AUTOSAVE = "settings/general/autosave";
+static constexpr const char *SETTING_CONFIRMATION_TIMEOUT = "settings/general/confirmation_timeout";
 static constexpr const char *SETTING_DEFAULTS_PREFIX = "settings/defaults/";
-static constexpr const char *SETTING_PATHS_PREFIX = "settings/paths/";
-static constexpr const char *SETTING_PATH_SUFFIX = "_settings_path";
+// Per domain: `settings/<domain>/<key>`.
+static constexpr const char *SETTING_DOMAIN_PREFIX = "settings/";
+static constexpr const char *SETTING_KEY_FILE_NAME = "file_name";
+static constexpr const char *SETTING_KEY_OVERRIDE_FORMAT = "override_format";
+static constexpr const char *SETTING_KEY_FORMAT = "format";
 
 // Metadata key in the settings file (INI and JSON) with the format version of the domain.
 static constexpr const char *META_SETTINGS_VERSION = "settings_version";
@@ -132,6 +135,10 @@ bool SettingsServer::values_equal(const Variant &p_a, const Variant &p_b) {
 		}
 		return true;
 	}
+	if (p_a.get_type() == Variant::FLOAT && p_b.get_type() == Variant::FLOAT) {
+		// A 32-bit member (0.2f read as 0.20000000298023224) equals the value it was set to (0.2).
+		return snap_float(p_a) == snap_float(p_b);
+	}
 	return p_a == p_b;
 }
 
@@ -149,13 +156,91 @@ Ref<Resource> SettingsServer::copy_settings(const Ref<Resource> &p_settings) {
 	return copy;
 }
 
+double SettingsServer::snap_float(double p_value, double p_step, double p_offset) {
+	if (!Math::is_finite(p_value)) {
+		return p_value;
+	}
+	double value = p_value;
+	// Values beyond 2^40 have no three decimals left in a double; they are kept.
+	if (Math::abs(value) < 1099511627776.0) {
+		const double step = MAX(Math::is_finite(p_step) ? p_step : FLOAT_STEP, FLOAT_STEP);
+		const double offset = Math::is_finite(p_offset) ? p_offset : 0.0;
+		value = Math::round((value - offset) / step) * step + offset;
+		// n / 1000 is the double nearest to the decimal value, so 3 * 0.1 is 0.3 and not 0.30000000000000004.
+		value = Math::round(value * 1000.0) / 1000.0;
+	}
+	return value == 0.0 ? 0.0 : value;
+}
+
+void SettingsServer::get_float_step(const PropertyInfo &p_info, double &r_step, double &r_offset) {
+	r_step = FLOAT_STEP;
+	r_offset = 0.0;
+	if (p_info.hint != PROPERTY_HINT_RANGE) {
+		return;
+	}
+	const Vector<String> parts = p_info.hint_string.split(",");
+	if (parts.size() < 3 || !parts[2].is_valid_float() || parts[2].to_float() < FLOAT_STEP) {
+		return;
+	}
+	r_step = parts[2].to_float();
+	r_offset = parts[0].is_valid_float() ? parts[0].to_float() : 0.0;
+}
+
+Variant SettingsServer::snap_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) {
+	if (p_value.get_type() != Variant::FLOAT) {
+		return p_value;
+	}
+	double step = FLOAT_STEP;
+	double offset = 0.0;
+	if (p_object != nullptr) {
+		List<PropertyInfo> list;
+		p_object->get_property_list(&list);
+		for (const PropertyInfo &info : list) {
+			if (info.name == p_name) {
+				get_float_step(info, step, offset);
+				break;
+			}
+		}
+	}
+	return snap_float(p_value, step, offset);
+}
+
+void SettingsServer::snap_resource_floats(const Ref<Resource> &p_resource) {
+	if (p_resource.is_null()) {
+		return;
+	}
+	LocalVector<PropertyInfo> infos;
+	get_value_infos(p_resource.ptr(), infos);
+	for (const PropertyInfo &info : infos) {
+		const Variant value = p_resource->get(info.name);
+		if (info.type == Variant::FLOAT && value.get_type() == Variant::FLOAT) {
+			double step = FLOAT_STEP;
+			double offset = 0.0;
+			get_float_step(info, step, offset);
+			const double snapped = snap_float(value, step, offset);
+			if (snapped != double(value)) {
+				p_resource->set(info.name, snapped);
+			}
+		} else if (value.get_type() == Variant::ARRAY) {
+			// List entries. Entries with a resource path are shared (like copy_value(), which keeps them) and left alone.
+			const Array list = value;
+			for (int i = 0; i < list.size(); i++) {
+				const Ref<Resource> entry = list[i];
+				if (entry.is_valid() && entry != p_resource && entry->get_path().is_empty()) {
+					snap_resource_floats(entry);
+				}
+			}
+		}
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // Project settings.
 
 void SettingsServer::register_settings() {
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_STORAGE_FOLDER, PROPERTY_HINT_DIR), "user://settings");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_GENERAL_FOLDER, PROPERTY_HINT_DIR), "user://settings");
 	// Values of ResourceTextSerializer::Format.
-	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_STORAGE_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_GENERAL_DEFAULT_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
 	GLOBAL_DEF(SETTING_ONLY_CHANGED, true);
 	GLOBAL_DEF(SETTING_AUTOSAVE, true);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, SETTING_CONFIRMATION_TIMEOUT, PROPERTY_HINT_RANGE, "1,120,0.5,or_greater,suffix:s"), 15.0);
@@ -170,37 +255,66 @@ static Variant _get_project_setting(const String &p_name, const Variant &p_defau
 }
 
 String SettingsServer::get_storage_folder() {
-	const String folder = _get_project_setting(SETTING_STORAGE_FOLDER, "user://settings");
+	const String folder = _get_project_setting(SETTING_GENERAL_FOLDER, "user://settings");
 	return folder.is_empty() ? String("user://settings") : folder;
 }
 
-String SettingsServer::get_path_setting_name(const StringName &p_domain) {
-	return String(SETTING_PATHS_PREFIX) + String(p_domain) + SETTING_PATH_SUFFIX;
+String SettingsServer::get_domain_setting_name(const StringName &p_domain, const String &p_key) {
+	return String(SETTING_DOMAIN_PREFIX) + String(p_domain) + "/" + p_key;
 }
 
-void SettingsServer::register_path_setting(const StringName &p_domain, bool p_csv) {
+void SettingsServer::register_domain_settings(const StringName &p_domain, bool p_csv) {
 	ERR_FAIL_COND(p_domain == StringName());
 	if (ProjectSettings::get_singleton() == nullptr) {
 		return;
 	}
-	// The extension of the path picks the text format. CSV only for list domains.
-	const String extensions = p_csv ? "*.json,*.ini,*.csv,*.xml,*.toml,*.yaml,*.yml" : "*.json,*.ini,*.xml,*.toml,*.yaml,*.yml";
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, get_path_setting_name(p_domain), PROPERTY_HINT_SAVE_FILE, extensions), String());
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, get_domain_setting_name(p_domain, SETTING_KEY_FILE_NAME)), String(p_domain));
+	GLOBAL_DEF(get_domain_setting_name(p_domain, SETTING_KEY_OVERRIDE_FORMAT), false);
+	// Values of ResourceTextSerializer::Format. CSV only for list domains.
+	const String formats = p_csv ? "JSON:0,INI:1,CSV:2,XML:3,TOML:4,YAML:5" : "JSON:0,INI:1,XML:3,TOML:4,YAML:5";
+	GLOBAL_DEF(PropertyInfo(Variant::INT, get_domain_setting_name(p_domain, SETTING_KEY_FORMAT), PROPERTY_HINT_ENUM, formats), ResourceTextSerializer::FORMAT_INI);
 }
 
-ResourceTextSerializer::Format SettingsServer::get_storage_format() {
-	const Variant value = _get_project_setting(SETTING_STORAGE_FORMAT, ResourceTextSerializer::FORMAT_INI);
+// A format value of the project settings: a Format value, or a format name written by hand into project.godot ("json", "ini", ...).
+static ResourceTextSerializer::Format _parse_format_setting(const Variant &p_value) {
 	int format = ResourceTextSerializer::FORMAT_INI;
-	if (value.get_type() == Variant::STRING || value.get_type() == Variant::STRING_NAME) {
-		// A format name written by hand into project.godot ("json", "ini", ...).
-		format = ResourceTextSerializer::get_format_for_extension(value);
-	} else if (value.get_type() == Variant::INT) {
-		format = value;
+	if (p_value.get_type() == Variant::STRING || p_value.get_type() == Variant::STRING_NAME) {
+		format = ResourceTextSerializer::get_format_for_extension(p_value);
+	} else if (p_value.get_type() == Variant::INT) {
+		format = p_value;
 	}
 	if (format < 0 || format >= ResourceTextSerializer::FORMAT_MAX) {
 		return ResourceTextSerializer::FORMAT_INI;
 	}
 	return ResourceTextSerializer::Format(format);
+}
+
+ResourceTextSerializer::Format SettingsServer::get_storage_format() {
+	return _parse_format_setting(_get_project_setting(SETTING_GENERAL_DEFAULT_FORMAT, ResourceTextSerializer::FORMAT_INI));
+}
+
+ResourceTextSerializer::Format SettingsServer::_get_configured_format() const {
+	const StringName domain = get_domain();
+	if (domain != StringName() && bool(_get_project_setting(get_domain_setting_name(domain, SETTING_KEY_OVERRIDE_FORMAT), false))) {
+		return _parse_format_setting(_get_project_setting(get_domain_setting_name(domain, SETTING_KEY_FORMAT), ResourceTextSerializer::FORMAT_INI));
+	}
+	return get_storage_format();
+}
+
+bool SettingsServer::is_valid_file_name(const String &p_file_name) {
+	const String file_name = p_file_name.strip_edges();
+	// is_absolute_path() also covers `res://`, `user://` and drive letters (`:/`, `:\`).
+	if (file_name.is_empty() || file_name.is_absolute_path()) {
+		return false;
+	}
+	// An empty part is a trailing or a double separator.
+	const Vector<String> parts = file_name.replace_char('\\', '/').split("/");
+	for (const String &part : parts) {
+		if (part.is_empty() || part == "." || part == "..") {
+			return false;
+		}
+	}
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -242,12 +356,21 @@ void SettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings)
 	GDVIRTUAL_CALL(_read_from_engine, p_settings);
 }
 
+void SettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	GDVIRTUAL_CALL(_value_applied, p_name, p_value);
+}
+
 Variant SettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	Variant ret;
 	if (GDVIRTUAL_CALL(_validate_value, p_name, p_value, ret)) {
 		return ret;
 	}
 	return p_value;
+}
+
+String SettingsServer::_get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const {
+	const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, p_format);
+	return ResourceTextSerializer::get_type_name(storage_defaults.ptr());
 }
 
 Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionary &p_data) {
@@ -259,7 +382,7 @@ Dictionary SettingsServer::_migrate_settings(int p_from_version, const Dictionar
 }
 
 ResourceTextSerializer::Format SettingsServer::_get_file_format() {
-	const ResourceTextSerializer::Format format = get_storage_format();
+	const ResourceTextSerializer::Format format = _get_configured_format();
 	if (format == ResourceTextSerializer::FORMAT_CSV) {
 		if (!format_warned) {
 			format_warned = true;
@@ -286,9 +409,9 @@ ResourceTextSerializer::Format SettingsServer::_get_format_for_path(const String
 	if (format_warned_path != p_path) {
 		format_warned_path = p_path;
 		if (format == ResourceTextSerializer::FORMAT_MAX) {
-			ERR_PRINT(vformat("Settings domain \"%s\": the extension of \"%s\" belongs to no text format (use .json, .ini, .csv, .xml, .toml, .yaml or .yml); the file is read and written as %s, the format of \"%s\".", get_domain(), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+			ERR_PRINT(vformat("Settings domain \"%s\": the extension of \"%s\" belongs to no text format (use .json, .ini, .csv, .xml, .toml, .yaml or .yml); the file is read and written as %s, the format of the domain (\"%s\" or \"%s\").", get_domain(), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_GENERAL_DEFAULT_FORMAT, get_domain_setting_name(get_domain(), SETTING_KEY_FORMAT)));
 		} else {
-			ERR_PRINT(vformat("Settings domain \"%s\": the text format %s of \"%s\" is not available (module disabled); the file is read and written as %s, the format of \"%s\".", get_domain(), ResourceTextSerializer::get_format_display_name(format), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_STORAGE_FORMAT));
+			ERR_PRINT(vformat("Settings domain \"%s\": the text format %s of \"%s\" is not available (module disabled); the file is read and written as %s, the format of the domain (\"%s\" or \"%s\").", get_domain(), ResourceTextSerializer::get_format_display_name(format), p_path, ResourceTextSerializer::get_format_display_name(fallback), SETTING_GENERAL_DEFAULT_FORMAT, get_domain_setting_name(get_domain(), SETTING_KEY_FORMAT)));
 		}
 	}
 	return fallback;
@@ -351,6 +474,7 @@ void SettingsServer::_initialize() {
 		}
 	}
 
+	snap_resource_floats(defaults);
 	settings = copy_settings(defaults);
 	applied = copy_settings(defaults);
 	restart_baseline = copy_settings(defaults);
@@ -421,7 +545,8 @@ bool SettingsServer::has_setting(const StringName &p_name) const {
 }
 
 Variant SettingsServer::_validate(const StringName &p_name, const Variant &p_value) const {
-	return _validate_setting(p_name, validate_property_value(settings.ptr(), p_name, p_value));
+	// A value returned by _validate_value() is snapped too.
+	return snap_property_value(settings.ptr(), p_name, _validate_setting(p_name, validate_property_value(settings.ptr(), p_name, p_value)));
 }
 
 Variant SettingsServer::validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const {
@@ -441,14 +566,30 @@ Variant SettingsServer::validate_property_value(const Object *p_object, const St
 				const bool or_greater = parts.has("or_greater");
 				const bool or_less = parts.has("or_less");
 				double number = value;
+				if (info.type == Variant::FLOAT) {
+					// Snapped to the step first, then clamped (like Range): a limit off the step stays reachable.
+					double step = FLOAT_STEP;
+					double offset = 0.0;
+					get_float_step(info, step, offset);
+					number = snap_float(number, step, offset);
+				}
 				if (!or_less && number < min_value) {
 					number = min_value;
 				}
 				if (!or_greater && number > max_value) {
 					number = max_value;
 				}
-				value = info.type == Variant::INT ? Variant(int64_t(Math::round(number))) : Variant(number);
+				if (info.type == Variant::INT) {
+					value = int64_t(Math::round(number));
+				} else {
+					value = snap_float(number);
+				}
+			} else if (info.type == Variant::FLOAT) {
+				value = snap_float(value);
 			}
+		} else if (info.type == Variant::FLOAT && (value.get_type() == Variant::INT || value.get_type() == Variant::FLOAT)) {
+			// A [float] without a range hint: three decimals.
+			value = snap_float(value);
 		} else if (info.hint == PROPERTY_HINT_ENUM && info.type == Variant::INT && value.get_type() == Variant::INT) {
 			const Vector<String> entries = info.hint_string.split(",");
 			int64_t next = 0;
@@ -490,7 +631,7 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 		if (had_override) {
 			PackedStringArray names;
 			names.push_back(p_name);
-			_push_values(names);
+			_notify_values_applied(names, _push_values(names));
 		}
 		return;
 	}
@@ -501,7 +642,7 @@ void SettingsServer::set_value(const StringName &p_name, const Variant &p_value)
 }
 
 void SettingsServer::notify_value_changed(const StringName &p_name) {
-	emit_signal(SNAME("value_changed"), p_name, settings->get(p_name));
+	emit_signal(SNAME("value_changed"), p_name, snap_property_value(settings.ptr(), p_name, settings->get(p_name)));
 	PackedStringArray names;
 	names.push_back(p_name);
 	_emit_settings_changed(names);
@@ -515,7 +656,8 @@ Variant SettingsServer::get_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = settings->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(settings.ptr(), p_name, value);
 }
 
 Variant SettingsServer::get_applied_value(const StringName &p_name) const {
@@ -523,7 +665,8 @@ Variant SettingsServer::get_applied_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = applied->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(applied.ptr(), p_name, value);
 }
 
 Variant SettingsServer::get_default_value(const StringName &p_name) const {
@@ -531,7 +674,8 @@ Variant SettingsServer::get_default_value(const StringName &p_name) const {
 	bool valid = false;
 	const Variant value = defaults->get(p_name, &valid);
 	ERR_FAIL_COND_V_MSG(!valid, Variant(), vformat("Settings domain \"%s\" has no value \"%s\".", get_domain(), p_name));
-	return value;
+	// A 32-bit member reads back as 0.20000000298023224; the value is 0.2.
+	return snap_property_value(defaults.ptr(), p_name, value);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -601,7 +745,7 @@ bool SettingsServer::_has_flag(const PackedStringArray &p_names, SettingFlags p_
 	return false;
 }
 
-void SettingsServer::_push_values(const PackedStringArray &p_names) {
+Ref<Resource> SettingsServer::_push_values(const PackedStringArray &p_names) {
 	const Ref<Resource> effective = _effective_settings();
 	PackedStringArray unbound;
 	for (const String &name : p_names) {
@@ -641,6 +785,13 @@ void SettingsServer::_push_values(const PackedStringArray &p_names) {
 	if (!unbound.is_empty()) {
 		_apply_settings(effective, unbound);
 	}
+	return effective;
+}
+
+void SettingsServer::_notify_values_applied(const PackedStringArray &p_names, const Ref<Resource> &p_effective) {
+	for (const String &name : p_names) {
+		_notify_value_applied(name, snap_property_value(p_effective.ptr(), name, p_effective->get(name)));
+	}
 }
 
 void SettingsServer::_read_from_engine_into(const Ref<Resource> &p_settings) {
@@ -678,6 +829,8 @@ void SettingsServer::_read_from_engine_into(const Ref<Resource> &p_settings) {
 		}
 	}
 	_read_settings_from_engine(p_settings);
+	// Engine values and internal conversions (linear volume to dB, ...) have at most three decimals too.
+	snap_resource_floats(p_settings);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -721,7 +874,7 @@ void SettingsServer::revert() {
 	const PackedStringArray names = _get_changed_names(settings, applied);
 	settings = copy_settings(applied);
 	for (const String &name : names) {
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 }
@@ -738,7 +891,7 @@ void SettingsServer::reset_to_defaults() {
 	settings = copy_settings(defaults);
 	for (const String &name : names) {
 		session_overrides.erase(name);
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 	emit_signal(SNAME("reset"));
@@ -756,7 +909,7 @@ void SettingsServer::set_session_override(const StringName &p_name, const Varian
 	session_overrides[p_name] = _validate(p_name, p_value);
 	PackedStringArray names;
 	names.push_back(p_name);
-	_push_values(names);
+	_notify_values_applied(names, _push_values(names));
 }
 
 void SettingsServer::clear_session_override(const StringName &p_name) {
@@ -768,8 +921,9 @@ void SettingsServer::clear_session_override(const StringName &p_name) {
 	names.push_back(p_name);
 	const Ref<Resource> pending = settings;
 	settings = applied;
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	settings = pending;
+	_notify_values_applied(names, effective);
 }
 
 bool SettingsServer::has_session_override(const StringName &p_name) const {
@@ -818,9 +972,10 @@ Error SettingsServer::apply() {
 	if (!in_startup && !confirmation_active && _has_flag(names, SETTING_FLAG_CONFIRM)) {
 		return apply_with_confirmation();
 	}
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	if (!in_startup && !confirmation_active) {
 		unsaved = true;
@@ -850,9 +1005,10 @@ Error SettingsServer::apply_with_confirmation(double p_timeout_sec) {
 	confirmation_backup = copy_settings(applied);
 	confirmation_active = true;
 	confirmation_deadline_msec = OS::get_singleton()->get_ticks_msec() + uint64_t(MAX(timeout, 0.0) * 1000.0);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	emit_signal(SNAME("applied"), names);
 	_set_confirmation_processing(true);
 	emit_signal(SNAME("confirmation_requested"), timeout);
@@ -880,12 +1036,13 @@ void SettingsServer::cancel_confirmation() {
 	confirmation_backup.unref();
 	const PackedStringArray names = _get_changed_names(backup, applied);
 	settings = copy_settings(backup);
-	_push_values(names);
+	const Ref<Resource> effective = _push_values(names);
 	applied = copy_settings(settings);
 	confirmation_active = false;
 	_update_restart_required_names(names);
+	_notify_values_applied(names, effective);
 	for (const String &name : names) {
-		emit_signal(SNAME("value_changed"), StringName(name), settings->get(name));
+		emit_signal(SNAME("value_changed"), StringName(name), snap_property_value(settings.ptr(), name, settings->get(name)));
 	}
 	_emit_settings_changed(names);
 	if (!names.is_empty()) {
@@ -947,22 +1104,27 @@ String SettingsServer::get_file_path() const {
 	if (!file_path.is_empty()) {
 		return file_path;
 	}
-	const String project_path = _get_project_file_path();
-	if (!project_path.is_empty()) {
-		return project_path;
-	}
 	const StringName domain = get_domain();
 	ERR_FAIL_COND_V_MSG(domain == StringName(), String(), "A settings server needs a domain name: implement _get_domain().");
-	return get_storage_folder().path_join(String(domain) + "." + ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format()));
+	const String extension = ResourceTextSerializer::get_format_file_extension(const_cast<SettingsServer *>(this)->_get_file_format());
+	return get_storage_folder().path_join(_get_file_name() + "." + extension);
 }
 
-String SettingsServer::_get_project_file_path() const {
+String SettingsServer::_get_file_name() const {
 	const StringName domain = get_domain();
-	if (domain == StringName()) {
-		return String();
+	const String key = get_domain_setting_name(domain, SETTING_KEY_FILE_NAME);
+	const String file_name = String(_get_project_setting(key, String(domain))).strip_edges();
+	if (file_name.is_empty()) {
+		return String(domain);
 	}
-	const String path = _get_project_setting(get_path_setting_name(domain), String());
-	return path.strip_edges();
+	if (!is_valid_file_name(file_name)) {
+		if (file_name_warned != file_name) {
+			file_name_warned = file_name;
+			ERR_PRINT(vformat("Settings domain \"%s\": \"%s\" in \"%s\" is not a relative file name (no absolute path, no \"..\", no empty folder name); \"%s\" is used.", domain, file_name, key, domain));
+		}
+		return String(domain);
+	}
+	return file_name.replace_char('\\', '/');
 }
 
 bool SettingsServer::has_unsaved_changes() const {
@@ -995,9 +1157,9 @@ Error SettingsServer::load() {
 	String error;
 	Ref<Resource> loaded;
 	PackedStringArray present;
-	const String type_name = ResourceTextSerializer::get_type_name(defaults.ptr());
-	// The extension decides; an unknown extension is read in the format of `settings/storage/format`.
+	// The extension decides; an unknown extension is read in the format of the domain.
 	const ResourceTextSerializer::Format format = _get_format_for_path(path);
+	const String type_name = _get_storage_type_for_text(text, format);
 
 	if (err != OK) {
 		error = vformat("can't read the file (%s)", error_names[err]);
@@ -1047,8 +1209,16 @@ Error SettingsServer::load() {
 				version = int(tree[version_key]);
 				tree.erase(version_key);
 			}
+			String decode_type = type_name;
 			if (version < current_version) {
+				const String old_type = tree.get("$type", String());
 				tree = _migrate_settings(version, tree);
+				// A migration may convert the stored type (version 2 rows into version 3 records): the converted
+				// tree is read as the type the migration wrote, not as the type found in the old text.
+				const String new_type = tree.get("$type", String());
+				if (!new_type.is_empty() && new_type != old_type) {
+					decode_type = new_type;
+				}
 			} else if (version > current_version) {
 				WARN_PRINT(vformat("Settings domain \"%s\": \"%s\" was written with version %d; this game reads version %d.", domain, path, version, current_version));
 			}
@@ -1058,7 +1228,15 @@ Error SettingsServer::load() {
 					present.push_back(key);
 				}
 			}
-			err = ResourceTextSerializer::decode_resource(tree, type_name, loaded, error);
+			err = ResourceTextSerializer::decode_resource(tree, decode_type, loaded, error);
+		}
+	}
+	if (err == OK && loaded.is_valid()) {
+		// The storage form has the value names of the settings resource.
+		loaded = _settings_from_storage(loaded);
+		if (loaded.is_null()) {
+			err = ERR_INVALID_DATA;
+			error = "the stored values can't be converted to the settings";
 		}
 	}
 
@@ -1110,10 +1288,15 @@ Error SettingsServer::save() {
 	String text;
 	String error;
 	Error err = OK;
-	if (format == ResourceTextSerializer::FORMAT_CSV) {
-		err = ResourceTextSerializer::write_csv(data, options, text, error);
+	// The storage form has the value names of the settings resource (see _settings_to_storage()).
+	const Ref<Resource> storage = _settings_to_storage_for_format(data, format);
+	if (storage.is_null()) {
+		err = ERR_INVALID_DATA;
+		error = "the settings can't be converted to their storage form";
+	} else if (format == ResourceTextSerializer::FORMAT_CSV) {
+		err = ResourceTextSerializer::write_csv(storage, options, text, error);
 	} else {
-		Ref<Resource> copy = data->duplicate(false);
+		Ref<Resource> copy = storage == data ? data->duplicate(false) : storage;
 		copy->set_meta(META_SETTINGS_VERSION, get_format_version());
 		const bool tree_format = format == ResourceTextSerializer::FORMAT_JSON || format == ResourceTextSerializer::FORMAT_INI || format == ResourceTextSerializer::FORMAT_MAX;
 		// Only JSON and INI are read back as a tree with the missing values taken from the defaults.
@@ -1121,13 +1304,13 @@ Error SettingsServer::save() {
 			// The serializer compares a value with its default by `==`, which compares the resources of a list by
 			// identity. A value equal to its default by its stored properties (values_equal()) is put into the
 			// compared defaults as the very same value, so it is skipped like an unchanged single value.
-			Ref<Resource> compared_defaults = defaults->duplicate(false);
+			const Ref<Resource> storage_defaults = _settings_to_storage_for_format(defaults, format);
+			Ref<Resource> compared_defaults = storage_defaults.is_valid() ? storage_defaults->duplicate(false) : Ref<Resource>();
 			LocalVector<PropertyInfo> infos;
 			get_value_infos(data.ptr(), infos);
 			for (const PropertyInfo &info : infos) {
-				const Variant value = data->get(info.name);
-				if (values_equal(value, defaults->get(info.name))) {
-					compared_defaults->set(info.name, value);
+				if (compared_defaults.is_valid() && values_equal(data->get(info.name), defaults->get(info.name))) {
+					compared_defaults->set(info.name, storage->get(info.name));
 				}
 			}
 			options.defaults = compared_defaults;
@@ -1228,6 +1411,7 @@ void SettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_setting_names"), &SettingsServer::get_setting_names);
 	ClassDB::bind_method(D_METHOD("has_setting", "name"), &SettingsServer::has_setting);
 	ClassDB::bind_method(D_METHOD("set_value", "name", "value"), &SettingsServer::set_value);
+	ClassDB::bind_static_method("SettingsServer", D_METHOD("snap_float", "value", "step", "offset"), &SettingsServer::snap_float, DEFVAL(FLOAT_STEP), DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("get_value", "name"), &SettingsServer::get_value);
 	ClassDB::bind_method(D_METHOD("get_applied_value", "name"), &SettingsServer::get_applied_value);
 	ClassDB::bind_method(D_METHOD("get_default_value", "name"), &SettingsServer::get_default_value);
@@ -1308,6 +1492,7 @@ void SettingsServer::_bind_methods() {
 	GDVIRTUAL_BIND(_validate_value, "name", "value");
 	GDVIRTUAL_BIND(_migrate, "from_version", "data");
 	GDVIRTUAL_BIND(_is_value_supported, "name");
+	GDVIRTUAL_BIND(_value_applied, "name", "value");
 }
 
 SettingsServer::SettingsServer() {
