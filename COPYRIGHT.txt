@@ -608,6 +608,11 @@ Comment: SPIRV-Reflect
 Copyright: 2017-2022, Google Inc.
 License: Apache-2.0
 
+Files: thirdparty/sqlite/*
+Comment: SQLite
+Copyright: none, dedicated to the public domain
+License: public-domain
+
 Files: thirdparty/swappy-frame-pacing/*
 Comment: Swappy
 Copyright: 2019, The Android Open Source Project
@@ -2285,6 +2290,14 @@ License: OFL-1.1
  INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
  DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE.
+
+License: public-domain
+ The author disclaims copyright to this source code. In place of a legal
+ notice, here is a blessing:
+ .
+ May you do good and not evil.
+ May you find forgiveness for yourself and forgive others.
+ May you share freely, never taking more than you give.
 
 License: Unicode
  UNICODE LICENSE V3
