@@ -363,6 +363,11 @@ jobs:
       - name: Package
         run: bash .github/truely/package-release.sh artifacts release "$NAME" "$CONFIG"
 
+      # Nothing is published when a package is broken: .NET packages of the wrong version,
+      # executables of another platform (e.g. a Linux apphost in the Windows zip), wrong version.txt.
+      - name: Verify release files
+        run: python3 .github/truely/verify-release.py release "$NAME" "$CONFIG"
+
       - name: Release notes
         run: |
           bash .github/truely/release-notes.sh "$SHA" "$TAG" "$CONFIG" > notes.md

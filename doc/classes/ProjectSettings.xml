@@ -991,6 +991,18 @@
 		<member name="display/mouse_cursor/tooltip_position_offset" type="Vector2" setter="" getter="" default="Vector2(10, 10)">
 			Position offset for tooltips, relative to the mouse cursor's hotspot.
 		</member>
+		<member name="display/screenshots/file_name" type="String" setter="" getter="" default="&quot;Screenshot {year}-{month}-{day} {hour}-{minute}-{second}&quot;">
+			The file name of screenshots saved by [ScreenshotServer], without extension. Placeholders: [code]{year}[/code], [code]{month}[/code], [code]{day}[/code], [code]{hour}[/code], [code]{minute}[/code], [code]{second}[/code], [code]{millisecond}[/code] (local time), [code]{unix}[/code] (Unix time) and [code]{project}[/code] ([member application/config/name]). Characters that are not allowed in file names, such as [code]:[/code], become [code]-[/code]. If the file exists, [code] (2)[/code], [code] (3)[/code], … is added.
+		</member>
+		<member name="display/screenshots/folder" type="String" setter="" getter="" default="&quot;user://screenshots&quot;">
+			The folder for screenshots saved by [ScreenshotServer]. Created when the first screenshot is saved.
+		</member>
+		<member name="display/screenshots/format" type="String" setter="" getter="" default="&quot;png&quot;">
+			The image format of screenshots saved by [ScreenshotServer]: [code]png[/code] (lossless), [code]jpg[/code] or [code]webp[/code] (lossy, see [member display/screenshots/quality]).
+		</member>
+		<member name="display/screenshots/quality" type="float" setter="" getter="" default="0.9">
+			The quality of [code]jpg[/code] and [code]webp[/code] screenshots saved by [ScreenshotServer], from [code]0.01[/code] to [code]1.0[/code].
+		</member>
 		<member name="display/window/dpi/allow_hidpi" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], allows HiDPI display on Windows, macOS, Android, iOS and Web. If [code]false[/code], the platform's low-DPI fallback will be used on HiDPI displays, which causes the window to be displayed in a blurry or pixelated manner (and can cause various window management bugs). Therefore, it is recommended to make your project scale to [url=$DOCS_URL/tutorials/rendering/multiple_resolutions.html]multiple resolutions[/url] instead of disabling this setting.
 			[b]Note:[/b] This setting has no effect on Linux as DPI-awareness fallbacks are not supported there.
