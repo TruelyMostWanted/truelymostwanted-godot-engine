@@ -116,6 +116,9 @@
 #include "servers/settings/video_window_settings_server.h"
 #include "servers/settings/xr_settings.h"
 #include "servers/settings/xr_settings_server.h"
+#include "servers/subtitle/subtitle.h"
+#include "servers/subtitle/subtitle_format_srt.h"
+#include "servers/subtitle/subtitle_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 #include "servers/text/text_server_extension.h"
@@ -192,6 +195,9 @@ static bool has_server_feature_callback(const String &p_feature) {
 
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
 static TTSServer *tts_server = nullptr;
+static SubtitleServer *subtitle_server = nullptr;
+static Ref<ResourceFormatLoaderSubtitleSRT> resource_loader_subtitle_srt;
+static Ref<ResourceFormatSaverSubtitleSRT> resource_saver_subtitle_srt;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioDeviceSettingsServer *audio_device_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
@@ -236,6 +242,17 @@ void register_server_types() {
 	GDREGISTER_ABSTRACT_CLASS(TTSServer);
 	tts_server = memnew(TTSServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TTSServer", TTSServer::get_singleton(), "TTSServer"));
+
+	GDREGISTER_CLASS(SubtitleSegment);
+	GDREGISTER_CLASS(SubtitleValidation);
+	GDREGISTER_CLASS(Subtitle);
+	GDREGISTER_ABSTRACT_CLASS(SubtitleServer);
+	subtitle_server = memnew(SubtitleServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("SubtitleServer", SubtitleServer::get_singleton(), "SubtitleServer"));
+	resource_loader_subtitle_srt.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_subtitle_srt);
+	resource_saver_subtitle_srt.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_subtitle_srt);
 
 	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
 	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
@@ -584,6 +601,12 @@ void unregister_server_types() {
 
 	ServersDebugger::deinitialize();
 	memdelete(shader_types);
+	ResourceLoader::remove_resource_format_loader(resource_loader_subtitle_srt);
+	resource_loader_subtitle_srt.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_subtitle_srt);
+	resource_saver_subtitle_srt.unref();
+	memdelete(subtitle_server);
+	subtitle_server = nullptr;
 	memdelete(tts_server);
 	tts_server = nullptr;
 	// Settings domains unregister from the manager in their destructor, so they go first.

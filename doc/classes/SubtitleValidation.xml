@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitleValidation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The result of [method Subtitle.validate]: the segments with problems.
+	</brief_description>
+	<description>
+		Each list holds indices into [member Subtitle.segments]. A segment can be in more than one list.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_problem_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of entries in all lists together.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="empty_text_segments" type="PackedInt32Array" setter="" getter="get_empty_text_segments" default="PackedInt32Array()">
+			Segments without text (only spaces count as empty).
+		</member>
+		<member name="fast_reading_segments" type="PackedInt32Array" setter="" getter="get_fast_reading_segments" default="PackedInt32Array()">
+			Segments with more characters per second than the limit passed to [method Subtitle.validate]: too much text to read in the time they are shown.
+		</member>
+		<member name="invalid_time_segments" type="PackedInt32Array" setter="" getter="get_invalid_time_segments" default="PackedInt32Array()">
+			Segments whose [member SubtitleSegment.end_time] is not after their [member SubtitleSegment.start_time], segments with a negative start time, and empty slots in the array.
+		</member>
+		<member name="overlapping_segments" type="PackedInt32Array" setter="" getter="get_overlapping_segments" default="PackedInt32Array()">
+			Segments that are still shown when the next segment starts. Overlaps are allowed (two people talking at once), but often a timing mistake.
+		</member>
+		<member name="valid" type="bool" setter="" getter="is_valid" default="true">
+			[code]true[/code] if all lists are empty.
+		</member>
+	</members>
+</class>
