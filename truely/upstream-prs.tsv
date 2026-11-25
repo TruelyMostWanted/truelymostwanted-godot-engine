@@ -1,0 +1,7 @@
+# Upstream pull requests carried in truely-godot-engine until Godot merges them.
+# merge-chain.ps1 updates each branch from refs/pull/<pr>/head and merges it into
+# truely-godot-engine, top to bottom. Order matters: a PR based on another comes after it.
+# Remove a line once the PR is merged upstream (master then brings it in).
+# branch	pr	issue	title
+195-feature-opus-audio	117921	195	Opus audio files
+196-feature-webm-video	119299	196	WebM video (VP9), based on 117921

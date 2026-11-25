@@ -76,6 +76,7 @@
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
+#include "editor/inspector/audio_bus_list_settings_editor_plugin.h"
 #include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/inspector/editor_resource_picker.h"
 #include "editor/inspector/editor_resource_preview.h"
@@ -84,6 +85,7 @@
 #include "editor/inspector/input_event_editor_plugin.h"
 #include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
+#include "editor/inspector/subtitle_editor_plugin.h"
 #include "editor/inspector/tool_button_editor_plugin.h"
 #include "editor/plugins/pck_extract_editor_plugin.h"
 #include "editor/scene/2d/camera_2d_editor_plugin.h"
@@ -237,6 +239,7 @@ void register_editor_types() {
 
 	// This list is alphabetized, and plugins that depend on Node2D or Node3D are in their own section below.
 	EditorPlugins::add_by_type<AnimationTreeEditorPlugin>();
+	EditorPlugins::add_by_type<AudioBusListSettingsEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
 	EditorPlugins::add_by_type<BitMapEditorPlugin>();
 	EditorPlugins::add_by_type<ControlEditorPlugin>();
@@ -255,6 +258,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<PackedSceneEditorPlugin>();
 	EditorPlugins::add_by_type<PCKExtractEditorPlugin>();
 	EditorPlugins::add_by_type<PCKPackageEditorPlugin>();
+	EditorPlugins::add_by_type<SubtitleEditorPlugin>();
 	EditorPlugins::add_by_type<PCKPackageExporterEditorPlugin>();
 	EditorPlugins::add_by_type<ResourcePreloaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderEditorPlugin>();

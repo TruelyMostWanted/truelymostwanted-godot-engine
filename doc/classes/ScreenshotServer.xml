@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ScreenshotServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Takes screenshots of viewports and screens and saves them with the project's folder and file name pattern.
+	</brief_description>
+	<description>
+		One call takes a screenshot of the main window and saves it to [member ProjectSettings.display/screenshots/folder] with the file name pattern [member ProjectSettings.display/screenshots/file_name] in [member ProjectSettings.display/screenshots/format]. No screenshot is overwritten. [method capture_viewport] and [method capture_screen] return the [Image] without saving it, for example to show a preview first.
+		[codeblocks]
+		[gdscript]
+		func _unhandled_input(event):
+		    if event.is_action_pressed("screenshot"):
+		        var path = ScreenshotServer.take_screenshot()
+		        print("Saved ", path)
+		[/gdscript]
+		[csharp]
+		public override void _UnhandledInput(InputEvent @event)
+		{
+		    if (@event.IsActionPressed("screenshot"))
+		    {
+		        string path = ScreenshotServer.TakeScreenshot();
+		        GD.Print("Saved ", path);
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] A viewport screenshot is the last rendered frame. The headless display server renders nothing, so there is no viewport screenshot in headless mode.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="capture_screen" qualifiers="const">
+			<return type="Image" />
+			<param index="0" name="screen" type="int" default="-4" />
+			<description>
+				Returns an image of the screen [param screen] (see [method DisplayServer.screen_get_image]), or [code]null[/code] with an error where screens can't be captured: on the Web, Android, iOS and with Wayland.
+			</description>
+		</method>
+		<method name="capture_viewport" qualifiers="const">
+			<return type="Image" />
+			<param index="0" name="viewport" type="Viewport" default="null" />
+			<description>
+				Returns the last rendered frame of [param viewport] as an [Image], or of the main window if [param viewport] is [code]null[/code]. Works for [Window] and [SubViewport] (a [SubViewport] is only rendered while its [member SubViewport.render_target_update_mode] allows it). Returns [code]null[/code] with an error if there is no image.
+			</description>
+		</method>
+		<method name="make_screenshot_path" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the path the next screenshot would be saved to: the folder, the file name pattern with the current time, and the format of the project settings, with [code] (2)[/code], [code] (3)[/code], … if the file exists.
+			</description>
+		</method>
+		<method name="save_screenshot">
+			<return type="String" />
+			<param index="0" name="image" type="Image" />
+			<param index="1" name="path" type="String" default="&quot;&quot;" />
+			<description>
+				Saves [param image] and returns its path. If [param path] is empty, the path comes from [method make_screenshot_path]; otherwise its extension picks the format ([code]png[/code], [code]jpg[/code]/[code]jpeg[/code] or [code]webp[/code]) and an existing file is overwritten. Missing folders are created. Emits [signal screenshot_saved]. Returns an empty string with an error if the image is empty or can't be written.
+			</description>
+		</method>
+		<method name="take_screen_screenshot">
+			<return type="String" />
+			<param index="0" name="screen" type="int" default="-4" />
+			<description>
+				Captures the screen [param screen] with [method capture_screen] and saves it with [method save_screenshot]. Returns the path, or an empty string.
+			</description>
+		</method>
+		<method name="take_screenshot">
+			<return type="String" />
+			<param index="0" name="viewport" type="Viewport" default="null" />
+			<description>
+				Captures [param viewport] (the main window if [code]null[/code]) with [method capture_viewport] and saves it with [method save_screenshot]. Returns the path, or an empty string.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="screenshot_saved">
+			<param index="0" name="path" type="String" />
+			<param index="1" name="image" type="Image" />
+			<description>
+				Emitted after a screenshot was saved to [param path]. [param image] is the saved image, for example for a thumbnail.
+			</description>
+		</signal>
+	</signals>
+</class>

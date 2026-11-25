@@ -82,6 +82,7 @@ skip = [
 ]
 ignore-words-list = [
 	"truely",
+	"dialogue", # Keyword of SubStation Alpha subtitle files (servers/subtitle).
 	"breaked",
 	"cancelled",
 	"checkin",

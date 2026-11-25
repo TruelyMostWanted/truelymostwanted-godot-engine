@@ -30,6 +30,7 @@
 
 #include "resource.h"
 
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/math/math_funcs.h"
 #include "core/math/random_pcg.h"
@@ -894,9 +895,31 @@ void ResourceCache::get_cached_resources(List<Ref<Resource>> *p_resources) {
 	}
 }
 
-template <typename F>
-void ResourceCache::_get_cached_paths_filtered(List<String> *r_paths, const F &p_filter) {
-	ERR_FAIL_NULL(r_paths);
+uint32_t ResourceCache::get_cached_kind(const String &p_path, const Resource *p_resource) {
+	if (p_path.contains("::")) {
+		return CACHED_KIND_BUILT_IN;
+	}
+#ifdef TOOLS_ENABLED
+	return p_resource->get_import_path().is_empty() ? CACHED_KIND_FILE : CACHED_KIND_IMPORTED;
+#else
+	// Exported projects keep the .import file (it remaps to the imported data); import_path is editor-only.
+	return FileAccess::exists(p_path + ".import") ? CACHED_KIND_IMPORTED : CACHED_KIND_FILE;
+#endif
+}
+
+StringName ResourceCache::get_cached_class_name(const Resource *p_resource) {
+	// Script data used here is cached by the script; no script code runs under the cache lock.
+	for (Ref<Script> scr = p_resource->get_script(); scr.is_valid(); scr = scr->get_base_script()) {
+		const StringName global_name = scr->get_global_name();
+		if (global_name != StringName()) {
+			return global_name;
+		}
+	}
+	return p_resource->get_class_name();
+}
+
+template <typename F, typename V>
+void ResourceCache::_visit_cached(uint32_t p_kinds, const F &p_filter, const V &p_visit) {
 	MutexLock mutex_lock(lock);
 
 	for (const KeyValue<String, Resource *> &E : resources) {
@@ -904,51 +927,50 @@ void ResourceCache::_get_cached_paths_filtered(List<String> *r_paths, const F &p
 			// This resource is in the process of being deleted, ignore its existence.
 			continue;
 		}
-		if (p_filter(E.key, E.value)) {
-			r_paths->push_back(E.key);
+		// The kind is checked last and only when it filters: in export templates it looks for the .import file.
+		if (p_filter(E.key, E.value) && ((p_kinds & CACHED_KIND_ALL) == CACHED_KIND_ALL || (get_cached_kind(E.key, E.value) & p_kinds))) {
+			p_visit(E.key, E.value);
 		}
 	}
 }
 
-void ResourceCache::get_cached_paths(List<String> *r_paths) {
-	_get_cached_paths_filtered(r_paths, [](const String &, const Resource *) { return true; });
+// Filters shared by the lists and the counts.
+
+static bool _cached_matches_all(const String &, const Resource *) {
+	return true;
 }
 
-void ResourceCache::get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths) {
-	if (p_type == StringName()) {
-		return;
-	}
+namespace {
 
-	_get_cached_paths_filtered(r_paths, [&p_type, p_exact](const String &, const Resource *p_res) {
-		// Script data used here is cached by the script; no script code runs under the cache lock.
-		Ref<Script> scr = p_res->get_script();
-		if (p_exact) {
-			// The most derived named class: the first global script class, else the native class.
-			for (; scr.is_valid(); scr = scr->get_base_script()) {
-				const StringName global_name = scr->get_global_name();
-				if (global_name != StringName()) {
-					return global_name == p_type;
-				}
-			}
-			return p_res->get_class_name() == p_type;
+struct CachedTypeFilter {
+	StringName type;
+	bool exact = false;
+
+	bool operator()(const String &, const Resource *p_res) const {
+		if (type == StringName()) {
+			return false;
 		}
-
-		for (; scr.is_valid(); scr = scr->get_base_script()) {
-			if (scr->get_global_name() == p_type) {
+		if (exact) {
+			return ResourceCache::get_cached_class_name(p_res) == type;
+		}
+		for (Ref<Script> scr = p_res->get_script(); scr.is_valid(); scr = scr->get_base_script()) {
+			if (scr->get_global_name() == type) {
 				return true;
 			}
 		}
-		return p_res->is_class(p_type);
-	});
-}
+		return p_res->is_class(type);
+	}
+};
 
-void ResourceCache::get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths) {
-	const String extension = (p_extension.begins_with(".") ? p_extension.substr(1) : p_extension).to_lower();
-	const int ext_len = extension.length();
-	const char32_t *ext = extension.ptr();
+struct CachedExtensionFilter {
+	String extension;
+
+	explicit CachedExtensionFilter(const String &p_extension) :
+			extension((p_extension.begins_with(".") ? p_extension.substr(1) : p_extension).to_lower()) {}
 
 	// Compares in place, without allocating a string per cached path.
-	_get_cached_paths_filtered(r_paths, [ext, ext_len](const String &p_path, const Resource *) {
+	bool operator()(const String &p_path, const Resource *) const {
+		const int ext_len = extension.length();
 		const int sep = p_path.find("::");
 		const int file_end = sep < 0 ? p_path.length() : sep;
 		const int dot = file_end > 0 ? p_path.rfind_char('.', file_end - 1) : -1;
@@ -961,26 +983,28 @@ void ResourceCache::get_cached_paths_with_extension(const String &p_extension, L
 			return false;
 		}
 		const char32_t *path = p_path.ptr() + dot + 1;
+		const char32_t *ext = extension.ptr();
 		for (int i = 0; i < ext_len; i++) {
 			if (String::char_lowercase(path[i]) != ext[i]) {
 				return false;
 			}
 		}
 		return true;
-	});
-}
-
-void ResourceCache::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths) {
-	if (p_directory.is_empty()) {
-		return;
 	}
-	const String directory = p_directory.ends_with("/") ? p_directory : p_directory + "/";
+};
 
-	_get_cached_paths_filtered(r_paths, [&directory, p_recursive](const String &p_path, const Resource *) {
-		if (!p_path.begins_with(directory)) {
+struct CachedDirectoryFilter {
+	String directory;
+	bool recursive = true;
+
+	CachedDirectoryFilter(const String &p_directory, bool p_recursive) :
+			directory(p_directory.is_empty() || p_directory.ends_with("/") ? p_directory : p_directory + "/"), recursive(p_recursive) {}
+
+	bool operator()(const String &p_path, const Resource *) const {
+		if (directory.is_empty() || !p_path.begins_with(directory)) {
 			return false;
 		}
-		if (p_recursive) {
+		if (recursive) {
 			return true;
 		}
 		// Direct child: no further '/' in the file part (the "::<id>" of a sub-resource is not part of it).
@@ -990,6 +1014,69 @@ void ResourceCache::get_cached_paths_in_directory(const String &p_directory, boo
 		}
 		const int sep = p_path.find("::", directory.length());
 		return sep >= 0 && sep < slash;
+	}
+};
+
+} // namespace
+
+void ResourceCache::get_cached_paths(List<String> *r_paths, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_paths);
+	_visit_cached(p_kinds, _cached_matches_all, [r_paths](const String &p_path, const Resource *) { r_paths->push_back(p_path); });
+}
+
+void ResourceCache::get_cached_paths_for_type(const StringName &p_type, bool p_exact, List<String> *r_paths, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_paths);
+	_visit_cached(p_kinds, CachedTypeFilter{ p_type, p_exact }, [r_paths](const String &p_path, const Resource *) { r_paths->push_back(p_path); });
+}
+
+void ResourceCache::get_cached_paths_with_extension(const String &p_extension, List<String> *r_paths, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_paths);
+	_visit_cached(p_kinds, CachedExtensionFilter(p_extension), [r_paths](const String &p_path, const Resource *) { r_paths->push_back(p_path); });
+}
+
+void ResourceCache::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, List<String> *r_paths, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_paths);
+	_visit_cached(p_kinds, CachedDirectoryFilter(p_directory, p_recursive), [r_paths](const String &p_path, const Resource *) { r_paths->push_back(p_path); });
+}
+
+int ResourceCache::get_cached_count(uint32_t p_kinds) {
+	int count = 0;
+	_visit_cached(p_kinds, _cached_matches_all, [&count](const String &, const Resource *) { count++; });
+	return count;
+}
+
+int ResourceCache::get_cached_count_for_type(const StringName &p_type, bool p_exact, uint32_t p_kinds) {
+	int count = 0;
+	_visit_cached(p_kinds, CachedTypeFilter{ p_type, p_exact }, [&count](const String &, const Resource *) { count++; });
+	return count;
+}
+
+int ResourceCache::get_cached_count_with_extension(const String &p_extension, uint32_t p_kinds) {
+	int count = 0;
+	_visit_cached(p_kinds, CachedExtensionFilter(p_extension), [&count](const String &, const Resource *) { count++; });
+	return count;
+}
+
+int ResourceCache::get_cached_count_in_directory(const String &p_directory, bool p_recursive, uint32_t p_kinds) {
+	int count = 0;
+	_visit_cached(p_kinds, CachedDirectoryFilter(p_directory, p_recursive), [&count](const String &, const Resource *) { count++; });
+	return count;
+}
+
+void ResourceCache::get_cached_resources_for_type(const StringName &p_type, bool p_exact, List<Ref<Resource>> *r_resources, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_resources);
+	_visit_cached(p_kinds, CachedTypeFilter{ p_type, p_exact }, [r_resources](const String &, Resource *p_res) { r_resources->push_back(Ref<Resource>(p_res)); });
+}
+
+void ResourceCache::get_cached_type_counts(HashMap<StringName, int> *r_counts, uint32_t p_kinds) {
+	ERR_FAIL_NULL(r_counts);
+	_visit_cached(p_kinds, _cached_matches_all, [r_counts](const String &, const Resource *p_res) {
+		const StringName name = get_cached_class_name(p_res);
+		if (int *count = r_counts->getptr(name)) {
+			(*count)++;
+		} else {
+			r_counts->insert(name, 1);
+		}
 	});
 }
 

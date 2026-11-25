@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TTSPersonaSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One stored text-to-speech persona of [TTSPersonaSettingsServer].
+	</brief_description>
+	<description>
+		An entry of [TTSPersonaListSettings]: the values of a [TTSPersona] that the player created or changed, and whether it is the player's default persona. In a CSV file it is one row. [TTSPersonaSettingsServer] applies it to [TTSServer] as a persona override (see [method TTSServer.set_persona_override]); [method to_persona] creates that [TTSPersona].
+		The value ranges are the same as those of [TTSPersona].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="copy_from_persona">
+			<return type="void" />
+			<param index="0" name="persona" type="TTSPersona" />
+			<description>
+				Takes all values of [param persona]. [member default] is not changed.
+			</description>
+		</method>
+		<method name="to_persona" qualifiers="const">
+			<return type="TTSPersona" />
+			<description>
+				Returns a new [TTSPersona] with the values of this entry. Changing it does not change the entry.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="default" type="bool" setter="set_default" getter="is_default" default="false">
+			If [code]true[/code], this persona is the player's default persona (see [method TTSServer.set_default_persona_override]). At most one entry should have it set; [method TTSPersonaSettingsServer.set_default_persona] keeps it that way. If a hand-edited file marks several entries, the first one is used.
+		</member>
+		<member name="interrupt" type="bool" setter="set_interrupt" getter="is_interrupt" default="false">
+			See [member TTSPersona.interrupt].
+		</member>
+		<member name="language" type="String" setter="set_language" getter="get_language" default="&quot;&quot;">
+			See [member TTSPersona.language].
+		</member>
+		<member name="persona_name" type="StringName" setter="set_persona_name" getter="get_persona_name" default="&amp;&quot;&quot;">
+			The name of the persona, the key of the entry. If the game has a persona with this name, this entry replaces it for the player.
+		</member>
+		<member name="pitch" type="float" setter="set_pitch" getter="get_pitch" default="1.0">
+			See [member TTSPersona.pitch]. From [code]0.0[/code] to [code]2.0[/code].
+		</member>
+		<member name="rate" type="float" setter="set_rate" getter="get_rate" default="1.0">
+			See [member TTSPersona.rate]. From [code]0.1[/code] to [code]10.0[/code].
+		</member>
+		<member name="voice" type="String" setter="set_voice" getter="get_voice" default="&quot;&quot;">
+			See [member TTSPersona.voice]. A voice that does not exist on the current device is kept; [method TTSServer.resolve_voice_id] picks another voice then.
+		</member>
+		<member name="volume" type="int" setter="set_volume" getter="get_volume" default="50">
+			See [member TTSPersona.volume]. From [code]0[/code] to [code]100[/code].
+		</member>
+	</members>
+</class>

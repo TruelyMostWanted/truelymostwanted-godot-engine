@@ -4,7 +4,7 @@
 		The stored volume, mute and solo values of one audio bus.
 	</brief_description>
 	<description>
-		One entry of [AudioBusListSettings], the settings resource of [AudioBusSettingsServer]. The bus is identified by [member bus_name]. In a CSV settings file, each [AudioBusSettings] is one row.
+		One entry of [AudioBusListSettings], the settings resource of [AudioBusSettingsServer]. The bus is identified by [member bus_name]. In the settings file, each entry is one [AudioBusSettingsRow] with the values that the project stores ([code]settings/audio_bus/store_*[/code]); the other values of an entry are the values of the bus layout.
 		Change the values through [AudioBusSettingsServer] (for example [method AudioBusSettingsServer.set_bus_volume_db]) or [method ListSettingsServer.set_entry_value], not on the entries of [method SettingsServer.get_settings] directly, so that the change is applied and saved.
 	</description>
 	<tutorials>

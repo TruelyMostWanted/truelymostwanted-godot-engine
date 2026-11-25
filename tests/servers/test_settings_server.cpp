@@ -89,6 +89,7 @@ public:
 	String domain = "test_domain";
 	int version = 1;
 	ApplyPhase phase = APPLY_PHASE_SERVERS;
+	String legacy_name;
 	int apply_calls = 0;
 	PackedStringArray last_applied;
 	// "name=value" per _notify_value_applied() call.
@@ -117,6 +118,10 @@ protected:
 
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override {
 		p_settings->set("quality", TestEngine::quality);
+	}
+
+	virtual String _get_legacy_file_name() const override {
+		return legacy_name;
 	}
 
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data) override {
@@ -219,13 +224,13 @@ static void register_test_classes() {
 struct TestSetup {
 	TestSetup() {
 		register_test_classes();
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", false);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 		TestEngine::volume = 0.5;
 		TestEngine::quality = 1;
 	}
 	~TestSetup() {
-		ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
-		ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
+		ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
+		ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_INI);
 	}
 };
 
@@ -251,7 +256,7 @@ TEST_CASE("[SettingsServer] Manager singleton, registration and project settings
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	REQUIRE(manager != nullptr);
 	CHECK(Engine::get_singleton()->has_singleton("SettingsServerManager"));
-	CHECK(ProjectSettings::get_singleton()->has_setting("settings/storage/folder"));
+	CHECK(ProjectSettings::get_singleton()->has_setting("settings/general/folder"));
 	CHECK(ProjectSettings::get_singleton()->has_setting("settings/startup/apply_on_startup"));
 	CHECK(manager->get_storage_folder() == "user://settings");
 	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_INI);
@@ -264,12 +269,12 @@ TEST_CASE("[SettingsServer] Manager singleton, registration and project settings
 	CHECK(server->get_file_path() == "user://settings/test_domain.ini");
 
 	// The format is an enum; a name written by hand into project.godot is accepted too.
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_JSON);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_JSON);
 	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_JSON);
 	CHECK(server->get_file_path() == "user://settings/test_domain.json");
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", "json");
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", "json");
 	CHECK(manager->get_storage_format() == ResourceTextSerializer::FORMAT_JSON);
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_INI);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_INI);
 
 	TestDomainServer *duplicate = memnew(TestDomainServer);
 	ERR_PRINT_OFF;
@@ -406,10 +411,10 @@ TEST_CASE("[SettingsServer] Only changed values are written") {
 	CHECK(text.contains("quality"));
 	CHECK_FALSE(text.contains("volume"));
 
-	ProjectSettings::get_singleton()->set_setting("settings/storage/only_changed_values", false);
+	ProjectSettings::get_singleton()->set_setting("settings/general/only_changed_values", false);
 	CHECK(server->save() == OK);
 	CHECK(FileAccess::get_file_as_string(path).contains("volume"));
-	ProjectSettings::get_singleton()->set_setting("settings/storage/only_changed_values", true);
+	ProjectSettings::get_singleton()->set_setting("settings/general/only_changed_values", true);
 	memdelete(server);
 }
 
@@ -443,6 +448,59 @@ TEST_CASE("[SettingsServer] Missing and broken files fall back to the defaults")
 	CHECK(FileAccess::get_file_as_string(path) == broken);
 	CHECK(restarted->save() == OK);
 	CHECK(FileAccess::get_file_as_string(path) != broken);
+	memdelete(restarted);
+}
+
+TEST_CASE("[SettingsServer] The file of the old domain name is read once") {
+	TestSetup setup;
+	const String path = temp_file("renamed_domain.ini");
+	const String legacy_path = temp_file("old_domain.ini");
+	{
+		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		// The old file names the class of the settings before the rename.
+		file->store_string("[root]
+$type=OldDomainSettings
+quality=2
+");
+	}
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->set_file_path(path);
+	// Without a legacy name, the old file is not read.
+	CHECK(server->load() == ERR_FILE_NOT_FOUND);
+	CHECK(int(server->get_value("quality")) == 1);
+	server->legacy_name = "old_domain";
+	CHECK(server->load() == OK);
+	CHECK(int(server->get_value("quality")) == 2);
+	// load() alone does not write the new file.
+	CHECK_FALSE(FileAccess::exists(path));
+	memdelete(server);
+
+	TestDomainServer *started = memnew(TestDomainServer);
+	started->legacy_name = "old_domain";
+	started->set_file_path(path);
+	started->startup();
+	CHECK(int(started->get_applied_value("quality")) == 2);
+	// startup() writes the new file once; the old file stays.
+	CHECK(FileAccess::exists(path));
+	CHECK(FileAccess::exists(legacy_path));
+	CHECK(FileAccess::get_file_as_string(path).contains("TestDomainSettings"));
+	memdelete(started);
+
+	// From now on the new file is read, not the old one.
+	{
+		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("[root]
+quality=0
+");
+	}
+	TestEngine::quality = 1;
+	TestDomainServer *restarted = memnew(TestDomainServer);
+	restarted->legacy_name = "old_domain";
+	restarted->set_file_path(path);
+	CHECK(restarted->load() == OK);
+	CHECK(int(restarted->get_value("quality")) == 2);
 	memdelete(restarted);
 }
 
@@ -536,7 +594,7 @@ TEST_CASE("[SettingsServer] Restart flags and values without an engine target") 
 
 TEST_CASE("[SettingsServer] Autosave writes once after apply") {
 	TestSetup setup;
-	ProjectSettings::get_singleton()->set_setting("settings/storage/autosave", true);
+	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 	const String path = temp_file("autosave.ini");
 	TestDomainServer *server = memnew(TestDomainServer);
 	server->set_file_path(path);
@@ -551,7 +609,7 @@ TEST_CASE("[SettingsServer] Autosave writes once after apply") {
 
 TEST_CASE("[SettingsServer] List domain: entries and the same values in CSV, JSON and INI") {
 	TestSetup setup;
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_CSV);
 	TestListServer *server = memnew(TestListServer);
 	CHECK(server->get_file_path() == "user://settings/test_list.csv");
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
@@ -591,7 +649,7 @@ TEST_CASE("[SettingsServer] List domain: entries and the same values in CSV, JSO
 
 TEST_CASE("[SettingsServer] Single domains fall back from CSV to INI") {
 	TestSetup setup;
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_CSV);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_CSV);
 	TestDomainServer *server = memnew(TestDomainServer);
 	ERR_PRINT_OFF;
 	CHECK(server->get_file_path().get_extension() == "ini");
@@ -796,81 +854,149 @@ TEST_CASE("[SettingsServer] Domains registered after their phase start at once")
 	memdelete(early);
 }
 
-static bool path_setting_has_save_file_hint(const String &p_setting, const String &p_extension) {
+static bool format_setting_offers(const String &p_setting, const String &p_format) {
 	List<PropertyInfo> infos;
 	ProjectSettings::get_singleton()->get_property_list(&infos);
 	for (const PropertyInfo &info : infos) {
 		if (info.name == p_setting) {
-			return info.hint == PROPERTY_HINT_SAVE_FILE && info.hint_string.contains(p_extension);
+			return info.hint == PROPERTY_HINT_ENUM && info.hint_string.contains(p_format);
 		}
 	}
 	return false;
 }
 
-TEST_CASE("[SettingsServer] File path from the project setting of the domain, runtime path wins") {
+// Resets the project settings of a domain to the values a project without them has.
+static void reset_domain_settings(const StringName &p_domain) {
+	ProjectSettings *project_settings = ProjectSettings::get_singleton();
+	project_settings->set_setting(SettingsServer::get_domain_setting_name(p_domain, "file_name"), String(p_domain));
+	project_settings->set_setting(SettingsServer::get_domain_setting_name(p_domain, "override_format"), false);
+	project_settings->set_setting(SettingsServer::get_domain_setting_name(p_domain, "format"), ResourceTextSerializer::FORMAT_INI);
+}
+
+TEST_CASE("[SettingsServer] Domain project settings: file name, format override, runtime path wins") {
 	TestSetup setup;
+	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	REQUIRE(manager != nullptr);
 	TestDomainServer *server = memnew(TestDomainServer);
 	server->domain = "test_paths";
-	const String setting = SettingsServer::get_path_setting_name("test_paths");
-	CHECK(setting == "settings/paths/test_paths_settings_path");
+	const String file_name_setting = SettingsServer::get_domain_setting_name("test_paths", "file_name");
+	const String override_setting = SettingsServer::get_domain_setting_name("test_paths", "override_format");
+	const String format_setting = SettingsServer::get_domain_setting_name("test_paths", "format");
+	CHECK(file_name_setting == "settings/test_paths/file_name");
+	CHECK(override_setting == "settings/test_paths/override_format");
+	CHECK(format_setting == "settings/test_paths/format");
 	REQUIRE(manager->register_server(server) == OK);
 
-	// Defined on registration, empty by default: the folder and format of `settings/storage/*` are used.
-	CHECK(ProjectSettings::get_singleton()->has_setting(setting));
-	CHECK(String(ProjectSettings::get_singleton()->get_setting(setting)).is_empty());
-	CHECK(path_setting_has_save_file_hint(setting, "*.json"));
-	CHECK(path_setting_has_save_file_hint(setting, "*.yml"));
-	CHECK_FALSE(path_setting_has_save_file_hint(setting, "*.csv"));
+	// Defined on registration: the file name defaults to the domain name, the format is not overridden.
+	CHECK(project_settings->has_setting(file_name_setting));
+	CHECK(project_settings->has_setting(override_setting));
+	CHECK(project_settings->has_setting(format_setting));
+	CHECK(String(project_settings->get_setting(file_name_setting)) == "test_paths");
+	CHECK_FALSE(bool(project_settings->get_setting(override_setting)));
+	CHECK(format_setting_offers(format_setting, "JSON"));
+	CHECK(format_setting_offers(format_setting, "YAML"));
+	CHECK_FALSE(format_setting_offers(format_setting, "CSV"));
 	CHECK(server->get_file_path() == "user://settings/test_paths.ini");
 
-	const String project_path = temp_file("project_path.json");
-	ProjectSettings::get_singleton()->set_setting(setting, project_path);
-	CHECK(server->get_file_path() == project_path);
+	// Path composition: <folder>/<file_name>.<extension of the effective format>.
+	project_settings->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_JSON);
+	CHECK(server->get_file_path() == "user://settings/test_paths.json");
+	project_settings->set_setting(file_name_setting, "player_one");
+	CHECK(server->get_file_path() == "user://settings/player_one.json");
 
-	// A path set at runtime wins over the project setting.
-	const String runtime_path = temp_file("runtime_path.ini");
-	server->set_file_path(runtime_path);
-	CHECK(server->get_file_path() == runtime_path);
-	server->set_file_path(String());
-	CHECK(server->get_file_path() == project_path);
+	// The format of the domain is only used with override_format.
+	project_settings->set_setting(format_setting, ResourceTextSerializer::FORMAT_INI);
+	CHECK(server->get_file_path() == "user://settings/player_one.json");
+	project_settings->set_setting(override_setting, true);
+	CHECK(server->get_file_path() == "user://settings/player_one.ini");
+	project_settings->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_INI);
+	project_settings->set_setting(format_setting, ResourceTextSerializer::FORMAT_JSON);
+	CHECK(server->get_file_path() == "user://settings/player_one.json");
 
-	// The project path is used by save() and load(); save() writes the applied values.
+	// A relative subfolder in the file name; save() creates it.
+	const String folder = TestUtils::get_temp_path("settings_server_folder");
+	project_settings->set_setting("settings/general/folder", folder);
+	project_settings->set_setting(file_name_setting, "profiles/test_paths");
+	const String composed_path = folder.path_join("profiles/test_paths.json");
+	CHECK(server->get_file_path() == composed_path);
+	if (FileAccess::exists(composed_path)) {
+		DirAccess::remove_absolute(composed_path);
+	}
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	server->set_value("quality", 2);
 	CHECK(server->apply() == OK);
 	CHECK(server->save() == OK);
-	CHECK(FileAccess::exists(project_path));
-	CHECK(FileAccess::get_file_as_string(project_path).strip_edges().begins_with("{"));
+	CHECK(FileAccess::exists(composed_path));
+	CHECK(FileAccess::get_file_as_string(composed_path).strip_edges().begins_with("{"));
 
-	ProjectSettings::get_singleton()->set_setting(setting, String());
+	// A path set at runtime wins; there the extension picks the format.
+	const String runtime_path = temp_file("runtime_path.ini");
+	server->set_file_path(runtime_path);
+	CHECK(server->get_file_path() == runtime_path);
+	CHECK(server->save() == OK);
+	CHECK_FALSE(FileAccess::get_file_as_string(runtime_path).strip_edges().begins_with("{"));
+	server->set_file_path(String());
+	CHECK(server->get_file_path() == composed_path);
+
+	project_settings->set_setting("settings/general/folder", "user://settings");
+	reset_domain_settings("test_paths");
 	CHECK(server->get_file_path() == "user://settings/test_paths.ini");
 	memdelete(server);
 
 	// List domains can be stored as CSV.
 	TestListServer *list = memnew(TestListServer);
 	REQUIRE(manager->register_server(list) == OK);
-	CHECK(path_setting_has_save_file_hint(SettingsServer::get_path_setting_name("test_list"), "*.csv"));
+	CHECK(format_setting_offers(SettingsServer::get_domain_setting_name("test_list", "format"), "CSV"));
 	memdelete(list);
 }
 
-TEST_CASE("[SettingsServer] The extension of the project path picks the format") {
+TEST_CASE("[SettingsServer] An invalid file name of the domain is rejected") {
 	TestSetup setup;
-	const String setting = SettingsServer::get_path_setting_name("test_formats");
-	SettingsServer::register_path_setting("test_formats", false);
+	CHECK(SettingsServer::is_valid_file_name("audio"));
+	CHECK(SettingsServer::is_valid_file_name("profiles/audio"));
+	CHECK(SettingsServer::is_valid_file_name("profiles\\audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name(""));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("../audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("profiles/../../audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("./audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("profiles//audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("profiles/"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("/audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("user://audio"));
+	CHECK_FALSE(SettingsServer::is_valid_file_name("C:/audio"));
+
+	SettingsServer::register_domain_settings("test_invalid_name", false);
+	const String file_name_setting = SettingsServer::get_domain_setting_name("test_invalid_name", "file_name");
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->domain = "test_invalid_name";
+	for (const String &file_name : { String("../outside"), String("/absolute"), String("res://inside_pack"), String("a//b") }) {
+		ProjectSettings::get_singleton()->set_setting(file_name_setting, file_name);
+		ERR_PRINT_OFF;
+		CHECK(server->get_file_path() == "user://settings/test_invalid_name.ini");
+		ERR_PRINT_ON;
+	}
+	// An empty file name is the domain name.
+	ProjectSettings::get_singleton()->set_setting(file_name_setting, String());
+	CHECK(server->get_file_path() == "user://settings/test_invalid_name.ini");
+	memdelete(server);
+	reset_domain_settings("test_invalid_name");
+}
+
+TEST_CASE("[SettingsServer] The extension of the runtime path picks the format") {
+	TestSetup setup;
 	for (const String &extension : { String("json"), String("ini"), String("xml"), String("toml"), String("yaml"), String("yml") }) {
 		const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(extension);
 		if (!ResourceTextSerializer::has_format_implementation(format)) {
 			continue; // The TOML or YAML module is not in this build.
 		}
 		const String path = temp_file("by_extension." + extension);
-		ProjectSettings::get_singleton()->set_setting(setting, path);
 		TestEngine::volume = 0.5;
 		TestEngine::quality = 1;
 		{
 			TestDomainServer *server = memnew(TestDomainServer);
 			server->domain = "test_formats";
+			server->set_file_path(path);
 			server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 			CHECK(server->get_file_path() == path);
 			server->set_value("volume", 0.25);
@@ -892,24 +1018,22 @@ TEST_CASE("[SettingsServer] The extension of the project path picks the format")
 		TestEngine::quality = 1;
 		TestDomainServer *server = memnew(TestDomainServer);
 		server->domain = "test_formats";
+		server->set_file_path(path);
 		CHECK(server->load() == OK);
 		CHECK(double(server->get_value("volume")) == doctest::Approx(0.25));
 		CHECK(int(server->get_value("quality")) == 2);
 		memdelete(server);
 	}
-	ProjectSettings::get_singleton()->set_setting(setting, String());
 }
 
-TEST_CASE("[SettingsServer] An unknown extension falls back to the global format") {
+TEST_CASE("[SettingsServer] An unknown extension falls back to the format of the domain") {
 	TestSetup setup;
-	const String setting = SettingsServer::get_path_setting_name("test_unknown_extension");
-	SettingsServer::register_path_setting("test_unknown_extension", false);
 	const String path = temp_file("unknown_extension.cfg");
-	ProjectSettings::get_singleton()->set_setting(setting, path);
-	ProjectSettings::get_singleton()->set_setting("settings/storage/format", ResourceTextSerializer::FORMAT_JSON);
+	ProjectSettings::get_singleton()->set_setting("settings/general/default_format", ResourceTextSerializer::FORMAT_JSON);
 
 	TestDomainServer *server = memnew(TestDomainServer);
 	server->domain = "test_unknown_extension";
+	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	CHECK(server->get_file_path() == path);
 	server->set_value("quality", 0);
@@ -923,12 +1047,12 @@ TEST_CASE("[SettingsServer] An unknown extension falls back to the global format
 	TestEngine::quality = 1;
 	TestDomainServer *loaded = memnew(TestDomainServer);
 	loaded->domain = "test_unknown_extension";
+	loaded->set_file_path(path);
 	ERR_PRINT_OFF;
 	CHECK(loaded->load() == OK);
 	ERR_PRINT_ON;
 	CHECK(int(loaded->get_value("quality")) == 0);
 	memdelete(loaded);
-	ProjectSettings::get_singleton()->set_setting(setting, String());
 }
 
 TEST_CASE("[SettingsServer] load_failed and save_failed report the error and the path") {

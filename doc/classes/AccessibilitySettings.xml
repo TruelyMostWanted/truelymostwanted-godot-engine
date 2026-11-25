@@ -45,7 +45,7 @@
 			If [code]true[/code], the game shows subtitles. Game-side.
 		</member>
 		<member name="ui_scale" type="float" setter="set_ui_scale" getter="get_ui_scale" default="1.0">
-			The scale of the whole GUI. Multiplies [member Window.content_scale_factor] of the root window, together with the factor of [VideoWindowSettingsServer].
+			The scale of the whole GUI. Multiplies [member Window.content_scale_factor] of the root window, together with the factor of [WindowSettingsServer].
 		</member>
 	</members>
 </class>
