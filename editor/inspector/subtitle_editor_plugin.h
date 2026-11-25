@@ -49,6 +49,10 @@ public:
 	static TypedArray<SubtitleSegment> get_sorted_segments(const Ref<Subtitle> &p_subtitle);
 	// The segments with a new two-second segment after the last one.
 	static TypedArray<SubtitleSegment> get_segments_with_new_segment(const Ref<Subtitle> &p_subtitle);
+	// "0:05.500", or "1:00:05.500" from one hour on.
+	static String format_short_time(double p_seconds);
+	// The text as the player sees it (decorated by kind), with the speaker in front; one line.
+	static String get_row_text(const Ref<Subtitle> &p_subtitle, const Ref<SubtitleSegment> &p_segment);
 	// "Dialog", "Sound", …
 	static String get_kind_name(SubtitleSegment::Kind p_kind);
 };
@@ -62,7 +66,7 @@ class SubtitleEditor : public VBoxContainer {
 	bool update_queued = false;
 
 	Label *summary_label = nullptr;
-	HBoxContainer *offset_box = nullptr;
+	VBoxContainer *offset_box = nullptr;
 	Label *offset_label = nullptr;
 	Button *offset_button = nullptr;
 	Button *add_button = nullptr;

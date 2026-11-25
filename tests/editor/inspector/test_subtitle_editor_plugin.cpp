@@ -86,6 +86,23 @@ TEST_CASE("[SubtitleEditorPlugin] Sorted segments and a new segment, without cha
 	CHECK(SubtitleEditorHelper::get_kind_name(SubtitleSegment::KIND_SOUND) == "Sound");
 }
 
+TEST_CASE("[SubtitleEditorPlugin] Short times and row texts") {
+	CHECK(SubtitleEditorHelper::format_short_time(5.5) == "0:05.500");
+	CHECK(SubtitleEditorHelper::format_short_time(65.25) == "1:05.250");
+	CHECK(SubtitleEditorHelper::format_short_time(3605.5) == "1:00:05.500");
+
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	Ref<SubtitleSegment> spoken = make_segment(0, 1);
+	spoken->set_text("Who\nis there?");
+	spoken->set_speaker("guard");
+	CHECK(SubtitleEditorHelper::get_row_text(subtitle, spoken) == "guard: Who / is there?");
+	Ref<SubtitleSegment> sound = make_segment(0, 1);
+	sound->set_text("Applause");
+	sound->set_kind(SubtitleSegment::KIND_SOUND);
+	CHECK(SubtitleEditorHelper::get_row_text(subtitle, sound) == "[Applause]");
+}
+
 } // namespace TestSubtitleEditorPlugin
 
 #endif // TOOLS_ENABLED

@@ -41,18 +41,40 @@
 #include "scene/gui/tree.h"
 #include "scene/scene_string_names.h"
 #include "servers/subtitle/subtitle_format_srt.h"
+#include "servers/subtitle/subtitle_server.h"
 
 enum {
 	COLUMN_INDEX,
 	COLUMN_START,
-	COLUMN_END,
-	COLUMN_KIND,
-	COLUMN_SPEAKER,
 	COLUMN_TEXT,
 	COLUMN_MAX,
 };
 
 // SubtitleEditorHelper
+
+String SubtitleEditorHelper::format_short_time(double p_seconds) {
+	int64_t total_ms = int64_t(Math::round(MAX(0.0, p_seconds) * 1000.0));
+	const int64_t ms = total_ms % 1000;
+	total_ms /= 1000;
+	const int64_t seconds = total_ms % 60;
+	const int64_t minutes = (total_ms / 60) % 60;
+	const int64_t hours = total_ms / 3600;
+	const String rest = String::num_int64(seconds).pad_zeros(2) + "." + String::num_int64(ms).pad_zeros(3);
+	if (hours > 0) {
+		return itos(hours) + ":" + String::num_int64(minutes).pad_zeros(2) + ":" + rest;
+	}
+	return itos(minutes) + ":" + rest;
+}
+
+String SubtitleEditorHelper::get_row_text(const Ref<Subtitle> &p_subtitle, const Ref<SubtitleSegment> &p_segment) {
+	ERR_FAIL_COND_V(p_segment.is_null(), String());
+	String text = SubtitleServer::get_singleton() ? SubtitleServer::get_singleton()->get_display_text(p_subtitle, p_segment) : p_segment->get_text();
+	const String speaker = String(p_segment->get_speaker());
+	if (!speaker.is_empty() && !p_segment->is_caption()) {
+		text = speaker + ": " + text;
+	}
+	return text.replace("\n", " / ");
+}
 
 double SubtitleEditorHelper::get_suggested_time_offset(const Ref<Subtitle> &p_subtitle) {
 	if (p_subtitle.is_null() || p_subtitle->get_segment_count() == 0) {
@@ -155,7 +177,7 @@ void SubtitleEditor::_update() {
 		summary += ", " + subtitle->get_language();
 	}
 	if (validation->get_problem_count() > 0) {
-		summary += ". " + vformat(TTR("%d problems: highlighted rows (see their tooltips)."), validation->get_problem_count());
+		summary += ". " + vformat(TTR("Problems: %d (highlighted rows, see their tooltips)."), validation->get_problem_count());
 	}
 	summary_label->set_text(summary);
 
@@ -191,12 +213,13 @@ void SubtitleEditor::_update() {
 		item->set_metadata(0, i);
 		item->set_text(COLUMN_INDEX, itos(i + 1));
 		if (segment.is_valid()) {
-			item->set_text(COLUMN_START, SubtitleFormatSRT::format_time(segment->get_start_time() + subtitle->get_time_offset()));
-			item->set_text(COLUMN_END, SubtitleFormatSRT::format_time(segment->get_end_time() + subtitle->get_time_offset()));
-			item->set_text(COLUMN_KIND, SubtitleEditorHelper::get_kind_name(segment->get_kind()));
-			item->set_text(COLUMN_SPEAKER, segment->get_speaker());
-			item->set_text(COLUMN_TEXT, segment->get_text().replace("\n", " / "));
-			item->set_tooltip_text(COLUMN_TEXT, segment->get_text());
+			const double start = segment->get_start_time() + subtitle->get_time_offset();
+			const double end = segment->get_end_time() + subtitle->get_time_offset();
+			item->set_text(COLUMN_START, SubtitleEditorHelper::format_short_time(start));
+			item->set_text(COLUMN_TEXT, SubtitleEditorHelper::get_row_text(subtitle, segment));
+			const String details = vformat(TTR("%s - %s (%s s), %s"), SubtitleFormatSRT::format_time(start), SubtitleFormatSRT::format_time(end), String::num(segment->get_duration(), 3), SubtitleEditorHelper::get_kind_name(segment->get_kind()));
+			item->set_tooltip_text(COLUMN_START, details);
+			item->set_tooltip_text(COLUMN_TEXT, details + "\n" + segment->get_text());
 		} else {
 			item->set_text(COLUMN_TEXT, TTR("<empty slot>"));
 		}
@@ -204,9 +227,7 @@ void SubtitleEditor::_update() {
 			const String tooltip = String("\n").join(problems[i]);
 			for (int column = 0; column < COLUMN_MAX; column++) {
 				item->set_custom_color(column, warning_color);
-				if (column != COLUMN_TEXT) {
-					item->set_tooltip_text(column, tooltip);
-				}
+				item->set_tooltip_text(column, item->get_tooltip_text(column) + "\n" + tooltip);
 			}
 		}
 	}
@@ -266,14 +287,14 @@ SubtitleEditor::SubtitleEditor(const Ref<Subtitle> &p_subtitle) {
 	summary_label->set_custom_minimum_size(Size2(100, 0) * EDSCALE);
 	add_child(summary_label);
 
-	offset_box = memnew(HBoxContainer);
+	offset_box = memnew(VBoxContainer);
 	offset_box->hide();
 	add_child(offset_box);
 	offset_label = memnew(Label);
 	offset_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	offset_label->set_h_size_flags(SIZE_EXPAND_FILL);
 	offset_box->add_child(offset_label);
 	offset_button = memnew(Button);
+	offset_button->set_h_size_flags(SIZE_SHRINK_BEGIN);
 	offset_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitleEditor::_apply_suggested_offset));
 	offset_box->add_child(offset_button);
 
@@ -293,14 +314,13 @@ SubtitleEditor::SubtitleEditor(const Ref<Subtitle> &p_subtitle) {
 	tree->set_column_titles_visible(true);
 	tree->set_column_title(COLUMN_INDEX, "#");
 	tree->set_column_title(COLUMN_START, TTR("Start"));
-	tree->set_column_title(COLUMN_END, TTR("End"));
-	tree->set_column_title(COLUMN_KIND, TTR("Kind"));
-	tree->set_column_title(COLUMN_SPEAKER, TTR("Speaker"));
 	tree->set_column_title(COLUMN_TEXT, TTR("Text"));
 	for (int column = 0; column < COLUMN_TEXT; column++) {
 		tree->set_column_expand(column, false);
 		tree->set_column_clip_content(column, false);
 	}
+	tree->set_column_custom_minimum_width(COLUMN_INDEX, 32 * EDSCALE);
+	tree->set_column_custom_minimum_width(COLUMN_START, 116 * EDSCALE);
 	tree->set_column_expand(COLUMN_TEXT, true);
 	tree->set_column_clip_content(COLUMN_TEXT, true);
 	tree->set_custom_minimum_size(Size2(0, 240) * EDSCALE);
