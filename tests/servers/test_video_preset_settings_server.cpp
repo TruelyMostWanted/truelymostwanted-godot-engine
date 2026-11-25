@@ -510,10 +510,10 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 	ERR_PRINT_OFF;
 	preset->set_domain_settings("video_shadow", effect);
 	CHECK(preset->get_video_shadow().is_null());
-	preset->set_domain_settings("video_window", effect);
-	CHECK(preset->get_domain_settings("video_window").is_null());
+	preset->set_domain_settings("window", effect);
+	CHECK(preset->get_domain_settings("window").is_null());
 	ERR_PRINT_ON;
-	CHECK_FALSE(preset->has_domain_settings("video_window"));
+	CHECK_FALSE(preset->has_domain_settings("window"));
 
 	// Null: the preset leaves the domain as it is again.
 	preset->set_domain_settings("video_effect", Ref<Resource>());

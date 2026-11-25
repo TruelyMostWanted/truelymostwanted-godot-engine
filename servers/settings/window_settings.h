@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_window_settings.h                                               */
+/*  window_settings.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -35,11 +35,11 @@
 #include "scene/main/window.h"
 #include "servers/display/display_server.h"
 
-// Data of the `video_window` settings domain (#20): the main window (mode, size, screen, position, flags,
+// Data of the `window` settings domain (#20): the main window (mode, size, screen, position, flags,
 // V-Sync, content scale, HDR) and the stored states of further windows, keyed by node path.
-// VideoWindowSettingsServer pushes the values to DisplayServer and the root window.
-class VideoWindowSettings : public Resource {
-	GDCLASS(VideoWindowSettings, Resource);
+// WindowSettingsServer pushes the values to DisplayServer and the root window.
+class WindowSettings : public Resource {
+	GDCLASS(WindowSettings, Resource);
 
 	DisplayServerEnums::WindowMode window_mode = DisplayServerEnums::WINDOW_MODE_WINDOWED;
 	Size2i window_size = Size2i(1152, 648);

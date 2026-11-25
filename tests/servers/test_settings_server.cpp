@@ -89,6 +89,7 @@ public:
 	String domain = "test_domain";
 	int version = 1;
 	ApplyPhase phase = APPLY_PHASE_SERVERS;
+	String legacy_name;
 	int apply_calls = 0;
 	PackedStringArray last_applied;
 	// "name=value" per _notify_value_applied() call.
@@ -117,6 +118,10 @@ protected:
 
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override {
 		p_settings->set("quality", TestEngine::quality);
+	}
+
+	virtual String _get_legacy_file_name() const override {
+		return legacy_name;
 	}
 
 	virtual Dictionary _migrate_settings(int p_from_version, const Dictionary &p_data) override {
@@ -443,6 +448,59 @@ TEST_CASE("[SettingsServer] Missing and broken files fall back to the defaults")
 	CHECK(FileAccess::get_file_as_string(path) == broken);
 	CHECK(restarted->save() == OK);
 	CHECK(FileAccess::get_file_as_string(path) != broken);
+	memdelete(restarted);
+}
+
+TEST_CASE("[SettingsServer] The file of the old domain name is read once") {
+	TestSetup setup;
+	const String path = temp_file("renamed_domain.ini");
+	const String legacy_path = temp_file("old_domain.ini");
+	{
+		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		// The old file names the class of the settings before the rename.
+		file->store_string("[root]
+$type=OldDomainSettings
+quality=2
+");
+	}
+	TestDomainServer *server = memnew(TestDomainServer);
+	server->set_file_path(path);
+	// Without a legacy name, the old file is not read.
+	CHECK(server->load() == ERR_FILE_NOT_FOUND);
+	CHECK(int(server->get_value("quality")) == 1);
+	server->legacy_name = "old_domain";
+	CHECK(server->load() == OK);
+	CHECK(int(server->get_value("quality")) == 2);
+	// load() alone does not write the new file.
+	CHECK_FALSE(FileAccess::exists(path));
+	memdelete(server);
+
+	TestDomainServer *started = memnew(TestDomainServer);
+	started->legacy_name = "old_domain";
+	started->set_file_path(path);
+	started->startup();
+	CHECK(int(started->get_applied_value("quality")) == 2);
+	// startup() writes the new file once; the old file stays.
+	CHECK(FileAccess::exists(path));
+	CHECK(FileAccess::exists(legacy_path));
+	CHECK(FileAccess::get_file_as_string(path).contains("TestDomainSettings"));
+	memdelete(started);
+
+	// From now on the new file is read, not the old one.
+	{
+		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("[root]
+quality=0
+");
+	}
+	TestEngine::quality = 1;
+	TestDomainServer *restarted = memnew(TestDomainServer);
+	restarted->legacy_name = "old_domain";
+	restarted->set_file_path(path);
+	CHECK(restarted->load() == OK);
+	CHECK(int(restarted->get_value("quality")) == 2);
 	memdelete(restarted);
 }
 

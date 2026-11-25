@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_window_settings_server.cpp                                      */
+/*  window_settings_server.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_window_settings_server.h"
+#include "window_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
@@ -39,18 +39,18 @@
 #include "scene/main/scene_tree.h"
 #include "servers/settings/accessibility_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_window_settings.h"
+#include "servers/settings/window_settings.h"
 
 static_assert(int(Window::MODE_EXCLUSIVE_FULLSCREEN) == int(DisplayServerEnums::WINDOW_MODE_EXCLUSIVE_FULLSCREEN), "Window::Mode mirrors DisplayServer::WindowMode.");
 static_assert(int(Window::FLAG_RESIZE_DISABLED) == int(DisplayServerEnums::WINDOW_FLAG_RESIZE_DISABLED) && int(Window::FLAG_TRANSPARENT) == int(DisplayServerEnums::WINDOW_FLAG_TRANSPARENT), "Window::Flags mirrors DisplayServer::WindowFlags.");
 
-VideoWindowSettingsServer *VideoWindowSettingsServer::singleton = nullptr;
+WindowSettingsServer *WindowSettingsServer::singleton = nullptr;
 
-VideoWindowSettingsServer *VideoWindowSettingsServer::get_singleton() {
+WindowSettingsServer *WindowSettingsServer::get_singleton() {
 	return singleton;
 }
 
-static Variant video_window_project_setting(const String &p_key, const Variant &p_default) {
+static Variant window_project_setting(const String &p_key, const Variant &p_default) {
 	const ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	if (project_settings == nullptr || !project_settings->has_setting(p_key)) {
 		return p_default;
@@ -60,7 +60,7 @@ static Variant video_window_project_setting(const String &p_key, const Variant &
 
 // A vector of a stored window state. The INI and JSON files keep the states as an untyped dictionary, so
 // after loading a vector arrives as an array of two numbers.
-static bool video_window_state_vector(const Variant &p_value, Vector2i &r_vector) {
+static bool window_state_vector(const Variant &p_value, Vector2i &r_vector) {
 	switch (p_value.get_type()) {
 		case Variant::VECTOR2I: {
 			r_vector = p_value;
@@ -89,16 +89,16 @@ static bool video_window_state_vector(const Variant &p_value, Vector2i &r_vector
 }
 
 // A stored window state with typed values: vectors as Vector2i, mode and screen as int. Unknown entries are dropped.
-static Dictionary video_window_normalize_state(const Dictionary &p_state) {
+static Dictionary window_normalize_state(const Dictionary &p_state) {
 	Dictionary state;
 	Vector2i vector;
 	if (p_state.has("mode") && p_state["mode"].is_num()) {
 		state["mode"] = int(p_state["mode"]);
 	}
-	if (video_window_state_vector(p_state.get("size", Variant()), vector)) {
+	if (window_state_vector(p_state.get("size", Variant()), vector)) {
 		state["size"] = vector;
 	}
-	if (video_window_state_vector(p_state.get("position", Variant()), vector)) {
+	if (window_state_vector(p_state.get("position", Variant()), vector)) {
 		state["position"] = vector;
 	}
 	if (p_state.has("screen") && p_state["screen"].is_num()) {
@@ -108,7 +108,7 @@ static Dictionary video_window_normalize_state(const Dictionary &p_state) {
 }
 
 // The window flag a setting controls, or -1.
-static int video_window_flag(const StringName &p_name) {
+static int window_flag(const StringName &p_name) {
 	if (p_name == SNAME("borderless")) {
 		return DisplayServerEnums::WINDOW_FLAG_BORDERLESS;
 	} else if (p_name == SNAME("always_on_top")) {
@@ -124,7 +124,7 @@ static int video_window_flag(const StringName &p_name) {
 /////////////////////////////////////////////////////////////////////////////
 // Targets.
 
-VideoWindowSettingsServer::Target VideoWindowSettingsServer::_get_target(const StringName &p_name) {
+WindowSettingsServer::Target WindowSettingsServer::_get_target(const StringName &p_name) {
 	if (p_name == SNAME("screen") || p_name == SNAME("window_position") || p_name == SNAME("window_centered")) {
 		return TARGET_PLACEMENT;
 	}
@@ -138,7 +138,7 @@ VideoWindowSettingsServer::Target VideoWindowSettingsServer::_get_target(const S
 	return TARGET_BOOT;
 }
 
-DisplayServer *VideoWindowSettingsServer::_get_display_server() {
+DisplayServer *WindowSettingsServer::_get_display_server() {
 	// No display server yet (APPLY_PHASE_PRE_DISPLAY), or one without a screen (headless): the values wait.
 	DisplayServer *display_server = DisplayServer::get_singleton();
 	if (display_server == nullptr || display_server->get_screen_count() <= 0) {
@@ -147,23 +147,23 @@ DisplayServer *VideoWindowSettingsServer::_get_display_server() {
 	return display_server;
 }
 
-Window *VideoWindowSettingsServer::_get_root() {
+Window *WindowSettingsServer::_get_root() {
 	SceneTree *tree = SceneTree::get_singleton();
 	return tree != nullptr ? tree->get_root().ptr() : nullptr;
 }
 
-bool VideoWindowSettingsServer::_is_embedded_in_editor() {
+bool WindowSettingsServer::_is_embedded_in_editor() {
 	return get_command_line_options().has("embedded");
 }
 
-Variant VideoWindowSettingsServer::_get_project_value(const StringName &p_name) {
+Variant WindowSettingsServer::_get_project_value(const StringName &p_name) {
 	if (p_name == SNAME("window_mode")) {
-		return int(video_window_project_setting("display/window/size/mode", int(DisplayServerEnums::WINDOW_MODE_WINDOWED)));
+		return int(window_project_setting("display/window/size/mode", int(DisplayServerEnums::WINDOW_MODE_WINDOWED)));
 	} else if (p_name == SNAME("window_size")) {
 		// What Main::setup() passes to DisplayServer::create().
-		Vector2i size(int(video_window_project_setting("display/window/size/viewport_width", 1152)), int(video_window_project_setting("display/window/size/viewport_height", 648)));
-		const int width_override = video_window_project_setting("display/window/size/window_width_override", 0);
-		const int height_override = video_window_project_setting("display/window/size/window_height_override", 0);
+		Vector2i size(int(window_project_setting("display/window/size/viewport_width", 1152)), int(window_project_setting("display/window/size/viewport_height", 648)));
+		const int width_override = window_project_setting("display/window/size/window_width_override", 0);
+		const int height_override = window_project_setting("display/window/size/window_height_override", 0);
 		if (width_override > 0) {
 			size.x = width_override;
 		}
@@ -178,18 +178,18 @@ Variant VideoWindowSettingsServer::_get_project_value(const StringName &p_name) 
 	} else if (p_name == SNAME("window_position")) {
 		return Vector2i();
 	} else if (p_name == SNAME("borderless")) {
-		return bool(video_window_project_setting("display/window/size/borderless", false));
+		return bool(window_project_setting("display/window/size/borderless", false));
 	} else if (p_name == SNAME("always_on_top")) {
-		return bool(video_window_project_setting("display/window/size/always_on_top", false));
+		return bool(window_project_setting("display/window/size/always_on_top", false));
 	} else if (p_name == SNAME("unresizable")) {
-		return !bool(video_window_project_setting("display/window/size/resizable", true));
+		return !bool(window_project_setting("display/window/size/resizable", true));
 	} else if (p_name == SNAME("transparent")) {
-		return bool(video_window_project_setting("display/window/size/transparent", false));
+		return bool(window_project_setting("display/window/size/transparent", false));
 	} else if (p_name == SNAME("vsync_mode")) {
-		return int(video_window_project_setting("display/window/vsync/vsync_mode", int(DisplayServerEnums::VSYNC_ENABLED)));
+		return int(window_project_setting("display/window/vsync/vsync_mode", int(DisplayServerEnums::VSYNC_ENABLED)));
 	} else if (p_name == SNAME("content_scale_mode")) {
 		// The same mapping as Main::start().
-		const String mode = video_window_project_setting("display/window/stretch/mode", "disabled");
+		const String mode = window_project_setting("display/window/stretch/mode", "disabled");
 		if (mode == "canvas_items") {
 			return int(Window::CONTENT_SCALE_MODE_CANVAS_ITEMS);
 		} else if (mode == "viewport") {
@@ -197,7 +197,7 @@ Variant VideoWindowSettingsServer::_get_project_value(const StringName &p_name) 
 		}
 		return int(Window::CONTENT_SCALE_MODE_DISABLED);
 	} else if (p_name == SNAME("content_scale_aspect")) {
-		const String aspect = video_window_project_setting("display/window/stretch/aspect", "keep");
+		const String aspect = window_project_setting("display/window/stretch/aspect", "keep");
 		if (aspect == "keep") {
 			return int(Window::CONTENT_SCALE_ASPECT_KEEP);
 		} else if (aspect == "keep_width") {
@@ -209,19 +209,19 @@ Variant VideoWindowSettingsServer::_get_project_value(const StringName &p_name) 
 		}
 		return int(Window::CONTENT_SCALE_ASPECT_IGNORE);
 	} else if (p_name == SNAME("content_scale_stretch")) {
-		const String stretch = video_window_project_setting("display/window/stretch/scale_mode", "fractional");
+		const String stretch = window_project_setting("display/window/stretch/scale_mode", "fractional");
 		return int(stretch == "integer" ? Window::CONTENT_SCALE_STRETCH_INTEGER : Window::CONTENT_SCALE_STRETCH_FRACTIONAL);
 	} else if (p_name == SNAME("content_scale_factor")) {
-		return float(video_window_project_setting("display/window/stretch/scale", 1.0));
+		return float(window_project_setting("display/window/stretch/scale", 1.0));
 	} else if (p_name == SNAME("hdr_output_requested")) {
-		return bool(video_window_project_setting("display/window/hdr/request_hdr_output", false));
+		return bool(window_project_setting("display/window/hdr/request_hdr_output", false));
 	} else if (p_name == SNAME("hdr_reference_luminance") || p_name == SNAME("hdr_max_luminance")) {
 		return -1.0; // Automatic: the value of the screen.
 	}
 	return Dictionary(); // window_states
 }
 
-int VideoWindowSettingsServer::_resolve_screen(int p_screen) {
+int WindowSettingsServer::_resolve_screen(int p_screen) {
 	const DisplayServer *display_server = DisplayServer::get_singleton();
 	if (display_server == nullptr) {
 		return p_screen;
@@ -235,12 +235,12 @@ int VideoWindowSettingsServer::_resolve_screen(int p_screen) {
 	}
 	if (p_screen >= screen_count) {
 		// A monitor that was unplugged: the normal case, no error.
-		print_verbose(vformat("Video window settings: screen %d does not exist (%d screens); the primary screen is used.", p_screen, screen_count));
+		print_verbose(vformat("Window settings: screen %d does not exist (%d screens); the primary screen is used.", p_screen, screen_count));
 	}
 	return display_server->get_primary_screen();
 }
 
-Rect2i VideoWindowSettingsServer::_fit_into_screen(const Rect2i &p_rect, int p_screen) {
+Rect2i WindowSettingsServer::_fit_into_screen(const Rect2i &p_rect, int p_screen) {
 	const DisplayServer *display_server = DisplayServer::get_singleton();
 	const Rect2i usable = display_server->screen_get_usable_rect(p_screen);
 	if (usable.size.x <= 0 || usable.size.y <= 0) {
@@ -256,12 +256,12 @@ Rect2i VideoWindowSettingsServer::_fit_into_screen(const Rect2i &p_rect, int p_s
 /////////////////////////////////////////////////////////////////////////////
 // Push and pull.
 
-Variant VideoWindowSettingsServer::_get_current(const StringName &p_name) const {
+Variant WindowSettingsServer::_get_current(const StringName &p_name) const {
 	const Variant *value = pushed_values.getptr(p_name);
 	return value != nullptr ? *value : _get_project_value(p_name);
 }
 
-bool VideoWindowSettingsServer::_can_deliver(const StringName &p_name) const {
+bool WindowSettingsServer::_can_deliver(const StringName &p_name) const {
 	switch (_get_target(p_name)) {
 		case TARGET_BOOT: {
 			if (p_name == SNAME("vsync_mode")) {
@@ -284,7 +284,7 @@ bool VideoWindowSettingsServer::_can_deliver(const StringName &p_name) const {
 	}
 }
 
-void VideoWindowSettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
+void WindowSettingsServer::_deliver(const StringName &p_name, const Variant &p_value) {
 	DisplayServer *display_server = _get_display_server();
 	Window *root = _get_root();
 	const DisplayServerEnums::WindowID main_window = DisplayServerEnums::MAIN_WINDOW_ID;
@@ -313,8 +313,8 @@ void VideoWindowSettingsServer::_deliver(const StringName &p_name, const Variant
 		_place_main_window();
 	} else if (_get_target(p_name) == TARGET_PLACEMENT) {
 		_place_main_window();
-	} else if (video_window_flag(p_name) >= 0) {
-		const int flag = video_window_flag(p_name);
+	} else if (window_flag(p_name) >= 0) {
+		const int flag = window_flag(p_name);
 		if (flag == DisplayServerEnums::WINDOW_FLAG_TRANSPARENT && !OS::get_singleton()->is_layered_allowed()) {
 			return; // Needs `display/window/per_pixel_transparency/allowed` at startup.
 		}
@@ -343,7 +343,7 @@ void VideoWindowSettingsServer::_deliver(const StringName &p_name, const Variant
 	}
 }
 
-void VideoWindowSettingsServer::_deliver_undelivered(Target p_target) {
+void WindowSettingsServer::_deliver_undelivered(Target p_target) {
 	LocalVector<StringName> names;
 	for (const StringName &name : undelivered) {
 		if (_get_target(name) == p_target && _can_deliver(name)) {
@@ -356,7 +356,7 @@ void VideoWindowSettingsServer::_deliver_undelivered(Target p_target) {
 	}
 }
 
-void VideoWindowSettingsServer::_push_window_value(const Variant &p_value, const StringName &p_name) {
+void WindowSettingsServer::_push_window_value(const Variant &p_value, const StringName &p_name) {
 	pushed_values[p_name] = p_value;
 	if (!_can_deliver(p_name)) {
 		undelivered.insert(p_name);
@@ -366,7 +366,7 @@ void VideoWindowSettingsServer::_push_window_value(const Variant &p_value, const
 	_deliver(p_name, p_value);
 }
 
-Variant VideoWindowSettingsServer::_pull_window_value(const StringName &p_name) {
+Variant WindowSettingsServer::_pull_window_value(const StringName &p_name) {
 	const Target target = _get_target(p_name);
 	if (undelivered.has(p_name) || target == TARGET_NONE) {
 		return _get_current(p_name);
@@ -400,7 +400,7 @@ Variant VideoWindowSettingsServer::_pull_window_value(const StringName &p_name) 
 	if (p_name == SNAME("vsync_mode")) {
 		return int(display_server->window_get_vsync_mode(main_window));
 	}
-	const int flag = video_window_flag(p_name);
+	const int flag = window_flag(p_name);
 	if (flag >= 0) {
 		return display_server->window_get_flag(DisplayServerEnums::WindowFlags(flag), main_window);
 	}
@@ -432,7 +432,7 @@ Variant VideoWindowSettingsServer::_pull_window_value(const StringName &p_name) 
 	return offset.x <= 1 && offset.y <= 1;
 }
 
-void VideoWindowSettingsServer::_place_main_window() {
+void WindowSettingsServer::_place_main_window() {
 	DisplayServer *display_server = _get_display_server();
 	if (display_server == nullptr || placing || _is_embedded_in_editor() || !display_server->has_feature(DisplayServerEnums::FEATURE_SUBWINDOWS)) {
 		return;
@@ -464,12 +464,12 @@ void VideoWindowSettingsServer::_place_main_window() {
 	placing = false;
 }
 
-void VideoWindowSettingsServer::_connect_tree() {
+void WindowSettingsServer::_connect_tree() {
 	SceneTree *tree = SceneTree::get_singleton();
 	if (tree == nullptr) {
 		return;
 	}
-	const Callable callback = callable_mp(this, &VideoWindowSettingsServer::_on_node_added);
+	const Callable callback = callable_mp(this, &WindowSettingsServer::_on_node_added);
 	if (!tree->is_connected(SNAME("node_added"), callback)) {
 		tree->connect(SNAME("node_added"), callback);
 	}
@@ -478,14 +478,14 @@ void VideoWindowSettingsServer::_connect_tree() {
 /////////////////////////////////////////////////////////////////////////////
 // Further windows.
 
-String VideoWindowSettingsServer::_get_window_key(Window *p_window, const String &p_key) const {
+String WindowSettingsServer::_get_window_key(Window *p_window, const String &p_key) const {
 	if (!p_key.is_empty()) {
 		return p_key;
 	}
 	return p_window->is_inside_tree() ? String(p_window->get_path()) : String();
 }
 
-Dictionary VideoWindowSettingsServer::_capture_window_state(Window *p_window) const {
+Dictionary WindowSettingsServer::_capture_window_state(Window *p_window) const {
 	Dictionary state;
 	state["mode"] = int(p_window->get_mode());
 	state["size"] = Vector2i(p_window->get_size());
@@ -501,7 +501,7 @@ Dictionary VideoWindowSettingsServer::_capture_window_state(Window *p_window) co
 	return state;
 }
 
-void VideoWindowSettingsServer::_apply_window_state(Window *p_window, const Dictionary &p_state) const {
+void WindowSettingsServer::_apply_window_state(Window *p_window, const Dictionary &p_state) const {
 	const Window::Mode mode = Window::Mode(int(p_state.get("mode", int(Window::MODE_WINDOWED))));
 	Size2i size = p_state.get("size", Vector2i(p_window->get_size()));
 	Point2i position = p_state.get("position", Vector2i(p_window->get_position()));
@@ -519,7 +519,7 @@ void VideoWindowSettingsServer::_apply_window_state(Window *p_window, const Dict
 	p_window->set_mode(mode);
 }
 
-void VideoWindowSettingsServer::_on_node_added(Node *p_node) {
+void WindowSettingsServer::_on_node_added(Node *p_node) {
 	Window *window = Object::cast_to<Window>(p_node);
 	if (window == nullptr || window == _get_root()) {
 		return;
@@ -534,7 +534,7 @@ void VideoWindowSettingsServer::_on_node_added(Node *p_node) {
 	}
 }
 
-void VideoWindowSettingsServer::save_window_state(Window *p_window, const String &p_key) {
+void WindowSettingsServer::save_window_state(Window *p_window, const String &p_key) {
 	ERR_FAIL_NULL(p_window);
 	const String key = _get_window_key(p_window, p_key);
 	ERR_FAIL_COND_MSG(key.is_empty(), "The window is not in the scene tree: pass a key to save its state.");
@@ -544,7 +544,7 @@ void VideoWindowSettingsServer::save_window_state(Window *p_window, const String
 	_connect_tree();
 }
 
-bool VideoWindowSettingsServer::restore_window_state(Window *p_window, const String &p_key) {
+bool WindowSettingsServer::restore_window_state(Window *p_window, const String &p_key) {
 	ERR_FAIL_NULL_V(p_window, false);
 	const String key = _get_window_key(p_window, p_key);
 	if (key.is_empty()) {
@@ -559,12 +559,12 @@ bool VideoWindowSettingsServer::restore_window_state(Window *p_window, const Str
 	return true;
 }
 
-bool VideoWindowSettingsServer::has_window_state(const String &p_key) const {
+bool WindowSettingsServer::has_window_state(const String &p_key) const {
 	const Dictionary states = get_value(SNAME("window_states"));
 	return states.has(p_key);
 }
 
-void VideoWindowSettingsServer::clear_window_state(const String &p_key) {
+void WindowSettingsServer::clear_window_state(const String &p_key) {
 	Dictionary states = Dictionary(get_value(SNAME("window_states"))).duplicate();
 	if (states.erase(p_key)) {
 		set_value(SNAME("window_states"), states);
@@ -574,12 +574,12 @@ void VideoWindowSettingsServer::clear_window_state(const String &p_key) {
 /////////////////////////////////////////////////////////////////////////////
 // Startup.
 
-Dictionary VideoWindowSettingsServer::get_command_line_options() {
+Dictionary WindowSettingsServer::get_command_line_options() {
 	// Main::setup() consumes these options, so they are not in OS::get_cmdline_args().
 	return Main::get_command_line_window_options();
 }
 
-void VideoWindowSettingsServer::get_boot_window(BootWindow &r_window) {
+void WindowSettingsServer::get_boot_window(BootWindow &r_window) {
 	// All boot values pushed so far: the player's file and the command line (`--windowed` included).
 	static const char *boot_names[] = { "window_mode", "window_size", "vsync_mode", "borderless", "always_on_top", "unresizable", "transparent" };
 	for (const char *boot_name : boot_names) {
@@ -595,7 +595,7 @@ void VideoWindowSettingsServer::get_boot_window(BootWindow &r_window) {
 		} else if (setting_name == SNAME("vsync_mode")) {
 			r_window.vsync_mode = DisplayServerEnums::VSyncMode(int(value));
 		} else {
-			const uint32_t bit = 1u << uint32_t(video_window_flag(setting_name));
+			const uint32_t bit = 1u << uint32_t(window_flag(setting_name));
 			if (bool(value)) {
 				r_window.flags |= bit;
 			} else {
@@ -605,7 +605,7 @@ void VideoWindowSettingsServer::get_boot_window(BootWindow &r_window) {
 	}
 }
 
-void VideoWindowSettingsServer::on_display_server_created() {
+void WindowSettingsServer::on_display_server_created() {
 	// The stored screen and position; `--screen` and `--position` were already passed to DisplayServer::create().
 	bool place = false;
 	static const char *placement_names[] = { "screen", "window_position", "window_centered" };
@@ -621,7 +621,7 @@ void VideoWindowSettingsServer::on_display_server_created() {
 	}
 }
 
-void VideoWindowSettingsServer::_on_loaded() {
+void WindowSettingsServer::_on_loaded() {
 	// Only the load of startup(), after the player's file is read and before it is applied.
 	if (!is_started() || startup_overrides_done) {
 		return;
@@ -640,7 +640,7 @@ void VideoWindowSettingsServer::_on_loaded() {
 	}
 }
 
-void VideoWindowSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
+void WindowSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		// After Main::start() and SceneTree have set the project values of the root window.
 		_deliver_undelivered(TARGET_SCENE);
@@ -651,16 +651,20 @@ void VideoWindowSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName VideoWindowSettingsServer::get_domain() const {
-	return SNAME("video_window");
+StringName WindowSettingsServer::get_domain() const {
+	return SNAME("window");
 }
 
-SettingsServer::ApplyPhase VideoWindowSettingsServer::get_apply_phase() const {
+String WindowSettingsServer::_get_legacy_file_name() const {
+	return "video_window";
+}
+
+SettingsServer::ApplyPhase WindowSettingsServer::get_apply_phase() const {
 	// Before DisplayServer::create(): the main window opens with the stored values.
 	return APPLY_PHASE_PRE_DISPLAY;
 }
 
-bool VideoWindowSettingsServer::is_value_supported(const StringName &p_name) const {
+bool WindowSettingsServer::is_value_supported(const StringName &p_name) const {
 	if (!SettingsServer::is_value_supported(p_name)) {
 		return false;
 	}
@@ -686,13 +690,13 @@ bool VideoWindowSettingsServer::is_value_supported(const StringName &p_name) con
 	return true;
 }
 
-Ref<Resource> VideoWindowSettingsServer::_create_default_settings() const {
-	Ref<VideoWindowSettings> default_settings;
+Ref<Resource> WindowSettingsServer::_create_default_settings() const {
+	Ref<WindowSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-Variant VideoWindowSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant WindowSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	const Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (p_name == SNAME("window_size")) {
 		return Vector2i(value).max(Vector2i(1, 1));
@@ -708,7 +712,7 @@ Variant VideoWindowSettingsServer::_validate_setting(const StringName &p_name, c
 		Dictionary normalized;
 		for (const KeyValue<Variant, Variant> &kv : states) {
 			if (kv.value.get_type() == Variant::DICTIONARY) {
-				normalized[kv.key] = video_window_normalize_state(kv.value);
+				normalized[kv.key] = window_normalize_state(kv.value);
 			}
 		}
 		return normalized;
@@ -719,147 +723,147 @@ Variant VideoWindowSettingsServer::_validate_setting(const StringName &p_name, c
 /////////////////////////////////////////////////////////////////////////////
 // Typed API.
 
-void VideoWindowSettingsServer::set_window_mode(DisplayServerEnums::WindowMode p_mode) {
+void WindowSettingsServer::set_window_mode(DisplayServerEnums::WindowMode p_mode) {
 	set_value(SNAME("window_mode"), int(p_mode));
 }
 
-DisplayServerEnums::WindowMode VideoWindowSettingsServer::get_window_mode() const {
+DisplayServerEnums::WindowMode WindowSettingsServer::get_window_mode() const {
 	return DisplayServerEnums::WindowMode(int(get_value(SNAME("window_mode"))));
 }
 
-void VideoWindowSettingsServer::set_window_size(const Size2i &p_size) {
+void WindowSettingsServer::set_window_size(const Size2i &p_size) {
 	set_value(SNAME("window_size"), Vector2i(p_size));
 }
 
-Size2i VideoWindowSettingsServer::get_window_size() const {
+Size2i WindowSettingsServer::get_window_size() const {
 	return Vector2i(get_value(SNAME("window_size")));
 }
 
-void VideoWindowSettingsServer::set_screen(int p_screen) {
+void WindowSettingsServer::set_screen(int p_screen) {
 	set_value(SNAME("screen"), p_screen);
 }
 
-int VideoWindowSettingsServer::get_screen() const {
+int WindowSettingsServer::get_screen() const {
 	return get_value(SNAME("screen"));
 }
 
-void VideoWindowSettingsServer::set_window_centered(bool p_centered) {
+void WindowSettingsServer::set_window_centered(bool p_centered) {
 	set_value(SNAME("window_centered"), p_centered);
 }
 
-bool VideoWindowSettingsServer::is_window_centered() const {
+bool WindowSettingsServer::is_window_centered() const {
 	return get_value(SNAME("window_centered"));
 }
 
-void VideoWindowSettingsServer::set_window_position(const Point2i &p_position) {
+void WindowSettingsServer::set_window_position(const Point2i &p_position) {
 	set_value(SNAME("window_position"), Vector2i(p_position));
 }
 
-Point2i VideoWindowSettingsServer::get_window_position() const {
+Point2i WindowSettingsServer::get_window_position() const {
 	return Vector2i(get_value(SNAME("window_position")));
 }
 
-void VideoWindowSettingsServer::set_borderless(bool p_borderless) {
+void WindowSettingsServer::set_borderless(bool p_borderless) {
 	set_value(SNAME("borderless"), p_borderless);
 }
 
-bool VideoWindowSettingsServer::is_borderless() const {
+bool WindowSettingsServer::is_borderless() const {
 	return get_value(SNAME("borderless"));
 }
 
-void VideoWindowSettingsServer::set_always_on_top(bool p_always_on_top) {
+void WindowSettingsServer::set_always_on_top(bool p_always_on_top) {
 	set_value(SNAME("always_on_top"), p_always_on_top);
 }
 
-bool VideoWindowSettingsServer::is_always_on_top() const {
+bool WindowSettingsServer::is_always_on_top() const {
 	return get_value(SNAME("always_on_top"));
 }
 
-void VideoWindowSettingsServer::set_unresizable(bool p_unresizable) {
+void WindowSettingsServer::set_unresizable(bool p_unresizable) {
 	set_value(SNAME("unresizable"), p_unresizable);
 }
 
-bool VideoWindowSettingsServer::is_unresizable() const {
+bool WindowSettingsServer::is_unresizable() const {
 	return get_value(SNAME("unresizable"));
 }
 
-void VideoWindowSettingsServer::set_transparent(bool p_transparent) {
+void WindowSettingsServer::set_transparent(bool p_transparent) {
 	set_value(SNAME("transparent"), p_transparent);
 }
 
-bool VideoWindowSettingsServer::is_transparent() const {
+bool WindowSettingsServer::is_transparent() const {
 	return get_value(SNAME("transparent"));
 }
 
-void VideoWindowSettingsServer::set_vsync_mode(DisplayServerEnums::VSyncMode p_mode) {
+void WindowSettingsServer::set_vsync_mode(DisplayServerEnums::VSyncMode p_mode) {
 	set_value(SNAME("vsync_mode"), int(p_mode));
 }
 
-DisplayServerEnums::VSyncMode VideoWindowSettingsServer::get_vsync_mode() const {
+DisplayServerEnums::VSyncMode WindowSettingsServer::get_vsync_mode() const {
 	return DisplayServerEnums::VSyncMode(int(get_value(SNAME("vsync_mode"))));
 }
 
-void VideoWindowSettingsServer::set_content_scale_mode(Window::ContentScaleMode p_mode) {
+void WindowSettingsServer::set_content_scale_mode(Window::ContentScaleMode p_mode) {
 	set_value(SNAME("content_scale_mode"), int(p_mode));
 }
 
-Window::ContentScaleMode VideoWindowSettingsServer::get_content_scale_mode() const {
+Window::ContentScaleMode WindowSettingsServer::get_content_scale_mode() const {
 	return Window::ContentScaleMode(int(get_value(SNAME("content_scale_mode"))));
 }
 
-void VideoWindowSettingsServer::set_content_scale_aspect(Window::ContentScaleAspect p_aspect) {
+void WindowSettingsServer::set_content_scale_aspect(Window::ContentScaleAspect p_aspect) {
 	set_value(SNAME("content_scale_aspect"), int(p_aspect));
 }
 
-Window::ContentScaleAspect VideoWindowSettingsServer::get_content_scale_aspect() const {
+Window::ContentScaleAspect WindowSettingsServer::get_content_scale_aspect() const {
 	return Window::ContentScaleAspect(int(get_value(SNAME("content_scale_aspect"))));
 }
 
-void VideoWindowSettingsServer::set_content_scale_stretch(Window::ContentScaleStretch p_stretch) {
+void WindowSettingsServer::set_content_scale_stretch(Window::ContentScaleStretch p_stretch) {
 	set_value(SNAME("content_scale_stretch"), int(p_stretch));
 }
 
-Window::ContentScaleStretch VideoWindowSettingsServer::get_content_scale_stretch() const {
+Window::ContentScaleStretch WindowSettingsServer::get_content_scale_stretch() const {
 	return Window::ContentScaleStretch(int(get_value(SNAME("content_scale_stretch"))));
 }
 
-void VideoWindowSettingsServer::set_content_scale_factor(float p_factor) {
+void WindowSettingsServer::set_content_scale_factor(float p_factor) {
 	set_value(SNAME("content_scale_factor"), p_factor);
 }
 
-float VideoWindowSettingsServer::get_content_scale_factor() const {
+float WindowSettingsServer::get_content_scale_factor() const {
 	return get_value(SNAME("content_scale_factor"));
 }
 
-void VideoWindowSettingsServer::set_hdr_output_requested(bool p_requested) {
+void WindowSettingsServer::set_hdr_output_requested(bool p_requested) {
 	set_value(SNAME("hdr_output_requested"), p_requested);
 }
 
-bool VideoWindowSettingsServer::is_hdr_output_requested() const {
+bool WindowSettingsServer::is_hdr_output_requested() const {
 	return get_value(SNAME("hdr_output_requested"));
 }
 
-void VideoWindowSettingsServer::set_hdr_reference_luminance(float p_luminance) {
+void WindowSettingsServer::set_hdr_reference_luminance(float p_luminance) {
 	set_value(SNAME("hdr_reference_luminance"), p_luminance);
 }
 
-float VideoWindowSettingsServer::get_hdr_reference_luminance() const {
+float WindowSettingsServer::get_hdr_reference_luminance() const {
 	return get_value(SNAME("hdr_reference_luminance"));
 }
 
-void VideoWindowSettingsServer::set_hdr_max_luminance(float p_luminance) {
+void WindowSettingsServer::set_hdr_max_luminance(float p_luminance) {
 	set_value(SNAME("hdr_max_luminance"), p_luminance);
 }
 
-float VideoWindowSettingsServer::get_hdr_max_luminance() const {
+float WindowSettingsServer::get_hdr_max_luminance() const {
 	return get_value(SNAME("hdr_max_luminance"));
 }
 
-void VideoWindowSettingsServer::place_main_window() {
+void WindowSettingsServer::place_main_window() {
 	_place_main_window();
 }
 
-void VideoWindowSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+void WindowSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
 	SettingsServer::_notify_value_applied(p_name, p_value);
 	// The values with a typed signal `<value>_changed` (see the class reference).
 	static const char *const SIGNAL_VALUES[] = {
@@ -881,7 +885,7 @@ void VideoWindowSettingsServer::_notify_value_applied(const StringName &p_name, 
 	}
 }
 
-void VideoWindowSettingsServer::_bind_methods() {
+void WindowSettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("window_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "DisplayServer.WindowMode")));
 	ADD_SIGNAL(MethodInfo("window_size_changed", PropertyInfo(Variant::VECTOR2I, "size")));
 	ADD_SIGNAL(MethodInfo("screen_changed", PropertyInfo(Variant::INT, "screen")));
@@ -892,53 +896,53 @@ void VideoWindowSettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("content_scale_factor_changed", PropertyInfo(Variant::FLOAT, "factor")));
 	ADD_SIGNAL(MethodInfo("hdr_output_requested_changed", PropertyInfo(Variant::BOOL, "requested")));
 
-	ClassDB::bind_method(D_METHOD("set_window_mode", "mode"), &VideoWindowSettingsServer::set_window_mode);
-	ClassDB::bind_method(D_METHOD("get_window_mode"), &VideoWindowSettingsServer::get_window_mode);
-	ClassDB::bind_method(D_METHOD("set_window_size", "size"), &VideoWindowSettingsServer::set_window_size);
-	ClassDB::bind_method(D_METHOD("get_window_size"), &VideoWindowSettingsServer::get_window_size);
-	ClassDB::bind_method(D_METHOD("set_screen", "screen"), &VideoWindowSettingsServer::set_screen);
-	ClassDB::bind_method(D_METHOD("get_screen"), &VideoWindowSettingsServer::get_screen);
-	ClassDB::bind_method(D_METHOD("set_window_centered", "centered"), &VideoWindowSettingsServer::set_window_centered);
-	ClassDB::bind_method(D_METHOD("is_window_centered"), &VideoWindowSettingsServer::is_window_centered);
-	ClassDB::bind_method(D_METHOD("set_window_position", "position"), &VideoWindowSettingsServer::set_window_position);
-	ClassDB::bind_method(D_METHOD("get_window_position"), &VideoWindowSettingsServer::get_window_position);
-	ClassDB::bind_method(D_METHOD("set_borderless", "borderless"), &VideoWindowSettingsServer::set_borderless);
-	ClassDB::bind_method(D_METHOD("is_borderless"), &VideoWindowSettingsServer::is_borderless);
-	ClassDB::bind_method(D_METHOD("set_always_on_top", "always_on_top"), &VideoWindowSettingsServer::set_always_on_top);
-	ClassDB::bind_method(D_METHOD("is_always_on_top"), &VideoWindowSettingsServer::is_always_on_top);
-	ClassDB::bind_method(D_METHOD("set_unresizable", "unresizable"), &VideoWindowSettingsServer::set_unresizable);
-	ClassDB::bind_method(D_METHOD("is_unresizable"), &VideoWindowSettingsServer::is_unresizable);
-	ClassDB::bind_method(D_METHOD("set_transparent", "transparent"), &VideoWindowSettingsServer::set_transparent);
-	ClassDB::bind_method(D_METHOD("is_transparent"), &VideoWindowSettingsServer::is_transparent);
-	ClassDB::bind_method(D_METHOD("set_vsync_mode", "mode"), &VideoWindowSettingsServer::set_vsync_mode);
-	ClassDB::bind_method(D_METHOD("get_vsync_mode"), &VideoWindowSettingsServer::get_vsync_mode);
+	ClassDB::bind_method(D_METHOD("set_window_mode", "mode"), &WindowSettingsServer::set_window_mode);
+	ClassDB::bind_method(D_METHOD("get_window_mode"), &WindowSettingsServer::get_window_mode);
+	ClassDB::bind_method(D_METHOD("set_window_size", "size"), &WindowSettingsServer::set_window_size);
+	ClassDB::bind_method(D_METHOD("get_window_size"), &WindowSettingsServer::get_window_size);
+	ClassDB::bind_method(D_METHOD("set_screen", "screen"), &WindowSettingsServer::set_screen);
+	ClassDB::bind_method(D_METHOD("get_screen"), &WindowSettingsServer::get_screen);
+	ClassDB::bind_method(D_METHOD("set_window_centered", "centered"), &WindowSettingsServer::set_window_centered);
+	ClassDB::bind_method(D_METHOD("is_window_centered"), &WindowSettingsServer::is_window_centered);
+	ClassDB::bind_method(D_METHOD("set_window_position", "position"), &WindowSettingsServer::set_window_position);
+	ClassDB::bind_method(D_METHOD("get_window_position"), &WindowSettingsServer::get_window_position);
+	ClassDB::bind_method(D_METHOD("set_borderless", "borderless"), &WindowSettingsServer::set_borderless);
+	ClassDB::bind_method(D_METHOD("is_borderless"), &WindowSettingsServer::is_borderless);
+	ClassDB::bind_method(D_METHOD("set_always_on_top", "always_on_top"), &WindowSettingsServer::set_always_on_top);
+	ClassDB::bind_method(D_METHOD("is_always_on_top"), &WindowSettingsServer::is_always_on_top);
+	ClassDB::bind_method(D_METHOD("set_unresizable", "unresizable"), &WindowSettingsServer::set_unresizable);
+	ClassDB::bind_method(D_METHOD("is_unresizable"), &WindowSettingsServer::is_unresizable);
+	ClassDB::bind_method(D_METHOD("set_transparent", "transparent"), &WindowSettingsServer::set_transparent);
+	ClassDB::bind_method(D_METHOD("is_transparent"), &WindowSettingsServer::is_transparent);
+	ClassDB::bind_method(D_METHOD("set_vsync_mode", "mode"), &WindowSettingsServer::set_vsync_mode);
+	ClassDB::bind_method(D_METHOD("get_vsync_mode"), &WindowSettingsServer::get_vsync_mode);
 
-	ClassDB::bind_method(D_METHOD("set_content_scale_mode", "mode"), &VideoWindowSettingsServer::set_content_scale_mode);
-	ClassDB::bind_method(D_METHOD("get_content_scale_mode"), &VideoWindowSettingsServer::get_content_scale_mode);
-	ClassDB::bind_method(D_METHOD("set_content_scale_aspect", "aspect"), &VideoWindowSettingsServer::set_content_scale_aspect);
-	ClassDB::bind_method(D_METHOD("get_content_scale_aspect"), &VideoWindowSettingsServer::get_content_scale_aspect);
-	ClassDB::bind_method(D_METHOD("set_content_scale_stretch", "stretch"), &VideoWindowSettingsServer::set_content_scale_stretch);
-	ClassDB::bind_method(D_METHOD("get_content_scale_stretch"), &VideoWindowSettingsServer::get_content_scale_stretch);
-	ClassDB::bind_method(D_METHOD("set_content_scale_factor", "factor"), &VideoWindowSettingsServer::set_content_scale_factor);
-	ClassDB::bind_method(D_METHOD("get_content_scale_factor"), &VideoWindowSettingsServer::get_content_scale_factor);
+	ClassDB::bind_method(D_METHOD("set_content_scale_mode", "mode"), &WindowSettingsServer::set_content_scale_mode);
+	ClassDB::bind_method(D_METHOD("get_content_scale_mode"), &WindowSettingsServer::get_content_scale_mode);
+	ClassDB::bind_method(D_METHOD("set_content_scale_aspect", "aspect"), &WindowSettingsServer::set_content_scale_aspect);
+	ClassDB::bind_method(D_METHOD("get_content_scale_aspect"), &WindowSettingsServer::get_content_scale_aspect);
+	ClassDB::bind_method(D_METHOD("set_content_scale_stretch", "stretch"), &WindowSettingsServer::set_content_scale_stretch);
+	ClassDB::bind_method(D_METHOD("get_content_scale_stretch"), &WindowSettingsServer::get_content_scale_stretch);
+	ClassDB::bind_method(D_METHOD("set_content_scale_factor", "factor"), &WindowSettingsServer::set_content_scale_factor);
+	ClassDB::bind_method(D_METHOD("get_content_scale_factor"), &WindowSettingsServer::get_content_scale_factor);
 
-	ClassDB::bind_method(D_METHOD("set_hdr_output_requested", "requested"), &VideoWindowSettingsServer::set_hdr_output_requested);
-	ClassDB::bind_method(D_METHOD("is_hdr_output_requested"), &VideoWindowSettingsServer::is_hdr_output_requested);
-	ClassDB::bind_method(D_METHOD("set_hdr_reference_luminance", "luminance"), &VideoWindowSettingsServer::set_hdr_reference_luminance);
-	ClassDB::bind_method(D_METHOD("get_hdr_reference_luminance"), &VideoWindowSettingsServer::get_hdr_reference_luminance);
-	ClassDB::bind_method(D_METHOD("set_hdr_max_luminance", "luminance"), &VideoWindowSettingsServer::set_hdr_max_luminance);
-	ClassDB::bind_method(D_METHOD("get_hdr_max_luminance"), &VideoWindowSettingsServer::get_hdr_max_luminance);
+	ClassDB::bind_method(D_METHOD("set_hdr_output_requested", "requested"), &WindowSettingsServer::set_hdr_output_requested);
+	ClassDB::bind_method(D_METHOD("is_hdr_output_requested"), &WindowSettingsServer::is_hdr_output_requested);
+	ClassDB::bind_method(D_METHOD("set_hdr_reference_luminance", "luminance"), &WindowSettingsServer::set_hdr_reference_luminance);
+	ClassDB::bind_method(D_METHOD("get_hdr_reference_luminance"), &WindowSettingsServer::get_hdr_reference_luminance);
+	ClassDB::bind_method(D_METHOD("set_hdr_max_luminance", "luminance"), &WindowSettingsServer::set_hdr_max_luminance);
+	ClassDB::bind_method(D_METHOD("get_hdr_max_luminance"), &WindowSettingsServer::get_hdr_max_luminance);
 
-	ClassDB::bind_method(D_METHOD("place_main_window"), &VideoWindowSettingsServer::place_main_window);
-	ClassDB::bind_method(D_METHOD("save_window_state", "window", "key"), &VideoWindowSettingsServer::save_window_state, DEFVAL(String()));
-	ClassDB::bind_method(D_METHOD("restore_window_state", "window", "key"), &VideoWindowSettingsServer::restore_window_state, DEFVAL(String()));
-	ClassDB::bind_method(D_METHOD("has_window_state", "key"), &VideoWindowSettingsServer::has_window_state);
-	ClassDB::bind_method(D_METHOD("clear_window_state", "key"), &VideoWindowSettingsServer::clear_window_state);
+	ClassDB::bind_method(D_METHOD("place_main_window"), &WindowSettingsServer::place_main_window);
+	ClassDB::bind_method(D_METHOD("save_window_state", "window", "key"), &WindowSettingsServer::save_window_state, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("restore_window_state", "window", "key"), &WindowSettingsServer::restore_window_state, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("has_window_state", "key"), &WindowSettingsServer::has_window_state);
+	ClassDB::bind_method(D_METHOD("clear_window_state", "key"), &WindowSettingsServer::clear_window_state);
 
-	ClassDB::bind_static_method("VideoWindowSettingsServer", D_METHOD("get_command_line_options"), &VideoWindowSettingsServer::get_command_line_options);
+	ClassDB::bind_static_method("WindowSettingsServer", D_METHOD("get_command_line_options"), &WindowSettingsServer::get_command_line_options);
 }
 
-VideoWindowSettingsServer::VideoWindowSettingsServer() {
+WindowSettingsServer::WindowSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
@@ -965,17 +969,17 @@ VideoWindowSettingsServer::VideoWindowSettingsServer() {
 		const StringName setting_name = bound_name;
 		// Mode, size and screen can leave the player without a visible window: they wait for confirm_changes().
 		const bool confirm = setting_name == SNAME("window_mode") || setting_name == SNAME("window_size") || setting_name == SNAME("screen");
-		bind_setting_callbacks(setting_name, callable_mp(this, &VideoWindowSettingsServer::_push_window_value).bind(setting_name), callable_mp(this, &VideoWindowSettingsServer::_pull_window_value).bind(setting_name), confirm ? SETTING_FLAG_CONFIRM : SETTING_FLAG_NONE);
+		bind_setting_callbacks(setting_name, callable_mp(this, &WindowSettingsServer::_push_window_value).bind(setting_name), callable_mp(this, &WindowSettingsServer::_pull_window_value).bind(setting_name), confirm ? SETTING_FLAG_CONFIRM : SETTING_FLAG_NONE);
 	}
 
-	connect(SNAME("loaded"), callable_mp(this, &VideoWindowSettingsServer::_on_loaded));
+	connect(SNAME("loaded"), callable_mp(this, &WindowSettingsServer::_on_loaded));
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	if (manager != nullptr) {
-		manager->connect(SNAME("startup_applied"), callable_mp(this, &VideoWindowSettingsServer::_on_startup_applied));
+		manager->connect(SNAME("startup_applied"), callable_mp(this, &WindowSettingsServer::_on_startup_applied));
 	}
 }
 
-VideoWindowSettingsServer::~VideoWindowSettingsServer() {
+WindowSettingsServer::~WindowSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}
