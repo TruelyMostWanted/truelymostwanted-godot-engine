@@ -115,6 +115,7 @@
 #include "scene/main/status_indicator.h"
 #include "scene/main/timer.h"
 #include "scene/main/viewport.h"
+#include "scene/main/viewport_server.h"
 #include "scene/main/window.h"
 #include "scene/resources/animation_library.h"
 #include "scene/resources/atlas_texture.h"
@@ -395,6 +396,7 @@
 
 static AudioMixerServer *audio_mixer_server = nullptr;
 static ScreenshotServer *screenshot_server = nullptr;
+static ViewportServer *viewport_server = nullptr;
 static InputIconServer *input_icon_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
@@ -1421,6 +1423,10 @@ void unregister_scene_types() {
 		memdelete(screenshot_server);
 		screenshot_server = nullptr;
 	}
+	if (viewport_server) {
+		memdelete(viewport_server);
+		viewport_server = nullptr;
+	}
 	if (audio_mixer_server) {
 		memdelete(audio_mixer_server);
 		audio_mixer_server = nullptr;
@@ -1530,6 +1536,10 @@ void register_scene_singletons() {
 	GDREGISTER_ABSTRACT_CLASS(ScreenshotServer);
 	screenshot_server = memnew(ScreenshotServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ScreenshotServer", ScreenshotServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ViewportServer);
+	viewport_server = memnew(ViewportServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ViewportServer", ViewportServer::get_singleton()));
 
 	GDREGISTER_CLASS(InputIconServer);
 	input_icon_server = memnew(InputIconServer);
