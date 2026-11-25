@@ -722,6 +722,7 @@ TEST_CASE("[Resource] Filtering cached paths") {
 	}
 }
 
+#ifdef TOOLS_ENABLED // import_path is editor-only.
 TEST_CASE("[Resource] Counting cached resources and filtering them by kind") {
 	const String root = "res://__test_cached_kinds/";
 	const uint32_t FILE = ResourceCache::CACHED_KIND_FILE;
@@ -788,5 +789,6 @@ TEST_CASE("[Resource] Counting cached resources and filtering them by kind") {
 	CHECK(counts["Image"] >= 1);
 	CHECK(ResourceCache::get_cached_count_for_type("JSON", true, IMPORTED) == 0);
 }
+#endif // TOOLS_ENABLED
 
 } // namespace TestResource
