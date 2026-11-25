@@ -70,7 +70,7 @@ TEST_CASE("[ScreenshotServer] Saving in every format, never overwriting") {
 
 	const String folder = TestUtils::get_temp_path("screenshots_test");
 	Ref<DirAccess> dir = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
-	for (const String &extension : { "png", "jpg", "webp" }) {
+	for (const char *extension : { "png", "jpg", "webp" }) {
 		const String path = folder.path_join(String("shot.") + extension);
 		if (FileAccess::exists(path)) {
 			dir->remove(path);
