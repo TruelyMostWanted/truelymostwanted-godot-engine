@@ -6,7 +6,7 @@
 	<description>
 		[AccessibilitySettingsServer] is the settings domain [code]"accessibility"[/code]: it stores the accessibility options chosen by the player, loads them when the game starts and applies them before the main scene is loaded ([constant SettingsServer.APPLY_PHASE_SCENE]), so the first menu is already shown with them. The settings resource is an [AccessibilitySettings]. The file is [code]user://settings/accessibility.ini[/code] by default.
 		[b]Engine-applied values[/b] take effect at once:
-		- [member AccessibilitySettings.ui_scale] multiplies [member Window.content_scale_factor] of the root window. The factor of the video window domain ([method VideoWindowSettingsServer.set_content_scale_factor]) stays separate: the root window gets both multiplied. In [constant Window.CONTENT_SCALE_MODE_VIEWPORT] a larger factor also lowers the render resolution; games in that mode should rather use the font size factor.
+		- [member AccessibilitySettings.ui_scale] multiplies [member Window.content_scale_factor] of the root window. The factor of the window domain ([method WindowSettingsServer.set_content_scale_factor]) stays separate: the root window gets both multiplied. In [constant Window.CONTENT_SCALE_MODE_VIEWPORT] a larger factor also lowers the render resolution; games in that mode should rather use the font size factor.
 		- [member AccessibilitySettings.font_size_factor], [member AccessibilitySettings.color_scheme] and [member AccessibilitySettings.focus_outline_width] go into an [i]overlay theme[/i] that is set as [member Window.theme] of the root window: a copy of the root window's previous theme plus the changed items (default font size and the font sizes of the built-in types, text and selection colors, flat style boxes, the [code]focus[/code] style box). The project theme is not changed and keeps providing all other items. Themes that the game sets on its own nodes win over the overlay. When all these values are back at their defaults, the root window gets its previous theme again. See [method get_overlay_theme].
 		- [member AccessibilitySettings.speak_focused_controls] speaks the control that gets the focus in the root window with [TTSServer], using the persona [member AccessibilitySettings.speech_persona]. The text comes from [method get_control_speech_text]. Nothing is spoken while a screen reader is active ([method is_screen_reader_active]), which would speak the same control.
 		[b]Game-side values[/b] have no engine target ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): [member AccessibilitySettings.reduce_motion], [member AccessibilitySettings.reduce_transparency], [member AccessibilitySettings.colorblind_mode], [member AccessibilitySettings.subtitles_enabled] and [member AccessibilitySettings.subtitle_scale]. The game reads them, or uses the helpers [method get_animation_duration], [method get_motion_scale], [method scale_font_size] and [method scale_subtitle_font_size]. Connect to [signal SettingsServer.value_changed] to react to a change, and to [signal color_scheme_changed] to recolor UI that the game draws itself.
@@ -286,6 +286,68 @@
 			<param index="0" name="scheme" type="AccessibilityColorScheme" />
 			<description>
 				Emitted when the applied color scheme changes. [param scheme] is the new scheme, or [code]null[/code] for [constant COLOR_SCHEME_DEFAULT]. See [method get_scheme_color].
+			</description>
+		</signal>
+		<signal name="colorblind_mode_changed">
+			<param index="0" name="mode" type="int" enum="AccessibilitySettingsServer.ColorblindMode" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.colorblind_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to switch the color filter or the palette of the game.
+			</description>
+		</signal>
+		<signal name="focus_outline_width_changed">
+			<param index="0" name="width" type="int" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.focus_outline_width] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for custom focus indicators.
+			</description>
+		</signal>
+		<signal name="font_size_factor_changed">
+			<param index="0" name="factor" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.font_size_factor] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for text that does not use the theme, for example [Label3D] or text drawn in [method CanvasItem._draw].
+			</description>
+		</signal>
+		<signal name="reduce_motion_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.reduce_motion] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to switch off screen shake, parallax or flashing effects.
+			</description>
+		</signal>
+		<signal name="reduce_transparency_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.reduce_transparency] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to make translucent panels opaque.
+			</description>
+		</signal>
+		<signal name="speak_focused_controls_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.speak_focused_controls] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="subtitle_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.subtitle_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to resize the subtitles.
+			</description>
+		</signal>
+		<signal name="subtitles_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.subtitles_enabled] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to show or hide the subtitles.
+			</description>
+		</signal>
+		<signal name="ui_scale_changed">
+			<param index="0" name="scale" type="float" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.ui_scale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it to scale UI that is not under the root window, for example a [SubViewport] or a separate [Window].
 			</description>
 		</signal>
 	</signals>

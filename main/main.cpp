@@ -84,7 +84,7 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/window_settings_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 
@@ -224,6 +224,7 @@ static bool show_help = false;
 static uint64_t quit_after = 0;
 static String record_performance_path;
 static String record_performance_profile;
+static String record_performance_budget;
 #ifdef TOOLS_ENABLED
 static ProcessID editor_pid = 0;
 static bool found_project = false;
@@ -592,6 +593,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("", "--quit-after can be used to specify the number of frames to write.\n");
 	print_help_option("--record-performance <file>", "Record per-frame performance metrics to the specified CSV file (see PerformanceRecorder).\n");
 	print_help_option("--record-performance-profile <file>", "PerformanceRecordingProfile resource to use with --record-performance.\n");
+	print_help_option("--performance-budget <file>", "PerformanceBudget resource checked at exit; the exit code is 1 if the recorded run exceeds it.\n");
 
 	print_help_title("Display options");
 	print_help_option("-f, --fullscreen", "Request fullscreen mode.\n");
@@ -1051,6 +1053,12 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	performance_recorder = memnew(PerformanceRecorder);
 	GDREGISTER_CLASS(PerformanceRecorder);
 	GDREGISTER_CLASS(PerformanceRecordingProfile);
+	GDREGISTER_CLASS(PerformanceColumnSummary);
+	GDREGISTER_CLASS(PerformanceSummary);
+	GDREGISTER_CLASS(PerformanceBudgetRule);
+	GDREGISTER_CLASS(PerformanceBudget);
+	GDREGISTER_CLASS(PerformanceBudgetFailure);
+	GDREGISTER_CLASS(PerformanceBudgetResult);
 	engine->add_singleton(Engine::Singleton("PerformanceRecorder", performance_recorder));
 
 	// Only flush stdout in debug builds by default, as spamming `print()` will
@@ -1972,9 +1980,9 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				OS::get_singleton()->print("Missing write-movie argument, aborting.\n");
 				goto error;
 			}
-		} else if (arg == "--record-performance" || arg == "--record-performance-profile") {
+		} else if (arg == "--record-performance" || arg == "--record-performance-profile" || arg == "--performance-budget") {
 			if (N) {
-				(arg == "--record-performance" ? record_performance_path : record_performance_profile) = N->get();
+				(arg == "--record-performance" ? record_performance_path : (arg == "--performance-budget" ? record_performance_budget : record_performance_profile)) = N->get();
 				N = N->next();
 			} else {
 				OS::get_singleton()->print("Missing %s argument, aborting.\n", arg.utf8().get_data());
@@ -3364,9 +3372,9 @@ Error Main::setup2(bool p_show_boot_logo) {
 
 	if (!editor && !project_manager) { // Player settings, phase 1: before the DisplayServer exists.
 		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_PRE_DISPLAY);
-		if (VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
-			VideoWindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
-			VideoWindowSettingsServer::get_singleton()->get_boot_window(boot_window);
+		if (WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
+			WindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
+			WindowSettingsServer::get_singleton()->get_boot_window(boot_window);
 			window_mode = boot_window.mode;
 			window_vsync_mode = boot_window.vsync_mode;
 			window_flags = boot_window.flags;
@@ -3509,8 +3517,8 @@ Error Main::setup2(bool p_show_boot_logo) {
 			return err;
 		}
 
-		if (!editor && !project_manager && VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
-			VideoWindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
+		if (!editor && !project_manager && WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
+			WindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
 		}
 
 #ifdef TOOLS_ENABLED
@@ -5017,7 +5025,7 @@ int Main::start() {
 		movie_writer->begin(movie_size, fixed_fps, Engine::get_singleton()->get_write_movie_path());
 	}
 
-	performance_recorder->start_from_settings(record_performance_path, record_performance_profile, !editor && !project_manager);
+	performance_recorder->start_from_settings(record_performance_path, record_performance_profile, record_performance_budget, !editor && !project_manager);
 
 	GDExtensionManager::get_singleton()->startup();
 

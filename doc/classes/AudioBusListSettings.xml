@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="AudioBusListSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings resource of [AudioBusSettingsServer]: the stored values of all audio buses.
+		Settings resource of [AudioBusSettingsServer]: the values of the player buses. In [code]res://[/code] also a preset.
 	</brief_description>
 	<description>
-		The data of the settings domain [code]"audio_buses"[/code]: one [AudioBusSettings] per bus. It holds nothing but the list, so [AudioBusSettingsServer] can store it as CSV with one row per bus. [AudioBusSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [AudioBusSettingsServer] and [ListSettingsServer] to change the entries.
+		The data of the settings domain [code]"audio_bus"[/code]: one [AudioBusSettings] per player bus (see [member AudioBusSettingsServer.player_buses]). [AudioBusSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]); use the methods of [AudioBusSettingsServer] and [ListSettingsServer] to change the entries. The defaults always come from the project's bus layout.
+		Saved as a [code].tres[/code] file in [code]res://[/code], it is a preset for [method AudioBusSettingsServer.apply_preset], for example a "Night mode" with quieter effects. Buses that a preset does not list keep their values. In the Inspector, the resource shows a small mixer instead of the [member buses] array: one row per player bus of the project's bus layout ([member ProjectSettings.audio/buses/default_bus_layout], only "Master" if there is none) with a checkbox that lists the bus in the resource, a volume slider in decibels and the Mute and Solo checkboxes. Only the values that the project stores ([code]settings/audio_bus/store_*[/code]) are shown; bus names can't be typed freely.
 	</description>
 	<tutorials>
 	</tutorials>

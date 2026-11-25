@@ -105,6 +105,15 @@
 				Clears all tile proxies.
 			</description>
 		</method>
+		<method name="convert_map_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="coords" type="Vector2i" />
+			<param index="1" name="from_layout" type="int" enum="TileSet.TileLayout" />
+			<param index="2" name="from_axes" type="int" enum="TileSet.CoordinateAxes" />
+			<description>
+				Returns the cell at the same place on screen for [param coords] that were made with [param from_layout] and [param from_axes], under the current [member tile_layout] and [member coordinate_axes]. Layouts whose cell centers lie on different grids ([constant TILE_LAYOUT_STACKED] and [constant TILE_LAYOUT_STACKED_OFFSET]) shift the whole map by half a cell; the shape stays. Used by [method TileMapLayer.convert_cell_coordinates].
+			</description>
+		</method>
 		<method name="get_alternative_level_tile_proxy">
 			<return type="Array" />
 			<param index="0" name="source_from" type="int" />
@@ -347,6 +356,13 @@
 				Returns if there is a source-level proxy for the given source ID.
 			</description>
 		</method>
+		<method name="layout_to_map_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="layout_coords" type="Vector2i" />
+			<description>
+				Returns the map coordinates for the layout coordinates [param layout_coords]: the coordinates of [member tile_layout] alone, before [member coordinate_axes] is applied. [TileMapPattern] stores layout coordinates.
+			</description>
+		</method>
 		<method name="map_tile_proxy" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="source_from" type="int" />
@@ -356,6 +372,13 @@
 				According to the configured proxies, maps the provided identifiers to a new set of identifiers. The source ID, atlas coordinates ID and alternative tile ID are returned as a 3 elements Array.
 				This function first look for matching alternative-level proxies, then coordinates-level proxies, then source-level proxies.
 				If no proxy corresponding to provided identifiers are found, returns the same values the ones used as arguments.
+			</description>
+		</method>
+		<method name="map_to_layout_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="map_coords" type="Vector2i" />
+			<description>
+				Returns the layout coordinates for the map coordinates [param map_coords], the reverse of [method layout_to_map_coords]. With [constant COORDINATE_AXES_DEFAULT], both are the same.
 			</description>
 		</method>
 		<method name="move_custom_data_layer">
@@ -638,6 +661,11 @@
 		</method>
 	</methods>
 	<members>
+		<member name="coordinate_axes" type="int" setter="set_coordinate_axes" getter="get_coordinate_axes" enum="TileSet.CoordinateAxes" default="0">
+			The direction in which cell coordinates count. [member tile_layout] decides along which lines the cells are numbered (rows, stairs or diagonals); [member coordinate_axes] decides which way X and Y point along those lines. The tiles stay where they are, only the numbering changes, so [method TileMapLayer.local_to_map], [method TileMapLayer.map_to_local], [method TileMapLayer.set_cell] and every other method use the new coordinates. Neighbor names ([constant CELL_NEIGHBOR_RIGHT_SIDE] and others) stay relative to the screen.
+			Examples: [constant TILE_SHAPE_ISOMETRIC] with [constant TILE_LAYOUT_DIAMOND_RIGHT] and [constant COORDINATE_AXES_SWAP] counts X towards the bottom right and Y towards the top right; [constant TILE_SHAPE_SQUARE] with [constant COORDINATE_AXES_FLIP_Y] counts Y upwards.
+			Changing this on a painted map makes it look different, like changing [member tile_layout]. The TileMap editor offers to convert the cells; in code, call [method TileMapLayer.convert_cell_coordinates].
+		</member>
 		<member name="tile_layout" type="int" setter="set_tile_layout" getter="get_tile_layout" enum="TileSet.TileLayout" default="0">
 			For all half-offset shapes (Isometric, Hexagonal and Half-Offset square), changes the way tiles are indexed in the [TileMapLayer] grid.
 		</member>
@@ -685,6 +713,33 @@
 		</constant>
 		<constant name="TILE_LAYOUT_DIAMOND_DOWN" value="5" enum="TileLayout">
 			Tile coordinates layout where the horizontal axis goes down-right, and the vertical one goes down-left.
+		</constant>
+		<constant name="COORDINATE_AXES_DEFAULT" value="0" enum="CoordinateAxes">
+			X and Y count as defined by [member tile_layout].
+		</constant>
+		<constant name="COORDINATE_AXES_FLIP_X" value="1" enum="CoordinateAxes">
+			X counts the other way.
+		</constant>
+		<constant name="COORDINATE_AXES_FLIP_Y" value="2" enum="CoordinateAxes">
+			Y counts the other way.
+		</constant>
+		<constant name="COORDINATE_AXES_FLIP_XY" value="3" enum="CoordinateAxes">
+			X and Y count the other way (a half turn).
+		</constant>
+		<constant name="COORDINATE_AXES_SWAP" value="4" enum="CoordinateAxes">
+			X counts where Y counted, and Y where X counted.
+		</constant>
+		<constant name="COORDINATE_AXES_SWAP_FLIP_X" value="5" enum="CoordinateAxes">
+			X and Y are swapped, then X counts the other way (a quarter turn).
+		</constant>
+		<constant name="COORDINATE_AXES_SWAP_FLIP_Y" value="6" enum="CoordinateAxes">
+			X and Y are swapped, then Y counts the other way (a quarter turn the other way).
+		</constant>
+		<constant name="COORDINATE_AXES_SWAP_FLIP_XY" value="7" enum="CoordinateAxes">
+			X and Y are swapped, then both count the other way.
+		</constant>
+		<constant name="COORDINATE_AXES_MAX" value="8" enum="CoordinateAxes">
+			Represents the size of the [enum CoordinateAxes] enum.
 		</constant>
 		<constant name="TILE_OFFSET_AXIS_HORIZONTAL" value="0" enum="TileOffsetAxis">
 			Horizontal half-offset.

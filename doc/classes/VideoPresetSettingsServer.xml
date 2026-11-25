@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="VideoPresetSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for graphics presets (Low, Medium, High, Ultra, Custom) over the four video settings domains.
+	</brief_description>
+	<description>
+		[VideoPresetSettingsServer] is the settings domain [code]"video_preset"[/code]: one call of [method apply_preset] sets the values of a [VideoPreset] in [VideoQualitySettingsServer], [VideoTextureSettingsServer], [VideoShadowSettingsServer] and [VideoEffectSettingsServer]: all values of each domain the preset has a settings resource for ([member VideoPreset.video_quality], ...); a [code]null[/code] resource leaves its domain as it is. Changing a single value in one of these domains afterwards makes the current preset [code]"Custom"[/code] ([method get_current_preset]). The domain stores only the name of the chosen preset ([VideoPresetSettings], file [code]user://settings/video_preset.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code])); the values stay in the files of the video domains. Window settings ([WindowSettingsServer]) are not part of a preset.
+		[b]Presets:[/b] the four built-in presets [code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] and [code]"Ultra"[/code] ([method create_builtin_preset]) and the [code].tres[/code] files of [member ProjectSettings.settings/video_preset/presets]. A project preset with the name of a built-in preset replaces it; [member ProjectSettings.settings/video_preset/use_builtin_presets] removes the built-in presets. At runtime, [method add_preset] and [method remove_preset] change the list.
+		[b]One step per domain:[/b] [method apply_preset] sets all values of a domain first and applies them with one [method SettingsServer.apply] if the domain is in [constant SettingsServer.APPLY_MODE_IMMEDIATE]: one [signal SettingsServer.applied] signal, one autosave and, for values with [constant SettingsServer.SETTING_FLAG_CONFIRM], one confirmation per domain. In [constant SettingsServer.APPLY_MODE_MANUAL], the values stay pending until the game calls [method SettingsServer.apply] of that domain.
+		[b]Renderers:[/b] values a domain doesn't support on the current renderer, hardware or build ([method SettingsServer.is_value_supported]) are skipped and keep their value; they don't count when presets are compared either. On the Compatibility renderer (default in the Web export), for example, the presets' screen-space anti-aliasing, TAA, SSAO, SSIL and SDFGI values are skipped.
+		[b]Custom:[/b] after a change in a video domain that is not part of [method apply_preset], the server compares the pending values with the chosen preset. If they no longer match, the first other preset that matches becomes the current one, else [code]"Custom"[/code]. A [method SettingsServer.revert] or a cancelled confirmation that restores the values gives the preset back. Domains a preset doesn't touch ([code]null[/code] resource) don't matter. Numbers are compared approximately.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			for preset_name in VideoPresetSettingsServer.get_preset_names():
+				$Preset.add_item(tr(preset_name))
+			VideoPresetSettingsServer.preset_changed.connect(_on_preset_changed)
+			_on_preset_changed(VideoPresetSettingsServer.get_current_preset())
+
+		func _on_preset_item_selected(index):
+			VideoPresetSettingsServer.apply_preset(VideoPresetSettingsServer.get_preset_names()[index])
+
+		func _on_preset_changed(preset_name):
+			$CustomLabel.visible = VideoPresetSettingsServer.is_custom()
+			$Preset.selected = VideoPresetSettingsServer.get_preset_names().find(preset_name)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var presetButton = GetNode&lt;OptionButton&gt;("Preset");
+		    foreach (string presetName in VideoPresetSettingsServer.GetPresetNames())
+		    {
+		        presetButton.AddItem(Tr(presetName));
+		    }
+		    VideoPresetSettingsServer.PresetChanged += OnPresetChanged;
+		    OnPresetChanged(VideoPresetSettingsServer.GetCurrentPreset());
+		}
+
+		private void OnPresetItemSelected(long index)
+		{
+		    VideoPresetSettingsServer.ApplyPreset(VideoPresetSettingsServer.GetPresetNames()[(int)index]);
+		}
+
+		private void OnPresetChanged(string presetName)
+		{
+		    GetNode&lt;Label&gt;("CustomLabel").Visible = VideoPresetSettingsServer.IsCustom();
+		    GetNode&lt;OptionButton&gt;("Preset").Selected = System.Array.IndexOf(VideoPresetSettingsServer.GetPresetNames(), presetName);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]First start:[/b] until the player picks a preset or changes a value, the stored name is empty and [method get_current_preset] detects the preset from the values. To start with a preset that fits the hardware, apply [method suggest_preset] when the file [member SettingsServer.file_path] doesn't exist yet.
+		[b]Platforms:[/b] works the same on every platform; no threads, only the domain file in [code]user://[/code] and the preset files in the PCK.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_preset">
+			<return type="void" />
+			<param index="0" name="preset" type="VideoPreset" />
+			<description>
+				Adds [param preset] after the other presets, or replaces the preset with the same [member VideoPreset.preset_name]. The name can't be empty or [code]"Custom"[/code]. The change lasts until [method reload_presets] or the end of the game.
+			</description>
+		</method>
+		<method name="apply_preset">
+			<return type="int" enum="Error" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Sets all values of the domain resources of the preset [param name] in the video domains ([code]null[/code] resources are skipped), one step per domain (see the class description), skipping values a domain doesn't support, and stores [param name] as the chosen preset. Returns [constant ERR_DOES_NOT_EXIST] if there is no such preset, [constant ERR_INVALID_PARAMETER] for [code]"Custom"[/code], or the first error of [method SettingsServer.apply].
+				Values a domain doesn't have are skipped with a warning.
+			</description>
+		</method>
+		<method name="create_builtin_preset" qualifiers="static">
+			<return type="VideoPreset" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns a new [VideoPreset] with the values of the built-in preset [param name] ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code] or [code]"Ultra"[/code]), or [code]null[/code] for another name. It has a settings resource for all four domains: a copy of the domain's defaults ([method SettingsServer.get_default_settings], from the project settings) with the quality values of the preset, so values like brightness or the default texture filter keep the project's choice. A starting point for project presets: change it and save it as a [code].tres[/code] file.
+				The built-in presets set: resolution scale, mesh LOD threshold, 3D MSAA, screen-space anti-aliasing, TAA and debanding ([VideoQualitySettings]); anisotropic filtering, 2D SDF scale and 2D shadow atlas size ([VideoTextureSettings]); directional and positional shadow atlas size and soft shadow filter quality ([VideoShadowSettings]); SSAO, SSIL, SDFGI, VoxelGI, volumetric fog, subsurface scattering and depth of field quality, and on Low the switches for SSAO, SSIL, SSR and volumetric fog ([VideoEffectSettings]). "High" is close to the engine defaults.
+			</description>
+		</method>
+		<method name="detect_preset" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the name of the first preset whose values match the pending values of the video domains, or [code]"Custom"[/code]. Unlike [method get_current_preset], the stored choice doesn't matter.
+			</description>
+		</method>
+		<method name="get_builtin_preset_names" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the built-in presets from the lowest to the highest: [code]["Low", "Medium", "High", "Ultra"][/code].
+			</description>
+		</method>
+		<method name="get_current_preset" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the name of the current preset: the one applied last, [code]"Custom"[/code] after a single change, or (if none was picked yet or the stored preset no longer exists) the result of [method detect_preset].
+			</description>
+		</method>
+		<method name="get_custom_preset_name" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns [code]"Custom"[/code], the name of the current preset after a single change. No preset can have this name.
+			</description>
+		</method>
+		<method name="get_preset" qualifiers="const">
+			<return type="VideoPreset" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the preset [param name], or [code]null[/code]. The preset is the one in the list: changes to it take effect on the next [method apply_preset].
+			</description>
+		</method>
+		<method name="get_preset_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all presets in their order: the built-in presets first, then the presets added by the project.
+			</description>
+		</method>
+		<method name="get_presets" qualifiers="const">
+			<return type="VideoPreset[]" />
+			<description>
+				Returns all presets in the order of [method get_preset_names].
+			</description>
+		</method>
+		<method name="has_preset" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if there is a preset [param name].
+			</description>
+		</method>
+		<method name="is_custom" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [method get_current_preset] is [code]"Custom"[/code].
+			</description>
+		</method>
+		<method name="matches_preset" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if the pending values of the video domains have every supported value of the domain resources of the preset [param name].
+			</description>
+		</method>
+		<method name="reload_presets">
+			<return type="void" />
+			<description>
+				Builds the list of presets again from the built-in presets and [member ProjectSettings.settings/video_preset/presets]. Presets added with [method add_preset] are dropped.
+			</description>
+		</method>
+		<method name="remove_preset">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Removes the preset [param name] from the list until [method reload_presets] or the end of the game. If it was the current preset, [method get_current_preset] detects the preset from the values.
+			</description>
+		</method>
+		<method name="suggest_preset" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns a preset for the current hardware: [code]"Low"[/code] for the Compatibility renderer or a CPU adapter, [code]"Medium"[/code] for the Mobile renderer or an integrated GPU, [code]"High"[/code] for a discrete GPU ([method RenderingServer.get_video_adapter_type]). [code]"Ultra"[/code] is never suggested. If the preset doesn't exist, the next lower built-in name that exists; an empty [String] if none does.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="preset_changed">
+			<param index="0" name="name" type="String" />
+			<description>
+				Emitted when [method get_current_preset] changes: after [method apply_preset], after a change in a video domain that gives [code]"Custom"[/code] or another preset, and when the stored name is loaded, reset or changed.
+			</description>
+		</signal>
+	</signals>
+</class>

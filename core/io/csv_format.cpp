@@ -34,7 +34,7 @@
 #include "core/object/class_db.h"
 #include "core/templates/hash_set.h"
 
-static String _csv_cell_text(const Variant &p_value) {
+static String _csv_format_cell_text(const Variant &p_value) {
 	return p_value.get_type() == Variant::NIL ? String() : String(p_value);
 }
 
@@ -126,12 +126,12 @@ Error CSV::write_text(const Array &p_data, const Ref<SerializerOptions> &p_optio
 		if (records) {
 			const Dictionary record = row;
 			for (const String &column : columns) {
-				cells.push_back(_csv_cell_text(record.get(column, Variant())));
+				cells.push_back(_csv_format_cell_text(record.get(column, Variant())));
 			}
 		} else if (row.get_type() == Variant::ARRAY || row.get_type() == Variant::PACKED_STRING_ARRAY) {
 			const Array values = row;
 			for (int j = 0; j < values.size(); j++) {
-				cells.push_back(_csv_cell_text(values[j]));
+				cells.push_back(_csv_format_cell_text(values[j]));
 			}
 		} else {
 			r_error = vformat("Row %d: a row must be an Array, a PackedStringArray or a Dictionary.", i + 1);
