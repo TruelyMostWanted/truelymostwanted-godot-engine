@@ -927,7 +927,8 @@ void ResourceCache::_visit_cached(uint32_t p_kinds, const F &p_filter, const V &
 			// This resource is in the process of being deleted, ignore its existence.
 			continue;
 		}
-		if ((get_cached_kind(E.key, E.value) & p_kinds) && p_filter(E.key, E.value)) {
+		// The kind is checked last and only when it filters: in export templates it looks for the .import file.
+		if (p_filter(E.key, E.value) && ((p_kinds & CACHED_KIND_ALL) == CACHED_KIND_ALL || (get_cached_kind(E.key, E.value) & p_kinds))) {
 			p_visit(E.key, E.value);
 		}
 	}
