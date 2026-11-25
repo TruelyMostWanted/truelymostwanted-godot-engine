@@ -147,28 +147,64 @@ static PackedStringArray _cached_paths_to_packed(const List<String> &p_paths) {
 	return ret;
 }
 
-PackedStringArray ResourceLoader::get_cached_paths() {
+PackedStringArray ResourceLoader::get_cached_paths(BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths(&paths);
+	ResourceCache::get_cached_paths(&paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact_type) {
+PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_for_type(p_type, p_exact_type, &paths);
+	ResourceCache::get_cached_paths_for_type(p_type, p_exact_type, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_with_extension(const String &p_extension) {
+PackedStringArray ResourceLoader::get_cached_paths_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_with_extension(p_extension, &paths);
+	ResourceCache::get_cached_paths_with_extension(p_extension, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_in_directory(const String &p_directory, bool p_recursive) {
+PackedStringArray ResourceLoader::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_in_directory(p_directory, p_recursive, &paths);
+	ResourceCache::get_cached_paths_in_directory(p_directory, p_recursive, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
+}
+
+int ResourceLoader::get_cached_count(BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count(uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_for_type(p_type, p_exact_type, uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_with_extension(p_extension, uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_in_directory(const String &p_directory, bool p_recursive, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_in_directory(p_directory, p_recursive, uint32_t(p_kinds));
+}
+
+TypedArray<Resource> ResourceLoader::get_cached_resources_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
+	List<Ref<Resource>> resources;
+	ResourceCache::get_cached_resources_for_type(p_type, p_exact_type, &resources, uint32_t(p_kinds));
+	TypedArray<Resource> result;
+	for (const Ref<Resource> &resource : resources) {
+		result.push_back(resource);
+	}
+	return result;
+}
+
+Dictionary ResourceLoader::get_cached_type_counts(BitField<CachedResourceKind> p_kinds) {
+	HashMap<StringName, int> counts;
+	ResourceCache::get_cached_type_counts(&counts, uint32_t(p_kinds));
+	Dictionary result;
+	for (const KeyValue<StringName, int> &E : counts) {
+		result[E.key] = E.value;
+	}
+	return result;
 }
 
 bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
@@ -319,10 +355,16 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
 	ClassDB::bind_method(D_METHOD("get_cached_ref", "path"), &ResourceLoader::get_cached_ref);
-	ClassDB::bind_method(D_METHOD("get_cached_paths"), &ResourceLoader::get_cached_paths);
-	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact_type"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension"), &ResourceLoader::get_cached_paths_with_extension);
-	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("get_cached_paths", "kinds"), &ResourceLoader::get_cached_paths, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension", "kinds"), &ResourceLoader::get_cached_paths_with_extension, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive", "kinds"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count", "kinds"), &ResourceLoader::get_cached_count, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_count_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_with_extension", "extension", "kinds"), &ResourceLoader::get_cached_count_with_extension, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_in_directory", "directory", "recursive", "kinds"), &ResourceLoader::get_cached_count_in_directory, DEFVAL(true), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_resources_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_resources_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_type_counts", "kinds"), &ResourceLoader::get_cached_type_counts, DEFVAL(CACHED_RESOURCE_KIND_ALL));
 	ClassDB::bind_method(D_METHOD("exists", "path", "type_hint"), &ResourceLoader::exists, DEFVAL(""));
 	ClassDB::bind_method(D_METHOD("get_resource_uid", "path"), &ResourceLoader::get_resource_uid);
 	ClassDB::bind_method(D_METHOD("get_resource_type", "path"), &ResourceLoader::get_resource_type);
@@ -340,6 +382,11 @@ void ResourceLoader::_bind_methods() {
 	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_FAILED);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_LOADED);
+
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_FILE);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_IMPORTED);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_BUILT_IN);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_ALL);
 
 	BIND_ENUM_CONSTANT(CACHE_MODE_IGNORE);
 	BIND_ENUM_CONSTANT(CACHE_MODE_REUSE);

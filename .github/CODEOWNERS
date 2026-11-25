@@ -389,6 +389,7 @@
 /modules/tilemap/                             @godotengine/2d-nodes
 /modules/tilemap/**/*.py                      @godotengine/2d-nodes @godotengine/buildsystem
 /modules/tilemap/**/SCsub                     @godotengine/2d-nodes @godotengine/buildsystem
+/modules/tilemap/tests/                       @godotengine/2d-nodes @godotengine/tests
 /modules/tilemap/doc_classes/                 @godotengine/2d-nodes @godotengine/documentation
 /modules/tilemap/editor/                      @godotengine/2d-nodes @godotengine/editor
 /modules/tilemap/editor/**/SCsub              @godotengine/2d-nodes @godotengine/editor @godotengine/buildsystem
@@ -538,6 +539,8 @@
 /truely/                                      @TruelyMostWanted
 /truely/**/*.py                               @TruelyMostWanted @godotengine/buildsystem
 /.agents/                                     @TruelyMostWanted
+/servers/subtitle/                            @TruelyMostWanted
+/servers/subtitle/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
 /servers/tts/                                 @TruelyMostWanted
 /servers/tts/**/SCsub                         @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/                                @TruelyMostWanted

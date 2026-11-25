@@ -722,4 +722,71 @@ TEST_CASE("[Resource] Filtering cached paths") {
 	}
 }
 
+TEST_CASE("[Resource] Counting cached resources and filtering them by kind") {
+	const String root = "res://__test_cached_kinds/";
+	const uint32_t FILE = ResourceCache::CACHED_KIND_FILE;
+	const uint32_t IMPORTED = ResourceCache::CACHED_KIND_IMPORTED;
+	const uint32_t BUILT_IN = ResourceCache::CACHED_KIND_BUILT_IN;
+	const uint32_t ALL = ResourceCache::CACHED_KIND_ALL;
+
+	Ref<Resource> own_file = memnew(Resource);
+	own_file->set_path(root + "level.tres");
+	Ref<Resource> sub_resource = memnew(Resource);
+	sub_resource->set_path(root + "level.tres::Resource_x1");
+	Ref<Image> imported = memnew(Image);
+	imported->set_path(root + "icon.png");
+	imported->set_import_path("res://.godot/imported/icon.png-0123.ctex");
+	Ref<JSON> data = memnew(JSON);
+	data->set_path(root + "sub/data.json");
+
+	CHECK(ResourceCache::get_cached_kind(own_file->get_path(), own_file.ptr()) == FILE);
+	CHECK(ResourceCache::get_cached_kind(sub_resource->get_path(), sub_resource.ptr()) == BUILT_IN);
+	CHECK(ResourceCache::get_cached_kind(imported->get_path(), imported.ptr()) == IMPORTED);
+
+	List<String> paths;
+	ResourceCache::get_cached_paths_in_directory(root, true, &paths, FILE);
+	CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "level.tres", root + "sub/data.json" }));
+	paths.clear();
+	ResourceCache::get_cached_paths_in_directory(root, true, &paths, IMPORTED | BUILT_IN);
+	CHECK(_sorted_paths_under(paths, root) == Vector<String>({ root + "icon.png", root + "level.tres::Resource_x1" }));
+
+	// Counts equal the size of the lists, for every filter and kind.
+	for (uint32_t kinds : { FILE, IMPORTED, BUILT_IN, FILE | BUILT_IN, ALL }) {
+		INFO("kinds ", kinds);
+		paths.clear();
+		ResourceCache::get_cached_paths_in_directory(root, true, &paths, kinds);
+		CHECK(ResourceCache::get_cached_count_in_directory(root, true, kinds) == paths.size());
+		paths.clear();
+		ResourceCache::get_cached_paths_for_type("Resource", false, &paths, kinds);
+		CHECK(ResourceCache::get_cached_count_for_type("Resource", false, kinds) == paths.size());
+		paths.clear();
+		ResourceCache::get_cached_paths_with_extension("tres", &paths, kinds);
+		CHECK(ResourceCache::get_cached_count_with_extension("tres", kinds) == paths.size());
+		paths.clear();
+		ResourceCache::get_cached_paths(&paths, kinds);
+		CHECK(ResourceCache::get_cached_count(kinds) == paths.size());
+	}
+	CHECK(ResourceCache::get_cached_count_in_directory(root, true) == 4);
+	CHECK(ResourceCache::get_cached_count_in_directory(root, false) == 3);
+	CHECK(ResourceCache::get_cached_count_with_extension("tres", BUILT_IN) == 1);
+	CHECK(ResourceCache::get_cached_count(0) == 0);
+
+	List<Ref<Resource>> images;
+	ResourceCache::get_cached_resources_for_type("Image", true, &images);
+	bool found = false;
+	for (const Ref<Resource> &resource : images) {
+		found = found || resource == imported;
+	}
+	CHECK(found);
+	images.clear();
+	ResourceCache::get_cached_resources_for_type("Image", true, &images, FILE);
+	CHECK(images.find(imported) == nullptr);
+
+	HashMap<StringName, int> counts;
+	ResourceCache::get_cached_type_counts(&counts, IMPORTED);
+	CHECK(counts.has("Image"));
+	CHECK(counts["Image"] >= 1);
+	CHECK(ResourceCache::get_cached_count_for_type("JSON", true, IMPORTED) == 0);
+}
+
 } // namespace TestResource

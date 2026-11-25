@@ -1704,6 +1704,9 @@
 		<member name="ResourceUID" type="ResourceUID" setter="" getter="">
 			The [ResourceUID] singleton.
 		</member>
+		<member name="ScreenshotServer" type="ScreenshotServer" setter="" getter="">
+			The [ScreenshotServer] singleton.
+		</member>
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
 		</member>
@@ -1712,6 +1715,9 @@
 		</member>
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
+		</member>
+		<member name="SubtitleServer" type="SubtitleServer" setter="" getter="">
+			The [SubtitleServer] singleton.
 		</member>
 		<member name="TTSPersonaSettingsServer" type="TTSPersonaSettingsServer" setter="" getter="">
 			The [TTSPersonaSettingsServer] singleton.

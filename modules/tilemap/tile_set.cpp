@@ -364,6 +364,67 @@ TileSet::TileLayout TileSet::get_tile_layout() const {
 	return tile_layout;
 }
 
+void TileSet::set_coordinate_axes(CoordinateAxes p_axes) {
+	ERR_FAIL_INDEX(p_axes, COORDINATE_AXES_MAX);
+	coordinate_axes = p_axes;
+	emit_changed();
+}
+
+TileSet::CoordinateAxes TileSet::get_coordinate_axes() const {
+	return coordinate_axes;
+}
+
+static bool _axes_swap(TileSet::CoordinateAxes p_axes) {
+	return p_axes >= TileSet::COORDINATE_AXES_SWAP;
+}
+
+static bool _axes_flip_x(TileSet::CoordinateAxes p_axes) {
+	return p_axes == TileSet::COORDINATE_AXES_FLIP_X || p_axes == TileSet::COORDINATE_AXES_FLIP_XY || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_X || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_XY;
+}
+
+static bool _axes_flip_y(TileSet::CoordinateAxes p_axes) {
+	return p_axes == TileSet::COORDINATE_AXES_FLIP_Y || p_axes == TileSet::COORDINATE_AXES_FLIP_XY || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_Y || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_XY;
+}
+
+Vector2i TileSet::layout_to_map_coords_with_axes(const Vector2i &p_layout_coords, CoordinateAxes p_axes) {
+	Vector2i result = _axes_swap(p_axes) ? Vector2i(p_layout_coords.y, p_layout_coords.x) : p_layout_coords;
+	if (_axes_flip_x(p_axes)) {
+		result.x = -result.x;
+	}
+	if (_axes_flip_y(p_axes)) {
+		result.y = -result.y;
+	}
+	return result;
+}
+
+Vector2i TileSet::map_to_layout_coords_with_axes(const Vector2i &p_map_coords, CoordinateAxes p_axes) {
+	Vector2i result = p_map_coords;
+	if (_axes_flip_x(p_axes)) {
+		result.x = -result.x;
+	}
+	if (_axes_flip_y(p_axes)) {
+		result.y = -result.y;
+	}
+	return _axes_swap(p_axes) ? Vector2i(result.y, result.x) : result;
+}
+
+Vector2i TileSet::map_to_layout_coords(const Vector2i &p_map_coords) const {
+	return coordinate_axes == COORDINATE_AXES_DEFAULT ? p_map_coords : map_to_layout_coords_with_axes(p_map_coords, coordinate_axes);
+}
+
+Vector2i TileSet::layout_to_map_coords(const Vector2i &p_layout_coords) const {
+	return coordinate_axes == COORDINATE_AXES_DEFAULT ? p_layout_coords : layout_to_map_coords_with_axes(p_layout_coords, coordinate_axes);
+}
+
+Vector2i TileSet::convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, CoordinateAxes p_from_axes) const {
+	const Vector2i old_layout_coords = map_to_layout_coords_with_axes(p_coords, p_from_axes);
+	Vector2i layout_coords = old_layout_coords;
+	if (tile_shape != TILE_SHAPE_SQUARE && p_from_layout != tile_layout) {
+		layout_coords = transform_coords_layout(old_layout_coords, tile_offset_axis, p_from_layout, tile_layout);
+	}
+	return layout_to_map_coords(layout_coords);
+}
+
 void TileSet::set_tile_offset_axis(TileSet::TileOffsetAxis p_alignment) {
 	tile_offset_axis = p_alignment;
 
@@ -1542,6 +1603,23 @@ void TileSet::draw_tile_shape(CanvasItem *p_canvas_item, Transform2D p_transform
 }
 
 Vector2 TileSet::map_to_local(const Vector2i &p_pos) const {
+	return _layout_coords_to_local(map_to_layout_coords(p_pos));
+}
+
+Vector2i TileSet::local_to_map(const Vector2 &p_local_position) const {
+	return layout_to_map_coords(_local_to_layout_coords(p_local_position));
+}
+
+Vector2i TileSet::get_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
+	return layout_to_map_coords(_get_layout_neighbor_cell(map_to_layout_coords(p_coords), p_cell_neighbor));
+}
+
+Vector2i TileSet::map_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
+	// Pattern coordinates are layout coordinates, so a pattern keeps its shape whatever the axes are.
+	return layout_to_map_coords(_map_layout_pattern(map_to_layout_coords(p_position_in_tilemap), p_coords_in_pattern, p_pattern));
+}
+
+Vector2 TileSet::_layout_coords_to_local(const Vector2i &p_pos) const {
 	// SHOULD RETURN THE CENTER OF THE CELL.
 	Vector2 ret = p_pos;
 
@@ -1614,7 +1692,7 @@ Vector2 TileSet::map_to_local(const Vector2i &p_pos) const {
 	return (ret + Vector2(0.5, 0.5)) * tile_size;
 }
 
-Vector2i TileSet::local_to_map(const Vector2 &p_local_position) const {
+Vector2i TileSet::_local_to_layout_coords(const Vector2 &p_local_position) const {
 	Vector2 ret = p_local_position;
 	ret /= tile_size;
 
@@ -1814,7 +1892,7 @@ bool TileSet::is_existing_neighbor(TileSet::CellNeighbor p_cell_neighbor) const 
 	}
 }
 
-Vector2i TileSet::get_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
+Vector2i TileSet::_get_layout_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
 	if (tile_shape == TileSet::TILE_SHAPE_SQUARE) {
 		switch (p_cell_neighbor) {
 			case TileSet::CELL_NEIGHBOR_RIGHT_SIDE:
@@ -2176,7 +2254,7 @@ TypedArray<Vector2i> TileSet::get_surrounding_cells(const Vector2i &p_coords) co
 	return around;
 }
 
-Vector2i TileSet::map_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
+Vector2i TileSet::_map_layout_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
 	ERR_FAIL_COND_V(p_pattern.is_null(), Vector2i());
 	ERR_FAIL_COND_V(!p_pattern->has_cell(p_coords_in_pattern), Vector2i());
 
@@ -3238,6 +3316,7 @@ void TileSet::reset_state() {
 	tile_shape = TILE_SHAPE_SQUARE;
 	tile_layout = TILE_LAYOUT_STACKED;
 	tile_offset_axis = TILE_OFFSET_AXIS_HORIZONTAL;
+	coordinate_axes = COORDINATE_AXES_DEFAULT;
 	tile_size = Size2i(16, 16);
 }
 
@@ -4269,12 +4348,18 @@ void TileSet::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_layout"), &TileSet::get_tile_layout);
 	ClassDB::bind_method(D_METHOD("set_tile_offset_axis", "alignment"), &TileSet::set_tile_offset_axis);
 	ClassDB::bind_method(D_METHOD("get_tile_offset_axis"), &TileSet::get_tile_offset_axis);
+	ClassDB::bind_method(D_METHOD("set_coordinate_axes", "axes"), &TileSet::set_coordinate_axes);
+	ClassDB::bind_method(D_METHOD("get_coordinate_axes"), &TileSet::get_coordinate_axes);
+	ClassDB::bind_method(D_METHOD("map_to_layout_coords", "map_coords"), &TileSet::map_to_layout_coords);
+	ClassDB::bind_method(D_METHOD("layout_to_map_coords", "layout_coords"), &TileSet::layout_to_map_coords);
+	ClassDB::bind_method(D_METHOD("convert_map_coords", "coords", "from_layout", "from_axes"), &TileSet::convert_map_coords);
 	ClassDB::bind_method(D_METHOD("set_tile_size", "size"), &TileSet::set_tile_size);
 	ClassDB::bind_method(D_METHOD("get_tile_size"), &TileSet::get_tile_size);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_shape", PROPERTY_HINT_ENUM, "Square,Isometric,Half-Offset Square,Hexagon"), "set_tile_shape", "get_tile_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_layout", PROPERTY_HINT_ENUM, "Stacked,Stacked Offset,Stairs Right,Stairs Down,Diamond Right,Diamond Down"), "set_tile_layout", "get_tile_layout");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_offset_axis", PROPERTY_HINT_ENUM, "Horizontal Offset,Vertical Offset"), "set_tile_offset_axis", "get_tile_offset_axis");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "coordinate_axes", PROPERTY_HINT_ENUM, "Default,Flip X,Flip Y,Flip X and Y,Swap,Swap and Flip X,Swap and Flip Y,Swap and Flip X and Y"), "set_coordinate_axes", "get_coordinate_axes");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "tile_size", PROPERTY_HINT_NONE, "suffix:px"), "set_tile_size", "get_tile_size");
 
 	// Rendering.
@@ -4399,6 +4484,16 @@ void TileSet::_bind_methods() {
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_STAIRS_DOWN);
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_DIAMOND_RIGHT);
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_DIAMOND_DOWN);
+
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_DEFAULT);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_X);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_Y);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_XY);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_X);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_Y);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_XY);
+	BIND_ENUM_CONSTANT(COORDINATE_AXES_MAX);
 
 	BIND_ENUM_CONSTANT(TILE_OFFSET_AXIS_HORIZONTAL);
 	BIND_ENUM_CONSTANT(TILE_OFFSET_AXIS_VERTICAL);

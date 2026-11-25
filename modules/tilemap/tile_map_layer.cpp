@@ -2212,6 +2212,7 @@ void TileMapLayer::_bind_methods() {
 	// --- Shortcuts to methods defined in TileSet ---
 	ClassDB::bind_method(D_METHOD("map_pattern", "position_in_tilemap", "coords_in_pattern", "pattern"), &TileMapLayer::map_pattern);
 	ClassDB::bind_method(D_METHOD("get_surrounding_cells", "coords"), &TileMapLayer::get_surrounding_cells);
+	ClassDB::bind_method(D_METHOD("convert_cell_coordinates", "from_layout", "from_axes"), &TileMapLayer::convert_cell_coordinates);
 	ClassDB::bind_method(D_METHOD("get_neighbor_cell", "coords", "neighbor"), &TileMapLayer::get_neighbor_cell);
 	ClassDB::bind_method(D_METHOD("map_to_local", "map_position"), &TileMapLayer::map_to_local);
 	ClassDB::bind_method(D_METHOD("local_to_map", "local_position"), &TileMapLayer::local_to_map);
@@ -2958,6 +2959,26 @@ bool TileMapLayer::is_cell_transposed(const Vector2i &p_coords) const {
 	return get_cell_alternative_tile(p_coords) & TileSetAtlasSource::TRANSFORM_TRANSPOSE;
 }
 
+void TileMapLayer::convert_cell_coordinates(TileSet::TileLayout p_from_layout, TileSet::CoordinateAxes p_from_axes) {
+	ERR_FAIL_COND(tile_set.is_null());
+	ERR_FAIL_INDEX(p_from_layout, TileSet::TILE_LAYOUT_DIAMOND_DOWN + 1);
+	ERR_FAIL_INDEX(p_from_axes, TileSet::COORDINATE_AXES_MAX);
+	struct Cell {
+		Vector2i coords;
+		int source_id;
+		Vector2i atlas_coords;
+		int alternative_tile;
+	};
+	Vector<Cell> cells;
+	for (const Vector2i &coords : get_used_cells()) {
+		cells.push_back({ tile_set->convert_map_coords(coords, p_from_layout, p_from_axes), get_cell_source_id(coords), get_cell_atlas_coords(coords), get_cell_alternative_tile(coords) });
+	}
+	clear();
+	for (const Cell &cell : cells) {
+		set_cell(cell.coords, cell.source_id, cell.atlas_coords, cell.alternative_tile);
+	}
+}
+
 Ref<TileMapPattern> TileMapLayer::get_pattern(TypedArray<Vector2i> p_coords_array) {
 	ERR_FAIL_COND_V(tile_set.is_null(), nullptr);
 
@@ -2967,17 +2988,22 @@ Ref<TileMapPattern> TileMapLayer::get_pattern(TypedArray<Vector2i> p_coords_arra
 		return output;
 	}
 
-	Vector2i min = Vector2i(p_coords_array[0]);
-	for (int i = 1; i < p_coords_array.size(); i++) {
-		min = min.min(p_coords_array[i]);
+	// Patterns store layout coordinates (see TileSet::map_pattern()), so the offset parity below is computed in them.
+	Vector<Vector2i> layout_coords_array;
+	layout_coords_array.resize(p_coords_array.size());
+	for (int i = 0; i < p_coords_array.size(); i++) {
+		layout_coords_array.write[i] = tile_set->map_to_layout_coords(p_coords_array[i]);
+	}
+	Vector2i min = layout_coords_array[0];
+	for (int i = 1; i < layout_coords_array.size(); i++) {
+		min = min.min(layout_coords_array[i]);
 	}
 
 	Vector<Vector2i> coords_in_pattern_array;
 	coords_in_pattern_array.resize(p_coords_array.size());
 	Vector2i ensure_positive_offset;
 	for (int i = 0; i < p_coords_array.size(); i++) {
-		Vector2i coords = p_coords_array[i];
-		Vector2i coords_in_pattern = coords - min;
+		Vector2i coords_in_pattern = layout_coords_array[i] - min;
 		if (tile_set->get_tile_shape() != TileSet::TILE_SHAPE_SQUARE) {
 			if (tile_set->get_tile_layout() == TileSet::TILE_LAYOUT_STACKED) {
 				if (tile_set->get_tile_offset_axis() == TileSet::TILE_OFFSET_AXIS_HORIZONTAL && bool(min.y % 2) && bool(coords_in_pattern.y % 2)) {
