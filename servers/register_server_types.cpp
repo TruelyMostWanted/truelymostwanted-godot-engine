@@ -99,6 +99,10 @@
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/texture_settings.h"
+#include "servers/settings/texture_settings_server.h"
+#include "servers/settings/texture_streaming_settings.h"
+#include "servers/settings/texture_streaming_settings_server.h"
 #include "servers/settings/tts_persona_settings.h"
 #include "servers/settings/tts_persona_settings_server.h"
 #include "servers/settings/video_effect_settings.h"
@@ -108,10 +112,6 @@
 #include "servers/settings/video_preset_settings_server.h"
 #include "servers/settings/video_shadow_settings.h"
 #include "servers/settings/video_shadow_settings_server.h"
-#include "servers/settings/video_texture_settings.h"
-#include "servers/settings/video_texture_settings_server.h"
-#include "servers/settings/video_texture_streaming_settings.h"
-#include "servers/settings/video_texture_streaming_settings_server.h"
 #include "servers/settings/window_settings.h"
 #include "servers/settings/window_settings_server.h"
 #include "servers/settings/xr_settings.h"
@@ -208,13 +208,13 @@ static WindowSettingsServer *window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
 static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
-static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
+static TextureSettingsServer *texture_settings_server = nullptr;
 static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
 static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
 static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
-static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
+static TextureStreamingSettingsServer *texture_streaming_settings_server = nullptr;
 #endif
 #ifndef _3D_DISABLED
 static Camera3DSettingsServer *camera_3d_settings_server = nullptr;
@@ -315,11 +315,11 @@ void register_server_types() {
 	video_shadow_settings_server = memnew(VideoShadowSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoShadowSettingsServer", VideoShadowSettingsServer::get_singleton(), "VideoShadowSettingsServer"));
 	settings_server_manager->register_server(video_shadow_settings_server);
-	GDREGISTER_CLASS(VideoTextureSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoTextureSettingsServer);
-	video_texture_settings_server = memnew(VideoTextureSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureSettingsServer", VideoTextureSettingsServer::get_singleton(), "VideoTextureSettingsServer"));
-	settings_server_manager->register_server(video_texture_settings_server);
+	GDREGISTER_CLASS(TextureSettings);
+	GDREGISTER_ABSTRACT_CLASS(TextureSettingsServer);
+	texture_settings_server = memnew(TextureSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextureSettingsServer", TextureSettingsServer::get_singleton(), "TextureSettingsServer"));
+	settings_server_manager->register_server(texture_settings_server);
 	GDREGISTER_CLASS(VideoEffectSettings);
 	GDREGISTER_ABSTRACT_CLASS(VideoEffectSettingsServer);
 	video_effect_settings_server = memnew(VideoEffectSettingsServer);
@@ -346,11 +346,11 @@ void register_server_types() {
 	settings_server_manager->register_server(tts_persona_settings_server);
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	// Only with the texture_streaming module (#22); otherwise the domain is missing.
-	GDREGISTER_CLASS(VideoTextureStreamingSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoTextureStreamingSettingsServer);
-	video_texture_streaming_settings_server = memnew(VideoTextureStreamingSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureStreamingSettingsServer", VideoTextureStreamingSettingsServer::get_singleton(), "VideoTextureStreamingSettingsServer"));
-	settings_server_manager->register_server(video_texture_streaming_settings_server);
+	GDREGISTER_CLASS(TextureStreamingSettings);
+	GDREGISTER_ABSTRACT_CLASS(TextureStreamingSettingsServer);
+	texture_streaming_settings_server = memnew(TextureStreamingSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextureStreamingSettingsServer", TextureStreamingSettingsServer::get_singleton(), "TextureStreamingSettingsServer"));
+	settings_server_manager->register_server(texture_streaming_settings_server);
 #endif
 #ifndef _3D_DISABLED
 	// Not with disable_3d (#28): Camera3D is missing.
@@ -619,8 +619,8 @@ void unregister_server_types() {
 	camera_3d_settings_server = nullptr;
 #endif
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
-	memdelete(video_texture_streaming_settings_server);
-	video_texture_streaming_settings_server = nullptr;
+	memdelete(texture_streaming_settings_server);
+	texture_streaming_settings_server = nullptr;
 #endif
 	memdelete(video_preset_settings_server);
 	video_preset_settings_server = nullptr;
@@ -630,8 +630,8 @@ void unregister_server_types() {
 	tts_persona_settings_server = nullptr;
 	memdelete(accessibility_settings_server);
 	accessibility_settings_server = nullptr;
-	memdelete(video_texture_settings_server);
-	video_texture_settings_server = nullptr;
+	memdelete(texture_settings_server);
+	texture_settings_server = nullptr;
 	memdelete(video_shadow_settings_server);
 	video_shadow_settings_server = nullptr;
 	memdelete(render_quality_settings_server);

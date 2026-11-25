@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_texture_streaming_settings.cpp                                  */
+/*  texture_streaming_settings.cpp                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,70 +28,70 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_texture_streaming_settings.h"
+#include "texture_streaming_settings.h"
 
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 
 #include "core/object/class_db.h"
 
-void VideoTextureStreamingSettings::set_enabled(bool p_enabled) {
+void TextureStreamingSettings::set_enabled(bool p_enabled) {
 	enabled = p_enabled;
 	emit_changed();
 }
 
-bool VideoTextureStreamingSettings::is_enabled() const {
+bool TextureStreamingSettings::is_enabled() const {
 	return enabled;
 }
 
-void VideoTextureStreamingSettings::set_memory_budget_enabled(bool p_enabled) {
+void TextureStreamingSettings::set_memory_budget_enabled(bool p_enabled) {
 	memory_budget_enabled = p_enabled;
 	emit_changed();
 }
 
-bool VideoTextureStreamingSettings::is_memory_budget_enabled() const {
+bool TextureStreamingSettings::is_memory_budget_enabled() const {
 	return memory_budget_enabled;
 }
 
-void VideoTextureStreamingSettings::set_memory_budget_mb(int p_mb) {
+void TextureStreamingSettings::set_memory_budget_mb(int p_mb) {
 	memory_budget_mb = p_mb;
 	emit_changed();
 }
 
-int VideoTextureStreamingSettings::get_memory_budget_mb() const {
+int TextureStreamingSettings::get_memory_budget_mb() const {
 	return memory_budget_mb;
 }
 
-void VideoTextureStreamingSettings::set_min_lod(int p_lod) {
+void TextureStreamingSettings::set_min_lod(int p_lod) {
 	min_lod = p_lod;
 	emit_changed();
 }
 
-int VideoTextureStreamingSettings::get_min_lod() const {
+int TextureStreamingSettings::get_min_lod() const {
 	return min_lod;
 }
 
-void VideoTextureStreamingSettings::set_max_lod(int p_lod) {
+void TextureStreamingSettings::set_max_lod(int p_lod) {
 	max_lod = p_lod;
 	emit_changed();
 }
 
-int VideoTextureStreamingSettings::get_max_lod() const {
+int TextureStreamingSettings::get_max_lod() const {
 	return max_lod;
 }
 
-void VideoTextureStreamingSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &VideoTextureStreamingSettings::set_enabled);
-	ClassDB::bind_method(D_METHOD("is_enabled"), &VideoTextureStreamingSettings::is_enabled);
-	ClassDB::bind_method(D_METHOD("set_memory_budget_enabled", "enabled"), &VideoTextureStreamingSettings::set_memory_budget_enabled);
-	ClassDB::bind_method(D_METHOD("is_memory_budget_enabled"), &VideoTextureStreamingSettings::is_memory_budget_enabled);
-	ClassDB::bind_method(D_METHOD("set_memory_budget_mb", "mb"), &VideoTextureStreamingSettings::set_memory_budget_mb);
-	ClassDB::bind_method(D_METHOD("get_memory_budget_mb"), &VideoTextureStreamingSettings::get_memory_budget_mb);
-	ClassDB::bind_method(D_METHOD("set_min_lod", "lod"), &VideoTextureStreamingSettings::set_min_lod);
-	ClassDB::bind_method(D_METHOD("get_min_lod"), &VideoTextureStreamingSettings::get_min_lod);
-	ClassDB::bind_method(D_METHOD("set_max_lod", "lod"), &VideoTextureStreamingSettings::set_max_lod);
-	ClassDB::bind_method(D_METHOD("get_max_lod"), &VideoTextureStreamingSettings::get_max_lod);
+void TextureStreamingSettings::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &TextureStreamingSettings::set_enabled);
+	ClassDB::bind_method(D_METHOD("is_enabled"), &TextureStreamingSettings::is_enabled);
+	ClassDB::bind_method(D_METHOD("set_memory_budget_enabled", "enabled"), &TextureStreamingSettings::set_memory_budget_enabled);
+	ClassDB::bind_method(D_METHOD("is_memory_budget_enabled"), &TextureStreamingSettings::is_memory_budget_enabled);
+	ClassDB::bind_method(D_METHOD("set_memory_budget_mb", "mb"), &TextureStreamingSettings::set_memory_budget_mb);
+	ClassDB::bind_method(D_METHOD("get_memory_budget_mb"), &TextureStreamingSettings::get_memory_budget_mb);
+	ClassDB::bind_method(D_METHOD("set_min_lod", "lod"), &TextureStreamingSettings::set_min_lod);
+	ClassDB::bind_method(D_METHOD("get_min_lod"), &TextureStreamingSettings::get_min_lod);
+	ClassDB::bind_method(D_METHOD("set_max_lod", "lod"), &TextureStreamingSettings::set_max_lod);
+	ClassDB::bind_method(D_METHOD("get_max_lod"), &TextureStreamingSettings::get_max_lod);
 
-	// `or_less`/`or_greater`: the Inspector shows the usual range, VideoTextureStreamingSettingsServer clamps with a warning.
+	// `or_less`/`or_greater`: the Inspector shows the usual range, TextureStreamingSettingsServer clamps with a warning.
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "memory_budget_enabled"), "set_memory_budget_enabled", "is_memory_budget_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "memory_budget_mb", PROPERTY_HINT_RANGE, "0,65535,1,or_greater,or_less,suffix:MiB"), "set_memory_budget_mb", "get_memory_budget_mb");

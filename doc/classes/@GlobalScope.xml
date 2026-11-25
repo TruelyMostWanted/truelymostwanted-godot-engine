@@ -1731,8 +1731,14 @@
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
+		<member name="TextureSettingsServer" type="TextureSettingsServer" setter="" getter="">
+			The [TextureSettingsServer] singleton.
+		</member>
 		<member name="TextureStreaming" type="TextureStreaming" setter="" getter="">
 			The [TextureStreaming] singleton.
+		</member>
+		<member name="TextureStreamingSettingsServer" type="TextureStreamingSettingsServer" setter="" getter="">
+			The [TextureStreamingSettingsServer] singleton.
 		</member>
 		<member name="ThemeDB" type="ThemeDB" setter="" getter="">
 			The [ThemeDB] singleton.
@@ -1751,12 +1757,6 @@
 		</member>
 		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
 			The [VideoShadowSettingsServer] singleton.
-		</member>
-		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
-			The [VideoTextureSettingsServer] singleton.
-		</member>
-		<member name="VideoTextureStreamingSettingsServer" type="VideoTextureStreamingSettingsServer" setter="" getter="">
-			The [VideoTextureStreamingSettingsServer] singleton.
 		</member>
 		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
 			The [WindowSettingsServer] singleton.

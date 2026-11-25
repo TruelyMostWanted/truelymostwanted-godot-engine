@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_texture_streaming_settings.h                                    */
+/*  texture_streaming_settings.h                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -36,11 +36,11 @@
 
 #include "core/io/resource.h"
 
-// Data of the `video_texture_streaming` settings domain (#22): texture streaming on or off (at the next start),
+// Data of the `texture_streaming` settings domain (#22): texture streaming on or off (at the next start),
 // the memory budget and the best and worst mip level. Only built with the `texture_streaming` module.
-// VideoTextureStreamingSettingsServer pushes the values to the project settings and the TextureStreaming singleton.
-class VideoTextureStreamingSettings : public Resource {
-	GDCLASS(VideoTextureStreamingSettings, Resource);
+// TextureStreamingSettingsServer pushes the values to the project settings and the TextureStreaming singleton.
+class TextureStreamingSettings : public Resource {
+	GDCLASS(TextureStreamingSettings, Resource);
 
 	bool enabled = false;
 	bool memory_budget_enabled = false;

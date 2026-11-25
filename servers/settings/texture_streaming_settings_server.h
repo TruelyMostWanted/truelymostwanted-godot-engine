@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_texture_streaming_settings_server.h                             */
+/*  texture_streaming_settings_server.h                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -38,7 +38,7 @@
 #include "core/templates/hash_set.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `video_texture_streaming` (#22): texture streaming (VideoTextureStreamingSettings).
+// Settings domain `texture_streaming` (#22): texture streaming (TextureStreamingSettings).
 // Only built and registered with the `texture_streaming` module (not on the Web: it needs a RenderingDevice).
 // Applied in APPLY_PHASE_PRE_DISPLAY: `enabled` is written to the project settings before the renderers compile
 // their shaders and the TextureStreaming singleton starts, so the stored value takes effect at the next start
@@ -47,10 +47,10 @@
 // override properties of TextureStreaming once the singleton exists (after the scene-level modules).
 // The Compatibility renderer has no texture streaming: every value is stored, but not pushed.
 // Defaults are the project settings `rendering/textures/streaming/*`. Precedence: player's file > project settings.
-class VideoTextureStreamingSettingsServer : public SettingsServer {
-	GDCLASS(VideoTextureStreamingSettingsServer, SettingsServer);
+class TextureStreamingSettingsServer : public SettingsServer {
+	GDCLASS(TextureStreamingSettingsServer, SettingsServer);
 
-	static VideoTextureStreamingSettingsServer *singleton;
+	static TextureStreamingSettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -82,8 +82,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_texture_streaming`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoTextureStreamingSettingsServer *get_singleton();
+	static TextureStreamingSettingsServer *get_singleton();
 
 	// True if the current renderer can stream textures (Forward+ and Mobile).
 	static bool is_renderer_supported();
@@ -106,8 +109,8 @@ public:
 	// The texture memory used by streamed textures now (TextureStreaming.get_memory_budget_bytes_used()), or 0.
 	int64_t get_memory_budget_bytes_used() const;
 
-	VideoTextureStreamingSettingsServer();
-	~VideoTextureStreamingSettingsServer();
+	TextureStreamingSettingsServer();
+	~TextureStreamingSettingsServer();
 };
 
 #endif // MODULE_TEXTURE_STREAMING_ENABLED

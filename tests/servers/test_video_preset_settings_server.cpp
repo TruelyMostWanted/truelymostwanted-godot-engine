@@ -41,12 +41,12 @@ TEST_FORCE_LINK(test_video_preset_settings_server)
 #include "core/object/callable_mp.h"
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/texture_settings_server.h"
 #include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
 #include "servers/settings/video_shadow_settings_server.h"
-#include "servers/settings/video_texture_settings_server.h"
 #include "tests/test_utils.h"
 
 namespace TestVideoPresetSettingsServer {
@@ -79,7 +79,7 @@ struct Servers {
 
 	explicit Servers(const String &p_suffix = String(), bool p_remove_files = true) {
 		domains[0] = memnew(RenderQualitySettingsServer);
-		domains[1] = memnew(VideoTextureSettingsServer);
+		domains[1] = memnew(TextureSettingsServer);
 		domains[2] = memnew(VideoShadowSettingsServer);
 		domains[3] = memnew(VideoEffectSettingsServer);
 		preset = memnew(VideoPresetSettingsServer);
@@ -197,8 +197,8 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 		CHECK(low->get_domain_settings(domain) != ultra->get_domain_settings(domain));
 	}
 	REQUIRE(low->get_render_quality().is_valid());
-	REQUIRE(ultra->get_video_texture().is_valid());
-	CHECK(int(low->get_video_texture()->get_anisotropic_filtering_level()) < int(ultra->get_video_texture()->get_anisotropic_filtering_level()));
+	REQUIRE(ultra->get_texture().is_valid());
+	CHECK(int(low->get_texture()->get_anisotropic_filtering_level()) < int(ultra->get_texture()->get_anisotropic_filtering_level()));
 	CHECK(low->get_video_shadow()->get_directional_shadow_atlas_size() < ultra->get_video_shadow()->get_directional_shadow_atlas_size());
 	CHECK(int(low->get_video_effect()->get_ssao_quality()) < int(ultra->get_video_effect()->get_ssao_quality()));
 	CHECK(low->get_render_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
@@ -222,7 +222,7 @@ TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the fo
 	Servers servers;
 	VideoPresetSettingsServer *server = servers.preset;
 	// One domain in manual mode keeps the values pending; the others apply them at once.
-	SettingsServer *texture = servers.get("video_texture");
+	SettingsServer *texture = servers.get("texture");
 	texture->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
 	preset_changed_count = 0;
@@ -379,10 +379,10 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	Ref<VideoPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
-	Ref<VideoTextureSettings> potato_texture;
+	Ref<TextureSettings> potato_texture;
 	potato_texture.instantiate();
 	potato_texture->set_anisotropic_filtering_level(Viewport::ANISOTROPY_DISABLED);
-	potato->set_video_texture(potato_texture);
+	potato->set_texture(potato_texture);
 	Ref<RenderQualitySettings> potato_quality;
 	potato_quality.instantiate();
 	potato_quality->set_scaling_3d_scale(0.5);
@@ -415,7 +415,7 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		CHECK(server->apply_preset("Potato") == OK);
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "Potato");
-		CHECK(int(servers.get("video_texture")->get_value("anisotropic_filtering_level")) == 0);
+		CHECK(int(servers.get("texture")->get_value("anisotropic_filtering_level")) == 0);
 		CHECK(float(servers.get("render_quality")->get_value("scaling_3d_scale")) == doctest::Approx(0.5));
 		CHECK(int(shadow->get_value("directional_shadow_atlas_size")) == 1024);
 
@@ -426,7 +426,7 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		CHECK(server->get_current_preset() == "Potato");
 		// A change in a domain the preset sets: "Custom".
 		ERR_PRINT_OFF;
-		servers.get("video_texture")->set_value("anisotropic_filtering_level", int(Viewport::ANISOTROPY_16X));
+		servers.get("texture")->set_value("anisotropic_filtering_level", int(Viewport::ANISOTROPY_16X));
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "Custom");
 	}
