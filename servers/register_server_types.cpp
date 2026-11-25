@@ -117,7 +117,7 @@
 #include "servers/settings/xr_settings.h"
 #include "servers/settings/xr_settings_server.h"
 #include "servers/subtitle/subtitle.h"
-#include "servers/subtitle/subtitle_format_srt.h"
+#include "servers/subtitle/subtitle_resource_format.h"
 #include "servers/subtitle/subtitle_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
@@ -196,8 +196,8 @@ static bool has_server_feature_callback(const String &p_feature) {
 static MovieWriterPNGWAV *writer_pngwav = nullptr;
 static TTSServer *tts_server = nullptr;
 static SubtitleServer *subtitle_server = nullptr;
-static Ref<ResourceFormatLoaderSubtitleSRT> resource_loader_subtitle_srt;
-static Ref<ResourceFormatSaverSubtitleSRT> resource_saver_subtitle_srt;
+static Ref<ResourceFormatLoaderSubtitle> resource_loader_subtitle;
+static Ref<ResourceFormatSaverSubtitle> resource_saver_subtitle;
 static SettingsServerManager *settings_server_manager = nullptr;
 static AudioDeviceSettingsServer *audio_device_settings_server = nullptr;
 static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
@@ -249,10 +249,10 @@ void register_server_types() {
 	GDREGISTER_ABSTRACT_CLASS(SubtitleServer);
 	subtitle_server = memnew(SubtitleServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("SubtitleServer", SubtitleServer::get_singleton(), "SubtitleServer"));
-	resource_loader_subtitle_srt.instantiate();
-	ResourceLoader::add_resource_format_loader(resource_loader_subtitle_srt);
-	resource_saver_subtitle_srt.instantiate();
-	ResourceSaver::add_resource_format_saver(resource_saver_subtitle_srt);
+	resource_loader_subtitle.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_subtitle);
+	resource_saver_subtitle.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_subtitle);
 
 	GDREGISTER_VIRTUAL_CLASS(SettingsServer);
 	GDREGISTER_VIRTUAL_CLASS(ListSettingsServer);
@@ -601,10 +601,10 @@ void unregister_server_types() {
 
 	ServersDebugger::deinitialize();
 	memdelete(shader_types);
-	ResourceLoader::remove_resource_format_loader(resource_loader_subtitle_srt);
-	resource_loader_subtitle_srt.unref();
-	ResourceSaver::remove_resource_format_saver(resource_saver_subtitle_srt);
-	resource_saver_subtitle_srt.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_subtitle);
+	resource_loader_subtitle.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_subtitle);
+	resource_saver_subtitle.unref();
 	memdelete(subtitle_server);
 	subtitle_server = nullptr;
 	memdelete(tts_server);
