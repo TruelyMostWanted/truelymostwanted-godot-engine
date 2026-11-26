@@ -8,12 +8,14 @@
 		[codeblocks]
 		[gdscript]
 		var exits := playback.get_available_exits()
-		for i in exits.size():
+		var index := 0
+		for exit: FlowExit in exits:
 		    var button := Button.new()
-		    button.text = exits[i].label
-		    button.disabled = not exits[i].enabled
-		    button.pressed.connect(playback.choose.bind(i))
+		    button.text = exit.label
+		    button.disabled = not exit.enabled
+		    button.pressed.connect(playback.choose.bind(index))
 		    menu.add_child(button)
+		    index += 1
 		[/gdscript]
 		[csharp]
 		var exits = playback.GetAvailableExits();
