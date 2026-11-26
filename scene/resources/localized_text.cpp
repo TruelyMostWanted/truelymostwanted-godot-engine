@@ -328,11 +328,8 @@ int LocalizedText::_get_count() const {
 	if (count_argument == StringName()) {
 		return -1;
 	}
-	// Like TextInsertionServer: StringName keys, then String keys, then the server's values.
+	// The arguments first (String and StringName keys are the same key), then the server's values.
 	Variant value = args.get(count_argument, Variant());
-	if (value.get_type() == Variant::NIL) {
-		value = args.get(String(count_argument), Variant());
-	}
 	if (value.get_type() == Variant::NIL && TextInsertionServer::get_singleton()) {
 		value = TextInsertionServer::get_singleton()->get_value(count_argument);
 	}
@@ -346,13 +343,13 @@ String LocalizedText::_evaluate(const StringName &p_channel) {
 	const int count = _get_count();
 	const TextLocalizationServer *localization = TextLocalizationServer::get_singleton();
 	TranslationServer *translation_server = TranslationServer::get_singleton();
-	const bool interface = p_channel == SNAME("interface");
+	const bool is_interface = p_channel == SNAME("interface");
 	String raw = key;
 	if (localization && localization->has_translation(key, context)) {
-		raw = interface || !translation_server ? localization->translate(key, context, count) : localization->translate_for_locale(translation_server->get_locale_for(p_channel), key, context, count);
+		raw = is_interface || !translation_server ? localization->translate(key, context, count) : localization->translate_for_locale(translation_server->get_locale_for(p_channel), key, context, count);
 	} else if (translation_server) {
 		// Keys of Godot's Translation resources, through the domain of the channel.
-		const Ref<TranslationDomain> domain = interface ? translation_server->get_main_domain() : translation_server->get_or_add_domain(p_channel);
+		const Ref<TranslationDomain> domain = is_interface ? translation_server->get_main_domain() : translation_server->get_or_add_domain(p_channel);
 		raw = count >= 0 ? String(domain->translate_plural(key, key, count, context)) : String(domain->translate(key, context));
 	}
 
