@@ -363,7 +363,7 @@ TEST_CASE("[ResourceLocalizationServer] Remap cost") {
 	CHECK(length > 0);
 	CHECK(ResourceLoader::path_remap(path) == godot_path);
 	CHECK(godot_path == folder.path_join("pl_500.bin"));
-	MESSAGE(vformat("path_remap with 1000 remaps x 12 locales: Godot %.0f ns, server %.0f ns, server lookup alone %.0f ns", godot_ns, server_ns, lookup_ns);
+	MESSAGE(vformat("path_remap with 1000 remaps x 12 locales: Godot %.0f ns, server %.0f ns, server lookup alone %.0f ns", godot_ns, server_ns, lookup_ns));
 }
 
 } // namespace TestResourceLocalizationServer
