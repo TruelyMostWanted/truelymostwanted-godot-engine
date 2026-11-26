@@ -99,6 +99,12 @@
 				Returns a readable country name for the [param country] code.
 			</description>
 		</method>
+		<method name="get_fallback_locale" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the fallback locale: the locale used for a text when the current locale (and its parent locales) have none. Defaults to [member ProjectSettings.internationalization/locale/fallback]. Changing it emits [signal fallback_locale_changed].
+			</description>
+		</method>
 		<method name="get_language_name" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="language" type="String" />
@@ -244,6 +250,13 @@
 			<param index="0" name="translation" type="Translation" />
 			<description>
 				Removes the given translation from the main translation domain.
+			</description>
+		</method>
+		<method name="set_fallback_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Sets the fallback locale (see [method get_fallback_locale]) and emits [signal fallback_locale_changed] if it changed. The project setting [member ProjectSettings.internationalization/locale/fallback] is not changed.
 			</description>
 		</method>
 		<method name="set_locale">

@@ -763,6 +763,8 @@ void TranslationServer::get_argument_options(const StringName &p_function, int p
 void TranslationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &TranslationServer::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &TranslationServer::get_locale);
+	ClassDB::bind_method(D_METHOD("set_fallback_locale", "locale"), &TranslationServer::set_fallback_locale);
+	ClassDB::bind_method(D_METHOD("get_fallback_locale"), &TranslationServer::get_fallback_locale);
 	ClassDB::bind_method(D_METHOD("set_locale_for", "channel", "locale"), &TranslationServer::set_locale_for);
 	ClassDB::bind_method(D_METHOD("get_locale_for", "channel"), &TranslationServer::get_locale_for);
 	ClassDB::bind_method(D_METHOD("clear_locale_for", "channel"), &TranslationServer::clear_locale_for);
