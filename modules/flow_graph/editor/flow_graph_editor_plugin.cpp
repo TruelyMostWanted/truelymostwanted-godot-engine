@@ -90,8 +90,8 @@ int FlowGraphEditor::_find_compatible_port(const Ref<FlowNode> &p_node, const Re
 		if (other.is_null() || other->get_kind() != p_port->get_kind()) {
 			continue;
 		}
-		const Variant::Type from = p_port_is_output ? p_port->get_type() : other->get_type();
-		const Variant::Type to = p_port_is_output ? other->get_type() : p_port->get_type();
+		const Variant::Type from = p_port_is_output ? p_port->get_port_type() : other->get_port_type();
+		const Variant::Type to = p_port_is_output ? other->get_port_type() : p_port->get_port_type();
 		if (other->get_kind() == FlowPort::PORT_KIND_FLOW || FlowPort::is_type_compatible(from, to)) {
 			return i;
 		}
@@ -101,17 +101,17 @@ int FlowGraphEditor::_find_compatible_port(const Ref<FlowNode> &p_node, const Re
 
 // Slot type 0 is flow, 1 + Variant.Type is data.
 int FlowGraphEditor::_slot_type(const Ref<FlowPort> &p_port) {
-	return (p_port.is_null() || p_port->get_kind() == FlowPort::PORT_KIND_FLOW) ? 0 : 1 + p_port->get_type();
+	return (p_port.is_null() || p_port->get_kind() == FlowPort::PORT_KIND_FLOW) ? 0 : 1 + p_port->get_port_type();
 }
 
 Color FlowGraphEditor::_slot_color(const Ref<FlowPort> &p_port) {
 	if (p_port.is_null() || p_port->get_kind() == FlowPort::PORT_KIND_FLOW) {
 		return Color(1, 1, 1);
 	}
-	if (p_port->get_type() == Variant::NIL) {
+	if (p_port->get_port_type() == Variant::NIL) {
 		return Color(0.6, 0.6, 0.6);
 	}
-	return Color::from_hsv(float(p_port->get_type()) / Variant::VARIANT_MAX, 0.55, 0.95);
+	return Color::from_hsv(float(p_port->get_port_type()) / Variant::VARIANT_MAX, 0.55, 0.95);
 }
 
 // Graph elements are named "n<node id>" and "f<frame index>".
