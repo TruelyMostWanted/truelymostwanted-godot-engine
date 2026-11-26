@@ -40,8 +40,8 @@
 // Settings domain `shadow` (#23): the directional shadow atlas (size, 16-bit depth), the positional shadow
 // atlas (size, 16-bit depth, quadrant subdivisions) and the soft shadow filter quality (ShadowSettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
-// The positional atlas values also go to the viewports passed to add_viewport() and to every Viewport in the
-// group get_viewport_group() when it enters the tree. The directional atlas and both filter qualities are global
+// The positional atlas values also go to the viewports passed to add_viewport() and, by viewport_target, to the
+// viewports in the group get_viewport_group() or to every viewport in ViewportServer, also when they enter the tree. The directional atlas and both filter qualities are global
 // (RenderingServer).
 // Atlas sizes are rounded up to a power of two (like the renderers do) and clamped to 256 to 16384; a positional
 // atlas size of 0 disables positional shadows.
@@ -56,6 +56,7 @@ class ShadowSettingsServer : public SettingsServer {
 	// Pushed before the root viewport or RenderingServer existed (headless tools, early startup): delivered later.
 	HashSet<StringName> undelivered;
 	LocalVector<ObjectID> extra_viewports;
+	ViewportTargetMode viewport_target = VIEWPORT_TARGET_GROUP;
 	bool defaults_captured = false;
 
 	static Variant _get_project_value(const StringName &p_name);
@@ -123,6 +124,8 @@ public:
 	void add_viewport(Viewport *p_viewport);
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
+	void set_viewport_target(ViewportTargetMode p_target);
+	ViewportTargetMode get_viewport_target() const;
 
 	ShadowSettingsServer();
 	~ShadowSettingsServer();

@@ -33,6 +33,7 @@
 #include "resource_format_toml.h"
 #include "toml.h"
 
+#include "core/io/resource_format_text_data.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
@@ -40,6 +41,8 @@
 
 static Ref<ResourceFormatLoaderResourceTOML> resource_loader_toml;
 static Ref<ResourceFormatSaverResourceTOML> resource_saver_toml;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_toml;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_toml;
 
 static Error _parse_toml_format(const String &p_text, const String &p_type_hint, const ResourceTextSerializer::Options &p_options, Ref<Resource> &r_resource, String &r_error) {
 	return TOML::parse_resource(p_text, p_type_hint, r_resource, r_error);
@@ -57,6 +60,12 @@ void initialize_toml_module(ModuleInitializationLevel p_level) {
 	resource_saver_toml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_toml);
 
+	// Plain TOML files (no type marker) as TOML resources, after the type-marked loaders above.
+	resource_loader_text_data_toml.instantiate("TOML", Vector<String>{ "toml" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_toml);
+	resource_saver_text_data_toml.instantiate("TOML");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_toml);
+
 	// ResourceTextSerializer.serialize(resource, FORMAT_TOML) and deserialize(text, FORMAT_TOML).
 	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_TOML, &TOML::write_resource, &_parse_toml_format);
 }
@@ -67,6 +76,10 @@ void uninitialize_toml_module(ModuleInitializationLevel p_level) {
 	}
 
 	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_TOML);
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_toml);
+	resource_loader_text_data_toml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_toml);
+	resource_saver_text_data_toml.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_toml);
 	resource_loader_toml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_toml);

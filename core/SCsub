@@ -4,6 +4,7 @@ from misc.utility.scons_hints import *
 import os
 
 import core_builders
+import truely_version_builders
 
 import methods
 
@@ -225,6 +226,13 @@ env.CommandNoCache(
     "version_generated.gen.h",
     env.Value(methods.get_version_info(env.module_version_string)),
     env.Run(core_builders.version_info_builder),
+)
+
+# Generate the Truely fork version (truely/version.txt)
+env.CommandNoCache(
+    "truely_version.gen.h",
+    env.Value(truely_version_builders.get_truely_version_info()),
+    env.Run(truely_version_builders.truely_version_builder),
 )
 
 # Generate version hash
