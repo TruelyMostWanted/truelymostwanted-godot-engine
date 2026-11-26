@@ -62,6 +62,13 @@
 				Returns the locales of all catalogs, each once, for example to fill a language menu.
 			</description>
 		</method>
+		<method name="get_available_locales_for" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the locales of the catalogs that give keys of the locale [param channel] (see [member LocalizationCatalog.channel] and [method TranslationServer.set_locale_for]), each once, in the order of the catalogs. A key counts for the channel of the highest-priority catalog that has it, and every catalog with that key serves the channel. Returns an empty array if no catalog has keys of [param channel], for example [code]"audio"[/code] in [TextLocalizationServer]. [method LanguageSettingsServer.get_available_locales_for] combines the locales of all localization servers.
+			</description>
+		</method>
 		<method name="get_catalogs" qualifiers="const">
 			<return type="LocalizationCatalog[]" />
 			<description>
