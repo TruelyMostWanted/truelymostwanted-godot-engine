@@ -1742,6 +1742,8 @@
 		</member>
 		<member name="TextInsertionServer" type="TextInsertionServer" setter="" getter="">
 		</member>
+		<member name="TextLocalizationServer" type="TextLocalizationServer" setter="" getter="">
+		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>

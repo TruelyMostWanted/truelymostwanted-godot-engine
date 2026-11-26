@@ -1440,6 +1440,62 @@ void LocalizationCatalogList::clear() {
 	set_entry_count(0);
 }
 
+// Folders matching `p_folder`, which may hold wildcards in any folder name. Missing folders are skipped.
+static PackedStringArray _expand_folders(const String &p_folder) {
+	const String name = p_folder.get_file();
+	if (!p_folder.contains_char('*') && !p_folder.contains_char('?')) {
+		return PackedStringArray({ p_folder });
+	}
+	PackedStringArray folders;
+	for (const String &parent : _expand_folders(p_folder.get_base_dir())) {
+		if (!name.contains_char('*') && !name.contains_char('?')) {
+			folders.push_back(parent.path_join(name));
+			continue;
+		}
+		Ref<DirAccess> dir = DirAccess::open(parent);
+		if (dir.is_null()) {
+			continue;
+		}
+		PackedStringArray directories = dir->get_directories();
+		directories.sort();
+		for (const String &directory : directories) {
+			if (directory.matchn(name)) {
+				folders.push_back(parent.path_join(directory));
+			}
+		}
+	}
+	return folders;
+}
+
+PackedStringArray LocalizationCatalogList::get_entry_catalog_paths(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, (int)entries.size(), PackedStringArray());
+	const String &path = entries[p_index].path;
+	const String pattern = path.get_file();
+	PackedStringArray paths;
+	for (const String &folder : _expand_folders(path.get_base_dir())) {
+		if (!pattern.contains_char('*') && !pattern.contains_char('?')) {
+			if (!pattern.is_empty()) {
+				paths.push_back(folder.path_join(pattern));
+			}
+			continue;
+		}
+		Ref<DirAccess> dir = DirAccess::open(folder);
+		if (dir.is_null()) {
+			continue; // A missing folder (for example no mods installed) is not an error.
+		}
+		PackedStringArray files = dir->get_files();
+		files.sort();
+		for (const String &file : files) {
+			const String extension = file.get_extension().to_lower();
+			const bool catalog_file = extension == LocalizationCatalog::BINARY_EXTENSION || ResourceTextSerializer::get_format_for_extension(extension) != ResourceTextSerializer::FORMAT_MAX;
+			if (catalog_file && file.matchn(pattern)) {
+				paths.push_back(folder.path_join(file));
+			}
+		}
+	}
+	return paths;
+}
+
 PackedStringArray LocalizationCatalogList::get_catalog_paths() const {
 	// Stable sort by priority: equal priorities keep the list order, a higher priority comes later (and wins).
 	LocalVector<uint32_t> order;
@@ -1454,28 +1510,7 @@ PackedStringArray LocalizationCatalogList::get_catalog_paths() const {
 	}
 	PackedStringArray paths;
 	for (const uint32_t entry_index : order) {
-		const String &path = entries[entry_index].path;
-		const String pattern = path.get_file();
-		if (!pattern.contains_char('*') && !pattern.contains_char('?')) {
-			if (!path.is_empty()) {
-				paths.push_back(path);
-			}
-			continue;
-		}
-		const String folder = path.get_base_dir();
-		Ref<DirAccess> dir = DirAccess::open(folder);
-		if (dir.is_null()) {
-			continue; // A missing folder (for example no mods installed) is not an error.
-		}
-		PackedStringArray files = dir->get_files();
-		files.sort();
-		for (const String &file : files) {
-			const String extension = file.get_extension().to_lower();
-			const bool catalog_file = extension == LocalizationCatalog::BINARY_EXTENSION || ResourceTextSerializer::get_format_for_extension(extension) != ResourceTextSerializer::FORMAT_MAX;
-			if (catalog_file && file.matchn(pattern)) {
-				paths.push_back(folder.path_join(file));
-			}
-		}
+		paths.append_array(get_entry_catalog_paths(entry_index));
 	}
 	return paths;
 }

@@ -11,7 +11,7 @@
 		4. The [TextInsertionValues] resources added with [method add_values], the higher [member TextInsertionValues.priority] first. With equal priority, the resource added later wins. The resources listed in [member ProjectSettings.internationalization/text_insertion/default_values] are added on the first use of the server.
 		[b]Syntax:[/b] [code]{name}[/code] inserts a value. [code]{name:modifier}[/code] passes the value through a modifier, and modifiers can be chained from left to right: [code]{item:t:upper}[/code]. [code]{{[/code] and [code]}}[/code] insert a literal brace. A brace that does not form a placeholder stays as written. If no source has a value, the placeholder stays in the text as written and a warning is printed once per name in debug builds (see [member ProjectSettings.internationalization/text_insertion/warn_missing_values]).
 		[b]Built-in modifiers:[/b]
-		- [code]t[/code]: translates the value as a key with [method TranslationServer.translate].
+		- [code]t[/code]: translates the value as a key with [method TextLocalizationServer.translate] if it has a text for the key, otherwise with [method TranslationServer.translate].
 		- [code]upper[/code], [code]lower[/code]: upper and lower case.
 		- [code]capitalize[/code]: like [method String.capitalize].
 		- [code]number[/code]: groups the digits of a number by thousands with the separators of the current locale ([code]1,234,567.5[/code] in English, [code]1.234.567,5[/code] in German) and uses native digits where [method TranslationServer.format_number] knows them. Text that is not a plain decimal number stays as it is.
