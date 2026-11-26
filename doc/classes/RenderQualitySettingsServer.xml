@@ -6,7 +6,7 @@
 	<description>
 		[RenderQualitySettingsServer] is the settings domain [code]"render_quality"[/code]: it stores the 3D scaling ([member Viewport.scaling_3d_mode], [member Viewport.scaling_3d_scale], [member Viewport.fsr_sharpness]), the mesh LOD threshold ([member Viewport.mesh_lod_threshold]), the anti-aliasing ([member Viewport.msaa_2d], [member Viewport.msaa_3d], [member Viewport.screen_space_aa], [member Viewport.use_taa], [member Viewport.use_debanding]), variable rate shading ([member Viewport.vrs_mode]) and occlusion culling ([member Viewport.use_occlusion_culling], [method RenderingServer.viewport_set_occlusion_rays_per_thread], [method RenderingServer.viewport_set_occlusion_culling_build_quality]) for the player. Every value takes effect at once on the root viewport. The settings resource is a [RenderQualitySettings]; the file is [code]user://settings/render_quality.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]). If it does not exist yet, the file of the former domain name ([code]user://settings/video_quality.ini[/code]) is read once at startup and written under the new name; the old file is kept.
 		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the root viewport exists and before the main scene is loaded. Values set earlier wait until then. The defaults are the project settings ([member ProjectSettings.rendering/scaling_3d/mode], [member ProjectSettings.rendering/anti_aliasing/quality/msaa_3d], [member ProjectSettings.rendering/mesh_lod/lod_change/threshold_pixels], [member ProjectSettings.rendering/vrs/mode], [member ProjectSettings.rendering/occlusion_culling/use_occlusion_culling] and the others), with their feature overrides such as [code].mobile[/code].
-		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and to every [Viewport] in the group [method get_viewport_group], for example a [SubViewport] that renders the 3D world of a pixel-art game.
+		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and, by [member viewport_target], to every [Viewport] in the group [method get_viewport_group] (the default) or to every viewport in [ViewportServer], for example a [SubViewport] that renders the 3D world of a pixel-art game.
 		[b]Renderers:[/b] the Compatibility renderer (default in the Web export) only scales with Bilinear or Nearest and has no FSR, FXAA/SMAA, TAA, debanding or variable rate shading. The Mobile renderer has no FSR and no TAA. Variable rate shading needs GPU support, MetalFX needs Metal (macOS, iOS), occlusion culling needs the [code]raycast[/code] module. [method SettingsServer.is_value_supported] returns [code]false[/code] for such values and [method get_unsupported_setting_names] lists them, so that a settings menu can gray them out. Such values are still stored, but not pushed; a warning names them once. A 3D scaling mode the renderer can't use is stored, and bilinear scaling is used.
 		Values out of range are clamped with a warning: [code]scaling_3d_scale[/code] [code]0.1[/code] to [code]2.0[/code], [code]fsr_sharpness[/code] [code]0[/code] to [code]2[/code], [code]mesh_lod_threshold[/code] [code]0[/code] to [code]1024[/code], [code]occlusion_rays_per_thread[/code] [code]1[/code] to [code]2048[/code]. An enum value out of range is replaced by the default.
 		[codeblocks]
@@ -113,7 +113,7 @@
 		<method name="get_viewport_group" qualifiers="static">
 			<return type="StringName" />
 			<description>
-				Returns the group [code]&amp;"render_quality_settings"[/code]. Every [Viewport] in this group gets the per-viewport values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
+				Returns the group [code]&amp;"render_quality_settings"[/code]. With [member viewport_target] [constant SettingsServer.VIEWPORT_TARGET_GROUP] (the default), every [Viewport] in this group gets the per-viewport values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
 			</description>
 		</method>
 		<method name="get_vrs_mode" qualifiers="const">
@@ -260,6 +260,12 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="viewport_target" type="int" setter="set_viewport_target" getter="get_viewport_target" enum="SettingsServer.ViewportTargetMode">
+			Which viewports get the per-viewport values besides the root viewport and the viewports added with [method add_viewport]: [constant SettingsServer.VIEWPORT_TARGET_GROUP] (the default) the viewports in the group [method get_viewport_group], [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] every viewport in [ViewportServer], [constant SettingsServer.VIEWPORT_TARGET_ROOT_ONLY] no others. Viewports that enter the tree later get the values if they are targets.
+			When the target changes, the viewports that are targets now get the current values at once; viewports that stop being targets keep the values they have. This is a choice of the game, not a player setting: it is not stored in the settings file. Set it in an autoload, for example. In the editor, [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] also reaches the editor's own viewports.
+		</member>
+	</members>
 	<signals>
 		<signal name="fsr_sharpness_changed">
 			<param index="0" name="sharpness" type="float" />

@@ -120,6 +120,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **Process memory**: `OS` methods that return the memory of the whole process as the platform tools show it (works in release exports, unlike `get_static_memory_usage()`). In code: `core/os/os.*`. Wiki: [`Process-Memory`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Process-Memory).
 
+**ProgressBarServer** / **ProgressBarStyle**: world-space progress bars (health bars over many units) without a node per bar: each bar is a canvas item parented to its unit, styled by a shared `ProgressBarStyle` resource, updated in bulk with `bars_set_ratios()`; static bars cost nothing per frame. For a single bar in a UI use the stock `ProgressBar` (`fill_mode`, theme type variations). In code: `scene/main/progress_bar_server.*`, `scene/resources/progress_bar_style.*`. Issues: #263, #284, #285. Wiki: [`285-feature-progress-bar-server`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/285-feature-progress-bar-server), [`284-task-world-space-progress-bars`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/284-task-world-space-progress-bars).
+
 ### R
 
 **Release** / **release names**: builds published from `truely-godot-engine-releases` after a green CI, named `Truely_Godot<Version>-<Status>_<Hash>_<Platform>` (for example `Truely_Godot4.8-beta5_a1b2c3d_win64.zip`, `..._mono_win64.zip`, `..._export_templates.tpz`); tag `truely-godot4.8-beta5-a1b2c3d`. A new naming scheme is tracked in #265. In code: `.github/workflows/truely_release.yml`, `.github/truely/`, `truely/release.ps1`, `truely/pack-release.ps1`. See `truely/README.md`.
@@ -216,6 +218,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Subtitles, TTS | `SubtitleServer`, `Subtitle`, `SubtitlePlayback`, `SubtitlePlayer`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `scene/main/subtitle_player.*`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `tests/scene/test_subtitle_player.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |
 | 2D | `SpriteSheet`, `TileSet`, `TileMapLayer`, `TileMapPathGraph` | `scene/resources/sprite_sheet.*`, `scene/resources/2d/tile_set.*`, `modules/tilemap/`, `modules/tilemap/tile_map_path_graph.*` | `modules/tilemap/tests/` |
+| World-space bars | `ProgressBarServer`, `ProgressBarStyle` | `scene/main/progress_bar_server.*`, `scene/resources/progress_bar_style.*` | `tests/scene/test_progress_bar_server.cpp` |
 | Random | `SeedServer` | `core/math/seed_server.*` | `tests/core/math/test_seed_server.cpp` |
 | Performance | `PerformanceRecorder`, `PerformanceBudget`, `PerformanceRecordingProfile`, `PerformanceSummary` | `main/performance_*.*` | `tests/main/` |
 | C# integration | glue, `GetChildren<T>`, `TryLoad<T>`, .NET metrics | `modules/mono/`, `modules/mono/dotnet_metric_source.*` | `modules/mono/tests/` |
