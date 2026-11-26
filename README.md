@@ -41,6 +41,9 @@ Official binaries for the Godot editor and the export templates can be found
 
 ### Compiling from source
 
+To build this fork (truely-godot-engine), see [BUILDING.md](BUILDING.md): prerequisites,
+editor, export templates (standard and .NET), running and troubleshooting.
+
 [See the official docs](https://docs.godotengine.org/en/latest/engine_details/development/compiling)
 for compilation instructions for every supported platform.
 
