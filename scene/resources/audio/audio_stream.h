@@ -113,6 +113,16 @@ public:
 	virtual Ref<AudioSamplePlayback> get_sample_playback() const;
 	virtual void set_sample_playback(const Ref<AudioSamplePlayback> &p_playback) {}
 
+	// Current track of a stream that plays a list of tracks (AudioStreamPlaylist), read by the
+	// stream players on the main thread. Returns false for streams without tracks.
+	struct TrackInfo {
+		int index = -1; // List index of the current track, -1 when stopped.
+		uint32_t serial = 0; // Counts started tracks, also repeats of the same index.
+		double position = 0.0; // Seconds inside the current track.
+		Ref<AudioStream> stream;
+	};
+	virtual bool get_track_info(TrackInfo &r_info) const { return false; }
+
 	AudioStreamPlayback();
 	~AudioStreamPlayback();
 

@@ -32,6 +32,7 @@
 
 #include "core/templates/fixed_vector.h"
 #include "scene/3d/node_3d.h"
+#include "scene/audio/audio_mixer_server.h"
 #include "servers/audio/audio_server_constants.h"
 #include "servers/audio/audio_server_enums.h"
 
@@ -214,6 +215,18 @@ public:
 
 	AuSE::PlaybackType get_playback_type() const;
 	void set_playback_type(AuSE::PlaybackType p_playback_type);
+
+	// Fades, crossfade and track info, shared by the three players through AudioStreamPlayerInternal.
+	void fade_in(float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_LINEAR);
+	void fade_out(float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_LINEAR, bool p_stop_at_end = true);
+	void crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_EQUAL_POWER);
+	bool is_fading() const;
+	float get_fade_gain() const;
+	int get_current_track_index();
+	Ref<AudioStream> get_current_track_stream();
+	double get_track_position();
+	void set_position_signal_interval(float p_interval);
+	float get_position_signal_interval() const;
 
 	AudioStreamPlayer3D();
 	~AudioStreamPlayer3D();

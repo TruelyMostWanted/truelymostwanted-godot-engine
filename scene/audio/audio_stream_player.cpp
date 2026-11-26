@@ -46,6 +46,9 @@ void AudioStreamPlayer::_notification(int p_what) {
 		AccessibilityServer::get_singleton()->update_set_role(ae, AccessibilityServerEnums::AccessibilityRole::ROLE_AUDIO);
 	} else {
 		internal->notification(p_what);
+		if (internal->volumes_dirty) {
+			set_volume_db(internal->volume_db); // Applies the new fade gains.
+		}
 	}
 }
 
@@ -73,10 +76,9 @@ void AudioStreamPlayer::set_volume_db(float p_volume) {
 	ERR_FAIL_COND_MSG(Math::is_nan(p_volume), "Volume can't be set to NaN.");
 	internal->volume_db = p_volume;
 
-	Vector<AudioFrame> volume_vector = _get_volume_vector();
-	for (Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
-		AudioServer::get_singleton()->set_playback_all_bus_volumes_linear(playback, volume_vector);
-	}
+	HashMap<StringName, Vector<AudioFrame>> bus_volumes;
+	bus_volumes[internal->bus] = _get_volume_vector();
+	internal->apply_bus_volumes(bus_volumes);
 }
 
 float AudioStreamPlayer::get_volume_db() const {
@@ -112,14 +114,14 @@ void AudioStreamPlayer::play(float p_from_pos) {
 	if (stream_playback.is_null()) {
 		return;
 	}
-	AudioServer::get_singleton()->start_playback_stream(stream_playback, internal->bus, _get_volume_vector(), p_from_pos, internal->pitch_scale, !can_process());
+	AudioServer::get_singleton()->start_playback_stream(stream_playback, internal->bus, internal->get_faded_volumes(_get_volume_vector()), p_from_pos, internal->pitch_scale, !can_process());
 	internal->ensure_playback_limit();
 
 	// Sample handling.
 	if (stream_playback->get_is_sample() && stream_playback->get_sample_playback().is_valid()) {
 		Ref<AudioSamplePlayback> sample_playback = stream_playback->get_sample_playback();
 		sample_playback->offset = p_from_pos;
-		sample_playback->volume_vector = _get_volume_vector();
+		sample_playback->volume_vector = internal->get_faded_volumes(_get_volume_vector());
 		sample_playback->bus = get_bus();
 
 		AudioServer::get_singleton()->start_sample_playback(sample_playback, !can_process());
@@ -144,9 +146,9 @@ float AudioStreamPlayer::get_playback_position() {
 
 void AudioStreamPlayer::set_bus(const StringName &p_bus) {
 	internal->bus = p_bus;
-	for (const Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
-		AudioServer::get_singleton()->set_playback_bus_exclusive(playback, p_bus, _get_volume_vector());
-	}
+	HashMap<StringName, Vector<AudioFrame>> bus_volumes;
+	bus_volumes[p_bus] = _get_volume_vector();
+	internal->apply_bus_volumes(bus_volumes);
 }
 
 StringName AudioStreamPlayer::get_bus() const {
@@ -234,6 +236,46 @@ void AudioStreamPlayer::set_playback_type(AuSE::PlaybackType p_playback_type) {
 	internal->set_playback_type(p_playback_type);
 }
 
+void AudioStreamPlayer::fade_in(float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->fade_in(p_duration, p_curve);
+}
+
+void AudioStreamPlayer::fade_out(float p_duration, AudioMixerServer::FadeCurve p_curve, bool p_stop_at_end) {
+	internal->fade_out(p_duration, p_curve, p_stop_at_end);
+}
+
+void AudioStreamPlayer::crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->crossfade_to(p_stream, p_duration, p_curve);
+}
+
+bool AudioStreamPlayer::is_fading() const {
+	return internal->is_fading();
+}
+
+float AudioStreamPlayer::get_fade_gain() const {
+	return internal->fade_gain;
+}
+
+int AudioStreamPlayer::get_current_track_index() {
+	return internal->get_current_track_index();
+}
+
+Ref<AudioStream> AudioStreamPlayer::get_current_track_stream() {
+	return internal->get_current_track_stream();
+}
+
+double AudioStreamPlayer::get_track_position() {
+	return internal->get_track_position();
+}
+
+void AudioStreamPlayer::set_position_signal_interval(float p_interval) {
+	internal->position_signal_interval = MAX(p_interval, 0.0f);
+}
+
+float AudioStreamPlayer::get_position_signal_interval() const {
+	return internal->position_signal_interval;
+}
+
 void AudioStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &AudioStreamPlayer::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &AudioStreamPlayer::get_stream);
@@ -277,6 +319,17 @@ void AudioStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_playback_type", "playback_type"), &AudioStreamPlayer::set_playback_type);
 	ClassDB::bind_method(D_METHOD("get_playback_type"), &AudioStreamPlayer::get_playback_type);
 
+	ClassDB::bind_method(D_METHOD("fade_in", "duration", "curve"), &AudioStreamPlayer::fade_in, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR));
+	ClassDB::bind_method(D_METHOD("fade_out", "duration", "curve", "stop_at_end"), &AudioStreamPlayer::fade_out, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("crossfade_to", "stream", "duration", "curve"), &AudioStreamPlayer::crossfade_to, DEFVAL(AudioMixerServer::FADE_CURVE_EQUAL_POWER));
+	ClassDB::bind_method(D_METHOD("is_fading"), &AudioStreamPlayer::is_fading);
+	ClassDB::bind_method(D_METHOD("get_fade_gain"), &AudioStreamPlayer::get_fade_gain);
+	ClassDB::bind_method(D_METHOD("get_current_track_index"), &AudioStreamPlayer::get_current_track_index);
+	ClassDB::bind_method(D_METHOD("get_current_track_stream"), &AudioStreamPlayer::get_current_track_stream);
+	ClassDB::bind_method(D_METHOD("get_track_position"), &AudioStreamPlayer::get_track_position);
+	ClassDB::bind_method(D_METHOD("set_position_signal_interval", "interval"), &AudioStreamPlayer::set_position_signal_interval);
+	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer::get_position_signal_interval);
+
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static()), "set_stream", "get_stream");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_linear", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_volume_linear", "get_volume_linear");
@@ -288,8 +341,13 @@ void AudioStreamPlayer::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_polyphony", PROPERTY_HINT_NONE, ""), "set_max_polyphony", "get_max_polyphony");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "bus", PROPERTY_HINT_AUDIO_BUS), "set_bus", "get_bus");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "playback_type", PROPERTY_HINT_ENUM, "Default,Stream,Sample"), "set_playback_type", "get_playback_type");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "position_signal_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_position_signal_interval", "get_position_signal_interval");
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("track_changed", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("fade_finished"));
+	ADD_SIGNAL(MethodInfo("position_changed", PropertyInfo(Variant::FLOAT, "position")));
 
 	BIND_ENUM_CONSTANT(MIX_TARGET_STEREO);
 	BIND_ENUM_CONSTANT(MIX_TARGET_SURROUND);

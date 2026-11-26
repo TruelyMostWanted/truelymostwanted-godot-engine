@@ -61,6 +61,98 @@ Ref<AudioStream> AudioStreamPlaylist::get_list_stream(int p_stream_index) const 
 	return audio_streams[p_stream_index];
 }
 
+Vector<Ref<AudioStream>> AudioStreamPlaylist::_get_list() const {
+	Vector<Ref<AudioStream>> list;
+	list.resize(stream_count);
+	for (int i = 0; i < stream_count; i++) {
+		list.write[i] = audio_streams[i];
+	}
+	return list;
+}
+
+void AudioStreamPlaylist::_set_list(const Vector<Ref<AudioStream>> &p_list) {
+	ERR_FAIL_COND_MSG(p_list.size() > MAX_STREAMS, vformat("An AudioStreamPlaylist holds at most %d streams.", MAX_STREAMS));
+	for (const Ref<AudioStream> &stream : p_list) {
+		ERR_FAIL_COND_MSG(stream.ptr() == this, "An AudioStreamPlaylist cannot contain itself.");
+	}
+
+	AudioServer::get_singleton()->lock();
+	stream_count = p_list.size();
+	for (int i = 0; i < MAX_STREAMS; i++) {
+		audio_streams[i] = i < stream_count ? p_list[i] : Ref<AudioStream>();
+	}
+	for (AudioStreamPlaybackPlaylist *E : playbacks) {
+		E->_update_playback_instances();
+	}
+	AudioServer::get_singleton()->unlock();
+}
+
+void AudioStreamPlaylist::set_streams(const TypedArray<AudioStream> &p_streams) {
+	Vector<Ref<AudioStream>> list;
+	for (int i = 0; i < p_streams.size(); i++) {
+		list.push_back(p_streams[i]);
+	}
+	_set_list(list);
+}
+
+TypedArray<AudioStream> AudioStreamPlaylist::get_streams() const {
+	TypedArray<AudioStream> streams;
+	for (int i = 0; i < stream_count; i++) {
+		streams.push_back(audio_streams[i]);
+	}
+	return streams;
+}
+
+void AudioStreamPlaylist::add_stream(const Ref<AudioStream> &p_stream) {
+	insert_stream(stream_count, p_stream);
+}
+
+void AudioStreamPlaylist::insert_stream(int p_index, const Ref<AudioStream> &p_stream) {
+	ERR_FAIL_INDEX(p_index, stream_count + 1);
+	Vector<Ref<AudioStream>> list = _get_list();
+	list.insert(p_index, p_stream);
+	_set_list(list);
+}
+
+void AudioStreamPlaylist::remove_stream(int p_index) {
+	ERR_FAIL_INDEX(p_index, stream_count);
+	Vector<Ref<AudioStream>> list = _get_list();
+	list.remove_at(p_index);
+	_set_list(list);
+}
+
+void AudioStreamPlaylist::move_stream(int p_from, int p_to) {
+	ERR_FAIL_INDEX(p_from, stream_count);
+	ERR_FAIL_INDEX(p_to, stream_count);
+	Vector<Ref<AudioStream>> list = _get_list();
+	const Ref<AudioStream> stream = list[p_from];
+	list.remove_at(p_from);
+	list.insert(p_to, stream);
+	_set_list(list);
+}
+
+int AudioStreamPlaylist::find_stream(const Ref<AudioStream> &p_stream) const {
+	for (int i = 0; i < stream_count; i++) {
+		if (audio_streams[i] == p_stream) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+String AudioStreamPlaylist::get_stream_name(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, stream_count, String());
+	const Ref<AudioStream> &stream = audio_streams[p_index];
+	if (stream.is_null()) {
+		return String();
+	}
+	if (!stream->get_name().is_empty()) {
+		return stream->get_name();
+	}
+	// Built-in resources have no file name of their own.
+	return stream->get_path().is_resource_file() ? stream->get_path().get_file().get_basename() : String();
+}
+
 double AudioStreamPlaylist::get_bpm() const {
 	for (int i = 0; i < stream_count; i++) {
 		if (audio_streams[i].is_valid()) {
@@ -125,15 +217,6 @@ bool AudioStreamPlaylist::has_loop() const {
 	return loop;
 }
 
-void AudioStreamPlaylist::_validate_property(PropertyInfo &r_property) const {
-	if (r_property.name != "stream_count" && r_property.name.begins_with("stream_")) {
-		int stream = r_property.name.get_slicec('/', 0).get_slicec('_', 1).to_int();
-		if (stream >= stream_count) {
-			r_property.usage = PROPERTY_USAGE_INTERNAL;
-		}
-	}
-}
-
 void AudioStreamPlaylist::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream_count", "stream_count"), &AudioStreamPlaylist::set_stream_count);
 	ClassDB::bind_method(D_METHOD("get_stream_count"), &AudioStreamPlaylist::get_stream_count);
@@ -142,6 +225,15 @@ void AudioStreamPlaylist::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_list_stream", "stream_index", "audio_stream"), &AudioStreamPlaylist::set_list_stream);
 	ClassDB::bind_method(D_METHOD("get_list_stream", "stream_index"), &AudioStreamPlaylist::get_list_stream);
+
+	ClassDB::bind_method(D_METHOD("set_streams", "streams"), &AudioStreamPlaylist::set_streams);
+	ClassDB::bind_method(D_METHOD("get_streams"), &AudioStreamPlaylist::get_streams);
+	ClassDB::bind_method(D_METHOD("add_stream", "stream"), &AudioStreamPlaylist::add_stream);
+	ClassDB::bind_method(D_METHOD("insert_stream", "index", "stream"), &AudioStreamPlaylist::insert_stream);
+	ClassDB::bind_method(D_METHOD("remove_stream", "index"), &AudioStreamPlaylist::remove_stream);
+	ClassDB::bind_method(D_METHOD("move_stream", "from", "to"), &AudioStreamPlaylist::move_stream);
+	ClassDB::bind_method(D_METHOD("find_stream", "stream"), &AudioStreamPlaylist::find_stream);
+	ClassDB::bind_method(D_METHOD("get_stream_name", "index"), &AudioStreamPlaylist::get_stream_name);
 
 	ClassDB::bind_method(D_METHOD("set_shuffle", "shuffle"), &AudioStreamPlaylist::set_shuffle);
 	ClassDB::bind_method(D_METHOD("get_shuffle"), &AudioStreamPlaylist::get_shuffle);
@@ -156,10 +248,13 @@ void AudioStreamPlaylist::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop"), "set_loop", "has_loop");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_time", PROPERTY_HINT_RANGE, "0,1,0.01,suffix:s"), "set_fade_time", "get_fade_time");
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "stream_count", PROPERTY_HINT_RANGE, "0," + itos(MAX_STREAMS), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_ARRAY, "Streams,stream_,unfoldable,page_size=999,add_button_text=" + String(TTRC("Add Stream"))), "set_stream_count", "get_stream_count");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "streams", PROPERTY_HINT_ARRAY_TYPE, AudioStream::get_class_static()), "set_streams", "get_streams");
+
+	// Not stored any more (`streams` is), but still set when old files load.
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "stream_count", PROPERTY_HINT_RANGE, "0," + itos(MAX_STREAMS), PROPERTY_USAGE_NONE), "set_stream_count", "get_stream_count");
 
 	for (int i = 0; i < MAX_STREAMS; i++) {
-		ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "stream_" + itos(i), PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_INTERNAL), "set_list_stream", "get_list_stream", i);
+		ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "stream_" + itos(i), PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static(), PROPERTY_USAGE_INTERNAL), "set_list_stream", "get_list_stream", i);
 	}
 
 	BIND_CONSTANT(MAX_STREAMS);
@@ -176,6 +271,7 @@ AudioStreamPlaybackPlaylist::~AudioStreamPlaybackPlaylist() {
 
 void AudioStreamPlaybackPlaylist::stop() {
 	active = false;
+	_publish_track();
 	for (int i = 0; i < playlist->stream_count; i++) {
 		if (playback[i].is_valid()) {
 			playback[i]->stop();
@@ -229,6 +325,7 @@ void AudioStreamPlaybackPlaylist::start(double p_from_pos) {
 			}
 			if (play_ofs < length) {
 				play_index = i;
+				track_length = length;
 				stream_todo = length - play_ofs;
 				break;
 			} else {
@@ -247,6 +344,8 @@ void AudioStreamPlaybackPlaylist::start(double p_from_pos) {
 	offset = p_from_pos;
 
 	active = true;
+	track_serial.increment();
+	_publish_track();
 }
 
 void AudioStreamPlaybackPlaylist::seek(double p_time) {
@@ -349,6 +448,8 @@ int AudioStreamPlaybackPlaylist::mix(AudioFrame *p_buffer, float p_rate_scale, i
 				} else {
 					stream_todo = playlist->audio_streams[idx]->get_length();
 				}
+				track_length = stream_todo;
+				track_serial.increment();
 			}
 
 			if (fade_index != -1) {
@@ -366,6 +467,7 @@ int AudioStreamPlaybackPlaylist::mix(AudioFrame *p_buffer, float p_rate_scale, i
 		todo -= to_mix;
 	}
 
+	_publish_track();
 	return p_frames;
 }
 
@@ -387,6 +489,41 @@ double AudioStreamPlaybackPlaylist::get_playback_position() const {
 
 bool AudioStreamPlaybackPlaylist::is_playing() const {
 	return active;
+}
+
+void AudioStreamPlaybackPlaylist::_publish_track() {
+	current_index.set(active ? play_order[play_index] : -1);
+	track_position.set(active ? (float)MAX(0.0, track_length - stream_todo) : 0.0f);
+}
+
+int AudioStreamPlaybackPlaylist::get_current_index() const {
+	return current_index.get();
+}
+
+Ref<AudioStream> AudioStreamPlaybackPlaylist::get_current_stream() const {
+	const int index = current_index.get();
+	if (playlist.is_null() || index < 0 || index >= playlist->stream_count) {
+		return Ref<AudioStream>();
+	}
+	return playlist->audio_streams[index];
+}
+
+double AudioStreamPlaybackPlaylist::get_position_in_stream() const {
+	return track_position.get();
+}
+
+bool AudioStreamPlaybackPlaylist::get_track_info(TrackInfo &r_info) const {
+	r_info.index = current_index.get();
+	r_info.serial = track_serial.get();
+	r_info.position = track_position.get();
+	r_info.stream = get_current_stream();
+	return true;
+}
+
+void AudioStreamPlaybackPlaylist::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_current_index"), &AudioStreamPlaybackPlaylist::get_current_index);
+	ClassDB::bind_method(D_METHOD("get_current_stream"), &AudioStreamPlaybackPlaylist::get_current_stream);
+	ClassDB::bind_method(D_METHOD("get_position_in_stream"), &AudioStreamPlaybackPlaylist::get_position_in_stream);
 }
 
 void AudioStreamPlaybackPlaylist::_update_playback_instances() {

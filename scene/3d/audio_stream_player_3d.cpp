@@ -292,7 +292,7 @@ void AudioStreamPlayer3D::_notification(int p_what) {
 			if (setplayback.is_valid() && setplay.get() >= 0) {
 				internal->active.set();
 				HashMap<StringName, Vector<AudioFrame>> bus_map;
-				bus_map[_get_actual_bus()] = volume_vector;
+				bus_map[_get_actual_bus()] = internal->get_faded_volumes(volume_vector);
 				AudioServer::get_singleton()->start_playback_stream(setplayback, bus_map, setplay.get(), actual_pitch_scale, linear_attenuation, attenuation_filter_cutoff_hz);
 				setplayback.unref();
 				setplay.set(-1);
@@ -581,9 +581,7 @@ Vector<AudioFrame> AudioStreamPlayer3D::_update_panning() {
 	was_further_than_max_distance_last_frame = !has_any_listener_in_range;
 
 	if (!skip_setting_volumes) {
-		for (Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
-			AudioServer::get_singleton()->set_playback_bus_volumes_linear(playback, bus_volumes);
-		}
+		internal->apply_bus_volumes(bus_volumes);
 
 		for (Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
 			AudioServer::get_singleton()->set_playback_pitch_scale(playback, actual_pitch_scale);
@@ -855,6 +853,46 @@ void AudioStreamPlayer3D::_get_property_list(List<PropertyInfo> *p_list) const {
 	internal->get_property_list(p_list);
 }
 
+void AudioStreamPlayer3D::fade_in(float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->fade_in(p_duration, p_curve);
+}
+
+void AudioStreamPlayer3D::fade_out(float p_duration, AudioMixerServer::FadeCurve p_curve, bool p_stop_at_end) {
+	internal->fade_out(p_duration, p_curve, p_stop_at_end);
+}
+
+void AudioStreamPlayer3D::crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->crossfade_to(p_stream, p_duration, p_curve);
+}
+
+bool AudioStreamPlayer3D::is_fading() const {
+	return internal->is_fading();
+}
+
+float AudioStreamPlayer3D::get_fade_gain() const {
+	return internal->fade_gain;
+}
+
+int AudioStreamPlayer3D::get_current_track_index() {
+	return internal->get_current_track_index();
+}
+
+Ref<AudioStream> AudioStreamPlayer3D::get_current_track_stream() {
+	return internal->get_current_track_stream();
+}
+
+double AudioStreamPlayer3D::get_track_position() {
+	return internal->get_track_position();
+}
+
+void AudioStreamPlayer3D::set_position_signal_interval(float p_interval) {
+	internal->position_signal_interval = MAX(p_interval, 0.0f);
+}
+
+float AudioStreamPlayer3D::get_position_signal_interval() const {
+	return internal->position_signal_interval;
+}
+
 void AudioStreamPlayer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &AudioStreamPlayer3D::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &AudioStreamPlayer3D::get_stream);
@@ -931,6 +969,17 @@ void AudioStreamPlayer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_playback_type", "playback_type"), &AudioStreamPlayer3D::set_playback_type);
 	ClassDB::bind_method(D_METHOD("get_playback_type"), &AudioStreamPlayer3D::get_playback_type);
 
+	ClassDB::bind_method(D_METHOD("fade_in", "duration", "curve"), &AudioStreamPlayer3D::fade_in, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR));
+	ClassDB::bind_method(D_METHOD("fade_out", "duration", "curve", "stop_at_end"), &AudioStreamPlayer3D::fade_out, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("crossfade_to", "stream", "duration", "curve"), &AudioStreamPlayer3D::crossfade_to, DEFVAL(AudioMixerServer::FADE_CURVE_EQUAL_POWER));
+	ClassDB::bind_method(D_METHOD("is_fading"), &AudioStreamPlayer3D::is_fading);
+	ClassDB::bind_method(D_METHOD("get_fade_gain"), &AudioStreamPlayer3D::get_fade_gain);
+	ClassDB::bind_method(D_METHOD("get_current_track_index"), &AudioStreamPlayer3D::get_current_track_index);
+	ClassDB::bind_method(D_METHOD("get_current_track_stream"), &AudioStreamPlayer3D::get_current_track_stream);
+	ClassDB::bind_method(D_METHOD("get_track_position"), &AudioStreamPlayer3D::get_track_position);
+	ClassDB::bind_method(D_METHOD("set_position_signal_interval", "interval"), &AudioStreamPlayer3D::set_position_signal_interval);
+	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer3D::get_position_signal_interval);
+
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static()), "set_stream", "get_stream");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "attenuation_model", PROPERTY_HINT_ENUM, "Inverse,Inverse Square,Logarithmic,Disabled"), "set_attenuation_model", "get_attenuation_model");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
@@ -947,6 +996,7 @@ void AudioStreamPlayer3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "bus", PROPERTY_HINT_AUDIO_BUS), "set_bus", "get_bus");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "area_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_area_mask", "get_area_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "playback_type", PROPERTY_HINT_ENUM, "Default,Stream,Sample"), "set_playback_type", "get_playback_type");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "position_signal_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_position_signal_interval", "get_position_signal_interval");
 	ADD_GROUP("Emission Angle", "emission_angle");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emission_angle_enabled", PROPERTY_HINT_GROUP_ENABLE), "set_emission_angle_enabled", "is_emission_angle_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "emission_angle_degrees", PROPERTY_HINT_RANGE, "0.1,90,0.1,degrees"), "set_emission_angle", "get_emission_angle");
@@ -967,6 +1017,10 @@ void AudioStreamPlayer3D::_bind_methods() {
 	BIND_ENUM_CONSTANT(DOPPLER_TRACKING_PHYSICS_STEP);
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("track_changed", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("fade_finished"));
+	ADD_SIGNAL(MethodInfo("position_changed", PropertyInfo(Variant::FLOAT, "position")));
 }
 
 AudioStreamPlayer3D::AudioStreamPlayer3D() {

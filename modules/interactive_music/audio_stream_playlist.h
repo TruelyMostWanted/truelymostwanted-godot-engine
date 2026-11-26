@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/templates/safe_refcount.h"
 #include "scene/resources/audio/audio_stream.h"
 
 class AudioStreamPlaybackPlaylist;
@@ -53,6 +54,9 @@ private:
 	Ref<AudioStream> audio_streams[MAX_STREAMS];
 	HashSet<AudioStreamPlaybackPlaylist *> playbacks;
 
+	Vector<Ref<AudioStream>> _get_list() const;
+	void _set_list(const Vector<Ref<AudioStream>> &p_list);
+
 public:
 	virtual double get_bpm() const override;
 	void set_stream_count(int p_count);
@@ -66,13 +70,22 @@ public:
 	void set_list_stream(int p_stream_index, Ref<AudioStream> p_stream);
 	Ref<AudioStream> get_list_stream(int p_stream_index) const;
 
+	// Typed list API (the stream_count and stream_N properties stay for old files).
+	void set_streams(const TypedArray<AudioStream> &p_streams);
+	TypedArray<AudioStream> get_streams() const;
+	void add_stream(const Ref<AudioStream> &p_stream);
+	void insert_stream(int p_index, const Ref<AudioStream> &p_stream);
+	void remove_stream(int p_index);
+	void move_stream(int p_from, int p_to);
+	int find_stream(const Ref<AudioStream> &p_stream) const;
+	String get_stream_name(int p_index) const;
+
 	virtual Ref<AudioStreamPlayback> instantiate_playback() override;
 	virtual double get_length() const override;
 	virtual bool is_meta_stream() const override { return true; }
 
 protected:
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &r_property) const;
 };
 
 ///////////////////////////////////////
@@ -103,9 +116,19 @@ private:
 
 	bool active = false;
 
+	// Track info written by start() and mix(), read on the main thread without a lock.
+	double track_length = 0.0;
+	SafeNumeric<int> current_index{ -1 };
+	SafeNumeric<uint32_t> track_serial;
+	SafeNumeric<float> track_position;
+	void _publish_track();
+
 	void _update_order();
 
 	void _update_playback_instances();
+
+protected:
+	static void _bind_methods();
 
 public:
 	virtual void start(double p_from_pos = 0.0) override;
@@ -117,6 +140,11 @@ public:
 	virtual int mix(AudioFrame *p_buffer, float p_rate_scale, int p_frames) override;
 
 	virtual void tag_used_streams() override;
+
+	int get_current_index() const;
+	Ref<AudioStream> get_current_stream() const;
+	double get_position_in_stream() const;
+	virtual bool get_track_info(TrackInfo &r_info) const override;
 
 	~AudioStreamPlaybackPlaylist();
 };
