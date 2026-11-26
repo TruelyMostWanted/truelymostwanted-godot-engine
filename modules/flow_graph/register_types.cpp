@@ -32,6 +32,7 @@
 
 #include "flow_graph.h"
 #include "flow_graph_data.h"
+#include "flow_graph_debugger.h"
 #include "flow_graph_playback.h"
 #include "flow_graph_player.h"
 #include "flow_node.h"
@@ -75,7 +76,15 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(FlowGraphState);
 	GDREGISTER_CLASS(FlowGraphPlayback);
 	GDREGISTER_CLASS(FlowGraphPlayer);
+#ifdef DEBUG_ENABLED
+	FlowGraphDebugger::initialize();
+#endif
 }
 
 void uninitialize_flow_graph_module(ModuleInitializationLevel p_level) {
+#ifdef DEBUG_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
+		FlowGraphDebugger::finalize();
+	}
+#endif
 }
