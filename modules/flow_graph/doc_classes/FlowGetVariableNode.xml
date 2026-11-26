@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		The get variable node has no flow ports and one data output, [code]value[/code] (any type). It reads the variable [member FlowVariableNode.variable_name] from the blackboard when another node reads its [code]value[/code].
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		At runtime the node outputs the current value of the variable [member FlowVariableNode.variable_name] of the blackboard of the [FlowGraphPlayback] each time its [code]value[/code] is read. A variable that does not exist is [code]null[/code].
 		[codeblocks]
 		[gdscript]
 		var get_gold := FlowGetVariableNode.new()

@@ -528,7 +528,9 @@ Ref<FlowGraphState> FlowGraphPlayback::get_state() const {
 	Ref<FlowGraphState> state;
 	state.instantiate();
 	if (graph.is_valid() && !graph->get_path().is_empty()) {
-		state->set_graph_path(ResourceUID::path_to_uid(graph->get_path()));
+		// uid:// survives moving the graph; only when the UID is registered, else it could not be loaded back.
+		const ResourceUID::ID uid = ResourceLoader::get_resource_uid(graph->get_path());
+		state->set_graph_path(uid != ResourceUID::INVALID_ID && ResourceUID::get_singleton()->has_id(uid) ? ResourceUID::get_singleton()->id_to_text(uid) : graph->get_path());
 	}
 	PackedInt32Array node_stack;
 	Array memory;
@@ -549,7 +551,7 @@ Error FlowGraphPlayback::set_state(const Ref<FlowGraphState> &p_state) {
 	ERR_FAIL_COND_V_MSG(p_state->get_layout_version() > FlowGraphState::STATE_LAYOUT_VERSION, ERR_FILE_UNRECOGNIZED, "FlowGraphPlayback: the state was saved by a newer engine version.");
 	Ref<FlowGraph> root = graph;
 	const String path = p_state->get_graph_path();
-	if (!path.is_empty() && (root.is_null() || root->get_path().is_empty() || ResourceUID::path_to_uid(root->get_path()) != path)) {
+	if (!path.is_empty() && (root.is_null() || root->get_path() != ResourceUID::ensure_path(path))) {
 		root = ResourceLoader::load(path, "FlowGraph");
 	}
 	ERR_FAIL_COND_V_MSG(root.is_null(), ERR_CANT_OPEN, vformat("FlowGraphPlayback: can't get the graph '%s' of the state.", path));
