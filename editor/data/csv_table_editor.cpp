@@ -109,17 +109,20 @@ void CSVTableEditor::_sync_from_text_file() {
 
 bool CSVTableEditor::_can_edit() {
 	TextEditorBase *text_editor = _get_text_editor();
+	const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
 	if (text_file.is_valid()) {
 		// A TextFile is only updated when its text editor saves: unsaved text must not be overwritten.
-		const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
 		if (text_edit && text_edit->get_text() != text_file->get_text()) {
 			status_label->set_text(TTR("The text editor has unsaved changes of this file. Save or discard them before editing the table."));
 			return false;
 		}
 		_sync_from_text_file();
-	} else if (text_editor) {
-		// Parses text typed since the text editor's last idle check, so the table edits the current text.
-		text_editor->validate_script();
+	} else if (text_edit) {
+		// Takes over text typed since the text editor's last idle parse, so the table edits the current text.
+		const bool in_sync = csv->get_parsed_text().is_empty() ? text_edit->get_version() == reloaded_version : text_edit->get_text() == csv->get_parsed_text();
+		if (!in_sync) {
+			csv->parse(text_edit->get_text(), true);
+		}
 	}
 	if (!csv->get_error_message().is_empty()) {
 		status_label->set_text(vformat(TTR("Fix the CSV text first: %s"), csv->get_error_message()));
@@ -171,6 +174,9 @@ void CSVTableEditor::_update() {
 		}
 		if (TextEditorBase *text_editor = _get_text_editor()) {
 			text_editor->reload_text();
+			if (const TextEdit *text_edit = Object::cast_to<TextEdit>(text_editor->get_base_editor())) {
+				reloaded_version = text_edit->get_version();
+			}
 		}
 	}
 	_render();

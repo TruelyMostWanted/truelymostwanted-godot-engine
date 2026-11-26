@@ -55,6 +55,7 @@ class CSVTableEditor : public EditorDock {
 	Ref<CSV> csv;
 	Ref<TextFile> text_file; // Translation CSVs: the TextFile of the script editor, kept in sync with `csv`.
 	String synced_text; // Text of `text_file` that `csv` was parsed from or written to.
+	uint32_t reloaded_version = UINT32_MAX; // Version of the text editor's text right after the table reloaded it.
 	Ref<DataSchema> schema;
 	bool translation_mode = false;
 	HashMap<int64_t, String> cell_issues; // (row << 32) | tree column -> messages.
