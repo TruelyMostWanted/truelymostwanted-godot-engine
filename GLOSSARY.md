@@ -150,6 +150,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **Subtitle** (`Subtitle`, `SubtitleSegment`, `SubtitleServer`, `SubtitleValidation`): timed text with SRT and other formats, handled by a server. In code: `servers/subtitle/`. Wiki: [`Subtitles`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Subtitles).
 
+**SubtitlePlayer** (`SubtitlePlayer`, `SubtitlePlayback`): plays a `Subtitle` in sync with an audio, video or animation player (or an own clock) and signals segment changes; the node is a thin front end (owner exception to "no nodes"), the logic is in the `RefCounted` playback. In code: `scene/main/subtitle_player.*`, `servers/subtitle/subtitle_playback.*`. Wiki: [`260-feature-subtitle-player`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/260-feature-subtitle-player).
+
 ### T
 
 **Test project**: separate public repository `godot-custom-build-project` with one folder per feature and checks in GDScript and C#; `new-feature.ps1 -Name <feature-branch>` creates the folder. See `truely/FEATURE-WORKFLOW.md` (section 4).
@@ -203,7 +205,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Runtime file formats | image, audio, video, scene and font loaders and savers | `scene/resources/*_resource_format.*`, `modules/{mp3,vorbis,theora,opus,webm,gltf,fbx}/` | `modules/*/tests/` |
 | Databases | `SQLiteDatabase`, `SQLiteStatement` | `modules/sqlite/` | `modules/sqlite/tests/` |
 | Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommandList` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
-| Subtitles, TTS | `SubtitleServer`, `Subtitle`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `test_tts_server.cpp` |
+| Subtitles, TTS | `SubtitleServer`, `Subtitle`, `SubtitlePlayback`, `SubtitlePlayer`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `scene/main/subtitle_player.*`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `tests/scene/test_subtitle_player.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |
 | 2D | `SpriteSheet`, `TileSet`, `TileMapLayer` | `scene/resources/sprite_sheet.*`, `scene/resources/2d/tile_set.*`, `modules/tilemap/` | `modules/tilemap/tests/` |
 | Random | `SeedServer` | `core/math/seed_server.*` | `tests/core/math/test_seed_server.cpp` |
