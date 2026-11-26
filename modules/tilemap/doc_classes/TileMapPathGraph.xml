@@ -60,7 +60,7 @@
 			<param index="0" name="layer" type="TileMapLayer" />
 			<param index="1" name="options" type="TileMapPathGraphOptions" default="null" />
 			<description>
-				Creates a graph for [param layer] with [param options] (default options if [code]null[/code]) and builds it with [method update_all].
+				Creates a graph for [param layer] with [param options] (default options if [code]null[/code]) and builds it with [method update_all]. For a subclass with overridden virtuals, use [code]new()[/code], [method set_layer] and [method update_all] instead.
 			</description>
 		</method>
 		<method name="get_astar" qualifiers="const">
