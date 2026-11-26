@@ -33,6 +33,7 @@
 #include "tile_map_layer.h"
 
 #include "core/object/class_db.h"
+#include "servers/rendering/rendering_server.h"
 
 // TileMapPathGraphOptions.
 
@@ -400,6 +401,71 @@ Rect2i TileMapPathGraph::get_region() const {
 	return region;
 }
 
+void TileMapPathGraph::draw_debug(RID p_canvas_item, const Rect2i &p_cells, const Color &p_blocked_color, const Color &p_cost_color) const {
+	ERR_FAIL_COND_MSG(!p_canvas_item.is_valid(), "Invalid canvas item.");
+	const Rect2i cells = p_cells.has_area() ? region.intersection(p_cells) : region;
+	if (tile_set.is_null() || !cells.has_area()) {
+		return; // Not built yet, or nothing to show.
+	}
+	const Vector2i end = cells.get_end();
+
+	// The cost shading goes from the cheapest to the most expensive walkable cell drawn.
+	bool has_cost = false;
+	real_t min_cost = 0;
+	real_t max_cost = 0;
+	for (int y = cells.position.y; y < end.y; y++) {
+		for (int x = cells.position.x; x < end.x; x++) {
+			const Vector2i cell(x, y);
+			if (!is_cell_blocked(cell)) {
+				const real_t cost = get_cell_cost(cell);
+				min_cost = has_cost ? MIN(min_cost, cost) : cost;
+				max_cost = has_cost ? MAX(max_cost, cost) : cost;
+				has_cost = true;
+			}
+		}
+	}
+	const real_t cost_range = max_cost - min_cost;
+
+	// All tile shapes are convex: each cell is a triangle fan of its shape.
+	Vector<Vector2> shape = tile_set->get_tile_shape_polygon();
+	const Vector2 tile_size = tile_set->get_tile_size();
+	for (int i = 0; i < shape.size(); i++) {
+		shape.write[i] *= tile_size;
+	}
+
+	Vector<Vector2> points;
+	Vector<Color> colors;
+	Vector<int> indices;
+	for (int y = cells.position.y; y < end.y; y++) {
+		for (int x = cells.position.x; x < end.x; x++) {
+			const Vector2i cell(x, y);
+			Color color = p_blocked_color;
+			if (!is_cell_blocked(cell)) {
+				const real_t weight = cost_range > 0 ? (get_cell_cost(cell) - min_cost) / cost_range : 0;
+				if (weight <= 0) {
+					continue;
+				}
+				color = p_cost_color;
+				color.a *= weight;
+			}
+			const int first = points.size();
+			const Vector2 center = tile_set->map_to_local(cell);
+			for (int i = 0; i < shape.size(); i++) {
+				points.push_back(center + shape[i]);
+				colors.push_back(color);
+			}
+			for (int i = 1; i < shape.size() - 1; i++) {
+				indices.push_back(first);
+				indices.push_back(first + i);
+				indices.push_back(first + i + 1);
+			}
+		}
+	}
+	if (!indices.is_empty()) {
+		RenderingServer::get_singleton()->canvas_item_add_triangle_array(p_canvas_item, indices, points, colors);
+	}
+}
+
 TileMapPathGraph::Backend TileMapPathGraph::get_backend() const {
 	return backend;
 }
@@ -430,6 +496,7 @@ void TileMapPathGraph::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_cell_blocked", "cell"), &TileMapPathGraph::is_cell_blocked);
 	ClassDB::bind_method(D_METHOD("get_cell_cost", "cell"), &TileMapPathGraph::get_cell_cost);
 	ClassDB::bind_method(D_METHOD("get_region"), &TileMapPathGraph::get_region);
+	ClassDB::bind_method(D_METHOD("draw_debug", "canvas_item", "cells", "blocked_color", "cost_color"), &TileMapPathGraph::draw_debug, DEFVAL(Rect2i()), DEFVAL(Color(1, 0.2, 0.1, 0.5)), DEFVAL(Color(1, 0.8, 0, 0.5)));
 
 	ClassDB::bind_method(D_METHOD("get_backend"), &TileMapPathGraph::get_backend);
 	ClassDB::bind_method(D_METHOD("get_astar_grid"), &TileMapPathGraph::get_astar_grid);

@@ -130,6 +130,8 @@ public:
 	real_t get_cell_cost(const Vector2i &p_cell) const;
 	Rect2i get_region() const;
 
+	void draw_debug(RID p_canvas_item, const Rect2i &p_cells = Rect2i(), const Color &p_blocked_color = Color(1, 0.2, 0.1, 0.5), const Color &p_cost_color = Color(1, 0.8, 0, 0.5)) const;
+
 	Backend get_backend() const;
 	Ref<AStarGrid2D> get_astar_grid() const;
 	Ref<AStar2D> get_astar() const;

@@ -36,6 +36,7 @@
 
 #include "core/templates/hash_set.h"
 #include "scene/resources/placeholder_textures.h"
+#include "servers/rendering/rendering_server.h"
 #include "tests/test_macros.h"
 
 namespace TestTileMapPathGraph {
@@ -387,6 +388,40 @@ TEST_CASE("[SceneTree][TileMapPathGraph] Options, empty cells, growing maps and 
 
 	memdelete(layer);
 	CHECK(graph->get_layer() == nullptr);
+}
+
+TEST_CASE("[SceneTree][TileMapPathGraph] draw_debug() draws into a canvas item for every backend") {
+	RenderingServer *rs = RenderingServer::get_singleton();
+	const RID canvas_item = rs->canvas_item_create();
+	TileMapLayer *layer = memnew(TileMapLayer);
+
+	// Not built yet: nothing to draw, no error.
+	const Ref<TileMapPathGraph> unbuilt = memnew(TileMapPathGraph);
+	unbuilt->draw_debug(canvas_item);
+
+	static const TileSet::TileShape shapes[] = { TileSet::TILE_SHAPE_SQUARE, TileSet::TILE_SHAPE_HEXAGON };
+	for (TileSet::TileShape shape : shapes) {
+		layer->clear();
+		layer->set_tile_set(make_tile_set(shape, TileSet::TILE_LAYOUT_STACKED));
+		fill(layer, Rect2i(0, 0, 5, 5), FLOOR);
+		layer->set_cell(Vector2i(2, 2), 0, WALL);
+		layer->set_cell(Vector2i(3, 3), 0, MUD);
+		const Ref<TileMapPathGraph> graph = TileMapPathGraph::create(layer, make_options());
+		REQUIRE(graph->is_cell_blocked(Vector2i(2, 2)));
+		REQUIRE(graph->get_cell_cost(Vector2i(3, 3)) == doctest::Approx(20.0));
+
+		graph->draw_debug(canvas_item); // The whole region.
+		graph->draw_debug(canvas_item, Rect2i(1, 1, 2, 2), Color(1, 0, 0), Color(0, 0, 1)); // A visible part.
+		graph->draw_debug(canvas_item, Rect2i(100, 100, 5, 5)); // Outside the region: nothing.
+	}
+
+	ERR_PRINT_OFF;
+	unbuilt->draw_debug(RID()); // Invalid canvas item: error, nothing drawn.
+	ERR_PRINT_ON;
+
+	rs->canvas_item_clear(canvas_item);
+	rs->free_rid(canvas_item);
+	memdelete(layer);
 }
 
 } // namespace TestTileMapPathGraph

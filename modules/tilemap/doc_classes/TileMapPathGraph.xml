@@ -7,6 +7,7 @@
 		Builds a pathfinding graph from the cells of a [TileMapLayer] and returns paths as cells or as local positions. Neighbors follow the tile shape, layout, offset axis and coordinate system of the [TileSet]; costs and blocked cells come from custom data layers named in [member options], or from [method _get_cell_cost] and [method _is_cell_blocked].
 		Two backends are used, chosen from the [TileSet] (see [enum Backend]): [AStarGrid2D] for square and diamond isometric maps, [AStar2D] for stacked and stairs isometric, half-offset square and hexagon maps.
 		The graph covers the used rect of the layer ([method get_region]). Blocked cells stay in the graph as solid or disabled points, so changing them is cheap. The layer has no per-cell change signal: call [method update_cells] after changing cells and [method update_all] after larger changes or a change of [member options].
+		To see the graph, use [method draw_debug] at runtime, or the path graph toggle in the toolbar of the TileMap editor, which also previews the path between two Alt+clicked cells.
 		[codeblocks]
 		[gdscript]
 		var graph = TileMapPathGraph.create($Ground)
@@ -61,6 +62,60 @@
 			<param index="1" name="options" type="TileMapPathGraphOptions" default="null" />
 			<description>
 				Creates a graph for [param layer] with [param options] (default options if [code]null[/code]) and builds it with [method update_all]. For a subclass with overridden virtuals, use [code]new()[/code], [method set_layer] and [method update_all] instead.
+			</description>
+		</method>
+		<method name="draw_debug" qualifiers="const">
+			<return type="void" />
+			<param index="0" name="canvas_item" type="RID" />
+			<param index="1" name="cells" type="Rect2i" default="Rect2i(0, 0, 0, 0)" />
+			<param index="2" name="blocked_color" type="Color" default="Color(1, 0.2, 0.1, 0.5)" />
+			<param index="3" name="cost_color" type="Color" default="Color(1, 0.8, 0, 0.5)" />
+			<description>
+				Draws the graph into [param canvas_item] for debugging: blocked cells are filled with [param blocked_color], walkable cells are shaded with [param cost_color] by cost. The alpha of [param cost_color] is scaled from [code]0[/code] for the cheapest drawn cell to its full value for the most expensive one; if all drawn cells cost the same, none is shaded. Each cell is drawn with the tile shape of the [TileSet].
+				Only the cells of [param cells] inside [method get_region] are drawn; an empty [param cells] draws the whole region. On large maps, pass the cells on screen. The geometry is in local coordinates of the layer and is added in one [method RenderingServer.canvas_item_add_triangle_array] call; the canvas item is not cleared first. Draws nothing before the first [method update_all].
+				Works in every build. Call it from [method CanvasItem._draw] of a [Node2D] child of the layer and redraw on [signal updated]:
+				[codeblocks]
+				[gdscript]
+				extends Node2D
+
+				var graph: TileMapPathGraph
+
+				func _ready():
+					if not OS.is_debug_build():
+						return
+					graph = TileMapPathGraph.create(get_parent())
+					graph.updated.connect(queue_redraw)
+					queue_redraw()
+
+				func _draw():
+					if graph:
+						graph.draw_debug(get_canvas_item())
+				[/gdscript]
+				[csharp]
+				using Godot;
+
+				public partial class PathGraphDebug : Node2D
+				{
+					private TileMapPathGraph _graph;
+
+					public override void _Ready()
+					{
+						if (!OS.IsDebugBuild())
+						{
+							return;
+						}
+						_graph = TileMapPathGraph.Create(GetParent&lt;TileMapLayer&gt;());
+						_graph.Updated += QueueRedraw;
+						QueueRedraw();
+					}
+
+					public override void _Draw()
+					{
+						_graph?.DrawDebug(GetCanvasItem());
+					}
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_astar" qualifiers="const">
