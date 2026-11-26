@@ -122,7 +122,12 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Updating release $TAG"
             gh release upload "$TAG" release/* --clobber
-            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md
+            # Keep the (curated) notes of an existing release; drop only the "Not included yet"
+            # note once nothing is missing any more.
+            if ! grep -q 'Not included yet' notes.md; then
+              gh release view "$TAG" --json body --jq .body | grep -v -e '^> \[!NOTE\]$' -e '^> Not included yet:' > body.md
+              gh release edit "$TAG" --notes-file body.md
+            fi
           elif [ -n "${{ inputs.replace_tag }}" ] && gh release view "${{ inputs.replace_tag }}" >/dev/null 2>&1; then
             old="${{ inputs.replace_tag }}"
             echo "Moving release post $old to $TAG"
