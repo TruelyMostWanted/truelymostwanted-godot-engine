@@ -93,6 +93,10 @@ public:
 	void set_row(int p_row, const PackedStringArray &p_values);
 	String get_cell(int p_row, int p_column) const;
 	void set_cell(int p_row, int p_column, const String &p_value);
+	// A block of cells as an Array of PackedStringArray (rows past the end are left out, missing cells are empty).
+	Array get_cells(int p_row, int p_column, int p_row_count, int p_column_count) const;
+	// Writes a block of cells (an Array of PackedStringArray) at p_row/p_column, appending rows as needed. Emits `changed` once.
+	void set_cells(int p_row, int p_column, const Array &p_cells);
 	int find_column(const String &p_name) const;
 	PackedStringArray get_column(int p_column) const;
 	PackedInt32Array find_rows(int p_column, const String &p_value) const;

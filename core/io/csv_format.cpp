@@ -303,6 +303,43 @@ void CSV::set_cell(int p_row, int p_column, const String &p_value) {
 	_mark_data_changed();
 }
 
+Array CSV::get_cells(int p_row, int p_column, int p_row_count, int p_column_count) const {
+	ERR_FAIL_COND_V(p_row < 0 || p_column < 0 || p_row_count < 0 || p_column_count < 0, Array());
+	const Array rows = _get_rows();
+	Array result;
+	for (int row = p_row; row < MIN(p_row + p_row_count, rows.size()); row++) {
+		const PackedStringArray cells = rows[row];
+		PackedStringArray block_row;
+		block_row.resize(p_column_count);
+		for (int column = 0; column < p_column_count; column++) {
+			block_row.set(column, p_column + column < cells.size() ? cells[p_column + column] : String());
+		}
+		result.push_back(block_row);
+	}
+	return result;
+}
+
+void CSV::set_cells(int p_row, int p_column, const Array &p_cells) {
+	Array rows = _get_rows();
+	ERR_FAIL_INDEX(p_row, rows.size() + 1);
+	ERR_FAIL_COND(p_column < 0);
+	for (int i = 0; i < p_cells.size(); i++) {
+		const PackedStringArray values = p_cells[i];
+		if (p_row + i == rows.size()) {
+			rows.push_back(PackedStringArray());
+		}
+		PackedStringArray cells = rows[p_row + i];
+		if (cells.size() < p_column + values.size()) {
+			cells.resize(p_column + values.size());
+		}
+		for (int column = 0; column < values.size(); column++) {
+			cells.set(p_column + column, values[column]);
+		}
+		rows[p_row + i] = cells;
+	}
+	_mark_data_changed();
+}
+
 int CSV::find_column(const String &p_name) const {
 	return (int)header.find(p_name);
 }
@@ -629,6 +666,8 @@ void CSV::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_row", "row", "values"), &CSV::set_row);
 	ClassDB::bind_method(D_METHOD("get_cell", "row", "column"), &CSV::get_cell);
 	ClassDB::bind_method(D_METHOD("set_cell", "row", "column", "value"), &CSV::set_cell);
+	ClassDB::bind_method(D_METHOD("get_cells", "row", "column", "row_count", "column_count"), &CSV::get_cells);
+	ClassDB::bind_method(D_METHOD("set_cells", "row", "column", "cells"), &CSV::set_cells);
 	ClassDB::bind_method(D_METHOD("find_column", "name"), &CSV::find_column);
 	ClassDB::bind_method(D_METHOD("get_column", "column"), &CSV::get_column);
 	ClassDB::bind_method(D_METHOD("find_rows", "column", "value"), &CSV::find_rows);
