@@ -71,7 +71,7 @@ Vector<Ref<AudioStream>> AudioStreamPlaylist::_get_list() const {
 }
 
 void AudioStreamPlaylist::_set_list(const Vector<Ref<AudioStream>> &p_list) {
-	ERR_FAIL_COND_MSG(p_list.size() > MAX_STREAMS, vformat("An AudioStreamPlaylist holds at most %d streams.", MAX_STREAMS));
+	ERR_FAIL_COND_MSG(p_list.size() > MAX_STREAMS, vformat("An AudioStreamPlaylist holds at most %d streams.", (int)MAX_STREAMS));
 	for (const Ref<AudioStream> &stream : p_list) {
 		ERR_FAIL_COND_MSG(stream.ptr() == this, "An AudioStreamPlaylist cannot contain itself.");
 	}
