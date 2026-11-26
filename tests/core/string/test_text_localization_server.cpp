@@ -255,34 +255,36 @@ TEST_CASE("[SceneTree][TextLocalizationServer] Controls follow their channel") {
 	subtitle->set_text("LINE");
 	subtitle_box->add_child(subtitle);
 	SceneTree::get_singleton()->process(0);
-	const float width_en = label->get_minimum_size().x;
-	const float subtitle_width_en = subtitle->get_minimum_size().x;
+	// The translated text (Label::xl_text) is what the label shows; get_total_character_count() reads it.
+	const int length_en = label->get_total_character_count();
+	const int subtitle_length_en = subtitle->get_total_character_count();
+	CHECK(length_en == String("Hi").length());
 	CHECK(label->get_shaping_locale() == "en");
 
 	// Only the interface channel changes: the label translates again and shapes in German, the subtitle stays.
 	translation_server->set_locale_for("interface", "de");
 	SceneTree::get_singleton()->process(0);
-	CHECK(label->get_minimum_size().x > width_en);
+	CHECK(label->get_total_character_count() == String("Guten Tag und willkommen").length());
 	CHECK(label->get_shaping_locale() == "de");
-	CHECK(subtitle->get_minimum_size().x == doctest::Approx(subtitle_width_en));
+	CHECK(subtitle->get_total_character_count() == subtitle_length_en);
 	CHECK(subtitle->get_shaping_locale() == "en");
 
 	// Only the subtitles channel changes.
 	translation_server->set_locale_for("subtitles", "ja");
 	SceneTree::get_singleton()->process(0);
-	CHECK(subtitle->get_minimum_size().x > subtitle_width_en);
+	CHECK(subtitle->get_total_character_count() == String(U"行こう、みんな、早く行こう").length());
 	CHECK(subtitle->get_shaping_locale() == "ja");
 	CHECK(label->get_shaping_locale() == "de");
 
 	// An audio-only change does not notify controls: a changed catalog text is not picked up.
 	translation_server->clear_locale_for("interface");
 	SceneTree::get_singleton()->process(0);
-	CHECK(label->get_minimum_size().x == doctest::Approx(width_en));
+	CHECK(label->get_total_character_count() == length_en);
 	ui->set_text("TITLE", "en", "Hi there, this is a much longer title");
 	MessageQueue::get_singleton()->flush();
 	translation_server->set_locale_for("audio", "ja");
 	SceneTree::get_singleton()->process(0);
-	CHECK(label->get_minimum_size().x == doctest::Approx(width_en));
+	CHECK(label->get_total_character_count() == length_en);
 	CHECK(label->get_shaping_locale() == "en");
 
 	memdelete(subtitle_box);
