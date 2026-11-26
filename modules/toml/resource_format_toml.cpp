@@ -39,7 +39,7 @@ Error ResourceFormatLoaderResourceTOML::_parse_text(const String &p_text, const 
 }
 
 String ResourceFormatLoaderResourceTOML::_get_marker_type(const String &p_text) const {
-	return TOML::get_marker_type(p_text);
+	return _scan_key_marker(p_text);
 }
 
 Error ResourceFormatSaverResourceTOML::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {

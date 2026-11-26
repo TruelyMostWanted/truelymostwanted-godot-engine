@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowWaitNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Waits a number of seconds before the execution continues.
+	</brief_description>
+	<description>
+		The wait node has the flow input [code]in[/code] and the flow output [code]out[/code]. When the execution reaches it, the playback pauses the graph for [member seconds] and then continues at [code]out[/code].
+		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		[codeblocks]
+		[gdscript]
+		var wait := FlowWaitNode.new()
+		wait.seconds = 2.5
+		graph.add_node(wait)
+		[/gdscript]
+		[csharp]
+		var wait = new FlowWaitNode { Seconds = 2.5 };
+		graph.AddNode(wait);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="seconds" type="float" setter="set_seconds" getter="get_seconds" default="1.0">
+			The time to wait, in seconds. Negative values are set to [code]0.0[/code].
+		</member>
+	</members>
+</class>

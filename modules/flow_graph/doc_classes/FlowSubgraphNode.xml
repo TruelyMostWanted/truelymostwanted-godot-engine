@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowSubgraphNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Runs another [FlowGraph] from its start node and continues when it ends.
+	</brief_description>
+	<description>
+		The subgraph node reuses a graph inside another graph. It has the flow input [code]in[/code] and the flow output [code]out[/code]. When the execution reaches it, the graph in [member graph] runs from its start node; when that graph reaches a [FlowEndNode], the execution continues at [code]out[/code]. How the ends of the inner graph map to the outputs of the node is part of the playback. A missing graph is a configuration warning.
+		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		[codeblocks]
+		[gdscript]
+		var subgraph := FlowSubgraphNode.new()
+		subgraph.graph = preload("res://graphs/shop.tres")
+		graph.add_node(subgraph)
+		[/gdscript]
+		[csharp]
+		var subgraph = new FlowSubgraphNode { Graph = GD.Load&lt;FlowGraph&gt;("res://graphs/shop.tres") };
+		graph.AddNode(subgraph);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph">
+			The graph to run. It is a separate resource and keeps its own nodes, variables and start node.
+		</member>
+	</members>
+</class>
