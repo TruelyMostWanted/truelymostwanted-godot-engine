@@ -78,7 +78,7 @@ void DataField::set_field_name(const StringName &p_name) {
 	emit_changed();
 }
 
-void DataField::set_type(Variant::Type p_type) {
+void DataField::set_value_type(Variant::Type p_type) {
 	ERR_FAIL_COND_MSG(!is_data_type(p_type), vformat("%s is not a data type.", Variant::get_type_name(p_type)));
 	type = p_type;
 	emit_changed();
@@ -237,7 +237,6 @@ bool DataField::coerce(Variant::Type p_type, const Variant &p_value, Variant &r_
 }
 
 bool DataField::text_to_type(Variant::Type p_type, const String &p_text, Variant &r_value) {
-	const String text = p_text.strip_edges();
 	switch (p_type) {
 		case Variant::NIL:
 		case Variant::STRING:
@@ -249,6 +248,11 @@ bool DataField::text_to_type(Variant::Type p_type, const String &p_text, Variant
 		case Variant::NODE_PATH:
 			r_value = NodePath(p_text);
 			return true;
+		default:
+			break;
+	}
+	const String text = p_text.strip_edges();
+	switch (p_type) {
 		case Variant::BOOL: {
 			const String lower = text.to_lower();
 			if (lower == "true" || lower == "1" || lower == "false" || lower == "0") {
@@ -287,8 +291,8 @@ bool DataField::is_data_type(Variant::Type p_type) {
 void DataField::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_field_name", "name"), &DataField::set_field_name);
 	ClassDB::bind_method(D_METHOD("get_field_name"), &DataField::get_field_name);
-	ClassDB::bind_method(D_METHOD("set_type", "type"), &DataField::set_type);
-	ClassDB::bind_method(D_METHOD("get_type"), &DataField::get_type);
+	ClassDB::bind_method(D_METHOD("set_value_type", "type"), &DataField::set_value_type);
+	ClassDB::bind_method(D_METHOD("get_value_type"), &DataField::get_value_type);
 	ClassDB::bind_method(D_METHOD("set_hint", "hint"), &DataField::set_hint);
 	ClassDB::bind_method(D_METHOD("get_hint"), &DataField::get_hint);
 	ClassDB::bind_method(D_METHOD("set_hint_string", "hint_string"), &DataField::set_hint_string);
@@ -330,7 +334,7 @@ void DataField::_bind_methods() {
 	}
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "name"), "set_field_name", "get_field_name");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, types), "set_type", "get_type");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, types), "set_value_type", "get_value_type");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "hint", PROPERTY_HINT_ENUM, hints), "set_hint", "get_hint");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "hint_string"), "set_hint_string", "get_hint_string");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "required"), "set_required", "is_required");

@@ -465,7 +465,7 @@ Error CSV::append_typed_row(const Dictionary &p_values, const Ref<DataSchema> &p
 			typed = field ? field->get_default_value() : Variant();
 		} else if (!field) {
 			typed = *value;
-		} else if (!DataField::coerce(field->get_type(), *value, typed)) {
+		} else if (!DataField::coerce(field->get_value_type(), *value, typed)) {
 			return ERR_INVALID_DATA;
 		}
 		cells.push_back(DataField::value_to_text(typed));
@@ -491,7 +491,7 @@ Variant CSV::get_typed_column(int p_column, const Ref<DataSchema> &p_schema) con
 	}
 	// Packed arrays by field type (one allocation, no Variant per value), an Array for other types.
 	Variant::Type packed_type = Variant::ARRAY;
-	switch (field ? field->get_type() : Variant::STRING) {
+	switch (field ? field->get_value_type() : Variant::STRING) {
 		case Variant::INT:
 			packed_type = Variant::PACKED_INT64_ARRAY;
 			break;

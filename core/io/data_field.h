@@ -76,8 +76,8 @@ protected:
 public:
 	void set_field_name(const StringName &p_name);
 	StringName get_field_name() const { return field_name; }
-	void set_type(Variant::Type p_type);
-	Variant::Type get_type() const { return type; }
+	void set_value_type(Variant::Type p_type);
+	Variant::Type get_value_type() const { return type; }
 	void set_hint(PropertyHint p_hint);
 	PropertyHint get_hint() const { return hint; }
 	void set_hint_string(const String &p_hint_string);

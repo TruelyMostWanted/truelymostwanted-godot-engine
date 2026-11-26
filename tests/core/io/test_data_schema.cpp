@@ -45,7 +45,7 @@ static Ref<DataField> make_field(const StringName &p_name, Variant::Type p_type)
 	Ref<DataField> field;
 	field.instantiate();
 	field->set_field_name(p_name);
-	field->set_type(p_type);
+	field->set_value_type(p_type);
 	return field;
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("[DataSchema] create_from_dictionary() and field access") {
 	REQUIRE(schema->get_fields().size() == 3);
 	CHECK(schema->find_field("pos") == 1);
 	CHECK(schema->get_field("name")->is_required());
-	CHECK(schema->get_field("pos")->get_schema()->get_field("x")->get_type() == Variant::INT);
+	CHECK(schema->get_field("pos")->get_schema()->get_field("x")->get_value_type() == Variant::INT);
 	CHECK(schema->get_field("tags")->get_element_type() == Variant::STRING);
 	CHECK(schema->convert_value("name", "abc") == Variant("abc"));
 	schema->remove_field(0);

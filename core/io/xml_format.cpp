@@ -339,7 +339,7 @@ static Variant _xml_validation_value(const Dictionary &p_element, const Ref<Data
 		const Dictionary child_element = child;
 		const String child_name = child_element.get(XML::KEY_NAME, String());
 		const Ref<DataField> field = p_schema.is_valid() ? p_schema->get_field(child_name) : Ref<DataField>();
-		const bool is_list = field.is_valid() && field->get_type() == Variant::ARRAY;
+		const bool is_list = field.is_valid() && field->get_value_type() == Variant::ARRAY;
 		const Variant value = _xml_validation_value(child_element, field.is_null() ? Ref<DataSchema>() : (is_list ? field->get_element_schema() : field->get_schema()));
 		if (lists.has(child_name)) {
 			Array list = result[child_name];

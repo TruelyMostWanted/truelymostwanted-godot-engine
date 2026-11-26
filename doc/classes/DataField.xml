@@ -86,7 +86,7 @@
 		<member name="schema" type="DataSchema" setter="set_schema" getter="get_schema">
 			For a [Dictionary] field: the schema its keys are validated against.
 		</member>
-		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="4">
+		<member name="type" type="int" setter="set_value_type" getter="get_value_type" enum="Variant.Type" default="4">
 			The type of the value ([constant TYPE_NIL] = any). Text values (CSV cells, XML attributes, plain INI values) are accepted if they convert: [int] and [float] as numbers, [bool] as [code]true[/code], [code]false[/code], [code]1[/code] or [code]0[/code], other types in the syntax of [method @GlobalScope.str_to_var] ([code]Vector2(1, 2)[/code]). An [int] field also accepts a [float] without fraction, as JSON numbers are floats. Only data types can be set: not [Object], [RID], [Callable] or [Signal].
 		</member>
 		<member name="unique" type="bool" setter="set_unique" getter="is_unique" default="false">

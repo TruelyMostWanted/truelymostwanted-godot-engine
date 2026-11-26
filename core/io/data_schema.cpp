@@ -64,8 +64,8 @@ bool DataSchema::_check_value(const DataField *p_field, const StringName &p_name
 		r_typed = p_field->get_default_value();
 		return false;
 	}
-	if (!DataField::coerce(p_field->get_type(), p_value, r_typed)) {
-		r_validation->add_issue(DataValidation::ISSUE_KIND_TYPE_MISMATCH, vformat("\"%s\" must be of type %s, not \"%s\".", p_name, Variant::get_type_name(p_field->get_type()), String(p_value)), p_name, DataValidation::join_path(p_parent_path, p_name), p_row, p_column);
+	if (!DataField::coerce(p_field->get_value_type(), p_value, r_typed)) {
+		r_validation->add_issue(DataValidation::ISSUE_KIND_TYPE_MISMATCH, vformat("\"%s\" must be of type %s, not \"%s\".", p_name, Variant::get_type_name(p_field->get_value_type()), String(p_value)), p_name, DataValidation::join_path(p_parent_path, p_name), p_row, p_column);
 		return false;
 	}
 	String message;
@@ -148,7 +148,7 @@ void DataSchema::_validate_records(const Array &p_records, const String &p_path,
 		for (int j = 0; j < fields.size(); j++) {
 			const DataField *field = _get_field_ptr(j);
 			const Variant *value = field && field->is_unique() ? record.getptr(String(field->get_field_name())) : nullptr;
-			if (value && DataField::coerce(field->get_type(), *value, typed)) {
+			if (value && DataField::coerce(field->get_value_type(), *value, typed)) {
 				_data_schema_check_unique(seen[j], typed, i, field->get_field_name(), DataValidation::join_path(item_path, field->get_field_name()), row, DataValidation::POSITION_NONE, r_validation);
 			}
 		}
@@ -303,12 +303,12 @@ Ref<DataSchema> DataSchema::create_from_dictionary(const Dictionary &p_dictionar
 		const Variant &shape = entry.value;
 		const Array elements = shape.get_type() == Variant::ARRAY ? shape.operator Array() : Array();
 		if (shape.get_type() == Variant::INT) {
-			field->set_type(Variant::Type((int)shape));
+			field->set_value_type(Variant::Type((int)shape));
 		} else if (shape.get_type() == Variant::DICTIONARY) {
-			field->set_type(Variant::DICTIONARY);
+			field->set_value_type(Variant::DICTIONARY);
 			field->set_schema(create_from_dictionary(shape));
 		} else if (elements.size() == 1) {
-			field->set_type(Variant::ARRAY);
+			field->set_value_type(Variant::ARRAY);
 			if (elements[0].get_type() == Variant::DICTIONARY) {
 				field->set_element_schema(create_from_dictionary(elements[0]));
 			} else {
