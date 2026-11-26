@@ -347,6 +347,31 @@ TEST_CASE("[SceneTree][TextureSettingsServer] Added viewports and viewports in t
 	memdelete(server);
 }
 
+TEST_CASE("[SceneTree][TextureSettingsServer] With all viewports as target every viewport gets the values") {
+	TestSetup setup;
+	RootState state;
+	Viewport *root = state.root;
+
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
+	server->set_file_path(temp_file("viewport_target.ini"));
+	server->set_canvas_item_default_texture_filter(Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
+	SubViewport *other = memnew(SubViewport);
+	root->add_child(other);
+	CHECK(other->get_default_canvas_item_texture_filter() == Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR);
+
+	server->set_viewport_target(SettingsServer::VIEWPORT_TARGET_ALL_VIEWPORTS);
+	CHECK(other->get_default_canvas_item_texture_filter() == Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
+	SubViewport *late = memnew(SubViewport);
+	root->add_child(late);
+	CHECK(late->get_default_canvas_item_texture_filter() == Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
+
+	root->remove_child(late);
+	root->remove_child(other);
+	memdelete(late);
+	memdelete(other);
+	memdelete(server);
+}
+
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 
 // The project values of texture streaming, restored at the end of a test.

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SQLiteColumn" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A column of a table in an [SQLiteDatabase].
+	</brief_description>
+	<description>
+		[method SQLiteDatabase.get_columns] returns one [SQLiteColumn] per column of a table, in table order. All properties are read-only: an [SQLiteColumn] describes the table as it was when [method SQLiteDatabase.get_columns] was called and does not change with it.
+		[codeblock]
+		for column in db.get_columns("items"):
+			var text = column.name + " " + column.declared_type
+			if column.primary_key_index &gt; 0:
+				text += " (key)"
+			if column.not_null:
+				text += " NOT NULL"
+			print(text)
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="affinity" type="int" setter="" getter="get_affinity" enum="SQLiteColumn.Affinity" default="3">
+			The type SQLite prefers for values in this column, derived from [member declared_type] by SQLite's rules: a type that contains [code]INT[/code] is [constant AFFINITY_INTEGER]; else one with [code]CHAR[/code], [code]CLOB[/code] or [code]TEXT[/code] is [constant AFFINITY_TEXT]; else one with [code]BLOB[/code], or no type, is [constant AFFINITY_BLOB]; else one with [code]REAL[/code], [code]FLOAT[/code] or [code]DOUBLE[/code] (the first four letters are enough) is [constant AFFINITY_REAL]; everything else is [constant AFFINITY_NUMERIC].
+			[b]Note:[/b] Except in [code]STRICT[/code] tables, a column can still hold values of any type.
+		</member>
+		<member name="declared_type" type="String" setter="" getter="get_declared_type" default="&quot;&quot;">
+			The type as written in [code]CREATE TABLE[/code], for example [code]VARCHAR(40)[/code]. Empty if the column was declared without a type.
+		</member>
+		<member name="default_value" type="String" setter="" getter="get_default_value" default="&quot;&quot;">
+			The SQL text of the [code]DEFAULT[/code] expression, for example [code]'none'[/code] (with quotes), [code]0[/code] or [code]CURRENT_TIMESTAMP[/code]. Empty if the column has no default.
+		</member>
+		<member name="name" type="String" setter="" getter="get_name" default="&quot;&quot;">
+			The name of the column.
+		</member>
+		<member name="not_null" type="bool" setter="" getter="is_not_null" default="false">
+			If [code]true[/code], the column has a [code]NOT NULL[/code] constraint.
+		</member>
+		<member name="primary_key_index" type="int" setter="" getter="get_primary_key_index" default="0">
+			The position of the column in the primary key, starting at [code]1[/code]. [code]0[/code] if the column is not part of the primary key. For [code]PRIMARY KEY (b, a)[/code], [code]b[/code] is [code]1[/code] and [code]a[/code] is [code]2[/code].
+		</member>
+	</members>
+	<constants>
+		<constant name="AFFINITY_INTEGER" value="0" enum="Affinity">
+			The column prefers integers ([code]INTEGER[/code], [code]INT[/code], [code]BIGINT[/code], …).
+		</constant>
+		<constant name="AFFINITY_REAL" value="1" enum="Affinity">
+			The column prefers floating-point numbers ([code]REAL[/code], [code]FLOAT[/code], [code]DOUBLE[/code], …).
+		</constant>
+		<constant name="AFFINITY_TEXT" value="2" enum="Affinity">
+			The column prefers text ([code]TEXT[/code], [code]VARCHAR[/code], [code]CLOB[/code], …).
+		</constant>
+		<constant name="AFFINITY_BLOB" value="3" enum="Affinity">
+			The column stores values as they are ([code]BLOB[/code], or no declared type).
+		</constant>
+		<constant name="AFFINITY_NUMERIC" value="4" enum="Affinity">
+			The column prefers numbers but keeps text that is not a number ([code]NUMERIC[/code], [code]DECIMAL[/code], [code]BOOLEAN[/code], [code]DATE[/code], [code]DATETIME[/code], …).
+		</constant>
+	</constants>
+</class>
