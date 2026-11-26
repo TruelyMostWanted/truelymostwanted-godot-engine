@@ -41,6 +41,7 @@
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/inspector/editor_resource_picker.h"
+#include "editor/script/data_schema_lookup.h"
 #include "editor/script/script_editor_base.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_command_palette.h"
@@ -64,23 +65,6 @@ static Ref<SerializerOptions> _tsv_options() {
 	options->set_csv_delimiter("\t");
 	options->set_csv_headers(false);
 	return options;
-}
-
-// The schema whose file_patterns match `p_path`, from the project setting `filesystem/data/schema_files`.
-static Ref<DataSchema> _find_schema(const String &p_path) {
-	const PackedStringArray files = ProjectSettings::get_singleton()->get_setting("filesystem/data/schema_files", PackedStringArray());
-	for (const String &file : files) {
-		const Ref<DataSchema> found = ResourceLoader::load(file, "DataSchema");
-		if (found.is_null()) {
-			continue;
-		}
-		for (const String &pattern : found->get_file_patterns()) {
-			if (p_path.matchn(pattern)) {
-				return found;
-			}
-		}
-	}
-	return Ref<DataSchema>();
 }
 
 TextEditorBase *CSVTableEditor::_get_text_editor() const {
@@ -490,7 +474,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 	const String path = p_resource->get_path();
 	translation_mode = ResourceLoader::get_resource_type(path) == "Translation";
 	if (!translation_mode) {
-		schema = _find_schema(path);
+		schema = EditorDataSchemaLookup::find_schema(path);
 	}
 	schema_picker->set_visible(!translation_mode);
 	schema_picker->set_edited_resource(schema);
