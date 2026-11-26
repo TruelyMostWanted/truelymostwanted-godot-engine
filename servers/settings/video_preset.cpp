@@ -36,7 +36,7 @@ PackedStringArray VideoPreset::get_domains() {
 	PackedStringArray domains;
 	domains.push_back("render_quality");
 	domains.push_back("texture");
-	domains.push_back("video_shadow");
+	domains.push_back("shadow");
 	domains.push_back("video_effect");
 	return domains;
 }
@@ -68,13 +68,13 @@ Ref<TextureSettings> VideoPreset::get_texture() const {
 	return texture;
 }
 
-void VideoPreset::set_video_shadow(const Ref<VideoShadowSettings> &p_settings) {
-	video_shadow = p_settings;
+void VideoPreset::set_shadow(const Ref<ShadowSettings> &p_settings) {
+	shadow = p_settings;
 	emit_changed();
 }
 
-Ref<VideoShadowSettings> VideoPreset::get_video_shadow() const {
-	return video_shadow;
+Ref<ShadowSettings> VideoPreset::get_shadow() const {
+	return shadow;
 }
 
 void VideoPreset::set_video_effect(const Ref<VideoEffectSettings> &p_settings) {
@@ -95,10 +95,10 @@ void VideoPreset::set_domain_settings(const StringName &p_domain, const Ref<Reso
 		const Ref<TextureSettings> typed = p_settings;
 		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"texture\" must be a TextureSettings resource.");
 		set_texture(typed);
-	} else if (p_domain == SNAME("video_shadow")) {
-		const Ref<VideoShadowSettings> typed = p_settings;
-		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_shadow\" must be a VideoShadowSettings resource.");
-		set_video_shadow(typed);
+	} else if (p_domain == SNAME("shadow")) {
+		const Ref<ShadowSettings> typed = p_settings;
+		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"shadow\" must be a ShadowSettings resource.");
+		set_shadow(typed);
 	} else if (p_domain == SNAME("video_effect")) {
 		const Ref<VideoEffectSettings> typed = p_settings;
 		ERR_FAIL_COND_MSG(p_settings.is_valid() && typed.is_null(), "VideoPreset: the settings of \"video_effect\" must be a VideoEffectSettings resource.");
@@ -113,8 +113,8 @@ Ref<Resource> VideoPreset::get_domain_settings(const StringName &p_domain) const
 		return render_quality;
 	} else if (p_domain == SNAME("texture")) {
 		return texture;
-	} else if (p_domain == SNAME("video_shadow")) {
-		return video_shadow;
+	} else if (p_domain == SNAME("shadow")) {
+		return shadow;
 	} else if (p_domain == SNAME("video_effect")) {
 		return video_effect;
 	}
@@ -137,8 +137,8 @@ void VideoPreset::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_render_quality"), &VideoPreset::get_render_quality);
 	ClassDB::bind_method(D_METHOD("set_texture", "settings"), &VideoPreset::set_texture);
 	ClassDB::bind_method(D_METHOD("get_texture"), &VideoPreset::get_texture);
-	ClassDB::bind_method(D_METHOD("set_video_shadow", "settings"), &VideoPreset::set_video_shadow);
-	ClassDB::bind_method(D_METHOD("get_video_shadow"), &VideoPreset::get_video_shadow);
+	ClassDB::bind_method(D_METHOD("set_shadow", "settings"), &VideoPreset::set_shadow);
+	ClassDB::bind_method(D_METHOD("get_shadow"), &VideoPreset::get_shadow);
 	ClassDB::bind_method(D_METHOD("set_video_effect", "settings"), &VideoPreset::set_video_effect);
 	ClassDB::bind_method(D_METHOD("get_video_effect"), &VideoPreset::get_video_effect);
 
@@ -150,6 +150,6 @@ void VideoPreset::_bind_methods() {
 	ADD_GROUP("Domains", "");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "render_quality", PROPERTY_HINT_RESOURCE_TYPE, RenderQualitySettings::get_class_static()), "set_render_quality", "get_render_quality");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, TextureSettings::get_class_static()), "set_texture", "get_texture");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_shadow", PROPERTY_HINT_RESOURCE_TYPE, VideoShadowSettings::get_class_static()), "set_video_shadow", "get_video_shadow");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shadow", PROPERTY_HINT_RESOURCE_TYPE, ShadowSettings::get_class_static()), "set_shadow", "get_shadow");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_effect", PROPERTY_HINT_RESOURCE_TYPE, VideoEffectSettings::get_class_static()), "set_video_effect", "get_video_effect");
 }

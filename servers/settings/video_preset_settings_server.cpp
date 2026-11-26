@@ -71,10 +71,10 @@ static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	{ "texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
 	{ "texture", "canvas_shadow_atlas_size", Variant::INT, { 1024, 2048, 2048, 4096 } },
 	// Shadow atlas sizes; filter quality: Soft Very Low, Soft Low, Soft Medium, Soft High.
-	{ "video_shadow", "directional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
-	{ "video_shadow", "directional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
-	{ "video_shadow", "positional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
-	{ "video_shadow", "positional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
+	{ "shadow", "directional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
+	{ "shadow", "directional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
+	{ "shadow", "positional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
+	{ "shadow", "positional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
 	// SSAO and SSIL quality: Very Low, Low, Medium, High.
 	{ "video_effect", "ssao_quality", Variant::INT, { 0, 1, 2, 3 } },
 	{ "video_effect", "ssao_half_size", Variant::BOOL, { 1, 1, 0, 0 } },
@@ -133,8 +133,8 @@ static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 		base = Ref<Resource>(memnew(RenderQualitySettings));
 	} else if (p_domain == "texture") {
 		base = Ref<Resource>(memnew(TextureSettings));
-	} else if (p_domain == "video_shadow") {
-		base = Ref<Resource>(memnew(VideoShadowSettings));
+	} else if (p_domain == "shadow") {
+		base = Ref<Resource>(memnew(ShadowSettings));
 	} else if (p_domain == "video_effect") {
 		base = Ref<Resource>(memnew(VideoEffectSettings));
 	}

@@ -32,12 +32,12 @@
 
 #include "core/io/resource.h"
 #include "servers/settings/render_quality_settings.h"
+#include "servers/settings/shadow_settings.h"
 #include "servers/settings/texture_settings.h"
 #include "servers/settings/video_effect_settings.h"
-#include "servers/settings/video_shadow_settings.h"
 
 // A graphics preset (#25): a name and one settings resource per video settings domain (`render_quality`,
-// `texture`, `video_shadow`, `video_effect`), the same classes the domains store. A domain resource sets
+// `texture`, `shadow`, `video_effect`), the same classes the domains store. A domain resource sets
 // all values of its domain; a null resource leaves the domain as it is.
 // VideoPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
 // replace presets with `.tres` files (project setting `settings/video_preset/presets`).
@@ -47,7 +47,7 @@ class VideoPreset : public Resource {
 	String preset_name;
 	Ref<RenderQualitySettings> render_quality;
 	Ref<TextureSettings> texture;
-	Ref<VideoShadowSettings> video_shadow;
+	Ref<ShadowSettings> shadow;
 	Ref<VideoEffectSettings> video_effect;
 
 protected:
@@ -64,8 +64,8 @@ public:
 	Ref<RenderQualitySettings> get_render_quality() const;
 	void set_texture(const Ref<TextureSettings> &p_settings);
 	Ref<TextureSettings> get_texture() const;
-	void set_video_shadow(const Ref<VideoShadowSettings> &p_settings);
-	Ref<VideoShadowSettings> get_video_shadow() const;
+	void set_shadow(const Ref<ShadowSettings> &p_settings);
+	Ref<ShadowSettings> get_shadow() const;
 	void set_video_effect(const Ref<VideoEffectSettings> &p_settings);
 	Ref<VideoEffectSettings> get_video_effect() const;
 
