@@ -82,14 +82,14 @@ LocalizationServer::Data *TextLocalizationServer::_create_data() const {
 }
 
 void TextLocalizationServer::_resolve(Data *p_data) const {
-	TextData *data = static_cast<TextData *>(p_data);
-	const KeyTable *table = data->keys;
+	TextData *text_data = static_cast<TextData *>(p_data);
+	const KeyTable *table = text_data->keys;
 	const uint32_t row_count = table->keys.size();
-	data->texts.resize(row_count);
-	data->names.resize(row_count);
+	text_data->texts.resize(row_count);
+	text_data->names.resize(row_count);
 	// The chain first (a `de_DE` text beats a `de` text), then the layers from the highest priority.
-	for (uint32_t chain_index = 0; chain_index < (uint32_t)data->chain.size(); chain_index++) {
-		const String &locale = data->chain[chain_index];
+	for (uint32_t chain_index = 0; chain_index < (uint32_t)text_data->chain.size(); chain_index++) {
+		const String &locale = text_data->chain[chain_index];
 		String rule;
 		for (uint32_t layer = table->layers.size(); layer-- > 0;) {
 			const LocalizationCatalog *catalog = table->layers[layer].ptr();
@@ -103,20 +103,20 @@ void TextLocalizationServer::_resolve(Data *p_data) const {
 			}
 			for (uint32_t row = 0; row < row_count; row++) {
 				const int32_t catalog_row = table->get_catalog_row(layer, row);
-				if (catalog_row < 0 || !data->texts[row].is_empty() || column->cells.get_length(catalog_row) == 0) {
+				if (catalog_row < 0 || !text_data->texts[row].is_empty() || column->cells.get_length(catalog_row) == 0) {
 					continue;
 				}
-				data->texts[row] = column->cells.get(catalog_row);
+				text_data->texts[row] = column->cells.get(catalog_row);
 				const Vector<String> *forms = column->plural_forms.getptr(catalog_row);
 				if (forms) {
-					data->plurals.insert(row, PluralEntry{ *forms, chain_index });
+					text_data->plurals.insert(row, PluralEntry{ *forms, chain_index });
 				}
 			}
 		}
 		if (rule.is_empty() && TranslationServer::get_singleton()) {
 			rule = TranslationServer::get_singleton()->get_plural_rules(locale);
 		}
-		data->rules.push_back(PluralRules::parse(rule.is_empty() ? String("nplurals=2; plural=(n != 1);") : rule));
+		text_data->rules.push_back(PluralRules::parse(rule.is_empty() ? String("nplurals=2; plural=(n != 1);") : rule));
 	}
 }
 
@@ -218,18 +218,18 @@ String TextLocalizationServer::_finish(const TextData *p_data, int p_row, const 
 }
 
 String TextLocalizationServer::translate(const StringName &p_key, const StringName &p_context, int p_count, const Dictionary &p_args) const {
-	const TextData *data = _get_text_data();
-	return _finish(data, data->keys->find(p_key, p_context), p_key, p_count, p_args);
+	const TextData *text_data = _get_text_data();
+	return _finish(text_data, text_data->keys->find(p_key, p_context), p_key, p_count, p_args);
 }
 
 String TextLocalizationServer::translate_for_locale(const String &p_locale, const StringName &p_key, const StringName &p_context, int p_count, const Dictionary &p_args) const {
-	const TextData *data = _get_text_data();
+	const TextData *text_data = _get_text_data();
 	const PackedStringArray chain = get_locale_chain(p_locale);
-	if (!chain.is_empty() && chain[0] == data->locale) {
+	if (!chain.is_empty() && chain[0] == text_data->locale) {
 		return translate(p_key, p_context, p_count, p_args);
 	}
-	const int row = data->keys->find(p_key, p_context);
-	const String text = row < 0 ? String() : _get_raw_text(data->keys, chain, row, p_count);
+	const int row = text_data->keys->find(p_key, p_context);
+	const String text = row < 0 ? String() : _get_raw_text(text_data->keys, chain, row, p_count);
 	const String result = text.is_empty() ? String(p_key) : text;
 	return p_args.is_empty() ? result : TextInsertionServer::get_singleton()->insert(result, p_args);
 }
@@ -239,27 +239,27 @@ int TextLocalizationServer::get_key_id(const StringName &p_key, const StringName
 }
 
 String TextLocalizationServer::translate_id(int p_id, int p_count, const Dictionary &p_args) const {
-	const TextData *data = _get_text_data();
-	ERR_FAIL_INDEX_V(p_id, (int)data->keys->keys.size(), String());
-	return _finish(data, p_id, data->keys->keys[p_id].key, p_count, p_args);
+	const TextData *text_data = _get_text_data();
+	ERR_FAIL_INDEX_V(p_id, (int)text_data->keys->keys.size(), String());
+	return _finish(text_data, p_id, text_data->keys->keys[p_id].key, p_count, p_args);
 }
 
 PackedStringArray TextLocalizationServer::get_translation_keys(const String &p_text) const {
-	const TextData *data = _get_text_data();
+	const TextData *text_data = _get_text_data();
 	PackedStringArray result;
-	MutexLock lock(data->mutex);
-	if (!data->reverse_built) {
-		for (uint32_t row = 0; row < data->texts.size(); row++) {
-			if (!data->texts[row].is_empty()) {
-				data->reverse[data->texts[row]].push_back(row);
+	MutexLock lock(text_data->mutex);
+	if (!text_data->reverse_built) {
+		for (uint32_t row = 0; row < text_data->texts.size(); row++) {
+			if (!text_data->texts[row].is_empty()) {
+				text_data->reverse[text_data->texts[row]].push_back(row);
 			}
 		}
-		data->reverse_built = true;
+		text_data->reverse_built = true;
 	}
-	const LocalVector<uint32_t> *rows = data->reverse.getptr(p_text);
+	const LocalVector<uint32_t> *rows = text_data->reverse.getptr(p_text);
 	if (rows) {
 		for (const uint32_t row : *rows) {
-			result.push_back(data->keys->keys[row].key);
+			result.push_back(text_data->keys->keys[row].key);
 		}
 	}
 	return result;
@@ -271,28 +271,28 @@ StringName TextLocalizationServer::get_translation_key(const String &p_text) con
 }
 
 StringName TextLocalizationServer::get_translation_key_for_locale(const String &p_locale, const String &p_text) const {
-	const TextData *data = _get_text_data();
+	const TextData *text_data = _get_text_data();
 	const PackedStringArray chain = get_locale_chain(p_locale);
-	if (!chain.is_empty() && chain[0] == data->locale) {
+	if (!chain.is_empty() && chain[0] == text_data->locale) {
 		return get_translation_key(p_text);
 	}
-	for (uint32_t row = 0; row < data->keys->keys.size(); row++) {
-		if (_get_raw_text(data->keys, chain, row, -1) == p_text) {
-			return data->keys->keys[row].key;
+	for (uint32_t row = 0; row < text_data->keys->keys.size(); row++) {
+		if (_get_raw_text(text_data->keys, chain, row, -1) == p_text) {
+			return text_data->keys->keys[row].key;
 		}
 	}
 	return StringName();
 }
 
 bool TextLocalizationServer::has_translation(const StringName &p_key, const StringName &p_context) const {
-	const TextData *data = _get_text_data();
-	const int row = data->keys->find(p_key, p_context);
-	return row >= 0 && !data->texts[row].is_empty();
+	const TextData *text_data = _get_text_data();
+	const int row = text_data->keys->find(p_key, p_context);
+	return row >= 0 && !text_data->texts[row].is_empty();
 }
 
 PackedStringArray TextLocalizationServer::get_missing_keys(const String &p_locale) const {
-	const TextData *data = _get_text_data();
-	const PackedStringArray full_chain = get_locale_chain(p_locale.is_empty() ? data->locale : p_locale);
+	const TextData *text_data = _get_text_data();
+	const PackedStringArray full_chain = get_locale_chain(p_locale.is_empty() ? text_data->locale : p_locale);
 	// Only the locale and its parents: a key that shows the fallback locale is missing.
 	PackedStringArray chain;
 	for (const String &locale : full_chain) {
@@ -301,43 +301,43 @@ PackedStringArray TextLocalizationServer::get_missing_keys(const String &p_local
 		}
 	}
 	PackedStringArray missing;
-	for (uint32_t row = 0; row < data->keys->keys.size(); row++) {
-		if (_get_raw_text(data->keys, chain, row, -1).is_empty()) {
-			missing.push_back(data->keys->keys[row].key);
+	for (uint32_t row = 0; row < text_data->keys->keys.size(); row++) {
+		if (_get_raw_text(text_data->keys, chain, row, -1).is_empty()) {
+			missing.push_back(text_data->keys->keys[row].key);
 		}
 	}
 	return missing;
 }
 
 StringName TextLocalizationServer::get_message(const StringName &p_key, const StringName &p_context) const {
-	const TextData *data = _get_text_data();
-	const int row = data->keys->find(p_key, p_context);
-	if (row < 0 || data->texts[row].is_empty()) {
+	const TextData *text_data = _get_text_data();
+	const int row = text_data->keys->find(p_key, p_context);
+	if (row < 0 || text_data->texts[row].is_empty()) {
 		return StringName();
 	}
-	MutexLock lock(data->mutex);
-	StringName &name = data->names[row];
+	MutexLock lock(text_data->mutex);
+	StringName &name = text_data->names[row];
 	if (name.is_empty()) {
-		name = data->texts[row];
+		name = text_data->texts[row];
 	}
 	return name;
 }
 
 StringName TextLocalizationServer::get_plural_message(const StringName &p_key, int p_count, const StringName &p_context) const {
-	const TextData *data = _get_text_data();
-	const int row = data->keys->find(p_key, p_context);
+	const TextData *text_data = _get_text_data();
+	const int row = text_data->keys->find(p_key, p_context);
 	if (row < 0) {
 		return StringName();
 	}
-	const String text = _get_text(data, row, p_count);
+	const String text = _get_text(text_data, row, p_count);
 	return text.is_empty() ? StringName() : StringName(text);
 }
 
 void TextLocalizationServer::get_message_list(List<StringName> *r_messages) const {
-	const TextData *data = _get_text_data();
-	for (uint32_t row = 0; row < data->texts.size(); row++) {
-		if (!data->texts[row].is_empty()) {
-			r_messages->push_back(data->keys->keys[row].key);
+	const TextData *text_data = _get_text_data();
+	for (uint32_t row = 0; row < text_data->texts.size(); row++) {
+		if (!text_data->texts[row].is_empty()) {
+			r_messages->push_back(text_data->keys->keys[row].key);
 		}
 	}
 }

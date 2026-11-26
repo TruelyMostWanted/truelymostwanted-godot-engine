@@ -228,8 +228,8 @@ TEST_CASE("[TextLocalizationServer] Signals") {
 
 #ifdef DEBUG_ENABLED
 	SIGNAL_WATCH(server, SNAME("key_missing"));
-	server->translate("NOT_THERE");
-	server->translate("NOT_THERE");
+	(void)server->translate("NOT_THERE");
+	(void)server->translate("NOT_THERE");
 	Array missing;
 	missing.push_back(Array({ StringName("NOT_THERE"), "en" }));
 	SIGNAL_CHECK("key_missing", missing); // Once per key.
