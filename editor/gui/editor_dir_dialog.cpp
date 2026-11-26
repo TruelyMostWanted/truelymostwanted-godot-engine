@@ -58,7 +58,7 @@ void EditorDirDialog::_update_dir(const Color &p_default_folder_color, const Dic
 		p_item->set_text(0, p_dir->get_name());
 
 		if (p_assigned_folder_colors.has(path)) {
-			const Color &folder_color = p_folder_colors[p_assigned_folder_colors[path]];
+			const Color folder_color = FileSystemDock::resolve_folder_color(p_folder_colors, p_assigned_folder_colors[path], p_default_folder_color);
 			p_item->set_icon_modulate(0, p_is_dark_icon_and_font ? folder_color : folder_color * FileSystemDock::ITEM_COLOR_SCALE);
 			p_item->set_custom_bg_color(0, Color(folder_color, p_is_dark_icon_and_font ? FileSystemDock::ITEM_ALPHA_MIN : FileSystemDock::ITEM_ALPHA_MAX));
 		} else {
