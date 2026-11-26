@@ -217,23 +217,30 @@ void LocalizedText::_on_frame() {
 }
 
 void LocalizedText::_apply_meta(Node *p_node, bool p_bind) {
-	List<StringName> metas;
-	p_node->get_meta_list(&metas);
-	for (const StringName &meta : metas) {
-		const String meta_name = meta;
-		if (!meta_name.begins_with(META_PREFIX)) {
-			continue;
+	// One fixed key: a single hash lookup, no allocation, for the many nodes without a binding.
+	if (!p_node->has_meta(SNAME("localized_text"))) {
+		return;
+	}
+	const auto apply = [p_node, p_bind](const Ref<LocalizedText> &p_localized, const StringName &p_property) {
+		if (p_localized.is_null()) {
+			return;
 		}
-		const Ref<LocalizedText> localized = p_node->get_meta(meta);
-		if (localized.is_null()) {
-			continue;
-		}
-		const StringName property = meta_name.substr(String(META_PREFIX).length());
 		if (p_bind) {
-			localized->_bind(p_node, property);
+			p_localized->_bind(p_node, p_property);
 		} else {
-			localized->_unbind(p_node, property);
+			p_localized->_unbind(p_node, p_property);
 		}
+	};
+	const Variant value = p_node->get_meta(SNAME("localized_text"));
+	if (value.get_type() != Variant::DICTIONARY) {
+		apply(value, SNAME("text"));
+		return;
+	}
+	const Dictionary properties = value;
+	const Array keys = properties.keys();
+	for (int idx = 0; idx < keys.size(); idx++) {
+		const StringName property = keys[idx];
+		apply(properties[keys[idx]], property);
 	}
 }
 
@@ -517,25 +524,50 @@ String LocalizedText::get_text() {
 void LocalizedText::bind(Object *p_target, const StringName &p_property) {
 	ERR_FAIL_NULL(p_target);
 	ERR_FAIL_COND_MSG(!Thread::is_main_thread(), "LocalizedText: bind() must be called on the main thread.");
-	ERR_FAIL_COND_MSG(!String(p_property).is_valid_ascii_identifier(), vformat("LocalizedText: \"%s\" is not a valid property name for a binding.", p_property));
-	// The binding is the metadata `localized_<property>`: visible in the inspector and saved with the node.
-	const StringName meta_name = String(META_PREFIX) + String(p_property);
-	if (p_target->has_meta(meta_name)) {
-		const Ref<LocalizedText> previous = p_target->get_meta(meta_name);
-		if (previous.is_valid() && previous.ptr() != this) {
-			previous->_unbind(p_target, p_property);
-		}
+	// The binding is the metadata `localized_text`: this text (binds `text`) or a dictionary property -> text.
+	const StringName meta_name = SNAME("localized_text");
+	const Variant current = p_target->has_meta(meta_name) ? p_target->get_meta(meta_name) : Variant();
+	const bool is_dictionary = current.get_type() == Variant::DICTIONARY;
+	Dictionary properties;
+	if (is_dictionary) {
+		const Dictionary existing = current;
+		properties = existing.duplicate();
+	} else if (current.get_type() != Variant::NIL) {
+		properties[SNAME("text")] = current;
 	}
-	p_target->set_meta(meta_name, Variant(this));
+	const Ref<LocalizedText> previous = properties.get(p_property, Variant());
+	if (previous.is_valid() && previous.ptr() != this) {
+		previous->_unbind(p_target, p_property);
+	}
+	if (!is_dictionary && p_property == SNAME("text")) {
+		p_target->set_meta(meta_name, Variant(this));
+	} else {
+		properties[p_property] = Variant(this);
+		p_target->set_meta(meta_name, properties);
+	}
 	_bind(p_target, p_property);
 }
 
 void LocalizedText::unbind(Object *p_target, const StringName &p_property) {
 	ERR_FAIL_NULL(p_target);
 	const Ref<LocalizedText> keep(this); // The metadata may hold the last reference.
-	const StringName meta_name = String(META_PREFIX) + String(p_property);
-	if (p_target->has_meta(meta_name) && p_target->get_meta(meta_name) == Variant(this)) {
-		p_target->remove_meta(meta_name);
+	const StringName meta_name = SNAME("localized_text");
+	if (p_target->has_meta(meta_name)) {
+		const Variant current = p_target->get_meta(meta_name);
+		if (current.get_type() == Variant::DICTIONARY) {
+			const Dictionary existing = current;
+			Dictionary properties = existing.duplicate();
+			if (properties.get(p_property, Variant()) == Variant(this)) {
+				properties.erase(p_property);
+				if (properties.is_empty()) {
+					p_target->remove_meta(meta_name);
+				} else {
+					p_target->set_meta(meta_name, properties);
+				}
+			}
+		} else if (p_property == SNAME("text") && current == Variant(this)) {
+			p_target->remove_meta(meta_name);
+		}
 	}
 	_unbind(p_target, p_property);
 }

@@ -39,10 +39,10 @@ class Node;
 
 // A translated text with inserted values (#345): `key` + `context` from TextLocalizationServer, `{name}` placeholders
 // from `args` and TextInsertionServer, the plural form from `count_argument`. Bound to an object property through
-// the metadata `localized_<property>`, it refreshes that property only when its locale channel, one of its
-// placeholder values, a catalog or the resource itself changed.
-// All tracked texts share one registry (static, main thread): a name index, a dirty list flushed once per frame and
-// a handful of signal connections in total, none per binding.
+// the one node metadata `localized_text` (a LocalizedText for `text`, or a dictionary property -> LocalizedText), it
+// refreshes that property only when its locale channel, one of its placeholder values, a catalog or the resource
+// itself changed. All tracked texts share one registry (static, main thread): a name index, a dirty list flushed once
+// per frame and a handful of signal connections in total, none per binding.
 class LocalizedText : public Resource {
 	GDCLASS(LocalizedText, Resource);
 
@@ -51,8 +51,6 @@ public:
 		REFRESH_ON_CHANGE,
 		REFRESH_EVERY_FRAME,
 	};
-
-	static constexpr const char *META_PREFIX = "localized_";
 
 private:
 	struct Binding {

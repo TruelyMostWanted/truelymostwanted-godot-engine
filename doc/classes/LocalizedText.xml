@@ -6,7 +6,7 @@
 	<description>
 		[LocalizedText] describes a text by its translation [member key] and [member context], fills its [code]{name}[/code] placeholders from [member args] and [TextInsertionServer], and picks the plural form from [member count_argument]. [method get_text] returns the current text.
 		Bound to a property of a node (for example [member Label.text], [member Button.text], [member RichTextLabel.text], [member Control.tooltip_text]), it sets that property again only when its text can have changed: when the locale of its channel changes ([signal TranslationServer.locale_changed]), when a value used by its placeholders changes ([signal TextInsertionServer.value_changed]), when catalogs change ([signal LocalizationServer.catalogs_changed]) or when one of its own properties changes. Refreshes are collected and run once at the end of the frame; a property is only set when its text is different.
-		A binding is the node metadata [code]localized_&lt;property&gt;[/code]: [code]localized_text[/code] binds [code]text[/code], [code]localized_tooltip_text[/code] binds [code]tooltip_text[/code]. Add it in the inspector with [b]Add Metadata[/b] (type [Object], then create or pick a [LocalizedText]), or call [method bind]. Metadata bindings are applied when the node enters the scene tree at run time (not in the editor) and removed when it leaves.
+		A binding is the node metadata [code]localized_text[/code]: a [LocalizedText] binds [code]text[/code], a [Dictionary] binds each property name to its [LocalizedText] (for example [code]{ "text": ..., "tooltip_text": ... }[/code]). Add it in the inspector with [b]Add Metadata[/b] (name [code]localized_text[/code], type [Object] to create or pick a [LocalizedText], or type [Dictionary]), or call [method bind]. Metadata bindings are applied when the node enters the scene tree at run time (not in the editor) and removed when it leaves; nodes without this one key cost a single lookup.
 		[codeblocks]
 		[gdscript]
 		# An NPC greeting: "Hello {player_name}!" in the catalog.
@@ -49,7 +49,7 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="property" type="StringName" default="&amp;&quot;text&quot;" />
 			<description>
-				Binds [param property] of [param target] to this text: sets the metadata [code]localized_&lt;property&gt;[/code] of [param target] to this resource and sets the property to [method get_text] now and whenever the text changes. A [LocalizedText] bound before to the same property is unbound. The channel of the binding is the translation domain ([method Object.get_translation_domain]) of [param target] at this moment, unless [member channel] is set.
+				Binds [param property] of [param target] to this text: stores this resource in the metadata [code]localized_text[/code] of [param target] (as the value for [code]text[/code], otherwise in a [Dictionary] by property name) and sets the property to [method get_text] now and whenever the text changes. A [LocalizedText] bound before to the same property is unbound. The channel of the binding is the translation domain ([method Object.get_translation_domain]) of [param target] at this moment, unless [member channel] is set.
 			</description>
 		</method>
 		<method name="get_text">
@@ -71,7 +71,7 @@
 			<param index="0" name="target" type="Object" />
 			<param index="1" name="property" type="StringName" default="&amp;&quot;text&quot;" />
 			<description>
-				Removes the binding of [param property] of [param target] and its metadata. The property keeps its last text. When it was the last binding of the node, the node's [member Node.auto_translate_mode] is restored.
+				Removes the binding of [param property] of [param target] and its entry in the metadata [code]localized_text[/code]. The property keeps its last text. When it was the last binding of the node, the node's [member Node.auto_translate_mode] is restored.
 			</description>
 		</method>
 	</methods>

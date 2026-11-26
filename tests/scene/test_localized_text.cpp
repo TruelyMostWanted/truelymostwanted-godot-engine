@@ -165,6 +165,10 @@ TEST_CASE("[SceneTree][LocalizedText] Bound controls refresh on locale, value an
 	greeting->bind(rich);
 	CHECK(button->get_text() == "Hello Ada!");
 	CHECK(button->get_tooltip_text() == "Hello Ada!");
+	// Two properties: the one metadata key holds a dictionary property -> text.
+	const Dictionary button_meta = button->get_meta("localized_text");
+	CHECK(button_meta.size() == 2);
+	CHECK(button_meta["tooltip_text"] == Variant(greeting));
 	CHECK(rich->get_text() == "Hello Ada!");
 
 	SIGNAL_WATCH(greeting.ptr(), SNAME("text_changed"));
@@ -197,7 +201,10 @@ TEST_CASE("[SceneTree][LocalizedText] Bound controls refresh on locale, value an
 	CHECK(button->get_text() == "Na, Cy?");
 	greeting->unbind(button);
 	CHECK(button->get_auto_translate_mode() == Node::AUTO_TRANSLATE_MODE_DISABLED); // The tooltip is still bound.
+	const Dictionary remaining = button->get_meta("localized_text");
+	CHECK(remaining.size() == 1);
 	greeting->unbind(button, "tooltip_text");
+	CHECK_FALSE(button->has_meta("localized_text"));
 	CHECK(button->get_auto_translate_mode() == Node::AUTO_TRANSLATE_MODE_INHERIT);
 
 	memdelete(label);
@@ -232,6 +239,49 @@ TEST_CASE("[SceneTree][LocalizedText] Metadata bindings follow the tree and the 
 	CHECK(greeting->get_text() == "Hallo Ada!"); // Its own channel is `interface`.
 
 	memdelete(subtitles);
+
+	// The dictionary form binds several properties of one node.
+	Button *button = memnew(Button);
+	Dictionary properties;
+	properties["text"] = greeting;
+	properties["tooltip_text"] = greeting;
+	button->set_meta("localized_text", properties);
+	root->add_child(button);
+	CHECK(button->get_text() == "Hallo Ada!");
+	CHECK(button->get_tooltip_text() == "Hallo Ada!");
+	CHECK(greeting->is_bound(button, "tooltip_text"));
+	root->remove_child(button);
+	CHECK_FALSE(greeting->is_bound(button, "tooltip_text"));
+	memdelete(button);
+}
+
+TEST_CASE("[SceneTree][LocalizedText] Cost of the node_added hook for nodes without bindings") {
+	Ref<LocalizedText> connect_registry = make_text("NPC_GREETING"); // Connects the hook to this tree.
+	Window *root = SceneTree::get_singleton()->get_root();
+	const int count = 10000;
+	LocalVector<Node *> nodes;
+	for (int idx = 0; idx < count; idx++) {
+		nodes.push_back(memnew(Node));
+	}
+	uint64_t start = OS::get_singleton()->get_ticks_usec();
+	for (Node *node : nodes) {
+		root->add_child(node);
+	}
+	const uint64_t add_usec = OS::get_singleton()->get_ticks_usec() - start;
+	// The hook alone, through the signal as the tree emits it.
+	start = OS::get_singleton()->get_ticks_usec();
+	for (Node *node : nodes) {
+		SceneTree::get_singleton()->emit_signal(SNAME("node_added"), node);
+	}
+	const uint64_t hook_usec = OS::get_singleton()->get_ticks_usec() - start;
+	CHECK_FALSE(nodes[0]->has_meta("localized_text"));
+	MESSAGE(vformat("LocalizedText node_added hook, %d nodes without bindings: emit node_added %d ns per node, add_child %d ns per node.",
+			count, (int)(hook_usec * 1000 / count), (int)(add_usec * 1000 / count))
+					.utf8()
+					.get_data());
+	for (Node *node : nodes) {
+		memdelete(node);
+	}
 }
 
 TEST_CASE("[SceneTree][LocalizedText] A value change refreshes only the texts using it, every frame refreshes") {
