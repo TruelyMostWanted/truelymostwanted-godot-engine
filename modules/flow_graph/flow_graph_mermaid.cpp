@@ -155,7 +155,6 @@ struct MermaidEdge {
 	String to;
 	String label;
 	bool data = false;
-	bool explicit_ports = false; // From `%% flow:edge`: label is "from_port:to_port".
 	int line = 0;
 };
 
@@ -352,7 +351,6 @@ struct MermaidReader {
 			edge.to = parts[3];
 			edge.label = parts[2] + ":" + parts[4];
 			edge.data = true;
-			edge.explicit_ports = true;
 			edge.line = p_line_number;
 			get_node(edge.from);
 			get_node(edge.to);

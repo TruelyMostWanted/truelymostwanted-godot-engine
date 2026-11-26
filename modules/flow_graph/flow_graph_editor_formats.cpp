@@ -45,7 +45,7 @@
 
 void FlowGraphExportPlugin::_export_file(const String &p_path, const String &p_type, const HashSet<String> &p_features) {
 	const String extension = p_path.get_extension().to_lower();
-	if (p_type != "FlowGraph" || extension == "tres" || extension == "res" || !GLOBAL_GET("flow_graph/export/convert_text_to_binary")) {
+	if (p_type != "FlowGraph" || extension == "tres" || extension == "res" || !bool(GLOBAL_GET("flow_graph/export/convert_text_to_binary"))) {
 		return;
 	}
 	const Ref<Resource> graph = ResourceLoader::load(p_path, "FlowGraph", ResourceFormatLoader::CACHE_MODE_IGNORE);
