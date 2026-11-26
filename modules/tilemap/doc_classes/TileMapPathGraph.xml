@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TileMapPathGraph" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A pathfinding graph built from a [TileMapLayer].
+	</brief_description>
+	<description>
+		Builds a pathfinding graph from the cells of a [TileMapLayer] and returns paths as cells or as local positions. Neighbors follow the tile shape, layout, offset axis and coordinate system of the [TileSet]; costs and blocked cells come from custom data layers named in [member options], or from [method _get_cell_cost] and [method _is_cell_blocked].
+		Two backends are used, chosen from the [TileSet] (see [enum Backend]): [AStarGrid2D] for square and diamond isometric maps, [AStar2D] for stacked and stairs isometric, half-offset square and hexagon maps.
+		The graph covers the used rect of the layer ([method get_region]). Blocked cells stay in the graph as solid or disabled points, so changing them is cheap. The layer has no per-cell change signal: call [method update_cells] after changing cells and [method update_all] after larger changes or a change of [member options].
+		To see the graph, use [method draw_debug] at runtime, or the path graph toggle in the toolbar of the TileMap editor, which also previews the path between two Alt+clicked cells.
+		[codeblocks]
+		[gdscript]
+		var graph = TileMapPathGraph.create($Ground)
+		var cells = graph.get_cell_path(Vector2i(0, 0), Vector2i(10, 4))
+		var points = graph.get_point_path(Vector2i(0, 0), Vector2i(10, 4))
+
+		$Ground.set_cell(Vector2i(5, 2), 0, Vector2i(1, 0))
+		graph.update_cells([Vector2i(5, 2)])
+		[/gdscript]
+		[csharp]
+		var ground = GetNode&lt;TileMapLayer&gt;("Ground");
+		var graph = TileMapPathGraph.Create(ground);
+		var cells = graph.GetCellPath(new Vector2I(0, 0), new Vector2I(10, 4));
+		var points = graph.GetPointPath(new Vector2I(0, 0), new Vector2I(10, 4));
+
+		ground.SetCell(new Vector2I(5, 2), 0, new Vector2I(1, 0));
+		graph.UpdateCells([new Vector2I(5, 2)]);
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] Not thread-safe, like [AStar2D]: build and query on one thread. The graph backend uses several times the memory of the grid backend per cell; prefer square or diamond isometric maps for very large maps on the Web and mobile.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="_get_cell_cost" qualifiers="virtual const">
+			<return type="float" />
+			<param index="0" name="cell" type="Vector2i" />
+			<param index="1" name="tile_data" type="TileData" />
+			<description>
+				Override to compute the cost of entering [param cell] yourself. When overridden, [member TileMapPathGraphOptions.cost_data_layer] and [member TileMapPathGraphOptions.default_cost] are not used. [param tile_data] is [code]null[/code] for empty cells. Negative values are treated as [code]0[/code].
+				Called for every cell of the graph at [method update_all] and for each given cell at [method update_cells], so keep it fast on large maps.
+			</description>
+		</method>
+		<method name="_is_cell_blocked" qualifiers="virtual const">
+			<return type="bool" />
+			<param index="0" name="cell" type="Vector2i" />
+			<param index="1" name="tile_data" type="TileData" />
+			<description>
+				Override to decide yourself whether [param cell] is blocked. When overridden, [member TileMapPathGraphOptions.blocked_data_layer] and [member TileMapPathGraphOptions.empty_cells_blocked] are not used. [param tile_data] is [code]null[/code] for empty cells.
+			</description>
+		</method>
+		<method name="cell_to_point_id" qualifiers="static">
+			<return type="int" />
+			<param index="0" name="cell" type="Vector2i" />
+			<description>
+				Returns the [AStar2D] point id of [param cell] used by the graph backend: [code]((x + 32768) &lt;&lt; 16) | (y + 32768)[/code]. The id is never negative and unique for every cell a [TileMapLayer] can save (-32768 to 32767 per coordinate). Returns [code]-1[/code] and prints an error for cells outside that range. See [method point_id_to_cell].
+			</description>
+		</method>
+		<method name="create" qualifiers="static">
+			<return type="TileMapPathGraph" />
+			<param index="0" name="layer" type="TileMapLayer" />
+			<param index="1" name="options" type="TileMapPathGraphOptions" default="null" />
+			<description>
+				Creates a graph for [param layer] with [param options] (default options if [code]null[/code]) and builds it with [method update_all]. For a subclass with overridden virtuals, use [code]new()[/code], [method set_layer] and [method update_all] instead.
+			</description>
+		</method>
+		<method name="draw_debug" qualifiers="const">
+			<return type="void" />
+			<param index="0" name="canvas_item" type="RID" />
+			<param index="1" name="cells" type="Rect2i" default="Rect2i(0, 0, 0, 0)" />
+			<param index="2" name="blocked_color" type="Color" default="Color(1, 0.2, 0.1, 0.5)" />
+			<param index="3" name="cost_color" type="Color" default="Color(1, 0.8, 0, 0.5)" />
+			<description>
+				Draws the graph into [param canvas_item] for debugging: blocked cells are filled with [param blocked_color], walkable cells are shaded with [param cost_color] by cost. The alpha of [param cost_color] is scaled from [code]0[/code] for the cheapest drawn cell to its full value for the most expensive one; if all drawn cells cost the same, none is shaded. Each cell is drawn with the tile shape of the [TileSet].
+				Only the cells of [param cells] inside [method get_region] are drawn; an empty [param cells] draws the whole region. On large maps, pass the cells on screen. The geometry is in local coordinates of the layer and is added in one [method RenderingServer.canvas_item_add_triangle_array] call; the canvas item is not cleared first. Draws nothing before the first [method update_all].
+				Works in every build. Call it from [method CanvasItem._draw] of a [Node2D] child of the layer and redraw on [signal updated]:
+				[codeblocks]
+				[gdscript]
+				extends Node2D
+
+				var graph: TileMapPathGraph
+
+				func _ready():
+					if not OS.is_debug_build():
+						return
+					graph = TileMapPathGraph.create(get_parent())
+					graph.updated.connect(queue_redraw)
+					queue_redraw()
+
+				func _draw():
+					if graph:
+						graph.draw_debug(get_canvas_item())
+				[/gdscript]
+				[csharp]
+				using Godot;
+
+				public partial class PathGraphDebug : Node2D
+				{
+					private TileMapPathGraph _graph;
+
+					public override void _Ready()
+					{
+						if (!OS.IsDebugBuild())
+						{
+							return;
+						}
+						_graph = TileMapPathGraph.Create(GetParent&lt;TileMapLayer&gt;());
+						_graph.Updated += QueueRedraw;
+						QueueRedraw();
+					}
+
+					public override void _Draw()
+					{
+						_graph?.DrawDebug(GetCanvasItem());
+					}
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_astar" qualifiers="const">
+			<return type="AStar2D" />
+			<description>
+				Returns the [AStar2D] of the graph backend, or [code]null[/code] when the grid backend is used. Point ids come from [method cell_to_point_id], positions are local positions of the layer. Changes made directly are lost at the next [method update_all].
+			</description>
+		</method>
+		<method name="get_astar_grid" qualifiers="const">
+			<return type="AStarGrid2D" />
+			<description>
+				Returns the [AStarGrid2D] of the grid backend, or [code]null[/code] when the graph backend is used. Points are the cells themselves; positions are in cell units, not local positions. Useful for advanced settings such as [member AStarGrid2D.jumping_enabled] on large square maps. Changes made directly are lost at the next [method update_all].
+			</description>
+		</method>
+		<method name="get_backend" qualifiers="const">
+			<return type="int" enum="TileMapPathGraph.Backend" />
+			<description>
+				Returns the backend chosen at the last [method update_all].
+			</description>
+		</method>
+		<method name="get_cell_cost" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="cell" type="Vector2i" />
+			<description>
+				Returns the cost of entering [param cell], or [code]0[/code] for cells outside [method get_region].
+			</description>
+		</method>
+		<method name="get_cell_path">
+			<return type="Vector2i[]" />
+			<param index="0" name="from" type="Vector2i" />
+			<param index="1" name="to" type="Vector2i" />
+			<param index="2" name="allow_partial_path" type="bool" default="false" />
+			<description>
+				Returns the cells of the cheapest path from [param from] to [param to], both included. Returns an empty array if there is no path, if [param from] is blocked or if a cell is outside [method get_region].
+				If [param allow_partial_path] is [code]true[/code] and [param to] can't be reached, returns the path to the reachable cell closest to [param to].
+			</description>
+		</method>
+		<method name="get_layer" qualifiers="const">
+			<return type="TileMapLayer" />
+			<description>
+				Returns the layer the graph is built from, or [code]null[/code] if none is set or it was freed.
+			</description>
+		</method>
+		<method name="get_point_path">
+			<return type="PackedVector2Array" />
+			<param index="0" name="from" type="Vector2i" />
+			<param index="1" name="to" type="Vector2i" />
+			<param index="2" name="allow_partial_path" type="bool" default="false" />
+			<description>
+				Like [method get_cell_path], but returns the centers of the cells as local positions of the layer ([method TileMapLayer.map_to_local]).
+			</description>
+		</method>
+		<method name="get_region" qualifiers="const">
+			<return type="Rect2i" />
+			<description>
+				Returns the cells covered by the graph: the used rect of the layer at the last build ([method TileMapLayer.get_used_rect]). Grows when [method update_cells] gets a painted cell outside of it.
+			</description>
+		</method>
+		<method name="is_cell_blocked" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="cell" type="Vector2i" />
+			<description>
+				Returns [code]true[/code] if [param cell] is blocked or outside [method get_region].
+			</description>
+		</method>
+		<method name="point_id_to_cell" qualifiers="static">
+			<return type="Vector2i" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Returns the cell of an [AStar2D] point id made by [method cell_to_point_id].
+			</description>
+		</method>
+		<method name="set_layer">
+			<return type="void" />
+			<param index="0" name="layer" type="TileMapLayer" />
+			<description>
+				Sets the layer the graph is built from. The graph keeps no reference to it. Call [method update_all] afterwards.
+			</description>
+		</method>
+		<method name="update_all">
+			<return type="int" enum="Error" />
+			<description>
+				Builds the whole graph from the layer: chooses the backend, takes the used rect, resolves the custom data layer names and computes every cell. Returns [constant ERR_UNCONFIGURED] without a layer or [TileSet], and [constant ERR_PARAMETER_RANGE_ERROR] if the graph backend gets cells outside -32768 to 32767. Emits [signal updated].
+			</description>
+		</method>
+		<method name="update_cells">
+			<return type="void" />
+			<param index="0" name="cells" type="Vector2i[]" />
+			<description>
+				Recomputes only [param cells] (blocked state and cost) after they were changed in the layer. Cells outside [method get_region] that now hold a tile trigger a full [method update_all]. Emits [signal updated].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="options" type="TileMapPathGraphOptions" setter="set_options" getter="get_options">
+			The settings of the graph. Setting [code]null[/code] restores the defaults. Changes take effect at the next [method update_all].
+		</member>
+	</members>
+	<signals>
+		<signal name="updated">
+			<description>
+				Emitted after [method update_all] and [method update_cells], for example to redraw a debug overlay.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="BACKEND_GRID" value="0" enum="Backend">
+			[AStarGrid2D]: square maps and isometric maps with a diamond layout. Compact and contiguous in memory.
+		</constant>
+		<constant name="BACKEND_GRAPH" value="1" enum="Backend">
+			[AStar2D] with the neighbors of the [TileSet] layout: stacked and stairs isometric, half-offset square and hexagon maps.
+		</constant>
+		<constant name="BACKEND_MAX" value="2" enum="Backend">
+			Represents the size of the [enum Backend] enum.
+		</constant>
+	</constants>
+</class>

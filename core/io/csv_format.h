@@ -30,23 +30,30 @@
 
 #pragma once
 
-#include "core/io/resource.h"
 #include "core/io/serializer_options.h"
-#include "core/object/ref_counted.h"
+#include "core/io/text_data_format.h"
 #include "core/variant/array.h"
 
-// Reads and writes CSV text (RFC 4180) as an Array of rows, and any list Resource as CSV (format FORMAT_CSV
-// of ResourceTextSerializer). With SerializerOptions.csv_headers, the first row names the columns and every
-// other row is a Dictionary of column -> cell; without, every row is a PackedStringArray. Cells stay String.
-class CSV : public RefCounted {
-	GDCLASS(CSV, RefCounted);
+// A CSV file (RFC 4180) as a Resource: `data` is an Array of rows (PackedStringArray), `header` the column
+// names when SerializerOptions.csv_headers is on. Columns are addressed by index; find_column() resolves a
+// header name. The static functions also read and write any list Resource as CSV (format FORMAT_CSV of
+// ResourceTextSerializer); parse_string() returns rows as Dictionary (with headers) or PackedStringArray.
+class CSV : public TextDataFormat {
+	GDCLASS(CSV, TextDataFormat);
 
-	Array data;
-	String error_message;
-	int error_line = 0;
+	PackedStringArray header;
+
+	Array _get_rows() const;
 
 protected:
 	static void _bind_methods();
+
+	virtual Error _parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) override;
+	virtual Error _encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const override;
+	virtual Variant _get_empty_data() const override { return Array(); }
+	virtual Variant::Type _get_data_type() const override { return Variant::ARRAY; }
+	virtual void _get_extensions(List<String> *r_extensions) const override;
+	virtual void _cleared() override { header = PackedStringArray(); }
 
 public:
 	// On error, r_line is the 1-based line of the problem.
@@ -54,14 +61,27 @@ public:
 	// Rows are arrays (PackedStringArray or Array) or dictionaries (columns in order of first appearance).
 	static Error write_text(const Array &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error);
 
-	// Bound API.
-	Error parse(const String &p_text, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
-	Array get_data() const { return data; }
-	String get_error_message() const { return error_message; }
-	int get_error_line() const { return error_line; }
+	void set_header(const PackedStringArray &p_header);
+	PackedStringArray get_header() const { return header; }
+
+	int get_row_count() const;
+	int get_column_count() const;
+	PackedStringArray get_row(int p_row) const;
+	Dictionary get_row_as_dictionary(int p_row) const;
+	void append_row(const PackedStringArray &p_values);
+	void insert_row(int p_row, const PackedStringArray &p_values);
+	void remove_row(int p_row);
+	void set_row(int p_row, const PackedStringArray &p_values);
+	String get_cell(int p_row, int p_column) const;
+	void set_cell(int p_row, int p_column, const String &p_value);
+	int find_column(const String &p_name) const;
+	PackedStringArray get_column(int p_column) const;
+	PackedInt32Array find_rows(int p_column, const String &p_value) const;
 
 	static Array parse_string(const String &p_text, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static String stringify(const Array &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static String serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static Ref<Resource> deserialize(const String &p_text, const StringName &p_type_hint = StringName(), const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+
+	CSV();
 };

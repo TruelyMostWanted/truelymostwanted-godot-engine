@@ -21,7 +21,7 @@
 	<tutorials>
 	</tutorials>
 	<members>
-		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph" default="null">
+		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph">
 			The graph to run. It is a separate resource and keeps its own nodes, variables and start node.
 		</member>
 	</members>

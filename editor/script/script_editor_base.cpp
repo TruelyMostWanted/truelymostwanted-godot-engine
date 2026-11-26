@@ -31,6 +31,7 @@
 #include "script_editor_base.h"
 
 #include "core/io/json.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "editor/editor_node.h"
@@ -617,6 +618,15 @@ void TextEditorBase::set_edited_resource(const Ref<Resource> &p_res) {
 		text = json_file->get_parsed_text();
 	}
 
+	// Plain data files (INI, CSV, XML, TOML, YAML): the kept text, or the data as text if it was changed.
+	Ref<TextDataFormat> data_file = edited_res;
+	if (data_file.is_valid()) {
+		text = data_file->get_parsed_text();
+		if (text.is_empty()) {
+			text = data_file->encode_to_text();
+		}
+	}
+
 	code_editor->get_text_editor()->set_text(text);
 	code_editor->get_text_editor()->clear_undo_history();
 	code_editor->get_text_editor()->tag_saved_version();
@@ -651,6 +661,12 @@ void TextEditorBase::reload_text() {
 	Ref<JSON> json_file = edited_res;
 	if (json_file.is_valid()) {
 		te->set_text(json_file->get_parsed_text());
+	}
+
+	Ref<TextDataFormat> data_file = edited_res;
+	if (data_file.is_valid()) {
+		const String data_text = data_file->get_parsed_text();
+		te->set_text(data_text.is_empty() ? data_file->encode_to_text() : data_text);
 	}
 
 	Ref<Script> script = edited_res;
