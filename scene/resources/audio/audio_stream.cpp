@@ -37,6 +37,29 @@
 #include "servers/audio/audio_driver.h"
 #include "servers/audio/audio_server.h"
 
+struct AudioStream::StreamInfo {
+	String title;
+	String artist;
+	String album;
+	String album_artist;
+	String genre;
+	String composer;
+	String copyright;
+	String comment;
+	int track_number = 0;
+	int track_count = 0;
+	int disc_number = 0;
+	int disc_count = 0;
+	int year = 0;
+	Ref<Texture2D> cover;
+	Vector<uint8_t> cover_data; // Encoded picture as stored in the file, decoded into `cover` on first access.
+	// Format of streams without audio data (`load_info()`).
+	double length = 0.0;
+	int sample_rate = 0;
+	int channel_count = 0;
+	int bitrate = 0;
+};
+
 void AudioStreamPlayback::start(double p_from_pos) {
 	GDVIRTUAL_CALL(_start, p_from_pos);
 }
@@ -337,29 +360,6 @@ Ref<AudioSample> AudioStream::generate_sample() const {
 	sample->stream = this;
 	return sample;
 }
-
-struct AudioStream::StreamInfo {
-	String title;
-	String artist;
-	String album;
-	String album_artist;
-	String genre;
-	String composer;
-	String copyright;
-	String comment;
-	int track_number = 0;
-	int track_count = 0;
-	int disc_number = 0;
-	int disc_count = 0;
-	int year = 0;
-	Ref<Texture2D> cover;
-	Vector<uint8_t> cover_data; // Encoded picture as stored in the file, decoded into `cover` on first access.
-	// Format of streams without audio data (`load_info()`).
-	double length = 0.0;
-	int sample_rate = 0;
-	int channel_count = 0;
-	int bitrate = 0;
-};
 
 AudioStream::StreamInfo *AudioStream::_stream_info_ptrw() {
 	if (!stream_info) {
