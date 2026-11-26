@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XMLElement" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A view of one element of an [XML] tree.
+	</brief_description>
+	<description>
+		[XMLElement] is a lightweight, lazily created view of one element in the tree of an [XML] resource. It stores no copy: reads show the tree and writes (name, text, attributes, children) change the tree of the [XML] resource. A change drops the text kept by [method TextDataFormat.parse], so comments and formatting are lost on the next save.
+		Get the root element with [method XML.get_root] or [method XML.create_root]. Create a new element with [code]XMLElement.new()[/code] and attach it with [method add_child].
+		Paths of [method find_first] and [method find_all] are element names separated by [code]/[/code], relative to this element ([code]"items/item"[/code]).
+		[codeblocks]
+		[gdscript]
+		var xml = XML.new()
+		xml.parse("&lt;shop&gt;&lt;item id=\"1\"&gt;Sword&lt;/item&gt;&lt;/shop&gt;")
+		var item = XMLElement.new()
+		item.name = "item"
+		item.set_attribute("id", "2")
+		item.text = "Shield"
+		xml.get_root().add_child(item)
+		print(xml.find_all("item").size()) # Prints 2
+		[/gdscript]
+		[csharp]
+		var xml = new Xml();
+		xml.Parse("&lt;shop&gt;&lt;item id=\"1\"&gt;Sword&lt;/item&gt;&lt;/shop&gt;");
+		var item = new Godot.XmlElement();
+		item.Name = "item";
+		item.SetAttribute("id", "2");
+		item.Text = "Shield";
+		xml.GetRoot().AddChild(item);
+		GD.Print(xml.FindAll("item").Count); // Prints 2
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] In C# the class is [code]XmlElement[/code], which clashes with [code]System.Xml.XmlElement[/code] when both namespaces are imported. Use the qualified name [code]Godot.XmlElement[/code].
+		[b]Note:[/b] The whole tree is kept in memory. For huge files use [XMLParser] and [XMLWriter].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_child">
+			<return type="void" />
+			<param index="0" name="element" type="XMLElement" />
+			<description>
+				Adds [param element] as the last child of this element. The child then belongs to this tree. An element can't be its own child.
+			</description>
+		</method>
+		<method name="find_all" qualifiers="const">
+			<return type="XMLElement[]" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns all descendants that match [param path]: element names separated by [code]/[/code], relative to this element. Returns an empty array if there is no match.
+			</description>
+		</method>
+		<method name="find_first" qualifiers="const">
+			<return type="XMLElement" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns the first descendant that matches [param path]: element names separated by [code]/[/code], relative to this element. Returns [code]null[/code] if there is no match.
+			</description>
+		</method>
+		<method name="get_attribute" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="default" type="String" default="&quot;&quot;" />
+			<description>
+				Returns the value of the attribute [param name], or [param default] if the element has no such attribute.
+			</description>
+		</method>
+		<method name="get_attributes" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns a copy of all attributes as a [Dictionary] of attribute name to value. Changing the copy does not change the tree; use [method set_attribute].
+			</description>
+		</method>
+		<method name="get_children" qualifiers="const">
+			<return type="XMLElement[]" />
+			<description>
+				Returns the child elements in document order. Text nodes are not included; see [member text].
+			</description>
+		</method>
+		<method name="get_children_by_name" qualifiers="const">
+			<return type="XMLElement[]" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the child elements with the tag name [param name] in document order.
+			</description>
+		</method>
+		<method name="has_attribute" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [code]true[/code] if the element has the attribute [param name].
+			</description>
+		</method>
+		<method name="remove_attribute">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Removes the attribute [param name]. Does nothing if the element has no such attribute.
+			</description>
+		</method>
+		<method name="remove_child">
+			<return type="void" />
+			<param index="0" name="element" type="XMLElement" />
+			<description>
+				Removes [param element] from the children of this element. Prints an error if it is not a child.
+			</description>
+		</method>
+		<method name="set_attribute">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="value" type="String" />
+			<description>
+				Sets the attribute [param name] to [param value]. Prints an error if [param name] is empty.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="name" type="String" setter="set_name" getter="get_name">
+			The tag name of the element.
+		</member>
+		<member name="text" type="String" setter="set_text" getter="get_text">
+			The text of the direct text children of the element, joined together. Setting it replaces all text nodes of the element and keeps its child elements.
+		</member>
+	</members>
+</class>

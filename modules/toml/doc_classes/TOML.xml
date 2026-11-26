@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="TOML" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+<class name="TOML" inherits="TextDataFormat" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
 	<brief_description>
 		Reads and writes TOML, and any [Resource] as a TOML file.
 	</brief_description>
@@ -54,6 +54,25 @@
 		[b]Reading:[/b] all of TOML 1.0 is supported: tables, dotted keys, arrays of tables, inline tables, basic, literal and multi-line strings, integers in decimal, hexadecimal ([code]0x[/code]), octal ([code]0o[/code]) and binary ([code]0b[/code]), floats including [code]inf[/code] and [code]nan[/code], booleans and comments. Dates and times have no [Variant] type and are returned as [String]s, as written in the file. Errors stop the parsing and are reported with line and column.
 		[b]Writing:[/b] keys keep their order. In each table the plain keys come first, then its sub-tables and arrays of tables, because TOML does not allow a key of a table after the header of one of its sub-tables. Strings with line breaks are written as multi-line strings. Arrays that contain tables together with other values are written with inline tables.
 		[b]Note:[/b] TOML has no [code]null[/code]. [code]null[/code] is written as an empty string [code]""[/code]; when a resource is loaded, an empty string sets an object property to [code]null[/code] and keeps the default value of a number or [bool] property.
+		[b]Resource and files:[/b] [TOML] is a [Resource] (see [TextDataFormat]). [code]load("res://x.toml")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_table] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
+		[b]Paths:[/b] a table path is dotted ([code]"window.size"[/code]); the empty path [code]""[/code] is the root table. A table name that contains [code].[/code] or [code]\[/code] is escaped with [code]\[/code] in the path ([code]"a\.b"[/code] is the one table [code]a.b[/code]).
+		[codeblocks]
+		[gdscript]
+		var toml = TOML.new()
+		toml.set_value("window", "width", 1280)
+		toml.set_value("window.mode", "fullscreen", false)
+		toml.save("user://settings.toml")
+		print(toml.get_value("window", "width")) # Prints 1280
+		[/gdscript]
+		[csharp]
+		var toml = new Toml();
+		toml.SetValue("window", "width", 1280);
+		toml.SetValue("window.mode", "fullscreen", false);
+		toml.Save("user://settings.toml");
+		GD.Print(toml.GetValue("window", "width")); // Prints 1280
+		[/csharp]
+		[/codeblocks]
 		[b]Note:[/b] The static methods can be called from any thread. A [TOML] instance should be used by one thread at a time.
 	</description>
 	<tutorials>
@@ -69,35 +88,56 @@
 				Creates a resource from TOML [param text]. The class comes from the key [code]"$type"[/code] of the root table, or from [param type_hint]. Missing keys keep the default value of the class; unknown keys are skipped with a warning. Returns [code]null[/code] and prints an error if the text can't be read. [param options] is accepted for symmetry with [method ResourceTextSerializer.deserialize]; reading TOML has no options yet. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_TOML, type_hint, options)[/code].
 			</description>
 		</method>
-		<method name="get_data" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="erase_table">
+			<return type="void" />
+			<param index="0" name="table_path" type="String" />
 			<description>
-				Returns the document read by the last successful call to [method parse], or an empty [Dictionary].
+				Erases the table at [param table_path] with all its keys and sub-tables. Prints an error if it does not exist; the root table can't be erased (use [method TextDataFormat.clear]). Drops the kept parsed text.
 			</description>
 		</method>
-		<method name="get_error_column" qualifiers="const">
-			<return type="int" />
+		<method name="erase_table_key">
+			<return type="void" />
+			<param index="0" name="table_path" type="String" />
+			<param index="1" name="key" type="String" />
 			<description>
-				Returns the column (starting at 1) of the error of the last call to [method parse], or [code]0[/code] if there was no error.
+				Erases the key [param key] of the table at [param table_path]. Prints an error if it does not exist. Drops the kept parsed text.
 			</description>
 		</method>
-		<method name="get_error_line" qualifiers="const">
-			<return type="int" />
+		<method name="get_table_keys" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="table_path" type="String" />
 			<description>
-				Returns the line (starting at 1) of the error of the last call to [method parse], or [code]0[/code] if there was no error.
+				Returns the keys of the table at [param table_path] in file order, or an empty array if the table does not exist.
 			</description>
 		</method>
-		<method name="get_error_message" qualifiers="const">
-			<return type="String" />
+		<method name="get_tables" qualifiers="const">
+			<return type="PackedStringArray" />
 			<description>
-				Returns the error message of the last call to [method parse], or an empty string if there was no error.
+				Returns the dotted paths of all tables, including nested ones, in file order. The root table is not included. Names with [code].[/code] or [code]\[/code] are escaped as described in the class description.
 			</description>
 		</method>
-		<method name="parse">
-			<return type="int" enum="Error" />
-			<param index="0" name="text" type="String" />
+		<method name="get_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="table_path" type="String" />
+			<param index="1" name="key" type="String" />
+			<param index="2" name="default" type="Variant" default="null" />
 			<description>
-				Reads the TOML document [param text]. Returns [constant OK] on success; the result is then available with [method get_data]. Returns [constant ERR_PARSE_ERROR] if the text is not valid TOML; [method get_error_message], [method get_error_line] and [method get_error_column] describe the problem.
+				Returns the value of [param key] in the table at [param table_path], or [param default] if the table or key does not exist. Use [code]""[/code] as [param table_path] for the root table.
+			</description>
+		</method>
+		<method name="has_table" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="table_path" type="String" />
+			<description>
+				Returns [code]true[/code] if the table at [param table_path] exists.
+			</description>
+		</method>
+		<method name="has_table_key" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="table_path" type="String" />
+			<param index="1" name="key" type="String" />
+			<description>
+				Returns [code]true[/code] if the table at [param table_path] has the key [param key].
 			</description>
 		</method>
 		<method name="parse_string" qualifiers="static">
@@ -113,6 +153,15 @@
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
 				Returns [param resource] as TOML text, with the same property mapping as the JSON format of [ResourceTextSerializer]. Of [param options], [member SerializerOptions.enums_as_names], [member SerializerOptions.defaults], [member SerializerOptions.include_type_marker], [member SerializerOptions.sort_keys] and [member SerializerOptions.full_precision_floats] apply; TOML ignores [member SerializerOptions.indent]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code]. Returns an empty string and prints an error if the resource can't be written, for example if it contains itself. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_TOML, options)[/code].
+			</description>
+		</method>
+		<method name="set_value">
+			<return type="void" />
+			<param index="0" name="table_path" type="String" />
+			<param index="1" name="key" type="String" />
+			<param index="2" name="value" type="Variant" />
+			<description>
+				Sets the value of [param key] in the table at [param table_path]; missing tables are created. TOML has no [code]null[/code], so a [code]null[/code] [param value] erases the key. Use [code]""[/code] as [param table_path] for the root table. Drops the kept parsed text.
 			</description>
 		</method>
 		<method name="stringify" qualifiers="static">

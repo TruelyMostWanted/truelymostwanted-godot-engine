@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextDataFormat" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Base class of the data file formats [INI], [CSV], [XML], [TOML] and [YAML].
+	</brief_description>
+	<description>
+		[TextDataFormat] holds the parsed [member data] of one text file. It is the abstract base of [INI], [CSV], [XML], [TOML] and [YAML] and of formats added by modules or extensions; use one of those classes. Like [JSON], these classes are [Resource]s: [code]load("res://x.ini")[/code] of a plain file returns the format resource, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options.
+		[method parse] reads text into [member data]. With [code]keep_text[/code], the text is kept (also if it has errors, like [member JSON.data] after [method JSON.parse]) and written back as it is on save while [member data] is unchanged, so comments and formatting survive. The editor keeps the text of files it opens; exported games do not, to save memory.
+		The instance methods [method load] and [method save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		Changing the data (in the inspector, by setting [member data], or with the editing methods of the subclasses such as [method INI.set_value], [method CSV.set_cell] or the writes of [XMLElement]) drops the kept text, so comments and formatting are lost on the next save.
+		[member options] decides how text is read and written ([member SerializerOptions.csv_delimiter], [member SerializerOptions.indent], ...). [code]null[/code] uses the project settings.
+		[codeblocks]
+		[gdscript]
+		var file = TOML.new()
+		if file.parse("# Window\n[window]\nwidth = 1280\n", true) == OK:
+			print(file.data["window"]["width"]) # Prints 1280
+			file.save("user://window.toml") # Saved as parsed, with the comment.
+		else:
+			print("Line %d, column %d: %s" % [file.get_error_line(), file.get_error_column(), file.get_error_message()])
+		[/gdscript]
+		[csharp]
+		var file = new Toml();
+		if (file.Parse("# Window\n[window]\nwidth = 1280\n", true) == Error.Ok)
+		{
+			GD.Print(file.Data.AsGodotDictionary()["window"].AsGodotDictionary()["width"]); // Prints 1280
+			file.Save("user://window.toml"); // Saved as parsed, with the comment.
+		}
+		else
+		{
+			GD.Print($"Line {file.GetErrorLine()}, column {file.GetErrorColumn()}: {file.GetErrorMessage()}");
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] An instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Resets [member data] to the empty value of the format, removes the kept text and clears the error. Subclasses also reset their own state, for example the header of a [CSV].
+			</description>
+		</method>
+		<method name="encode_to_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns [member data] as text of this format, using [member options]. Prints an error and returns an empty [String] if [member data] does not fit the format. Unlike [method save], it never returns the kept text.
+			</description>
+		</method>
+		<method name="get_error_column" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the 1-based column of the error of the last call to [method parse] or [method load], or [code]0[/code] if there was no error or the column is unknown. [INI], [CSV] and [XML] always return [code]0[/code]; [TOML] and [YAML] report the column.
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the 1-based line of the error of the last call to [method parse] or [method load], or [code]0[/code] if there was no error.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last call to [method parse] or [method load], or an empty [String] if there was no error.
+			</description>
+		</method>
+		<method name="get_parsed_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the text kept by [method parse] with [code]keep_text[/code] set, or an empty [String] if no text is kept. The text is dropped when [member data] changes.
+			</description>
+		</method>
+		<method name="get_recognized_extensions" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the file extensions of this format, without the dot, for example [code]["yaml", "yml"][/code] for [YAML].
+			</description>
+		</method>
+		<method name="load">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Reads the file at [param path] and parses it, like [method ConfigFile.load]. The resource cache is not used and [member Resource.resource_path] is not changed. Returns [constant OK], or an error code if the file can't be read or parsed; see [method get_error_message].
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="keep_text" type="bool" default="false" />
+			<description>
+				Parses [param text] with [member options] and stores the result in [member data]. If [param keep_text] is [code]true[/code], the text is kept for [method get_parsed_text] and [method save], also if parsing fails. Returns [constant OK], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_message], [method get_error_line] and [method get_error_column]. After an error, [member data] is the empty value of the format.
+			</description>
+		</method>
+		<method name="save">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Writes the file at [param path], like [method ConfigFile.save]. If text was kept by [method parse] and [member data] has not changed since, the kept text is written, so comments and formatting survive; otherwise [member data] is written with [member options]. Returns [constant OK] or an error code. In exported games [code]res://[/code] is read-only: save to [code]user://[/code].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data">
+			The parsed content: the type depends on the format ([Dictionary] for [INI], [XML] and [TOML], [Array] of [PackedStringArray] rows for [CSV], any [Variant] for [YAML]). Setting it drops the kept parsed text. Setting a value of the wrong type for the format prints an error.
+		</member>
+		<member name="options" type="SerializerOptions" setter="set_options" getter="get_options">
+			The options used by [method parse], [method encode_to_text] and [method save]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code].
+		</member>
+	</members>
+</class>

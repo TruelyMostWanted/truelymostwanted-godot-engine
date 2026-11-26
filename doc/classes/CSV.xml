@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="CSV" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="CSV" inherits="TextDataFormat" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Reads and writes CSV text as arrays, and list resources as CSV.
 	</brief_description>
 	<description>
-		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
+		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
 		Cells that contain the delimiter, a double quote, a line break or leading or trailing spaces are written in double quotes, and a double quote inside is doubled ([code]""[/code]). The delimiter comes from [member SerializerOptions.csv_delimiter] (one character, for example [code];[/code] or a tab).
-		With [member SerializerOptions.csv_headers] (the default), the first row names the columns and [method parse] returns an [Array] of [Dictionary], one per row, keyed by column name. Without it, every row is a [PackedStringArray]. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
+		The [member TextDataFormat.data] of an instance is an [Array] of rows, each row a [PackedStringArray]. With [member SerializerOptions.csv_headers] (the default), the first line names the columns: it is stored in [member header] and is not part of the data, and [method get_row_as_dictionary] keys a row by column name. Without it, [member header] is empty and every line is a data row. Columns are [int] indices; [method find_column] resolves a name. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
+The static [method parse_string] returns an [Array] of [Dictionary] keyed by column name when headers are on, and an [Array] of [PackedStringArray] otherwise.
 		[codeblocks]
 		[gdscript]
 		var csv = CSV.new()
 		if csv.parse("name,level\nAnn,3\n\"Bob, the 2nd\",7\n") == OK:
-			for row in csv.get_data():
-				print(row["name"], " ", int(row["level"]))
+			for i in csv.get_row_count():
+				print(csv.get_cell(i, csv.find_column("name")), " ", int(csv.get_cell(i, 1)))
 		else:
 			print(csv.get_error_message()) # For example "Line 2: ..."; the line alone is csv.get_error_line().
 
@@ -24,10 +25,9 @@
 		var csv = new Csv();
 		if (csv.Parse("name,level\nAnn,3\n\"Bob, the 2nd\",7\n") == Error.Ok)
 		{
-			foreach (var row in csv.GetData())
+			for (int i = 0; i &lt; csv.GetRowCount(); i++)
 			{
-				var record = row.AsGodotDictionary();
-				GD.Print(record["name"], " ", record["level"].AsString().ToInt());
+				GD.Print(csv.GetCell(i, csv.FindColumn("name")), " ", csv.GetCell(i, 1).ToInt());
 			}
 		}
 		else
@@ -39,11 +39,21 @@
 		GD.Print(Csv.Stringify(rows));
 		[/csharp]
 		[/codeblocks]
+		[b]Resource and files:[/b] [CSV] is a [Resource] (see [TextDataFormat]). [code]load("res://x.csv")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_cell], [method append_row] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
+		[b]Import:[/b] CSV files that are imported as translations still load as [Translation]. Only files imported with [b]Keep File[/b] load as [CSV].
 		[b]Note:[/b] The static methods can be called from any thread. A [CSV] instance should be used by one thread at a time.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="append_row">
+			<return type="void" />
+			<param index="0" name="values" type="PackedStringArray" />
+			<description>
+				Adds [param values] as a new row at the end. Drops the kept parsed text.
+			</description>
+		</method>
 		<method name="deserialize" qualifiers="static">
 			<return type="Resource" />
 			<param index="0" name="text" type="String" />
@@ -53,30 +63,68 @@
 				Creates a list [Resource] of the class [param type_hint] from CSV [param text]: every row becomes one element of its typed array of resources. CSV has no type marker, so [param type_hint] is needed. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_CSV, type_hint, options)[/code].
 			</description>
 		</method>
-		<method name="get_data" qualifiers="const">
-			<return type="Array" />
+		<method name="find_column" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="name" type="String" />
 			<description>
-				Returns the rows read by the last successful call to [method parse], or an empty [Array].
+				Returns the index of the column named [param name] in [member header], or [code]-1[/code] if there is no such column.
 			</description>
 		</method>
-		<method name="get_error_line" qualifiers="const">
+		<method name="find_rows" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="column" type="int" />
+			<param index="1" name="value" type="String" />
+			<description>
+				Returns the indices of all rows whose cell in [param column] equals [param value].
+			</description>
+		</method>
+		<method name="get_cell" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="column" type="int" />
+			<description>
+				Returns the cell at [param row] and [param column], or an empty [String] if the row is shorter than [param column]. Prints an error if [param row] is out of range.
+			</description>
+		</method>
+		<method name="get_column" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Returns the cells of [param column] in all rows. Rows that are shorter give an empty [String].
+			</description>
+		</method>
+		<method name="get_column_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				Returns the 1-based line of the error of the last call to [method parse], or [code]0[/code] if it succeeded. For a row with more cells than the header has columns, this is the row number, which differs from the line if a quoted cell above contains a line break.
+				Returns the number of columns: the larger of the size of [member header] and the length of the longest row.
 			</description>
 		</method>
-		<method name="get_error_message" qualifiers="const">
-			<return type="String" />
+		<method name="get_row" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="row" type="int" />
 			<description>
-				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded. The message starts with the position, for example [code]Line 2: ...[/code].
+				Returns the cells of the row at index [param row]. Prints an error and returns an empty array if [param row] is out of range.
 			</description>
 		</method>
-		<method name="parse">
-			<return type="int" enum="Error" />
-			<param index="0" name="text" type="String" />
-			<param index="1" name="options" type="SerializerOptions" default="null" />
+		<method name="get_row_as_dictionary" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="row" type="int" />
 			<description>
-				Parses the CSV [param text] with the delimiter and header mode of [param options] ([code]null[/code] uses the project settings). Returns [constant OK] and stores the rows for [method get_data], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_line] and [method get_error_message]. Errors are a quoted cell that is not closed and, with headers, a row with more cells than the header has columns. Missing cells at the end of a row are empty strings. Empty lines are skipped.
+				Returns the row at index [param row] as a [Dictionary] keyed by the column names of [member header]. Prints an error if [member header] is empty or [param row] is out of range.
+			</description>
+		</method>
+		<method name="get_row_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of data rows, not counting the header.
+			</description>
+		</method>
+		<method name="insert_row">
+			<return type="void" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="values" type="PackedStringArray" />
+			<description>
+				Inserts [param values] as a new row at index [param row]; the following rows move down. Drops the kept parsed text.
 			</description>
 		</method>
 		<method name="parse_string" qualifiers="static">
@@ -84,7 +132,14 @@
 			<param index="0" name="text" type="String" />
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Parses the CSV [param text] and returns its rows, like [method parse]. Returns an empty [Array] and prints the error if the text can't be read.
+				Parses the CSV [param text] and returns its rows, like [method TextDataFormat.parse]. Returns an empty [Array] and prints the error if the text can't be read.
+			</description>
+		</method>
+		<method name="remove_row">
+			<return type="void" />
+			<param index="0" name="row" type="int" />
+			<description>
+				Removes the row at index [param row]. Drops the kept parsed text.
 			</description>
 		</method>
 		<method name="serialize" qualifiers="static">
@@ -93,6 +148,23 @@
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
 				Returns a list [param resource] as CSV text: the resource needs exactly one typed array of resources with simple properties, and every element becomes one row. Use [method ResourceTextSerializer.can_serialize] to check a resource first. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_CSV, options)[/code].
+			</description>
+		</method>
+		<method name="set_cell">
+			<return type="void" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="column" type="int" />
+			<param index="2" name="value" type="String" />
+			<description>
+				Sets the cell at [param row] and [param column] to [param value]. A row that is shorter is padded with empty cells. Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="set_row">
+			<return type="void" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="values" type="PackedStringArray" />
+			<description>
+				Replaces the row at index [param row] with [param values]. Drops the kept parsed text.
 			</description>
 		</method>
 		<method name="stringify" qualifiers="static">
@@ -104,4 +176,9 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="header" type="PackedStringArray" setter="set_header" getter="get_header" default="PackedStringArray()">
+			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line. Changing it drops the kept parsed text.
+		</member>
+	</members>
 </class>
