@@ -1605,6 +1605,9 @@
 		<member name="Geometry3D" type="Geometry3D" setter="" getter="">
 			The [Geometry3D] singleton.
 		</member>
+		<member name="GraphicsPresetSettingsServer" type="GraphicsPresetSettingsServer" setter="" getter="">
+			The [GraphicsPresetSettingsServer] singleton.
+		</member>
 		<member name="IP" type="IP" setter="" getter="">
 			The [IP] singleton.
 		</member>
@@ -1686,6 +1689,12 @@
 		<member name="ProjectSettings" type="ProjectSettings" setter="" getter="">
 			The [ProjectSettings] singleton.
 		</member>
+		<member name="RenderEffectSettingsServer" type="RenderEffectSettingsServer" setter="" getter="">
+			The [RenderEffectSettingsServer] singleton.
+		</member>
+		<member name="RenderQualitySettingsServer" type="RenderQualitySettingsServer" setter="" getter="">
+			The [RenderQualitySettingsServer] singleton.
+		</member>
 		<member name="RenderingServer" type="RenderingServer" setter="" getter="">
 			The [RenderingServer] singleton.
 		</member>
@@ -1713,6 +1722,9 @@
 		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
 			The [SettingsServerManager] singleton.
 		</member>
+		<member name="ShadowSettingsServer" type="ShadowSettingsServer" setter="" getter="">
+			The [ShadowSettingsServer] singleton.
+		</member>
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
 		</member>
@@ -1728,8 +1740,14 @@
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
+		<member name="TextureSettingsServer" type="TextureSettingsServer" setter="" getter="">
+			The [TextureSettingsServer] singleton.
+		</member>
 		<member name="TextureStreaming" type="TextureStreaming" setter="" getter="">
 			The [TextureStreaming] singleton.
+		</member>
+		<member name="TextureStreamingSettingsServer" type="TextureStreamingSettingsServer" setter="" getter="">
+			The [TextureStreamingSettingsServer] singleton.
 		</member>
 		<member name="ThemeDB" type="ThemeDB" setter="" getter="">
 			The [ThemeDB] singleton.
@@ -1740,29 +1758,11 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
-		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
-			The [VideoEffectSettingsServer] singleton.
-		</member>
-		<member name="VideoPresetSettingsServer" type="VideoPresetSettingsServer" setter="" getter="">
-			The [VideoPresetSettingsServer] singleton.
-		</member>
-		<member name="VideoQualitySettingsServer" type="VideoQualitySettingsServer" setter="" getter="">
-			The [VideoQualitySettingsServer] singleton.
-		</member>
-		<member name="VideoShadowSettingsServer" type="VideoShadowSettingsServer" setter="" getter="">
-			The [VideoShadowSettingsServer] singleton.
-		</member>
-		<member name="VideoTextureSettingsServer" type="VideoTextureSettingsServer" setter="" getter="">
-			The [VideoTextureSettingsServer] singleton.
-		</member>
-		<member name="VideoTextureStreamingSettingsServer" type="VideoTextureStreamingSettingsServer" setter="" getter="">
-			The [VideoTextureStreamingSettingsServer] singleton.
-		</member>
-		<member name="VideoWindowSettingsServer" type="VideoWindowSettingsServer" setter="" getter="">
-			The [VideoWindowSettingsServer] singleton.
-		</member>
 		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
 			The [ViewportServer] singleton.
+		</member>
+		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
+			The [WindowSettingsServer] singleton.
 		</member>
 		<member name="WorkerThreadPool" type="WorkerThreadPool" setter="" getter="">
 			The [WorkerThreadPool] singleton.

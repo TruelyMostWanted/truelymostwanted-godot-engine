@@ -84,7 +84,7 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/window_settings_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 
@@ -3372,9 +3372,9 @@ Error Main::setup2(bool p_show_boot_logo) {
 
 	if (!editor && !project_manager) { // Player settings, phase 1: before the DisplayServer exists.
 		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_PRE_DISPLAY);
-		if (VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
-			VideoWindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
-			VideoWindowSettingsServer::get_singleton()->get_boot_window(boot_window);
+		if (WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
+			WindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
+			WindowSettingsServer::get_singleton()->get_boot_window(boot_window);
 			window_mode = boot_window.mode;
 			window_vsync_mode = boot_window.vsync_mode;
 			window_flags = boot_window.flags;
@@ -3517,8 +3517,8 @@ Error Main::setup2(bool p_show_boot_logo) {
 			return err;
 		}
 
-		if (!editor && !project_manager && VideoWindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
-			VideoWindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
+		if (!editor && !project_manager && WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
+			WindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
 		}
 
 #ifdef TOOLS_ENABLED

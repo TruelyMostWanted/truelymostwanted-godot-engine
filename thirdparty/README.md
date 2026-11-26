@@ -1192,6 +1192,17 @@ Patches:
 - `0003-findnode-id-lookup-table.patch` ([GH-121835](https://github.com/godotengine/godot/pull/121835))
 
 
+## sqlite
+
+- Upstream: https://sqlite.org
+- Version: 3.54.1 (555e07ef33f69a0957d24d8e555b702464a131d6f1607f4c3c1e4551e8e6ca76, 2026)
+- License: Public Domain
+
+Files extracted from the upstream amalgamation (`sqlite-amalgamation-3540100.zip`):
+
+- `sqlite3.c`, `sqlite3.h`
+
+
 ## swappy-frame-pacing
 
 - Upstream: https://android.googlesource.com/platform/frameworks/opt/gamesdk/ via https://github.com/godotengine/godot-swappy

@@ -265,17 +265,15 @@ public:
 	};
 
 	// truely-godot-engine: the direction in which map coordinates count, relative to the coordinates of
-	// `tile_layout` ("layout coordinates"). SWAP exchanges X and Y; FLIP reverses an axis after the swap.
-	enum CoordinateAxes {
-		COORDINATE_AXES_DEFAULT,
-		COORDINATE_AXES_FLIP_X,
-		COORDINATE_AXES_FLIP_Y,
-		COORDINATE_AXES_FLIP_XY,
-		COORDINATE_AXES_SWAP,
-		COORDINATE_AXES_SWAP_FLIP_X,
-		COORDINATE_AXES_SWAP_FLIP_Y,
-		COORDINATE_AXES_SWAP_FLIP_XY,
-		COORDINATE_AXES_MAX,
+	// `tile_layout` ("layout coordinates"). The swap exchanges X and Y first; the flips then reverse an axis.
+	struct CoordinateSystem {
+		bool swap_x_and_y_axis = false;
+		bool flip_x = false;
+		bool flip_y = false;
+
+		bool is_default() const { return !swap_x_and_y_axis && !flip_x && !flip_y; }
+		bool operator==(const CoordinateSystem &p_other) const { return swap_x_and_y_axis == p_other.swap_x_and_y_axis && flip_x == p_other.flip_x && flip_y == p_other.flip_y; }
+		bool operator!=(const CoordinateSystem &p_other) const { return !(*this == p_other); }
 	};
 
 	struct PackedSceneSource {
@@ -330,7 +328,7 @@ private:
 	TileShape tile_shape = TILE_SHAPE_SQUARE;
 	TileLayout tile_layout = TILE_LAYOUT_STACKED;
 	TileOffsetAxis tile_offset_axis = TILE_OFFSET_AXIS_HORIZONTAL;
-	CoordinateAxes coordinate_axes = COORDINATE_AXES_DEFAULT;
+	CoordinateSystem coordinate_system;
 	Size2i tile_size = Size2i(16, 16); //Size2(64, 64);
 
 	// Rendering.
@@ -562,16 +560,23 @@ public:
 	Vector<Vector2> get_tile_shape_polygon() const;
 	void draw_tile_shape(CanvasItem *p_canvas_item, Transform2D p_transform, Color p_color, bool p_filled = false, Ref<Texture2D> p_texture = Ref<Texture2D>()) const;
 
-	// Coordinate axes (truely-godot-engine). Map coordinates are what TileMapLayer uses; layout coordinates
+	// Coordinate system (truely-godot-engine). Map coordinates are what TileMapLayer uses; layout coordinates
 	// are those of `tile_layout` alone, in which the geometry below is computed.
-	void set_coordinate_axes(CoordinateAxes p_axes);
-	CoordinateAxes get_coordinate_axes() const;
-	static Vector2i map_to_layout_coords_with_axes(const Vector2i &p_map_coords, CoordinateAxes p_axes);
-	static Vector2i layout_to_map_coords_with_axes(const Vector2i &p_layout_coords, CoordinateAxes p_axes);
+	void set_swap_x_and_y_axis(bool p_swap);
+	bool is_swap_x_and_y_axis() const;
+	void set_flip_x(bool p_flip);
+	bool is_flip_x() const;
+	void set_flip_y(bool p_flip);
+	bool is_flip_y() const;
+	void set_coordinate_system(const CoordinateSystem &p_system);
+	CoordinateSystem get_coordinate_system() const;
+	static Vector2i map_to_layout_coords_with_system(const Vector2i &p_map_coords, const CoordinateSystem &p_system);
+	static Vector2i layout_to_map_coords_with_system(const Vector2i &p_layout_coords, const CoordinateSystem &p_system);
 	Vector2i map_to_layout_coords(const Vector2i &p_map_coords) const;
 	Vector2i layout_to_map_coords(const Vector2i &p_layout_coords) const;
-	// The cell at the same place on screen, for coordinates made with another layout and other axes.
-	Vector2i convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, CoordinateAxes p_from_axes) const;
+	// The cell at the same place on screen, for coordinates made with another layout and another coordinate system.
+	Vector2i convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, bool p_from_swap_x_and_y_axis = false, bool p_from_flip_x = false, bool p_from_flip_y = false) const;
+	Vector2i convert_map_coords_from_system(const Vector2i &p_coords, TileLayout p_from_layout, const CoordinateSystem &p_from_system) const;
 
 	// Used by TileMap/TileMapLayer
 	Vector2 map_to_local(const Vector2i &p_pos) const;
@@ -1073,7 +1078,6 @@ VARIANT_ENUM_CAST(TileSet::CellNeighbor);
 VARIANT_ENUM_CAST(TileSet::TerrainMode);
 VARIANT_ENUM_CAST(TileSet::TileShape);
 VARIANT_ENUM_CAST(TileSet::TileLayout);
-VARIANT_ENUM_CAST(TileSet::CoordinateAxes);
 VARIANT_ENUM_CAST(TileSet::TileOffsetAxis);
 
 VARIANT_ENUM_CAST(TileSetAtlasSource::TileAnimationMode);

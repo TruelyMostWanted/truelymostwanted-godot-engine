@@ -10,7 +10,7 @@ upstream/master
  └─► master                               reine Kopie von upstream, keine eigenen Commits
       ├─► 195-feature-opus-audio, …        mitgeführte Godot-PRs (upstream-prs.tsv), merge-chain.ps1
       ├─► <pr-branch>                      Beitrag an Godot  ──► PR an godotengine/godot
-      └──(merge)──► truely-godot-engine    die eigene Engine: Entwicklung, CI, keine Releases
+      └──(merge)──► truely-godot-engine    die eigene Engine: Entwicklung, keine CI, keine Releases
                       ├─► <nn>-feature-…   Feature-Branches (Squash-Merge, bleiben bestehen)
                       └──(Fast-forward, release.ps1)──► truely-godot-engine-releases
                                                          freigegebene Stände: CI → Builds → Release
@@ -75,7 +75,7 @@ Bei einem Konflikt hält das Skript an; lösen, committen, erneut starten (erled
 
 ## Releases
 
-Entwicklung und Veröffentlichung sind getrennt: `truely-godot-engine` ist der Entwicklungsstand (Merges, CI, **keine** Releases), `truely-godot-engine-releases` enthält nur freigegebene Stände.
+Entwicklung und Veröffentlichung sind getrennt: `truely-godot-engine` ist der Entwicklungsstand (Merges, lokal geprüft, **keine** CI und **keine** Releases), `truely-godot-engine-releases` enthält nur freigegebene Stände.
 
 ```powershell
 ./truely/release.ps1                  # Spitze von origin/truely-godot-engine freigeben
@@ -94,6 +94,10 @@ Das Skript schiebt den Release-Branch per Fast-forward auf den Commit. Der Push 
 - **macOS:** unsigniert (nur Ad-hoc-Signatur). Erster Start per Rechtsklick → Öffnen; für den Self-contained-Modus einmal `xattr -dr com.apple.quarantine <Ordner>`.
 - **Lokal packen:** `./truely/pack-release.ps1` packt die Windows-Builds aus `bin/` mit denselben Namen nach `P:/Projects/GitHub/truely-releases/<Name>/` (Parameter `-OutDir`). Der Name kommt aus `<exe> --version`. **Lokale Packs enthalten nur Windows-Templates.** Vorher mit `production=yes` bauen, bei Mono danach Glue und `build_assemblies.py` (`FEATURE-WORKFLOW.md`, Abschnitt 3). Nach einem Wechsel des Status ohne SCons-Cache bauen (`$env:TRUELY_SCONS_CACHE = ''`), sonst landen alte Versionsstrings im Build.
 - **Packen im Workflow:** [`package-release.sh`](../.github/truely/package-release.sh) setzt die Artefakte der Build-Jobs zu Zips und `.tpz` zusammen.
+
+## Glossar
+
+[`GLOSSARY.md`](../GLOSSARY.md) erklärt die Begriffe dieser Fork und ordnet Features ihren Dateien zu (Datei-Index). Neue öffentliche Begriffe bekommen dort einen Eintrag.
 
 ## Wichtig
 

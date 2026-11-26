@@ -2212,7 +2212,7 @@ void TileMapLayer::_bind_methods() {
 	// --- Shortcuts to methods defined in TileSet ---
 	ClassDB::bind_method(D_METHOD("map_pattern", "position_in_tilemap", "coords_in_pattern", "pattern"), &TileMapLayer::map_pattern);
 	ClassDB::bind_method(D_METHOD("get_surrounding_cells", "coords"), &TileMapLayer::get_surrounding_cells);
-	ClassDB::bind_method(D_METHOD("convert_cell_coordinates", "from_layout", "from_axes"), &TileMapLayer::convert_cell_coordinates);
+	ClassDB::bind_method(D_METHOD("convert_cell_coordinates", "from_layout", "from_swap_x_and_y_axis", "from_flip_x", "from_flip_y"), &TileMapLayer::convert_cell_coordinates, DEFVAL(false), DEFVAL(false), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("get_neighbor_cell", "coords", "neighbor"), &TileMapLayer::get_neighbor_cell);
 	ClassDB::bind_method(D_METHOD("map_to_local", "map_position"), &TileMapLayer::map_to_local);
 	ClassDB::bind_method(D_METHOD("local_to_map", "local_position"), &TileMapLayer::local_to_map);
@@ -2959,10 +2959,13 @@ bool TileMapLayer::is_cell_transposed(const Vector2i &p_coords) const {
 	return get_cell_alternative_tile(p_coords) & TileSetAtlasSource::TRANSFORM_TRANSPOSE;
 }
 
-void TileMapLayer::convert_cell_coordinates(TileSet::TileLayout p_from_layout, TileSet::CoordinateAxes p_from_axes) {
+void TileMapLayer::convert_cell_coordinates(TileSet::TileLayout p_from_layout, bool p_from_swap_x_and_y_axis, bool p_from_flip_x, bool p_from_flip_y) {
 	ERR_FAIL_COND(tile_set.is_null());
 	ERR_FAIL_INDEX(p_from_layout, TileSet::TILE_LAYOUT_DIAMOND_DOWN + 1);
-	ERR_FAIL_INDEX(p_from_axes, TileSet::COORDINATE_AXES_MAX);
+	TileSet::CoordinateSystem from_system;
+	from_system.swap_x_and_y_axis = p_from_swap_x_and_y_axis;
+	from_system.flip_x = p_from_flip_x;
+	from_system.flip_y = p_from_flip_y;
 	struct Cell {
 		Vector2i coords;
 		int source_id;
@@ -2972,7 +2975,7 @@ void TileMapLayer::convert_cell_coordinates(TileSet::TileLayout p_from_layout, T
 	Vector<Cell> cells;
 	for (const Variant &cell : get_used_cells()) {
 		const Vector2i coords = cell;
-		cells.push_back({ tile_set->convert_map_coords(coords, p_from_layout, p_from_axes), get_cell_source_id(coords), get_cell_atlas_coords(coords), get_cell_alternative_tile(coords) });
+		cells.push_back({ tile_set->convert_map_coords_from_system(coords, p_from_layout, from_system), get_cell_source_id(coords), get_cell_atlas_coords(coords), get_cell_alternative_tile(coords) });
 	}
 	clear();
 	for (const Cell &cell : cells) {

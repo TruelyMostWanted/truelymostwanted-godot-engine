@@ -64,21 +64,27 @@
 		<method name="convert_cell_coordinates">
 			<return type="void" />
 			<param index="0" name="from_layout" type="int" enum="TileSet.TileLayout" />
-			<param index="1" name="from_axes" type="int" enum="TileSet.CoordinateAxes" />
+			<param index="1" name="from_swap_x_and_y_axis" type="bool" default="false" />
+			<param index="2" name="from_flip_x" type="bool" default="false" />
+			<param index="3" name="from_flip_y" type="bool" default="false" />
 			<description>
-				Moves every cell so the map keeps its look after [member TileSet.tile_layout] or [member TileSet.coordinate_axes] of [member tile_set] changed. [param from_layout] and [param from_axes] are the values the cells were painted with. See [method TileSet.convert_map_coords].
+				Moves every cell so the map keeps its look after [member TileSet.tile_layout] or the coordinate system ([member TileSet.swap_x_and_y_axis], [member TileSet.flip_x], [member TileSet.flip_y]) of [member tile_set] changed. [param from_layout], [param from_swap_x_and_y_axis], [param from_flip_x] and [param from_flip_y] are the values the cells were painted with. See [method TileSet.convert_map_coords].
 				[codeblocks]
 				[gdscript]
 				var old_layout = tile_set.tile_layout
-				var old_axes = tile_set.coordinate_axes
-				tile_set.coordinate_axes = TileSet.COORDINATE_AXES_SWAP
-				$TileMapLayer.convert_cell_coordinates(old_layout, old_axes)
+				var old_swap = tile_set.swap_x_and_y_axis
+				var old_flip_x = tile_set.flip_x
+				var old_flip_y = tile_set.flip_y
+				tile_set.swap_x_and_y_axis = true
+				$TileMapLayer.convert_cell_coordinates(old_layout, old_swap, old_flip_x, old_flip_y)
 				[/gdscript]
 				[csharp]
 				var oldLayout = TileSet.TileLayout;
-				var oldAxes = TileSet.CoordinateAxes;
-				TileSet.CoordinateAxes = TileSet.CoordinateAxesEnum.Swap;
-				GetNode&lt;TileMapLayer&gt;("TileMapLayer").ConvertCellCoordinates(oldLayout, oldAxes);
+				var oldSwap = TileSet.SwapXAndYAxis;
+				var oldFlipX = TileSet.FlipX;
+				var oldFlipY = TileSet.FlipY;
+				TileSet.SwapXAndYAxis = true;
+				GetNode&lt;TileMapLayer&gt;("TileMapLayer").ConvertCellCoordinates(oldLayout, oldSwap, oldFlipX, oldFlipY);
 				[/csharp]
 				[/codeblocks]
 			</description>

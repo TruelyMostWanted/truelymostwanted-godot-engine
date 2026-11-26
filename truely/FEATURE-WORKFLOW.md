@@ -53,7 +53,8 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.4 CI in Stapeln
 
-- Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
+- Die volle CI läuft nur **auf `truely-godot-engine-releases`**, wenn `truely-godot-engine` per `release.ps1` dorthin kommt (Fast-forward). Merges nach `truely-godot-engine` und Feature-Branches starten keine CI; dort zählt der lokale Windows-Build mit Mono und die Checks in GDScript und C#.
+- Rot auf `truely-godot-engine-releases`: auf dem Feature-Branch (oder einem Bug-Branch) beheben, nach `truely-godot-engine` mergen, erneut freigeben.
 - Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
 - Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
 - **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
@@ -62,7 +63,7 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.5 Mergen
 
-Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft danach auf `truely-godot-engine` (2.4).
+Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft erst bei der Freigabe auf `truely-godot-engine-releases` (2.4).
 
 **Richtung:** Feature-Branches enthalten nur ihre eigenen Änderungen, wie ein PR. Sie gehen nach `truely-godot-engine`, nie umgekehrt: `truely-godot-engine` wird nicht in einen Feature-Branch gemergt.
 
