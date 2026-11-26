@@ -70,7 +70,7 @@ Ref<FlowNode> FlowGraphEditor::_instantiate_type(const StringName &p_type) {
 }
 
 Ref<FlowPort> FlowGraphEditor::_port_at(const TypedArray<FlowPort> &p_ports, int p_index) {
-	return p_index >= 0 && p_index < p_ports.size() ? Ref<FlowPort>(p_ports[p_index]) : Ref<FlowPort>();
+	return (p_index >= 0 && p_index < p_ports.size()) ? Ref<FlowPort>(p_ports[p_index]) : Ref<FlowPort>();
 }
 
 int FlowGraphEditor::_port_index(const TypedArray<FlowPort> &p_ports, const StringName &p_name) {
@@ -101,7 +101,7 @@ int FlowGraphEditor::_find_compatible_port(const Ref<FlowNode> &p_node, const Re
 
 // Slot type 0 is flow, 1 + Variant.Type is data.
 int FlowGraphEditor::_slot_type(const Ref<FlowPort> &p_port) {
-	return p_port.is_null() || p_port->get_kind() == FlowPort::PORT_KIND_FLOW ? 0 : 1 + p_port->get_type();
+	return (p_port.is_null() || p_port->get_kind() == FlowPort::PORT_KIND_FLOW) ? 0 : 1 + p_port->get_type();
 }
 
 Color FlowGraphEditor::_slot_color(const Ref<FlowPort> &p_port) {
@@ -270,9 +270,9 @@ void FlowGraphEditor::_rebuild() {
 		}
 	}
 
-	const TypedArray<FlowConnection> connections = graph->get_connections();
-	for (int i = 0; i < connections.size(); i++) {
-		const Ref<FlowConnection> c = connections[i];
+	const TypedArray<FlowConnection> graph_connections = graph->get_connections();
+	for (int i = 0; i < graph_connections.size(); i++) {
+		const Ref<FlowConnection> c = graph_connections[i];
 		if (!graph->has_node(c->get_from_node_id()) || !graph->has_node(c->get_to_node_id())) {
 			continue;
 		}
@@ -489,11 +489,12 @@ void FlowGraphEditor::_commit_drag() {
 		const TypedArray<FlowFrame> frames = graph->get_frames();
 		for (const DragOp &op : drag_buffer) {
 			const int id = _element_id(op.element);
-			if (String(op.element).begins_with("n") && graph->has_node(id)) {
+			const bool is_node = String(op.element).begins_with("n");
+			if (is_node && graph->has_node(id)) {
 				const Ref<FlowNode> node = graph->get_node(id);
 				undo_redo->add_do_property(node.ptr(), "editor_position", op.to);
 				undo_redo->add_undo_property(node.ptr(), "editor_position", op.from);
-			} else if (id < frames.size()) {
+			} else if (!is_node && id < frames.size()) {
 				const Ref<FlowFrame> frame = frames[id];
 				undo_redo->add_do_property(frame.ptr(), "rect", Rect2(op.to, frame->get_rect().size));
 				undo_redo->add_undo_property(frame.ptr(), "rect", Rect2(op.from, frame->get_rect().size));
@@ -562,9 +563,9 @@ void FlowGraphEditor::_copy(bool p_cut) {
 	for (const int id : ids) {
 		clipboard.nodes.push_back(Ref<FlowNode>(graph->get_node(id)->duplicate(true)));
 	}
-	const TypedArray<FlowConnection> connections = graph->get_connections();
-	for (int i = 0; i < connections.size(); i++) {
-		const Ref<FlowConnection> c = connections[i];
+	const TypedArray<FlowConnection> graph_connections = graph->get_connections();
+	for (int i = 0; i < graph_connections.size(); i++) {
+		const Ref<FlowConnection> c = graph_connections[i];
 		if (ids.has(c->get_from_node_id()) && ids.has(c->get_to_node_id())) {
 			clipboard.connections.push_back(c->get_from_node_id());
 			clipboard.connections.push_back(c->get_from_port());
@@ -669,8 +670,8 @@ void FlowGraphEditor::_update_add_tree() {
 		if (node.is_null()) {
 			continue;
 		}
-		const String title = node->get_title();
-		if (!filter.is_empty() && !title.containsn(filter) && !String(type).containsn(filter)) {
+		const String node_title = node->get_title();
+		if (!filter.is_empty() && !node_title.containsn(filter) && !String(type).containsn(filter)) {
 			continue;
 		}
 		if (pending_port.is_valid() && _find_compatible_port(node, pending_port, pending_port_is_output) < 0) {
@@ -688,7 +689,7 @@ void FlowGraphEditor::_update_add_tree() {
 			parent = &categories.insert(category, category_item)->value;
 		}
 		TreeItem *item = add_tree->create_item(*parent);
-		item->set_text(0, title);
+		item->set_text(0, node_title);
 		item->set_icon(0, EditorNode::get_singleton()->get_class_icon(type, "Object"));
 		item->set_tooltip_text(0, type);
 		item->set_metadata(0, type);
