@@ -163,6 +163,10 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 **Stand (2026-11-27, Vormittag):** Zusätzlich gemergt: #255-Rename (C# GetType), #256, #257 (+CI-Fix float/enum), #276, #259, #258, #277, #278, #279+#280, Nacharbeiten #283 (Warnung einmal), #260 (Subtitle leitet Segment-`changed` weiter). Geschlossen: Tracker #253, Konzepte #262/#263/#270. Neu: #322–#325 (Untertitel-Tracker #230, nach Release 0.1.0). Wiki: alle Guides bis #280, alle `Class-*`-Seiten aus der XML neu erzeugt (`P:/wt/tools/classref_md.py`). CI-Lauf 45794131388 auf `2d62e3fa17`.
 - **Nächster Schritt:** CI grün → `truely/release.ps1` (Release `Truely-v0.1.0`), danach Release-Notes prüfen/ergänzen, alten Entwurf und Assets des alten Pre-Releases `truely-godot4.8-beta5-3bd081f` entfernen (Notes auf neues Release verweisen). #212 Screenshots per Agent (editor-shots-Tool im alten Scratchpad).
 
+
+**Stand (2026-11-27, Nachmittag):** Alle Issues der Nacht gemergt, zuletzt #277–#280, #332 (YAML im Editor mit Leerzeichen), CI-Fixes (float/enum, signed/unsigned, SCU-Testordner). CI auf `truely-godot-engine` grün (`fff0779c6e`). Release v0.1.0 gestartet: `truely-godot-engine-releases` = `995b042db8`, CI dort grün; Release-Workflow 45826619814 hängt an macOS-Runner-Kapazität (Jobs werden nicht vergeben) → Wiederholungen laufen. Wiki: alle Guides überarbeitet (Stil-Brief `P:/wt/brief-wiki-style.md`, Vorbild Audio-Bus-Settings), Text-Format-Guides neu mit Screenshots (Editor + Inspector), Data-Schemas neu, Class-Seiten aus XML (`P:/wt/tools/classref_md.py`), 36 Screenshots neu/ersetzt.
+- **Offen:** Release veröffentlichen (bei Erfolg: alten Entwurf `truely-godot4.8-beta5-3bd081f` löschen, beim alten Pre-Release die Assets entfernen und auf v0.1.0 verweisen); danach `truely/version.txt` erst beim nächsten Release erhöhen. Untertitel #322–#325, #12/#8 (Besitzer am Bildschirm), 9 Screenshots ohne Werkzeug-Schritt (Laufzeit-Bilder, Menüs).
+
 ## Übergabe
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
