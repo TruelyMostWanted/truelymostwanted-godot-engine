@@ -30,10 +30,14 @@
 
 #include "register_types.h"
 
+#include "dialogue/dialogue_nodes.h"
 #include "flow_graph.h"
 #include "flow_graph_data.h"
+#include "flow_graph_debugger.h"
 #include "flow_graph_editor_formats.h"
 #include "flow_graph_mermaid.h"
+#include "flow_graph_playback.h"
+#include "flow_graph_player.h"
 #include "flow_node.h"
 #include "flow_nodes.h"
 #include "flow_port.h"
@@ -41,12 +45,17 @@
 #include "core/config/project_settings.h"
 #include "core/object/class_db.h"
 
+#ifdef TOOLS_ENABLED
+#include "editor/flow_graph_editor_plugin.h"
+#endif
+
 static Ref<ResourceFormatLoaderFlowGraphMermaid> resource_loader_mermaid;
 static Ref<ResourceFormatSaverFlowGraphMermaid> resource_saver_mermaid;
 
 void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 #ifdef TOOLS_ENABLED
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::add_by_type<FlowGraphEditorPlugin>();
 		EditorPlugins::add_by_type<FlowGraphFormatsEditorPlugin>();
 	}
 #endif
@@ -71,6 +80,13 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(FlowEmitEventNode);
 	GDREGISTER_CLASS(FlowSubgraphNode);
 	GDREGISTER_CLASS(FlowWaitNode);
+	GDREGISTER_CLASS(FlowExit);
+	GDREGISTER_CLASS(FlowGraphState);
+	GDREGISTER_CLASS(FlowGraphPlayback);
+	GDREGISTER_CLASS(FlowGraphPlayer);
+	GDREGISTER_CLASS(DialogueOption);
+	GDREGISTER_CLASS(DialogueLineNode);
+	GDREGISTER_CLASS(DialogueChoiceNode);
 	GDREGISTER_CLASS(FlowGraphMermaidOptions);
 	GDREGISTER_CLASS(FlowGraphMermaid);
 
@@ -79,12 +95,18 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	resource_saver_mermaid.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_mermaid);
 	GLOBAL_DEF("flow_graph/export/convert_text_to_binary", true);
+#ifdef DEBUG_ENABLED
+	FlowGraphDebugger::initialize();
+#endif
 }
 
 void uninitialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+#ifdef DEBUG_ENABLED
+	FlowGraphDebugger::finalize();
+#endif
 	ResourceLoader::remove_resource_format_loader(resource_loader_mermaid);
 	resource_loader_mermaid.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_mermaid);
