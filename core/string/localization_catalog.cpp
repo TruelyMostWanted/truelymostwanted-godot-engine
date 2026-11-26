@@ -570,6 +570,7 @@ void LocalizationCatalog::clear() {
 	columns.clear();
 	row_extras.clear();
 	note_columns.clear();
+	duplicates.clear();
 	source_path = String();
 	emit_changed();
 }
@@ -636,7 +637,6 @@ PackedStringArray LocalizationCatalog::get_note_columns() const {
 Dictionary LocalizationCatalog::_get_data() const {
 	Dictionary data;
 	ERR_FAIL_COND_V(_load_all_columns() != OK, data);
-	const String extra_field = "_" + _get_extra_name();
 	Array locales;
 	Dictionary rules;
 	for (const LocaleColumn *column : columns) {
@@ -656,38 +656,190 @@ Dictionary LocalizationCatalog::_get_data() const {
 	for (uint32_t row = 0; row < ids.size(); row++) {
 		String key, context;
 		_split_id(ids.get(row), key, context);
-		Dictionary entry;
-		String entry_name = key;
-		if (!context.is_empty()) {
-			entry_name = key + "@" + context;
-			entry["_key"] = key;
-			entry["_context"] = context;
-		}
-		const String extra = _get_row_extra(row);
-		if (!extra.is_empty()) {
-			entry[extra_field] = extra;
-		}
-		for (const NoteColumn &note_column : note_columns) {
-			const String *note = note_column.notes.getptr(row);
-			if (note) {
-				entry["_" + String(note_column.name)] = *note;
-			}
-		}
-		for (const LocaleColumn *column : columns) {
-			const Vector<String> *forms = column->plural_forms.getptr(row);
-			if (forms) {
-				Array values;
-				for (const String &form : *forms) {
-					values.push_back(form);
-				}
-				entry[column->locale] = values;
-			} else if (column->cells.get_length(row) > 0) {
-				entry[column->locale] = column->cells.get(row);
-			}
-		}
-		data[entry_name] = entry;
+		data[context.is_empty() ? key : key + "@" + context] = _get_entry(row);
 	}
 	return data;
+}
+
+Dictionary LocalizationCatalog::_get_entry(uint32_t p_row) const {
+	Dictionary entry;
+	String key, context;
+	_split_id(ids.get(p_row), key, context);
+	if (!context.is_empty()) {
+		entry["_key"] = key;
+		entry["_context"] = context;
+	}
+	const String extra = _get_row_extra(p_row);
+	if (!extra.is_empty()) {
+		entry["_" + _get_extra_name()] = extra;
+	}
+	for (const NoteColumn &note_column : note_columns) {
+		const String *note = note_column.notes.getptr(p_row);
+		if (note) {
+			entry["_" + String(note_column.name)] = *note;
+		}
+	}
+	for (const LocaleColumn *column : columns) {
+		const Vector<String> *forms = column->plural_forms.getptr(p_row);
+		if (forms) {
+			Array values;
+			for (const String &form : *forms) {
+				values.push_back(form);
+			}
+			entry[column->locale] = values;
+		} else if (column->cells.get_length(p_row) > 0) {
+			entry[column->locale] = column->cells.get(p_row);
+		}
+	}
+	return entry;
+}
+
+void LocalizationCatalog::_set_entry(uint32_t p_row, const Dictionary &p_entry, HashMap<String, LocaleColumn *> &r_column_of_field, bool p_replace) {
+	TranslationServer *ts = TranslationServer::get_singleton();
+	_set_row_extra(p_row, p_entry.get("_" + _get_extra_name(), String()));
+	if (p_replace) {
+		for (NoteColumn &note_column : note_columns) {
+			note_column.notes.erase(p_row);
+		}
+		for (LocaleColumn *column : columns) {
+			_set_plural_forms(column, p_row, PackedStringArray());
+		}
+	}
+	for (const KeyValue<Variant, Variant> &field : p_entry) {
+		const String field_name = field.key;
+		if (field_name.begins_with("_")) {
+			NoteColumn *note_column = _get_note_column(field_name);
+			if (note_column) {
+				_set_note(p_row, note_column, field.value);
+			}
+			continue;
+		}
+		// standardize_locale() once per field name.
+		LocaleColumn **known = r_column_of_field.getptr(field_name);
+		LocaleColumn *column = nullptr;
+		if (known) {
+			column = *known;
+		} else {
+			const String locale = ts->standardize_locale(field_name);
+			column = locale.is_empty() ? nullptr : _get_or_add_column(locale);
+			r_column_of_field[field_name] = column;
+		}
+		if (!column) {
+			continue;
+		}
+		const Variant::Type type = field.value.get_type();
+		if (type == Variant::ARRAY || type == Variant::PACKED_STRING_ARRAY) {
+			_set_plural_forms(column, p_row, field.value);
+		} else {
+			_set_cell(column, p_row, field.value);
+		}
+	}
+}
+
+Dictionary LocalizationCatalog::get_entry(const StringName &p_key, const StringName &p_context) const {
+	const int row = find_key(p_key, p_context);
+	if (row < 0 || _load_all_columns() != OK) {
+		return Dictionary();
+	}
+	return _get_entry(row);
+}
+
+void LocalizationCatalog::set_entry(const StringName &p_key, const Dictionary &p_entry, const StringName &p_context) {
+	ERR_FAIL_COND(_load_all_columns() != OK);
+	const int row = add_key(p_key, p_context);
+	HashMap<String, LocaleColumn *> column_of_field;
+	_set_entry(row, p_entry, column_of_field, true);
+	emit_changed();
+}
+
+static String _detect_csv_delimiter(const String &p_text);
+
+LocalVector<int> LocalizationCatalog::_get_csv_key_lines(const String &p_text, const String &p_delimiter) {
+	// Key rows are the lines after the header whose first cell is not empty and not a `?` row (plural rules);
+	// line breaks inside quoted cells don't start a row.
+	LocalVector<int> lines;
+	const char32_t delimiter = p_delimiter.is_empty() ? U',' : p_delimiter[0];
+	int line = 1;
+	bool in_quotes = false;
+	bool row_start = false; // The header row is skipped.
+	for (int i = 0; i < p_text.length(); i++) {
+		const char32_t c = p_text[i];
+		if (row_start) {
+			row_start = false;
+			if (c != delimiter && c != U'\n' && c != U'\r' && c != U'?') {
+				lines.push_back(line);
+			}
+		}
+		if (c == U'"') {
+			in_quotes = !in_quotes;
+		} else if (c == U'\n') {
+			line++;
+			row_start = !in_quotes;
+		}
+	}
+	return lines;
+}
+
+Ref<DataValidation> LocalizationCatalog::validate(const Ref<DataValidationOptions> &p_options) const {
+	Ref<DataValidation> result;
+	result.instantiate();
+	result->apply_options(p_options);
+	const auto entry_name = [this](uint32_t p_row) {
+		String key, context;
+		_split_id(ids.get(p_row), key, context);
+		return context.is_empty() ? key : key + "@" + context;
+	};
+
+	for (const String &duplicate : duplicates) {
+		if (result->is_full()) {
+			break;
+		}
+		const int at = duplicate.rfind_char('@');
+		const int row = at < 0 ? find_key(duplicate) : find_key(duplicate.left(at), duplicate.substr(at + 1));
+		const int row_or_none = row < 0 ? DataValidation::POSITION_NONE : row;
+		result->add_issue(DataValidation::ISSUE_KIND_DUPLICATE_KEY, vformat("\"%s\" is defined more than once; the definitions are merged.", duplicate), StringName(), duplicate, row_or_none);
+	}
+	const Vector<String> languages = TranslationServer::get_singleton()->get_all_languages();
+	for (uint32_t i = 0; i < columns.size() && !result->is_full(); i++) {
+		const String &locale = columns[i]->locale;
+		if (TranslationServer::get_singleton()->standardize_locale(locale) != locale || !languages.has(locale.get_slicec('_', 0))) {
+			result->add_issue(DataValidation::ISSUE_KIND_INVALID_LOCALE, vformat("\"%s\" is not a known locale code.", locale), locale, locale, DataValidation::POSITION_NONE, i);
+		}
+	}
+	for (uint32_t i = 0; i < columns.size() && !result->is_full(); i++) {
+		if (columns[i]->translated == ids.size()) {
+			continue; // Known without loading the column.
+		}
+		const LocaleColumn *column = get_locale_column(i);
+		ERR_CONTINUE(!column);
+		for (uint32_t row = 0; row < ids.size() && !result->is_full(); row++) {
+			if (column->cells.get_length(row) == 0) {
+				const String name = entry_name(row);
+				result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("\"%s\" has no \"%s\" translation.", name, column->locale), column->locale, name, row, i);
+			}
+		}
+	}
+
+	// Lines from the text file the catalog was loaded from.
+	const String path = get_path();
+	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(path.get_extension());
+	if (result->is_valid() || format == ResourceTextSerializer::FORMAT_MAX || !FileAccess::exists(path)) {
+		return result;
+	}
+	const String text = FileAccess::get_file_as_string(path);
+	if (format != ResourceTextSerializer::FORMAT_CSV) {
+		result->resolve_lines(text);
+	} else if (duplicates.is_empty()) {
+		// The catalog rows are the key rows of the file in order.
+		const LocalVector<int> lines = _get_csv_key_lines(text, _detect_csv_delimiter(text));
+		for (int i = 0; i < result->get_issue_count(); i++) {
+			const int row = result->get_issue_row(i);
+			if (row >= 0 && row < (int)lines.size()) {
+				result->set_issue_line(i, lines[row]);
+			}
+		}
+	}
+	return result;
 }
 
 void LocalizationCatalog::_set_data(const Dictionary &p_data) {
@@ -721,37 +873,18 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 		}
 	}
 
-	const String extra_field = "_" + _get_extra_name();
 	for (const KeyValue<Variant, Variant> &kv : p_data) {
 		const String entry_name = kv.key;
 		if (entry_name.is_empty() || entry_name.begins_with("?") || kv.value.get_type() != Variant::DICTIONARY) {
 			continue;
 		}
 		const Dictionary entry = kv.value;
-		const String key = entry.get("_key", entry_name);
-		const String context = entry.get("_context", String());
-		const int row = add_key(key, context);
-		_set_row_extra(row, entry.get(extra_field, String()));
-		for (const KeyValue<Variant, Variant> &field : entry) {
-			const String field_name = field.key;
-			if (field_name.begins_with("_")) {
-				NoteColumn *note_column = _get_note_column(field_name);
-				if (note_column) {
-					_set_note(row, note_column, field.value);
-				}
-				continue;
-			}
-			LocaleColumn *column = column_for(field_name);
-			if (!column) {
-				continue;
-			}
-			const Variant::Type type = field.value.get_type();
-			if (type == Variant::ARRAY || type == Variant::PACKED_STRING_ARRAY) {
-				_set_plural_forms(column, row, field.value);
-			} else {
-				_set_cell(column, row, field.value);
-			}
+		const uint32_t key_count = ids.size();
+		const int row = add_key(entry.get("_key", entry_name), entry.get("_context", String()));
+		if ((uint32_t)row < key_count) {
+			duplicates.push_back(entry_name); // The `_key` and `_context` of another entry.
 		}
+		_set_entry(row, entry, column_of_field, false);
 	}
 	emit_changed();
 }
@@ -962,7 +1095,11 @@ Error LocalizationCatalog::_load_rows(const Array &p_rows) {
 		}
 		int row = plural_row;
 		if (plural_row < 0) {
+			const uint32_t key_count = ids.size();
 			row = add_key(key, context);
+			if ((uint32_t)row < key_count) {
+				duplicates.push_back(context.is_empty() ? key : key + "@" + context);
+			}
 			_set_row_extra(row, extra);
 			for (const KeyValue<int, uint32_t> &E : note_column_of) {
 				if (E.key < line.size()) {
@@ -1081,25 +1218,35 @@ Array LocalizationCatalog::_get_rows() const {
 /////////////////////////////////////////////////////////////////////////////
 // Text formats and files.
 
-static Ref<TextDataFormat> _create_text_format(ResourceTextSerializer::Format p_format) {
-	// JSON is not a TextDataFormat (handled by the callers).
-	const char *format_classes[ResourceTextSerializer::FORMAT_MAX] = { nullptr, "INI", "CSV", "XML", "TOML", "YAML" };
-	ERR_FAIL_INDEX_V((int)p_format, (int)ResourceTextSerializer::FORMAT_MAX, Ref<TextDataFormat>());
-	ERR_FAIL_NULL_V(format_classes[p_format], Ref<TextDataFormat>());
-	const StringName format_class = format_classes[p_format];
-	ERR_FAIL_COND_V_MSG(!ClassDB::class_exists(format_class), Ref<TextDataFormat>(), vformat("The %s format is not available in this build.", format_class));
-	Ref<TextDataFormat> format = Object::cast_to<TextDataFormat>(ClassDB::instantiate(format_class));
-	ERR_FAIL_COND_V(format.is_null(), format);
-	if (p_format == ResourceTextSerializer::FORMAT_CSV) {
-		Ref<SerializerOptions> options;
-		options.instantiate();
-		options->set_csv_headers(false);
-		format->set_options(options);
+// The delimiter of CSV text: the one of `,`, `;` and tab found most often in the header row.
+static String _detect_csv_delimiter(const String &p_text) {
+	const String header = p_text.get_slicec('\n', 0);
+	String delimiter = ",";
+	int best = 0;
+	for (const char *candidate : { ",", ";", "\t" }) {
+		const int count = header.count(candidate);
+		if (count > best) {
+			best = count;
+			delimiter = candidate;
+		}
 	}
-	return format;
+	return delimiter;
 }
 
-Error LocalizationCatalog::load_from_text(const String &p_text, ResourceTextSerializer::Format p_format) {
+// JSON is not a TextDataFormat (null; handled by the callers). CSV is read and written as rows: no header mode.
+static Ref<TextDataFormat> _create_text_format(ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options, const String &p_text = String()) {
+	Ref<SerializerOptions> options = p_options;
+	if (p_format == ResourceTextSerializer::FORMAT_CSV) {
+		options = p_options.is_valid() ? Ref<SerializerOptions>(p_options->duplicate()) : Ref<SerializerOptions>(memnew(SerializerOptions));
+		options->set_csv_headers(false);
+		if (p_options.is_null() && !p_text.is_empty()) {
+			options->set_csv_delimiter(_detect_csv_delimiter(p_text));
+		}
+	}
+	return ResourceTextSerializer::create_data_format(p_format, options);
+}
+
+Error LocalizationCatalog::load_from_text(const String &p_text, ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options) {
 	Variant data;
 	Error err = OK;
 	String error;
@@ -1112,7 +1259,7 @@ Error LocalizationCatalog::load_from_text(const String &p_text, ResourceTextSeri
 		error = json->get_error_message();
 		line = json->get_error_line();
 	} else {
-		const Ref<TextDataFormat> format = _create_text_format(p_format);
+		const Ref<TextDataFormat> format = _create_text_format(p_format, p_options, p_text);
 		ERR_FAIL_COND_V(format.is_null(), ERR_UNAVAILABLE);
 		err = format->parse(p_text);
 		data = format->get_data();
@@ -1128,7 +1275,7 @@ Error LocalizationCatalog::load_from_text(const String &p_text, ResourceTextSeri
 	return OK;
 }
 
-String LocalizationCatalog::to_text(ResourceTextSerializer::Format p_format) const {
+String LocalizationCatalog::to_text(ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options) const {
 	Variant data;
 	if (p_format == ResourceTextSerializer::FORMAT_CSV) {
 		data = _get_rows();
@@ -1136,9 +1283,9 @@ String LocalizationCatalog::to_text(ResourceTextSerializer::Format p_format) con
 		data = p_format == ResourceTextSerializer::FORMAT_XML ? _data_to_xml(_get_data(), _get_extra_name()) : _get_data();
 	}
 	if (p_format == ResourceTextSerializer::FORMAT_JSON) {
-		return JSON::stringify(data, "\t", false);
+		return JSON::stringify(data, p_options.is_valid() ? ResourceTextSerializer::get_options(p_options).indent : String("\t"), false);
 	}
-	const Ref<TextDataFormat> format = _create_text_format(p_format);
+	const Ref<TextDataFormat> format = _create_text_format(p_format, p_options);
 	ERR_FAIL_COND_V(format.is_null(), String());
 	format->set_data(data);
 	String text, error;
@@ -1277,7 +1424,8 @@ bool LocalizationCatalog::_get(const StringName &p_name, Variant &r_ret) const {
 		return false;
 	}
 	const uint32_t translated = columns[column]->translated;
-	r_ret = vformat("%d of %d translated, %d missing", translated, ids.size(), ids.size() - translated);
+	const int percent = ids.size() == 0 ? 100 : int(uint64_t(translated) * 100 / ids.size());
+	r_ret = vformat("%d of %d translated (%d%%), %d missing", translated, ids.size(), percent, ids.size() - translated);
 	return true;
 }
 
@@ -1310,9 +1458,12 @@ void LocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_note", "key", "note", "context", "column"), &LocalizationCatalog::set_note, DEFVAL(StringName()), DEFVAL(StringName("notes")));
 	ClassDB::bind_method(D_METHOD("get_note", "key", "context", "column"), &LocalizationCatalog::get_note, DEFVAL(StringName()), DEFVAL(StringName("notes")));
 	ClassDB::bind_method(D_METHOD("get_note_columns"), &LocalizationCatalog::get_note_columns);
+	ClassDB::bind_method(D_METHOD("get_entry", "key", "context"), &LocalizationCatalog::get_entry, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("set_entry", "key", "entry", "context"), &LocalizationCatalog::set_entry, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("validate", "options"), &LocalizationCatalog::validate, DEFVAL(Ref<DataValidationOptions>()));
 
-	ClassDB::bind_method(D_METHOD("load_from_text", "text", "format"), &LocalizationCatalog::load_from_text);
-	ClassDB::bind_method(D_METHOD("to_text", "format"), &LocalizationCatalog::to_text);
+	ClassDB::bind_method(D_METHOD("load_from_text", "text", "format", "options"), &LocalizationCatalog::load_from_text, DEFVAL(Ref<SerializerOptions>()));
+	ClassDB::bind_method(D_METHOD("to_text", "format", "options"), &LocalizationCatalog::to_text, DEFVAL(Ref<SerializerOptions>()));
 	ClassDB::bind_method(D_METHOD("load_from_file", "path"), &LocalizationCatalog::load_from_file);
 	ClassDB::bind_method(D_METHOD("save_to_file", "path"), &LocalizationCatalog::save_to_file);
 
@@ -1327,6 +1478,7 @@ void LocalizationCatalog::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL), "_set_data", "_get_data");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "key_count", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_key_count");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "locales", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_locales");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "note_columns", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_note_columns");
 
 	ADD_SIGNAL(MethodInfo("locale_loaded", PropertyInfo(Variant::STRING, "locale")));
 }
@@ -1475,6 +1627,52 @@ TypedArray<Translation> TextLocalizationCatalog::to_translations() {
 	return translations;
 }
 
+static String _po_string(const String &p_text) {
+	return "\"" + p_text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\t", "\\t") + "\"";
+}
+
+String TextLocalizationCatalog::to_po(const String &p_locale) const {
+	const int column_index = p_locale.is_empty() ? -1 : find_locale(p_locale);
+	ERR_FAIL_COND_V_MSG(!p_locale.is_empty() && column_index < 0, String(), vformat("The localization catalog has no locale '%s'.", p_locale));
+	const LocaleColumn *column = column_index < 0 ? nullptr : get_locale_column(column_index);
+	String po = "msgid \"\"\nmsgstr \"\"\n\"MIME-Version: 1.0\\n\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\"Content-Transfer-Encoding: 8-bit\\n\"\n";
+	if (column) {
+		po += "\"Language: " + p_locale + "\\n\"\n";
+		if (!column->plural_rule.is_empty()) {
+			po += "\"Plural-Forms: " + column->plural_rule + "\\n\"\n";
+		}
+	}
+	const PackedStringArray notes = get_note_columns();
+	for (int row = 0; row < get_key_count(); row++) {
+		const StringName key = get_key(row);
+		const StringName context = get_key_context(row);
+		po += "\n";
+		for (const String &note_column : notes) {
+			const String note = get_note(key, context, note_column);
+			if (!note.is_empty()) {
+				po += "#. " + (note_column == "notes" ? String() : note_column + ": ") + note.replace("\n", "\n#. ") + "\n";
+			}
+		}
+		if (context != StringName()) {
+			po += "msgctxt " + _po_string(context) + "\n";
+		}
+		po += "msgid " + _po_string(key) + "\n";
+		const Vector<String> *forms = column ? column->plural_forms.getptr(row) : nullptr;
+		const String plural_key = _get_row_extra(row);
+		if (plural_key.is_empty() && !forms) {
+			po += "msgstr " + _po_string(column ? column->cells.get(row) : String()) + "\n";
+			continue;
+		}
+		po += "msgid_plural " + _po_string(plural_key.is_empty() ? String(key) : plural_key) + "\n";
+		const int form_count = forms ? (int)forms->size() : (column ? 1 : 2);
+		for (int form = 0; form < form_count; form++) {
+			const String text = forms ? (*forms)[form] : (column ? column->cells.get(row) : String());
+			po += vformat("msgstr[%d] ", form) + _po_string(text) + "\n";
+		}
+	}
+	return po;
+}
+
 void TextLocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_text", "key", "locale", "text", "context"), &TextLocalizationCatalog::set_text, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("get_text", "key", "locale", "context"), &TextLocalizationCatalog::get_text, DEFVAL(StringName()));
@@ -1488,6 +1686,7 @@ void TextLocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_plural_form", "locale", "n"), &TextLocalizationCatalog::get_plural_form);
 	ClassDB::bind_method(D_METHOD("add_translation", "translation"), &TextLocalizationCatalog::add_translation);
 	ClassDB::bind_method(D_METHOD("to_translations"), &TextLocalizationCatalog::to_translations);
+	ClassDB::bind_method(D_METHOD("to_po", "locale"), &TextLocalizationCatalog::to_po, DEFVAL(String()));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1675,4 +1874,8 @@ void ResourceFormatSaverLocalizationCatalog::get_recognized_extensions(const Ref
 
 bool ResourceFormatSaverLocalizationCatalog::recognize(const Ref<Resource> &p_resource) const {
 	return Object::cast_to<LocalizationCatalog>(p_resource.ptr()) != nullptr;
+}
+
+bool ResourceFormatSaverLocalizationCatalog::recognize_path(const Ref<Resource> &p_resource, const String &p_path) const {
+	return recognize(p_resource) && LocalizationCatalog::get_file_extensions().has(p_path.get_extension().to_lower());
 }
