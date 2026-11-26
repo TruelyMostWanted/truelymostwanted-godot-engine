@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_text_data_format)
 
+#include "core/config/project_settings.h"
 #include "core/io/config_file.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
@@ -39,6 +40,7 @@ TEST_FORCE_LINK(test_text_data_format)
 #include "core/io/json.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/io/serializer_options.h"
 #include "core/io/text_data_format.h"
 #include "core/io/xml_format.h"
@@ -108,6 +110,11 @@ TEST_CASE("[TextDataFormat] Base API through INI") {
 	CHECK(ini->get_error_column() == 0);
 	CHECK(Dictionary(ini->get_data()).is_empty());
 
+	// Setting valid data clears the parse error.
+	ini->set_data(Dictionary());
+	CHECK(ini->get_error_message().is_empty());
+	CHECK(ini->get_error_line() == 0);
+
 	ini->set_value("a", "b", 1);
 	ini->clear();
 	CHECK(Dictionary(ini->get_data()).is_empty());
@@ -174,6 +181,25 @@ TEST_CASE("[SerializerOptions] ini_value_style") {
 	CHECK(ini->encode_to_text().contains("name=\"Ann\""));
 	options->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	CHECK(ini->encode_to_text().contains("name=Ann\n"));
+}
+
+TEST_CASE("[ResourceTextSerializer] Project setting ini_value_style and the old bool ini_plain_values") {
+	ProjectSettings *settings = ProjectSettings::get_singleton();
+	REQUIRE(settings != nullptr);
+	const String style_key = "filesystem/resources/text_formats/ini_value_style";
+	const String legacy_key = "filesystem/resources/text_formats/ini_plain_values";
+	const Variant previous = settings->get_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
+
+	settings->set_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_PLAIN));
+	CHECK(ResourceTextSerializer::get_default_options().ini_plain_values);
+	settings->set_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
+	CHECK_FALSE(ResourceTextSerializer::get_default_options().ini_plain_values);
+	// An old project.godot with the bool is still read while ini_value_style is the default.
+	settings->set_setting(legacy_key, true);
+	CHECK(ResourceTextSerializer::get_default_options().ini_plain_values);
+
+	settings->set_setting(legacy_key, Variant());
+	settings->set_setting(style_key, previous);
 }
 
 TEST_CASE("[CSV] Rows, cells and columns by index") {

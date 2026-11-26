@@ -3,14 +3,17 @@
 #
 # Usage: .github/truely/release-notes.sh <sha> <tag> <config> [<previous-tag>]
 #   sha           the commit the release is built from
-#   tag           the new release tag, e.g. truely-godot4.8-beta5-a1b2c3d
+#   tag           the new release tag, e.g. truely-v0.1.0-godot4.8-beta5
 #   config        the Godot base, e.g. 4.8.beta5
 #   previous-tag  optional, overrides the search for the previous release (any revision works)
 #
 # Needs git (full history with tags) and gh (GH_TOKEN or GITHUB_TOKEN in CI). The repository comes
 # from GITHUB_REPOSITORY, else from the origin remote.
 #
-# Changes: the first-parent commits since the previous truely-godot* tag (without one: the last
+# The Truely version comes from truely/version.txt at <sha> (and at the previous release).
+#
+# Changes: the first-parent commits since the previous release tag, truely-v* or the older
+# truely-godot* (without one: the last
 # 50), merge commits and "[skip ci]" commits left out. The issue number "(#N)" at the end of each
 # subject is looked up with gh and grouped by category (Godot's topic groups) and type (Feature,
 # Enhancement, Bugfix) with the rules of .github/truely/changelog-categories.tsv.
@@ -26,7 +29,8 @@ if [ -z "$REPO" ]; then
 fi
 URL="https://github.com/$REPO"
 
-# Previous release: the newest truely-godot* tag reachable from SHA that does not point at SHA itself.
+# Previous release: the newest release tag (truely-v*, before #265 truely-godot*) reachable from SHA
+# that does not point at SHA itself.
 PREV="${4:-}"
 [ -n "$PREV" ] || while read -r t; do
 	[ -n "$t" ] || continue
@@ -34,7 +38,7 @@ PREV="${4:-}"
 		PREV="$t"
 		break
 	fi
-done < <(git tag --merged "$SHA" --sort=-committerdate --list 'truely-godot*')
+done < <(git tag --merged "$SHA" --sort=-committerdate --list 'truely-v*' 'truely-godot*')
 
 if [ -n "$PREV" ]; then
 	RANGE=("$PREV..$SHA")
@@ -132,10 +136,27 @@ base_of() {
 	fi
 }
 
+# Truely version (truely/version.txt) at a revision; empty before #265.
+truely_of() {
+	git show "$1:truely/version.txt" 2>/dev/null | tr -d '[:space:]' || true
+}
+
 NOW="$(base_of "$SHA")"
 HASH="${SHA:0:9}"
+TRUELY="$(truely_of "$SHA")"
 
-printf 'Truely Godot Engine at commit [`%s`](%s/commit/%s), based on Godot %s.\n' "${SHA:0:7}" "$URL" "$SHA" "$NOW"
+if [ -n "$TRUELY" ]; then
+	printf '**Truely v%s**, based on Godot %s, at commit [`%s`](%s/commit/%s).\n' "$TRUELY" "$NOW" "${SHA:0:7}" "$URL" "$SHA"
+	if [ -n "$PREV" ]; then
+		BEFORE_TRUELY="$(truely_of "$PREV")"
+		if [ -n "$BEFORE_TRUELY" ] && [ "$BEFORE_TRUELY" != "$TRUELY" ]; then
+			printf 'Truely v%s → v%s.\n' "$BEFORE_TRUELY" "$TRUELY"
+		fi
+	fi
+	printf 'In the engine: `Engine.get_version_info()["truely_version"]`, `--truely-version`.\n'
+else
+	printf 'Truely Godot Engine at commit [`%s`](%s/commit/%s), based on Godot %s.\n' "${SHA:0:7}" "$URL" "$SHA" "$NOW"
+fi
 printf 'Version string: `%s.truely.%s` (Mono: `%s.mono.truely.%s`).\n\n' "$CONFIG" "$HASH" "$CONFIG" "$HASH"
 
 printf '## Changes\n\n'

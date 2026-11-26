@@ -10,6 +10,8 @@ def get_doc_classes():
     return [
         "TileMap",
         "TileMapLayer",
+        "TileMapPathGraph",
+        "TileMapPathGraphOptions",
         "TileData",
         "TileMapPattern",
         "TileSet",

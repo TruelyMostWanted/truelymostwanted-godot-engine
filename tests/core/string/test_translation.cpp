@@ -201,14 +201,7 @@ TEST_CASE("[TranslationCSV] validate_translation() reports header problems, dupl
 	Ref<CSV> csv;
 	csv.instantiate();
 	// Column 2 is empty (invalid), 'xx' is an unknown language, '_notes' is ignored, '?context' is special.
-	REQUIRE(csv->parse("keys,en,,de,xx,_notes,?context
-HELLO,Hello,,Hallo,hi,note,
-BYE,Bye,,,bye,,
-HELLO,Hi again,,Hallo,hi,,
-HELLO,Hello,,Hallo,hi,,formal
-?pluralrule,,,,,,
-,,,,,,
-") == OK);
+	REQUIRE(csv->parse("keys,en,,de,xx,_notes,?context\nHELLO,Hello,,Hallo,hi,note,\nBYE,Bye,,,bye,,\nHELLO,Hi again,,Hallo,hi,,\nHELLO,Hello,,Hallo,hi,,formal\n?pluralrule,,,,,,\n,,,,,,\n") == OK);
 
 	const Ref<DataValidation> result = csv->validate_translation();
 	REQUIRE(result.is_valid());
@@ -247,9 +240,7 @@ HELLO,Hello,,Hallo,hi,,formal
 TEST_CASE("[TranslationCSV] validate_translation() of a data CSV and a CSV without header") {
 	Ref<CSV> csv;
 	csv.instantiate();
-	REQUIRE(csv->parse("name,health,speed
-knight,100,4
-") == OK);
+	REQUIRE(csv->parse("name,health,speed\nknight,100,4\n") == OK);
 	Ref<DataValidation> result = csv->validate_translation();
 	CHECK_MESSAGE(result->get_issue_count() == 3, "Two unknown language codes and one 'not a translation table' issue, no row checks.");
 	CHECK(result->get_issue_kind(2) == DataValidation::ISSUE_KIND_INVALID_LOCALE);
@@ -260,9 +251,7 @@ knight,100,4
 	CHECK(result->get_issue_count() == 1);
 	CHECK(result->get_issue_kind(0) == DataValidation::ISSUE_KIND_MISSING_FIELD);
 
-	REQUIRE(csv->parse("keys,en,fr
-HELLO,Hello,Bonjour
-") == OK);
+	REQUIRE(csv->parse("keys,en,fr\nHELLO,Hello,Bonjour\n") == OK);
 	CHECK(csv->validate_translation()->is_valid());
 }
 
@@ -435,9 +424,7 @@ TEST_CASE("[TranslationCSV] A second ?context column is reported and ignored") {
 	options["compress"] = 0;
 	options["delimiter"] = 0;
 
-	const String path = write_temp_csv("double_context.csv", "keys,en,?context,?CONTEXT
-HELLO,Hello,a,b
-");
+	const String path = write_temp_csv("double_context.csv", "keys,en,?context,?CONTEXT\nHELLO,Hello,a,b\n");
 	List<String> gen_files;
 	Error result;
 	int errors;

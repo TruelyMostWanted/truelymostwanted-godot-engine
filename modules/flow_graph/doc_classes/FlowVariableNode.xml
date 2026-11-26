@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowVariableNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Base class of the nodes that access a variable of a [FlowGraph].
+	</brief_description>
+	<description>
+		[FlowVariableNode] holds the name of a variable. It is the base class of [FlowGetVariableNode] and [FlowSetVariableNode] and can't be instantiated itself. The name must be declared in [member FlowGraph.variables]; otherwise [method FlowGraph.validate] reports [constant FlowGraphValidation.ISSUE_KIND_UNDECLARED_VARIABLE]. An empty name is a configuration warning of the node.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="variable_name" type="StringName" setter="set_variable_name" getter="get_variable_name" default="&amp;&quot;&quot;">
+			The name of the variable, as declared by a [FlowVariable] in [member FlowGraph.variables].
+		</member>
+	</members>
+</class>

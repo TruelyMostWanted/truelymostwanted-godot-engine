@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowPort" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A named input or output of a [FlowNode].
+	</brief_description>
+	<description>
+		A [FlowPort] describes one connection point of a [FlowNode]. There are two kinds ([enum PortKind]). A [b]flow[/b] port ([constant PORT_KIND_FLOW]) carries the execution from one node to the next. A [b]data[/b] port ([constant PORT_KIND_DATA]) carries a value and has a [member type] and a [member default_value].
+		Ports are returned by [method FlowNode.get_input_ports] and [method FlowNode.get_output_ports] and are created in code with [method create_flow] and [method create_data]. Ports are addressed by their [member name], which is unique among the inputs and unique among the outputs of one node. The built-in nodes use the names [code]in[/code] and [code]out[/code] for their flow ports.
+		A data output can be connected to a data input if the types are equal, if either side has the type [constant @GlobalScope.TYPE_NIL] (any type), or if an [int] output goes into a [float] input. A flow port can only be connected to a flow port.
+		[codeblocks]
+		[gdscript]
+		var port := FlowPort.create_data("amount", TYPE_INT, 1, "Amount")
+		print(port.kind == FlowPort.PORT_KIND_DATA) # true
+		[/gdscript]
+		[csharp]
+		FlowPort port = FlowPort.CreateData("amount", Variant.Type.Int, 1, "Amount");
+		GD.Print(port.Kind == FlowPort.PortKind.Data); // True
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_data" qualifiers="static">
+			<return type="FlowPort" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="type" type="int" enum="Variant.Type" />
+			<param index="2" name="default_value" type="Variant" default="null" />
+			<param index="3" name="label" type="String" default="&quot;&quot;" />
+			<description>
+				Creates a data port named [param name] that carries values of [param type]. Use [constant @GlobalScope.TYPE_NIL] for a port that accepts any type. [param default_value] is the value an unconnected input uses. [param label] is shown in the graph editor instead of the name when it is not empty.
+			</description>
+		</method>
+		<method name="create_flow" qualifiers="static">
+			<return type="FlowPort" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="label" type="String" default="&quot;&quot;" />
+			<description>
+				Creates a flow port named [param name]. [param label] is shown in the graph editor instead of the name when it is not empty.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="class_hint" type="StringName" setter="set_class_hint" getter="get_class_hint" default="&amp;&quot;&quot;">
+			The class of the values when [member type] is [constant @GlobalScope.TYPE_OBJECT], for example [Texture2D]. Only a hint for editors; connections are not checked against it.
+		</member>
+		<member name="default_value" type="Variant" setter="set_default_value" getter="get_default_value" default="null">
+			The value of a data input that has no connection. Ignored by flow ports.
+		</member>
+		<member name="kind" type="int" setter="set_kind" getter="get_kind" enum="FlowPort.PortKind" default="0">
+			Whether the port carries the execution (flow) or a value (data). See [enum PortKind].
+		</member>
+		<member name="label" type="String" setter="set_label" getter="get_label" default="&quot;&quot;">
+			Text shown in the graph editor instead of [member name]. If empty, the name is shown.
+		</member>
+		<member name="name" type="StringName" setter="set_port_name" getter="get_port_name" default="&amp;&quot;&quot;">
+			The name of the port, used in [method FlowGraph.connect_nodes] and in saved connections. It must be unique among the inputs, and among the outputs, of one node.
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="0">
+			The [enum Variant.Type] of the values of a data port. [constant @GlobalScope.TYPE_NIL] means any type. Ignored by flow ports.
+		</member>
+	</members>
+	<constants>
+		<constant name="PORT_KIND_FLOW" value="0" enum="PortKind">
+			The port carries the execution.
+		</constant>
+		<constant name="PORT_KIND_DATA" value="1" enum="PortKind">
+			The port carries a value.
+		</constant>
+		<constant name="PORT_KIND_MAX" value="2" enum="PortKind">
+			Represents the size of the [enum PortKind] enum.
+		</constant>
+	</constants>
+</class>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowFrame" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A titled, colored rectangle that groups nodes in the graph editor.
+	</brief_description>
+	<description>
+		A [FlowFrame] is a purely visual helper of the graph editor: a rectangle with a title and a color behind a group of nodes. Frames are stored in [member FlowGraph.frames] and are ignored at runtime. The frame lists the ids of the nodes it groups in [member node_ids]; when a node is removed with [method FlowGraph.remove_node], its id is removed from every frame.
+		[codeblocks]
+		[gdscript]
+		var frame := FlowFrame.new()
+		frame.title = "Intro"
+		frame.rect = Rect2(-20, -40, 460, 140)
+		frame.node_ids = PackedInt32Array([start_id, wait_id])
+		graph.frames = [frame]
+		[/gdscript]
+		[csharp]
+		var frame = new FlowFrame { Title = "Intro", Rect = new Rect2(-20, -40, 460, 140), NodeIds = [startId, waitId] };
+		graph.Frames = [frame];
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="color" type="Color" setter="set_color" getter="get_color" default="Color(0.3, 0.3, 0.3, 0.75)">
+			The color of the rectangle.
+		</member>
+		<member name="node_ids" type="PackedInt32Array" setter="set_node_ids" getter="get_node_ids" default="PackedInt32Array()">
+			The ids of the nodes of the graph that belong to the frame.
+		</member>
+		<member name="rect" type="Rect2" setter="set_rect" getter="get_rect" default="Rect2(0, 0, 0, 0)">
+			Position and size of the frame in graph editor coordinates (pixels), the same space as [member FlowNode.editor_position].
+		</member>
+		<member name="title" type="String" setter="set_title" getter="get_title" default="&quot;&quot;">
+			The title shown at the top of the frame.
+		</member>
+	</members>
+</class>
