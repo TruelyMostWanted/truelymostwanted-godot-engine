@@ -10,6 +10,20 @@
 		<link title="Audio streams">$DOCS_URL/tutorials/audio/audio_streams.html</link>
 	</tutorials>
 	<methods>
+		<method name="add_stream">
+			<return type="void" />
+			<param index="0" name="stream" type="AudioStream" />
+			<description>
+				Appends [param stream] to the end of the list. Fails if the list already holds [constant MAX_STREAMS] streams.
+			</description>
+		</method>
+		<method name="find_stream" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="stream" type="AudioStream" />
+			<description>
+				Returns the index of [param stream] in the list, or [code]-1[/code] if it is not in the list.
+			</description>
+		</method>
 		<method name="get_bpm" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -21,6 +35,57 @@
 			<param index="0" name="stream_index" type="int" />
 			<description>
 				Returns the stream at playback position index.
+			</description>
+		</method>
+		<method name="get_stream_index_at" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Returns the index of the stream that plays at [param time] seconds from the start of the playlist, in list order (the inverse of [method get_stream_start_time]). With [member loop], times past the end wrap around like a seek; without it they return [code]-1[/code], as do negative times and an empty playlist.
+			</description>
+		</method>
+		<method name="get_stream_length" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the length in seconds the playlist gives the stream at [param index]: [code]beat_count * 60 / bpm[/code] if the stream has a BPM and a beat count, else its [method AudioStream.get_length]. [code]null[/code] entries have length [code]0.0[/code].
+			</description>
+		</method>
+		<method name="get_stream_name" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns a display name for the stream at [param index]: its [member Resource.resource_name], else its file name without extension, else an empty string (built-in streams without a name). Useful for a "now playing" label together with [signal AudioStreamPlayer.track_changed].
+			</description>
+		</method>
+		<method name="get_stream_start_time" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the time in seconds at which the stream at [param index] starts, in list order: the sum of [method get_stream_length] of the streams before it. Tracks follow each other without overlap; [member fade_time] does not shorten this timeline, the previous track fades out over the start of the next one.
+			</description>
+		</method>
+		<method name="insert_stream">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="stream" type="AudioStream" />
+			<description>
+				Inserts [param stream] at [param index]; the later streams move one place down. [param index] may be the list size to append.
+			</description>
+		</method>
+		<method name="move_stream">
+			<return type="void" />
+			<param index="0" name="from" type="int" />
+			<param index="1" name="to" type="int" />
+			<description>
+				Moves the stream at [param from] to [param to]; the streams in between shift by one place.
+			</description>
+		</method>
+		<method name="remove_stream">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the stream at [param index].
 			</description>
 		</method>
 		<method name="set_list_stream">
@@ -35,6 +100,7 @@
 	<members>
 		<member name="fade_time" type="float" setter="set_fade_time" getter="get_fade_time" default="0.3">
 			Fade time used when a stream ends, when going to the next one. Streams are expected to have an extra bit of audio after the end to help with fading.
+			The fade does not change the timeline: [method AudioStream.get_length] of the playlist is the sum of [method get_stream_length], and each track starts at [method get_stream_start_time].
 		</member>
 		<member name="loop" type="bool" setter="set_loop" getter="has_loop" default="true">
 			If [code]true[/code], the playlist will loop, otherwise the playlist will end when the last stream is finished.
@@ -42,8 +108,12 @@
 		<member name="shuffle" type="bool" setter="set_shuffle" getter="get_shuffle" default="false">
 			If [code]true[/code], the playlist will shuffle each time playback starts and each time it loops.
 		</member>
-		<member name="stream_count" type="int" setter="set_stream_count" getter="get_stream_count" default="0">
-			Amount of streams in the playlist.
+		<member name="stream_count" type="int" setter="set_stream_count" getter="get_stream_count">
+			Amount of streams in the playlist. Kept for files saved before [member streams] existed; it is no longer stored.
+		</member>
+		<member name="streams" type="AudioStream[]" setter="set_streams" getter="get_streams" default="[]">
+			The streams of the playlist in play order (when [member shuffle] is off), at most [constant MAX_STREAMS]. Entries may be [code]null[/code]; they are skipped. Changing the list stops running playbacks of this playlist, like [method set_list_stream].
+			Files saved with [member stream_count] and [code]stream_0[/code], [code]stream_1[/code], ... still load into this list.
 		</member>
 	</members>
 	<constants>
