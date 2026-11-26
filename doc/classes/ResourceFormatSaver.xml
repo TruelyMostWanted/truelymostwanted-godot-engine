@@ -37,9 +37,11 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="resource" type="Resource" />
 			<param index="1" name="path" type="String" />
-			<param index="2" name="flags" type="int" />
+			<param index="2" name="flags" type="int" enum="ResourceSaver.SaverFlags" is_bitfield="true" />
 			<description>
 				Saves the given resource object to a file at the target [param path]. [param flags] is a bitmask composed with [enum ResourceSaver.SaverFlags] constants.
+				When [method ResourceSaver.save] is called with [constant ResourceSaver.FLAG_CHANGE_PATH], [member Resource.resource_path] of [param resource] already points to the target path while this method runs (unless another loaded resource holds that path).
+				[b]Note:[/b] [param flags] used to be declared as [int]. GDScript sees it as [int] either way, and compiled GDExtensions that implement the old signature keep working through a compatibility hash. In C#, the override takes [enum ResourceSaver.SaverFlags].
 				Returns [constant OK] on success, or an [enum Error] constant in case of failure.
 			</description>
 		</method>

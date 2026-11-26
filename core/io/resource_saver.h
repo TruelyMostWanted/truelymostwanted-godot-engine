@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/io/resource.h"
+#include "core/io/resource_saver_constants.h"
 #include "core/object/gdvirtual.gen.h"
 #include "core/os/mutex.h"
 
@@ -40,7 +41,10 @@ class ResourceFormatSaver : public RefCounted {
 protected:
 	static void _bind_methods();
 
-	GDVIRTUAL3R(Error, _save, Ref<Resource>, String, uint32_t)
+	GDVIRTUAL3R(Error, _save, Ref<Resource>, String, BitField<ResourceSaverConstants::SaverFlags>)
+#ifndef DISABLE_DEPRECATED
+	GDVIRTUAL3R_COMPAT(_save_bind_compat_367, _save, Error, Ref<Resource>, String, uint32_t)
+#endif
 	GDVIRTUAL2R(Error, _set_uid, String, ResourceUID::ID)
 	GDVIRTUAL1RC(bool, _recognize, Ref<Resource>)
 	GDVIRTUAL1RC(Vector<String>, _get_recognized_extensions, Ref<Resource>)
@@ -83,16 +87,15 @@ class ResourceSaver {
 	static Ref<ResourceFormatSaver> _find_custom_resource_format_saver(const String &p_path);
 
 public:
-	enum SaverFlags {
-		FLAG_NONE = 0,
-		FLAG_RELATIVE_PATHS = 1,
-		FLAG_BUNDLE_RESOURCES = 2,
-		FLAG_CHANGE_PATH = 4,
-		FLAG_OMIT_EDITOR_PROPERTIES = 8,
-		FLAG_SAVE_BIG_ENDIAN = 16,
-		FLAG_COMPRESS = 32,
-		FLAG_REPLACE_SUBRESOURCE_PATHS = 64,
-	};
+	using SaverFlags = ResourceSaverConstants::SaverFlags;
+	static constexpr SaverFlags FLAG_NONE = ResourceSaverConstants::FLAG_NONE;
+	static constexpr SaverFlags FLAG_RELATIVE_PATHS = ResourceSaverConstants::FLAG_RELATIVE_PATHS;
+	static constexpr SaverFlags FLAG_BUNDLE_RESOURCES = ResourceSaverConstants::FLAG_BUNDLE_RESOURCES;
+	static constexpr SaverFlags FLAG_CHANGE_PATH = ResourceSaverConstants::FLAG_CHANGE_PATH;
+	static constexpr SaverFlags FLAG_OMIT_EDITOR_PROPERTIES = ResourceSaverConstants::FLAG_OMIT_EDITOR_PROPERTIES;
+	static constexpr SaverFlags FLAG_SAVE_BIG_ENDIAN = ResourceSaverConstants::FLAG_SAVE_BIG_ENDIAN;
+	static constexpr SaverFlags FLAG_COMPRESS = ResourceSaverConstants::FLAG_COMPRESS;
+	static constexpr SaverFlags FLAG_REPLACE_SUBRESOURCE_PATHS = ResourceSaverConstants::FLAG_REPLACE_SUBRESOURCE_PATHS;
 
 	static Error save(RequiredParam<Resource> p_resource, const String &p_path = "", uint32_t p_flags = (uint32_t)FLAG_NONE);
 	static void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions);
