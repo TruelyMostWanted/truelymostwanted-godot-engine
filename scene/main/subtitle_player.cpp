@@ -50,7 +50,8 @@ Node *SubtitlePlayer::_get_sync_node() {
 	sync_id = node->get_instance_id();
 	sync_position_method = StringName();
 	if (node->has_method(SNAME("is_playing"))) {
-		for (const char *method : { "get_playback_position", "get_stream_position", "get_current_animation_position" }) {
+		static const char *const methods[] = { "get_playback_position", "get_stream_position", "get_current_animation_position" };
+		for (const char *method : methods) {
 			if (node->has_method(method)) {
 				sync_position_method = method;
 				break;

@@ -34,6 +34,7 @@ TEST_FORCE_LINK(test_subtitle_player)
 
 #include "core/object/callable_mp.h"
 #include "scene/animation/animation_player.h"
+#include "scene/main/scene_tree.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/window.h"
 #include "scene/resources/animation_library.h"
