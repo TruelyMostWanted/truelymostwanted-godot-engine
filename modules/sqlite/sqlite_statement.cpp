@@ -49,6 +49,16 @@ void SQLiteStatement::setup(const Ref<SQLiteDatabase> &p_database, sqlite3_stmt 
 	database = p_database;
 	db = p_database.is_valid() ? p_database->get_handle() : nullptr;
 	stmt = p_stmt;
+	if (database.is_valid() && stmt) {
+		database->register_statement(this);
+	}
+}
+
+void SQLiteStatement::finalize() {
+	if (stmt) {
+		sqlite3_finalize(stmt);
+		stmt = nullptr;
+	}
 }
 
 String SQLiteStatement::get_sql() const {
@@ -256,8 +266,7 @@ void SQLiteStatement::_bind_methods() {
 
 SQLiteStatement::~SQLiteStatement() {
 	if (stmt) {
-		// Finalizing is valid even after the database was closed with sqlite3_close_v2().
-		sqlite3_finalize(stmt);
-		stmt = nullptr;
+		database->unregister_statement(this);
+		finalize();
 	}
 }
