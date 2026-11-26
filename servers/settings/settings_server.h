@@ -56,6 +56,8 @@ enum ApplyPhase {
 
 VARIANT_ENUM_CAST_EXT(SettingsServerEnums::ApplyPhase, SettingsServer::ApplyPhase);
 
+class Viewport;
+
 // Base of all settings servers (one engine singleton per domain: audio, language, video, ...).
 // Keeps three copies of the domain's settings resource: the defaults, the applied state and the
 // pending (edited) state. Loads and saves the player's file in `user://settings/`, pushes changed
@@ -80,6 +82,14 @@ public:
 
 	// The finest step of a [float] setting: at most three decimals.
 	static constexpr double FLOAT_STEP = 0.001;
+
+	// The viewports a graphics settings server with per-viewport values gives them to (#251). The root viewport and
+	// the viewports passed to add_viewport() get them with every target.
+	enum ViewportTargetMode {
+		VIEWPORT_TARGET_ROOT_ONLY,
+		VIEWPORT_TARGET_GROUP, // Also the viewports in the server's group.
+		VIEWPORT_TARGET_ALL_VIEWPORTS, // Also every viewport in ViewportServer.
+	};
 
 	enum SettingFlags {
 		SETTING_FLAG_NONE = 0,
@@ -124,6 +134,7 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	bool legacy_file_loaded = false; // load() read the file of the old domain name: startup() writes the new file.
 	String format_warned_path; // The last path whose extension gave no usable format (warned once).
 	mutable String file_name_warned; // The last invalid `settings/<domain>/file_name` (warned once).
 
@@ -178,6 +189,9 @@ protected:
 	// The type name of the storage form that a file with this text is read as (a CSV header of an older layout can
 	// name another type). By default the type of _settings_to_storage_for_format() of the defaults.
 	virtual String _get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const;
+	// The file name (without extension) the domain used before it was renamed (#243). If the settings file does not
+	// exist yet, load() reads this file from the same folder once; startup() then writes the new file. Empty: none.
+	virtual String _get_legacy_file_name() const { return String(); }
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)
@@ -205,6 +219,13 @@ protected:
 	Variant validate_property_value(const Object *p_object, const StringName &p_name, const Variant &p_value) const;
 	// Called by load() after the values of the file are set on `p_settings` and validated (ListSettingsServer validates its entries).
 	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) {}
+
+	// For the graphics settings servers with per-viewport values: the root viewport, the viewports in `r_extra`
+	// (freed ones are removed from it) and, by `p_target`, the viewports in `p_group` or every viewport in
+	// ViewportServer. Each viewport once, the root first.
+	static LocalVector<Viewport *> _get_target_viewports(ViewportTargetMode p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra);
+	// Whether a viewport that enters the tree is a target by `p_target` alone (not as root or extra viewport).
+	static bool _is_viewport_targeted(ViewportTargetMode p_target, const StringName &p_group, const Viewport *p_viewport);
 
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
@@ -303,4 +324,5 @@ public:
 };
 
 VARIANT_ENUM_CAST(SettingsServer::ApplyMode);
+VARIANT_ENUM_CAST(SettingsServer::ViewportTargetMode);
 VARIANT_BITFIELD_CAST(SettingsServer::SettingFlags);

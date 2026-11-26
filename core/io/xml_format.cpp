@@ -30,10 +30,12 @@
 
 #include "xml_format.h"
 
+#include "core/io/data_schema.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/xml_parser.h"
 #include "core/io/xml_writer.h"
 #include "core/object/class_db.h"
+#include "core/templates/hash_set.h"
 
 namespace {
 
@@ -304,8 +306,107 @@ Error XML::write_text(const Dictionary &p_data, const Ref<SerializerOptions> &p_
 	return OK;
 }
 
-Error XML::parse(const String &p_text) {
-	return parse_text(p_text, data, error_message, error_line);
+Error XML::_parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) {
+	Dictionary parsed;
+	r_column = 0;
+	const Error err = parse_text(p_text, parsed, r_error, r_line);
+	r_data = parsed;
+	return err;
+}
+
+Error XML::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const {
+	return write_text(p_data, p_options, r_text, r_error);
+}
+
+void XML::_get_extensions(List<String> *r_extensions) const {
+	r_extensions->push_back("xml");
+}
+
+// An element as validation data: attributes and child elements are the keys (repeated children, and children
+// whose field is an Array, become an Array), other text is the key "#text". An element with neither
+// attributes nor children is its text.
+static Variant _xml_validation_value(const Dictionary &p_element, const Ref<DataSchema> &p_schema) {
+	const Dictionary attributes = p_element.get(XML::KEY_ATTRIBUTES, Dictionary());
+	const Array children = p_element.get(XML::KEY_CHILDREN, Array());
+	Dictionary result = attributes.duplicate();
+	HashSet<String> lists;
+	bool has_elements = false;
+	for (const Variant &child : children) {
+		if (child.get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		has_elements = true;
+		const Dictionary child_element = child;
+		const String child_name = child_element.get(XML::KEY_NAME, String());
+		const Ref<DataField> field = p_schema.is_valid() ? p_schema->get_field(child_name) : Ref<DataField>();
+		const bool is_list = field.is_valid() && field->get_value_type() == Variant::ARRAY;
+		const Variant value = _xml_validation_value(child_element, field.is_null() ? Ref<DataSchema>() : (is_list ? field->get_element_schema() : field->get_schema()));
+		if (lists.has(child_name)) {
+			Array list = result[child_name];
+			list.push_back(value);
+		} else if (is_list || result.has(child_name)) {
+			Array list;
+			if (result.has(child_name)) {
+				list.push_back(result[child_name]);
+			}
+			list.push_back(value);
+			result[child_name] = list;
+			lists.insert(child_name);
+		} else {
+			result[child_name] = value;
+		}
+	}
+	const String text = p_element.get(XML::KEY_TEXT, String());
+	if (attributes.is_empty() && !has_elements) {
+		return text;
+	}
+	if (!text.strip_edges().is_empty()) {
+		result["#text"] = text;
+	}
+	return result;
+}
+
+Ref<DataValidation> XML::_validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const {
+	const Dictionary root = get_data();
+	Variant value = root.is_empty() ? Variant(Dictionary()) : _xml_validation_value(root, p_schema);
+	if (value.get_type() != Variant::DICTIONARY) {
+		// A root element with only text.
+		Dictionary text_only;
+		text_only["#text"] = value;
+		value = text_only;
+	}
+	return p_schema->validate(value, p_options);
+}
+
+Ref<XMLElement> XML::get_root() {
+	const Dictionary tree = get_data();
+	if (tree.is_empty()) {
+		return Ref<XMLElement>();
+	}
+	if (root_view.is_null()) {
+		root_view = XMLElement::create_view(tree, get_instance_id());
+	}
+	return root_view;
+}
+
+Ref<XMLElement> XML::create_root(const String &p_name) {
+	Dictionary tree;
+	tree[KEY_NAME] = p_name;
+	tree[KEY_ATTRIBUTES] = Dictionary();
+	tree[KEY_CHILDREN] = Array();
+	tree[KEY_TEXT] = String();
+	set_data(tree);
+	return get_root();
+}
+
+Ref<XMLElement> XML::find_first(const String &p_path) {
+	const Ref<XMLElement> root = get_root();
+	return root.is_valid() ? root->find_first(p_path) : Ref<XMLElement>();
+}
+
+TypedArray<XMLElement> XML::find_all(const String &p_path) {
+	const Ref<XMLElement> root = get_root();
+	return root.is_valid() ? root->find_all(p_path) : TypedArray<XMLElement>();
 }
 
 Dictionary XML::parse_string(const String &p_text) {
@@ -341,14 +442,218 @@ Ref<Resource> XML::deserialize(const String &p_text, const StringName &p_type_hi
 	return serializer->deserialize(p_text, ResourceTextSerializer::FORMAT_XML, p_type_hint, p_options);
 }
 
+XML::XML() {
+	_get_data_ref() = Dictionary();
+}
+
 void XML::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("parse", "text"), &XML::parse);
-	ClassDB::bind_method(D_METHOD("get_data"), &XML::get_data);
-	ClassDB::bind_method(D_METHOD("get_error_message"), &XML::get_error_message);
-	ClassDB::bind_method(D_METHOD("get_error_line"), &XML::get_error_line);
+	ClassDB::bind_method(D_METHOD("get_root"), &XML::get_root);
+	ClassDB::bind_method(D_METHOD("create_root", "name"), &XML::create_root);
+	ClassDB::bind_method(D_METHOD("find_first", "path"), &XML::find_first);
+	ClassDB::bind_method(D_METHOD("find_all", "path"), &XML::find_all);
 
 	ClassDB::bind_static_method("XML", D_METHOD("parse_string", "text"), &XML::parse_string);
 	ClassDB::bind_static_method("XML", D_METHOD("stringify", "data", "options"), &XML::stringify, DEFVAL(Ref<SerializerOptions>()));
 	ClassDB::bind_static_method("XML", D_METHOD("serialize", "resource", "options"), &XML::serialize, DEFVAL(Ref<SerializerOptions>()));
 	ClassDB::bind_static_method("XML", D_METHOD("deserialize", "text", "type_hint", "options"), &XML::deserialize, DEFVAL(StringName()), DEFVAL(Ref<SerializerOptions>()));
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// XMLElement.
+
+XMLElement::XMLElement() {
+	element[XML::KEY_NAME] = String();
+	element[XML::KEY_ATTRIBUTES] = Dictionary();
+	element[XML::KEY_CHILDREN] = Array();
+	element[XML::KEY_TEXT] = String();
+}
+
+Ref<XMLElement> XMLElement::create_view(const Dictionary &p_element, ObjectID p_owner) {
+	Ref<XMLElement> view;
+	view.instantiate();
+	view->element = p_element;
+	view->owner_id = p_owner;
+	return view;
+}
+
+void XMLElement::_changed() {
+	XML *owner = ObjectDB::get_instance<XML>(owner_id);
+	if (owner) {
+		owner->notify_tree_changed();
+	}
+}
+
+Array XMLElement::_get_children_array() {
+	if (element.get(XML::KEY_CHILDREN, Variant()).get_type() != Variant::ARRAY) {
+		element[XML::KEY_CHILDREN] = Array();
+	}
+	return element[XML::KEY_CHILDREN];
+}
+
+void XMLElement::set_name(const String &p_name) {
+	element[XML::KEY_NAME] = p_name;
+	_changed();
+}
+
+String XMLElement::get_name() const {
+	return element.get(XML::KEY_NAME, String());
+}
+
+void XMLElement::set_text(const String &p_text) {
+	// Replaces all text nodes; child elements stay.
+	Array children = _get_children_array();
+	for (int i = children.size() - 1; i >= 0; i--) {
+		if (children[i].get_type() == Variant::STRING) {
+			children.remove_at(i);
+		}
+	}
+	if (!p_text.is_empty()) {
+		children.insert(0, p_text);
+	}
+	element[XML::KEY_TEXT] = p_text;
+	_changed();
+}
+
+String XMLElement::get_text() const {
+	return element.get(XML::KEY_TEXT, String());
+}
+
+String XMLElement::get_attribute(const String &p_name, const String &p_default) const {
+	const Variant attributes = element.get(XML::KEY_ATTRIBUTES, Variant());
+	if (attributes.get_type() != Variant::DICTIONARY) {
+		return p_default;
+	}
+	return Dictionary(attributes).get(p_name, p_default);
+}
+
+void XMLElement::set_attribute(const String &p_name, const String &p_value) {
+	ERR_FAIL_COND_MSG(p_name.is_empty(), "An attribute name can't be empty.");
+	if (element.get(XML::KEY_ATTRIBUTES, Variant()).get_type() != Variant::DICTIONARY) {
+		element[XML::KEY_ATTRIBUTES] = Dictionary();
+	}
+	Dictionary attributes = element[XML::KEY_ATTRIBUTES];
+	attributes[p_name] = p_value;
+	_changed();
+}
+
+bool XMLElement::has_attribute(const String &p_name) const {
+	const Variant attributes = element.get(XML::KEY_ATTRIBUTES, Variant());
+	return attributes.get_type() == Variant::DICTIONARY && Dictionary(attributes).has(p_name);
+}
+
+void XMLElement::remove_attribute(const String &p_name) {
+	const Variant attributes = element.get(XML::KEY_ATTRIBUTES, Variant());
+	if (attributes.get_type() != Variant::DICTIONARY) {
+		return;
+	}
+	Dictionary values = attributes;
+	if (values.erase(p_name)) {
+		_changed();
+	}
+}
+
+Dictionary XMLElement::get_attributes() const {
+	const Variant attributes = element.get(XML::KEY_ATTRIBUTES, Variant());
+	return attributes.get_type() == Variant::DICTIONARY ? Dictionary(attributes).duplicate() : Dictionary();
+}
+
+TypedArray<XMLElement> XMLElement::get_children() const {
+	TypedArray<XMLElement> result;
+	const Variant children = element.get(XML::KEY_CHILDREN, Variant());
+	if (children.get_type() != Variant::ARRAY) {
+		return result;
+	}
+	const Array nodes = children;
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i].get_type() == Variant::DICTIONARY) {
+			result.push_back(create_view(nodes[i], owner_id));
+		}
+	}
+	return result;
+}
+
+void XMLElement::add_child(const Ref<XMLElement> &p_element) {
+	ERR_FAIL_COND(p_element.is_null());
+	ERR_FAIL_COND_MSG(p_element->element.is_same_instance(element), "An element can't be its own child.");
+	Array children = _get_children_array();
+	children.push_back(p_element->element);
+	// The child now belongs to this tree: its changes mark this document as changed.
+	p_element->owner_id = owner_id;
+	_changed();
+}
+
+void XMLElement::remove_child(const Ref<XMLElement> &p_element) {
+	ERR_FAIL_COND(p_element.is_null());
+	Array children = _get_children_array();
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i].get_type() == Variant::DICTIONARY && Dictionary(children[i]).is_same_instance(p_element->element)) {
+			children.remove_at(i);
+			_changed();
+			return;
+		}
+	}
+	ERR_FAIL_MSG("The element is not a child of this element.");
+}
+
+TypedArray<XMLElement> XMLElement::get_children_by_name(const String &p_name) const {
+	TypedArray<XMLElement> result;
+	const Variant children = element.get(XML::KEY_CHILDREN, Variant());
+	if (children.get_type() != Variant::ARRAY) {
+		return result;
+	}
+	const Array nodes = children;
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i].get_type() == Variant::DICTIONARY && String(Dictionary(nodes[i]).get(XML::KEY_NAME, String())) == p_name) {
+			result.push_back(create_view(nodes[i], owner_id));
+		}
+	}
+	return result;
+}
+
+void XMLElement::_find(const Vector<String> &p_segments, int p_index, bool p_first, TypedArray<XMLElement> &r_found) const {
+	if (p_index >= p_segments.size()) {
+		r_found.push_back(create_view(element, owner_id));
+		return;
+	}
+	const TypedArray<XMLElement> matches = get_children_by_name(p_segments[p_index]);
+	for (int i = 0; i < matches.size(); i++) {
+		const Ref<XMLElement> match = matches[i];
+		match->_find(p_segments, p_index + 1, p_first, r_found);
+		if (p_first && !r_found.is_empty()) {
+			return;
+		}
+	}
+}
+
+Ref<XMLElement> XMLElement::find_first(const String &p_path) const {
+	TypedArray<XMLElement> found;
+	_find(p_path.split("/", false), 0, true, found);
+	return found.is_empty() ? Ref<XMLElement>() : Ref<XMLElement>(found[0]);
+}
+
+TypedArray<XMLElement> XMLElement::find_all(const String &p_path) const {
+	TypedArray<XMLElement> found;
+	_find(p_path.split("/", false), 0, false, found);
+	return found;
+}
+
+void XMLElement::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_name", "name"), &XMLElement::set_name);
+	ClassDB::bind_method(D_METHOD("get_name"), &XMLElement::get_name);
+	ClassDB::bind_method(D_METHOD("set_text", "text"), &XMLElement::set_text);
+	ClassDB::bind_method(D_METHOD("get_text"), &XMLElement::get_text);
+	ClassDB::bind_method(D_METHOD("get_attribute", "name", "default"), &XMLElement::get_attribute, DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("set_attribute", "name", "value"), &XMLElement::set_attribute);
+	ClassDB::bind_method(D_METHOD("has_attribute", "name"), &XMLElement::has_attribute);
+	ClassDB::bind_method(D_METHOD("remove_attribute", "name"), &XMLElement::remove_attribute);
+	ClassDB::bind_method(D_METHOD("get_attributes"), &XMLElement::get_attributes);
+	ClassDB::bind_method(D_METHOD("get_children"), &XMLElement::get_children);
+	ClassDB::bind_method(D_METHOD("add_child", "element"), &XMLElement::add_child);
+	ClassDB::bind_method(D_METHOD("remove_child", "element"), &XMLElement::remove_child);
+	ClassDB::bind_method(D_METHOD("get_children_by_name", "name"), &XMLElement::get_children_by_name);
+	ClassDB::bind_method(D_METHOD("find_first", "path"), &XMLElement::find_first);
+	ClassDB::bind_method(D_METHOD("find_all", "path"), &XMLElement::find_all);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "name"), "set_name", "get_name");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "text"), "set_text", "get_text");
 }

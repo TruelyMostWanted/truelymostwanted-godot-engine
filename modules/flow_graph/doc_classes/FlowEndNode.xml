@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowEndNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Ends a [FlowGraph], or returns from a [FlowSubgraphNode].
+	</brief_description>
+	<description>
+		The end node has one flow input port, [code]in[/code], and no outputs. When the execution reaches it, the graph is finished. The optional [member end_name] tells the caller which end was reached, which is useful when a graph has several ends, for example a dialogue with different outcomes. When a graph runs as a [FlowSubgraphNode], its end nodes are where it returns to the calling graph.
+		At runtime the node ends the graph: [signal FlowGraphPlayback.finished] is emitted with the id of this node and the playback stops playing. Inside a [FlowSubgraphNode] it only ends the inner graph; the outer graph continues at the output of the subgraph node that matches [member end_name] (see [member FlowSubgraphNode.exit_names]), or at [code]out[/code].
+		[codeblocks]
+		[gdscript]
+		var end_node := FlowEndNode.new()
+		end_node.end_name = &amp;"won"
+		graph.add_node(end_node)
+		[/gdscript]
+		[csharp]
+		var endNode = new FlowEndNode { EndName = "won" };
+		graph.AddNode(endNode);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="end_name" type="StringName" setter="set_end_name" getter="get_end_name" default="&amp;&quot;&quot;">
+			The name of this end. It is shown in the graph node and is available to the playback to tell which end was reached. May be empty.
+		</member>
+	</members>
+</class>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowSetVariableNode" inherits="FlowVariableNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Writes a value into a variable.
+	</brief_description>
+	<description>
+		The set variable node has the flow input [code]in[/code], the data input [code]value[/code] (any type) and the flow output [code]out[/code]. When the execution reaches it, the value of [code]value[/code] is stored in the variable [member FlowVariableNode.variable_name] of the blackboard and the execution continues at [code]out[/code].
+		At runtime the node reads [code]value[/code] when it is entered, writes it to the variable [member FlowVariableNode.variable_name] of the blackboard of the [FlowGraphPlayback] (which emits [signal FlowGraphPlayback.variable_changed]) and continues at [code]out[/code].
+		[codeblocks]
+		[gdscript]
+		var set_gold := FlowSetVariableNode.new()
+		set_gold.variable_name = &amp;"gold"
+		var set_id := graph.add_node(set_gold)
+		graph.connect_nodes(expression_id, "result", set_id, "value")
+		[/gdscript]
+		[csharp]
+		var setGold = new FlowSetVariableNode { VariableName = "gold" };
+		int setId = graph.AddNode(setGold);
+		graph.ConnectNodes(expressionId, "result", setId, "value");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

@@ -364,6 +364,89 @@ TileSet::TileLayout TileSet::get_tile_layout() const {
 	return tile_layout;
 }
 
+void TileSet::set_swap_x_and_y_axis(bool p_swap) {
+	coordinate_system.swap_x_and_y_axis = p_swap;
+	emit_changed();
+}
+
+bool TileSet::is_swap_x_and_y_axis() const {
+	return coordinate_system.swap_x_and_y_axis;
+}
+
+void TileSet::set_flip_x(bool p_flip) {
+	coordinate_system.flip_x = p_flip;
+	emit_changed();
+}
+
+bool TileSet::is_flip_x() const {
+	return coordinate_system.flip_x;
+}
+
+void TileSet::set_flip_y(bool p_flip) {
+	coordinate_system.flip_y = p_flip;
+	emit_changed();
+}
+
+bool TileSet::is_flip_y() const {
+	return coordinate_system.flip_y;
+}
+
+void TileSet::set_coordinate_system(const CoordinateSystem &p_system) {
+	coordinate_system = p_system;
+	emit_changed();
+}
+
+TileSet::CoordinateSystem TileSet::get_coordinate_system() const {
+	return coordinate_system;
+}
+
+Vector2i TileSet::layout_to_map_coords_with_system(const Vector2i &p_layout_coords, const CoordinateSystem &p_system) {
+	Vector2i result = p_system.swap_x_and_y_axis ? Vector2i(p_layout_coords.y, p_layout_coords.x) : p_layout_coords;
+	if (p_system.flip_x) {
+		result.x = -result.x;
+	}
+	if (p_system.flip_y) {
+		result.y = -result.y;
+	}
+	return result;
+}
+
+Vector2i TileSet::map_to_layout_coords_with_system(const Vector2i &p_map_coords, const CoordinateSystem &p_system) {
+	Vector2i result = p_map_coords;
+	if (p_system.flip_x) {
+		result.x = -result.x;
+	}
+	if (p_system.flip_y) {
+		result.y = -result.y;
+	}
+	return p_system.swap_x_and_y_axis ? Vector2i(result.y, result.x) : result;
+}
+
+Vector2i TileSet::map_to_layout_coords(const Vector2i &p_map_coords) const {
+	return coordinate_system.is_default() ? p_map_coords : map_to_layout_coords_with_system(p_map_coords, coordinate_system);
+}
+
+Vector2i TileSet::layout_to_map_coords(const Vector2i &p_layout_coords) const {
+	return coordinate_system.is_default() ? p_layout_coords : layout_to_map_coords_with_system(p_layout_coords, coordinate_system);
+}
+
+Vector2i TileSet::convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, bool p_from_swap_x_and_y_axis, bool p_from_flip_x, bool p_from_flip_y) const {
+	CoordinateSystem from_system;
+	from_system.swap_x_and_y_axis = p_from_swap_x_and_y_axis;
+	from_system.flip_x = p_from_flip_x;
+	from_system.flip_y = p_from_flip_y;
+	return convert_map_coords_from_system(p_coords, p_from_layout, from_system);
+}
+
+Vector2i TileSet::convert_map_coords_from_system(const Vector2i &p_coords, TileLayout p_from_layout, const CoordinateSystem &p_from_system) const {
+	const Vector2i old_layout_coords = map_to_layout_coords_with_system(p_coords, p_from_system);
+	Vector2i layout_coords = old_layout_coords;
+	if (tile_shape != TILE_SHAPE_SQUARE && p_from_layout != tile_layout) {
+		layout_coords = transform_coords_layout(old_layout_coords, tile_offset_axis, p_from_layout, tile_layout);
+	}
+	return layout_to_map_coords(layout_coords);
+}
+
 void TileSet::set_tile_offset_axis(TileSet::TileOffsetAxis p_alignment) {
 	tile_offset_axis = p_alignment;
 
@@ -1542,6 +1625,23 @@ void TileSet::draw_tile_shape(CanvasItem *p_canvas_item, Transform2D p_transform
 }
 
 Vector2 TileSet::map_to_local(const Vector2i &p_pos) const {
+	return _layout_coords_to_local(map_to_layout_coords(p_pos));
+}
+
+Vector2i TileSet::local_to_map(const Vector2 &p_local_position) const {
+	return layout_to_map_coords(_local_to_layout_coords(p_local_position));
+}
+
+Vector2i TileSet::get_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
+	return layout_to_map_coords(_get_layout_neighbor_cell(map_to_layout_coords(p_coords), p_cell_neighbor));
+}
+
+Vector2i TileSet::map_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
+	// Pattern coordinates are layout coordinates, so a pattern keeps its shape whatever the axes are.
+	return layout_to_map_coords(_map_layout_pattern(map_to_layout_coords(p_position_in_tilemap), p_coords_in_pattern, p_pattern));
+}
+
+Vector2 TileSet::_layout_coords_to_local(const Vector2i &p_pos) const {
 	// SHOULD RETURN THE CENTER OF THE CELL.
 	Vector2 ret = p_pos;
 
@@ -1614,7 +1714,7 @@ Vector2 TileSet::map_to_local(const Vector2i &p_pos) const {
 	return (ret + Vector2(0.5, 0.5)) * tile_size;
 }
 
-Vector2i TileSet::local_to_map(const Vector2 &p_local_position) const {
+Vector2i TileSet::_local_to_layout_coords(const Vector2 &p_local_position) const {
 	Vector2 ret = p_local_position;
 	ret /= tile_size;
 
@@ -1814,7 +1914,7 @@ bool TileSet::is_existing_neighbor(TileSet::CellNeighbor p_cell_neighbor) const 
 	}
 }
 
-Vector2i TileSet::get_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
+Vector2i TileSet::_get_layout_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const {
 	if (tile_shape == TileSet::TILE_SHAPE_SQUARE) {
 		switch (p_cell_neighbor) {
 			case TileSet::CELL_NEIGHBOR_RIGHT_SIDE:
@@ -2176,7 +2276,7 @@ TypedArray<Vector2i> TileSet::get_surrounding_cells(const Vector2i &p_coords) co
 	return around;
 }
 
-Vector2i TileSet::map_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
+Vector2i TileSet::_map_layout_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern) const {
 	ERR_FAIL_COND_V(p_pattern.is_null(), Vector2i());
 	ERR_FAIL_COND_V(!p_pattern->has_cell(p_coords_in_pattern), Vector2i());
 
@@ -3238,6 +3338,7 @@ void TileSet::reset_state() {
 	tile_shape = TILE_SHAPE_SQUARE;
 	tile_layout = TILE_LAYOUT_STACKED;
 	tile_offset_axis = TILE_OFFSET_AXIS_HORIZONTAL;
+	coordinate_system = CoordinateSystem();
 	tile_size = Size2i(16, 16);
 }
 
@@ -4009,6 +4110,20 @@ bool TileSet::_set(const StringName &p_name, const Variant &p_value) {
 	}
 #endif // DISABLE_DEPRECATED
 
+	// truely-godot-engine: `coordinate_axes`, one value of eight, was replaced by `swap_x_and_y_axis`, `flip_x`
+	// and `flip_y`. Bit 0 was flip X, bit 1 flip Y, bit 2 the swap. The value is read once and saved as the three bools.
+	if (p_name == SNAME("coordinate_axes")) {
+		ERR_FAIL_COND_V(p_value.get_type() != Variant::INT, false);
+		const int axes = p_value;
+		ERR_FAIL_INDEX_V(axes, 8, false);
+		CoordinateSystem system;
+		system.swap_x_and_y_axis = (axes & 4) != 0;
+		system.flip_x = (axes & 1) != 0;
+		system.flip_y = (axes & 2) != 0;
+		set_coordinate_system(system);
+		return true;
+	}
+
 	return false;
 }
 
@@ -4269,6 +4384,15 @@ void TileSet::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_layout"), &TileSet::get_tile_layout);
 	ClassDB::bind_method(D_METHOD("set_tile_offset_axis", "alignment"), &TileSet::set_tile_offset_axis);
 	ClassDB::bind_method(D_METHOD("get_tile_offset_axis"), &TileSet::get_tile_offset_axis);
+	ClassDB::bind_method(D_METHOD("set_swap_x_and_y_axis", "swap"), &TileSet::set_swap_x_and_y_axis);
+	ClassDB::bind_method(D_METHOD("is_swap_x_and_y_axis"), &TileSet::is_swap_x_and_y_axis);
+	ClassDB::bind_method(D_METHOD("set_flip_x", "flip"), &TileSet::set_flip_x);
+	ClassDB::bind_method(D_METHOD("is_flip_x"), &TileSet::is_flip_x);
+	ClassDB::bind_method(D_METHOD("set_flip_y", "flip"), &TileSet::set_flip_y);
+	ClassDB::bind_method(D_METHOD("is_flip_y"), &TileSet::is_flip_y);
+	ClassDB::bind_method(D_METHOD("map_to_layout_coords", "map_coords"), &TileSet::map_to_layout_coords);
+	ClassDB::bind_method(D_METHOD("layout_to_map_coords", "layout_coords"), &TileSet::layout_to_map_coords);
+	ClassDB::bind_method(D_METHOD("convert_map_coords", "coords", "from_layout", "from_swap_x_and_y_axis", "from_flip_x", "from_flip_y"), &TileSet::convert_map_coords, DEFVAL(false), DEFVAL(false), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("set_tile_size", "size"), &TileSet::set_tile_size);
 	ClassDB::bind_method(D_METHOD("get_tile_size"), &TileSet::get_tile_size);
 
@@ -4276,6 +4400,11 @@ void TileSet::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_layout", PROPERTY_HINT_ENUM, "Stacked,Stacked Offset,Stairs Right,Stairs Down,Diamond Right,Diamond Down"), "set_tile_layout", "get_tile_layout");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_offset_axis", PROPERTY_HINT_ENUM, "Horizontal Offset,Vertical Offset"), "set_tile_offset_axis", "get_tile_offset_axis");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "tile_size", PROPERTY_HINT_NONE, "suffix:px"), "set_tile_size", "get_tile_size");
+	ADD_GROUP("Coordinate System", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "swap_x_and_y_axis"), "set_swap_x_and_y_axis", "is_swap_x_and_y_axis");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_x"), "set_flip_x", "is_flip_x");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_y"), "set_flip_y", "is_flip_y");
+	ADD_GROUP("", "");
 
 	// Rendering.
 	ClassDB::bind_method(D_METHOD("set_uv_clipping", "uv_clipping"), &TileSet::set_uv_clipping);

@@ -33,6 +33,7 @@
 #include "../yaml.h"
 
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/math/math_defs.h"
@@ -432,8 +433,8 @@ TEST_CASE("[YAML] Errors with line and column") {
 		{ "a: !!int abc\n", 1, "!!int" },
 		{ "<<: {a: 1}\n", 1, "Merge keys" },
 		{ "? a\n: b\n", 1, "Complex" },
-		{ "a: 1\n---\nb: 2\n", 2, "document" },
-		{ "a: 1\n...\nb: 2\n", 3, "document" },
+		{ "---\n- a\n---\nb: c: d\n", 4, "mapping value" }, // Errors in later documents have their line.
+		{ "--- a: 1\n", 1, "'---'" },
 		{ "a: 1\na: 2\n", 2, "Duplicate" },
 		{ "a:\n\tb: 1\n", 2, "Tabs" },
 		{ "a: 99999999999999999999\n", 1, "64-bit" },
@@ -625,6 +626,74 @@ TEST_CASE("[YAML] Through ResourceSaver and ResourceLoader") {
 		check_yaml_settings(ResourceLoader::load(path, "YAMLTestSettings", ResourceFormatLoader::CACHE_MODE_IGNORE));
 		DirAccess::remove_absolute(path);
 	}
+}
+
+TEST_CASE("[YAML] Resource API: slash paths and plain files") {
+	Ref<YAML> yaml;
+	yaml.instantiate();
+	CHECK(yaml->get_recognized_extensions() == PackedStringArray({ "yaml", "yml" }));
+	REQUIRE(yaml->parse("enemies:\n  - name: Orc\n    hp: 10\n  - name: Elf\n") == OK);
+	CHECK(yaml->get_value("enemies/0/name") == "Orc");
+	CHECK(yaml->get_value("enemies/1/hp", -1) == Variant(-1));
+	CHECK(yaml->has_value("enemies/1"));
+	CHECK_FALSE(yaml->has_value("enemies/2"));
+	yaml->set_value("enemies/1/hp", 5);
+	yaml->set_value("enemies/2", "Troll"); // Index == size appends.
+	yaml->set_value("meta/" + YAML::escape_key("a/b"), true);
+	CHECK(bool(yaml->get_value("meta/a~1b")) == true);
+	CHECK(YAML::split_path("x/a~1b~0c") == Vector<String>({ "x", "a/b~c" }));
+	yaml->erase_value("enemies/0");
+	CHECK(yaml->get_value("enemies/0/name") == "Elf");
+
+	for (const String extension : { "yaml", "yml" }) {
+		const String path = TestUtils::get_temp_path("yaml_plain." + extension);
+		REQUIRE(ResourceSaver::save(yaml, path) == OK);
+		CHECK_FALSE(FileAccess::get_file_as_string(path).contains("$type"));
+		CHECK(ResourceLoader::get_resource_type(path) == "YAML");
+		const Ref<YAML> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+		REQUIRE(loaded.is_valid());
+		CHECK(int(loaded->get_value("enemies/0/hp")) == 5);
+		DirAccess::remove_absolute(path);
+	}
+}
+
+TEST_CASE("[YAML] Several documents") {
+	Ref<YAML> yaml;
+	yaml.instantiate();
+	REQUIRE(yaml->parse("a: 1\n---\n- x\n...\n---\n# empty\n...\nb: 2\n") == OK);
+	REQUIRE(yaml->get_document_count() == 4);
+	CHECK(yaml->get_data() == yaml->get_document(0));
+	CHECK(int(yaml->get_value("a")) == 1);
+	CHECK(Array(yaml->get_document(1)) == Array({ "x" }));
+	CHECK(yaml->get_document(2).get_type() == Variant::NIL);
+	CHECK(int(Dictionary(yaml->get_document(3))["b"]) == 2);
+	CHECK(YAML::parse_string("---\nfirst\n---\nsecond\n") == Variant("first"));
+
+	yaml->remove_document(2);
+	yaml->add_document(Dictionary({ { "c", 3 } }));
+	const String text = yaml->encode_to_text();
+	CHECK(text == "a: 1\n---\n- x\n---\nb: 2\n---\nc: 3\n");
+	Ref<YAML> again;
+	again.instantiate();
+	REQUIRE(again->parse(text) == OK);
+	CHECK(again->get_document_count() == 4);
+
+	yaml->remove_document(0);
+	CHECK(Array(yaml->get_data()) == Array({ "x" }));
+	CHECK(yaml->get_document_count() == 3);
+	ERR_PRINT_OFF;
+	CHECK(yaml->get_document(3).get_type() == Variant::NIL);
+	ERR_PRINT_ON;
+	yaml->clear();
+	CHECK(yaml->get_document_count() == 1);
+
+	// One document, an empty text and a failed parse.
+	REQUIRE(yaml->parse("a: 1\n") == OK);
+	CHECK(yaml->get_document_count() == 1);
+	REQUIRE(yaml->parse("") == OK);
+	CHECK(yaml->get_document_count() == 1);
+	REQUIRE(yaml->parse("a: 1\n---\nb: [\n") == ERR_PARSE_ERROR);
+	CHECK(yaml->get_document_count() == 1);
 }
 
 TEST_CASE("[YAML] Registered as text format FORMAT_YAML") {

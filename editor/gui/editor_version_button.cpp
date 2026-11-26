@@ -31,6 +31,7 @@
 #include "editor_version_button.h"
 
 #include "core/os/time.h"
+#include "core/truely_version.h"
 #include "core/version.h"
 #include "editor/gui/editor_toaster.h"
 #include "servers/display/display_server.h"
@@ -38,14 +39,15 @@
 String _get_version_string(EditorVersionButton::VersionFormat p_format) {
 	String main;
 	switch (p_format) {
+		// The Truely version comes first, the Godot base version follows in parentheses.
 		case EditorVersionButton::FORMAT_BASIC: {
-			return GODOT_VERSION_FULL_CONFIG;
+			return TRUELY_VERSION_FULL_NAME " (" GODOT_VERSION_FULL_CONFIG ")";
 		} break;
 		case EditorVersionButton::FORMAT_WITH_BUILD: {
-			main = "v" GODOT_VERSION_FULL_BUILD;
+			main = TRUELY_VERSION_FULL_NAME " (Godot v" GODOT_VERSION_FULL_BUILD ")";
 		} break;
 		case EditorVersionButton::FORMAT_WITH_NAME_AND_BUILD: {
-			main = GODOT_VERSION_FULL_NAME;
+			main = TRUELY_VERSION_FULL_NAME " (" GODOT_VERSION_FULL_NAME ")";
 		} break;
 		default: {
 			ERR_FAIL_V_MSG(GODOT_VERSION_FULL_NAME, "Unexpected format: " + itos(p_format));

@@ -30,7 +30,6 @@
 
 #include "subtitle_format_srt.h"
 
-#include "core/io/file_access.h"
 #include "core/string/char_utils.h"
 
 static const char32_t MUSIC_NOTE = 0x266A; // ♪
@@ -197,6 +196,14 @@ void SubtitleFormatSRT::read_cue_text(const String &p_raw_text, const Ref<Subtit
 	ERR_FAIL_COND(r_segment.is_null());
 	String raw = p_raw_text.strip_edges();
 
+	// `{\an7}`, `{\an8}`, `{\an9}`: alignment at the top (SubStation Alpha tags, also used in SubRip files).
+	const bool top = raw.contains("\\an7") || raw.contains("\\an8") || raw.contains("\\an9");
+
+	// Leading `{\…}` blocks don't count for the italics check below.
+	while (raw.begins_with("{\\") && raw.find_char('}') > 0) {
+		raw = raw.substr(raw.find_char('}') + 1).strip_edges();
+	}
+
 	// A text fully in italics is usually an off-screen voice.
 	bool off_screen = false;
 	if (raw.begins_with("<i>") && raw.ends_with("</i>") && raw.find("<i>", 3) < 0) {
@@ -238,33 +245,45 @@ void SubtitleFormatSRT::read_cue_text(const String &p_raw_text, const Ref<Subtit
 	r_segment->set_kind(kind);
 	r_segment->set_speaker(speaker);
 	r_segment->set_off_screen(off_screen);
+	r_segment->set_placement(top ? SubtitleSegment::PLACEMENT_TOP : SubtitleSegment::PLACEMENT_AUTO);
 }
 
-String SubtitleFormatSRT::make_cue_text(const Ref<SubtitleSegment> &p_segment) {
+String SubtitleFormatSRT::decode_entities(const String &p_text) {
+	return p_text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&nbsp;", String::chr(0x00A0)).replace("&lrm;", String::chr(0x200E)).replace("&rlm;", String::chr(0x200F)).replace("&amp;", "&");
+}
+
+String SubtitleFormatSRT::decorate_text(const Ref<SubtitleSegment> &p_segment) {
 	ERR_FAIL_COND_V(p_segment.is_null(), String());
 	String text = p_segment->get_text().strip_edges();
 	switch (p_segment->get_kind()) {
 		case SubtitleSegment::KIND_SOUND:
 		case SubtitleSegment::KIND_REACTION:
-			text = "[" + text + "]";
-			break;
+			return "[" + text + "]";
 		case SubtitleSegment::KIND_MUSIC:
 		case SubtitleSegment::KIND_LYRICS: {
 			Vector<String> lines = text.split("\n");
 			for (int i = 0; i < lines.size(); i++) {
 				lines.write[i] = String::chr(MUSIC_NOTE) + " " + lines[i] + " " + String::chr(MUSIC_NOTE);
 			}
-			text = String("\n").join(lines);
-		} break;
-		default: {
-			const String speaker = String(p_segment->get_speaker()).strip_edges();
-			if (!speaker.is_empty()) {
-				text = speaker.to_upper() + ": " + text;
-			}
-		} break;
+			return String("\n").join(lines);
+		}
+		default:
+			return text;
+	}
+}
+
+String SubtitleFormatSRT::make_cue_text(const Ref<SubtitleSegment> &p_segment) {
+	ERR_FAIL_COND_V(p_segment.is_null(), String());
+	String text = decorate_text(p_segment);
+	const String speaker = String(p_segment->get_speaker()).strip_edges();
+	if (!speaker.is_empty() && !p_segment->is_caption()) {
+		text = speaker.to_upper() + ": " + text;
 	}
 	if (p_segment->is_off_screen()) {
 		text = "<i>" + text + "</i>";
+	}
+	if (p_segment->get_placement() == SubtitleSegment::PLACEMENT_TOP) {
+		text = "{\\an8}" + text;
 	}
 	return text;
 }
@@ -375,75 +394,4 @@ String SubtitleFormatSRT::write(const Vector<Ref<SubtitleSegment>> &p_segments, 
 		result += make_cue_text(segment) + "\n";
 	}
 	return result;
-}
-
-// ResourceFormatLoaderSubtitleSRT
-
-Ref<Resource> ResourceFormatLoaderSubtitleSRT::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
-	if (r_error) {
-		*r_error = ERR_FILE_CANT_OPEN;
-	}
-	Error err = OK;
-	const Vector<uint8_t> bytes = FileAccess::get_file_as_bytes(p_path, &err);
-	if (err != OK) {
-		if (r_error) {
-			*r_error = err;
-		}
-		ERR_FAIL_V_MSG(Ref<Resource>(), vformat("Cannot open subtitle file '%s'.", p_path));
-	}
-
-	Vector<Ref<SubtitleSegment>> segments;
-	int skipped = 0;
-	err = SubtitleFormatSRT::parse(SubtitleFormatSRT::decode(bytes), segments, &skipped);
-	if (err != OK) {
-		if (r_error) {
-			*r_error = err;
-		}
-		ERR_FAIL_V_MSG(Ref<Resource>(), vformat("Cannot parse subtitle file '%s': no cue could be read.", p_path));
-	}
-	if (skipped > 0) {
-		WARN_PRINT(vformat("Subtitle file '%s': %d cue(s) could not be read and were skipped.", p_path, skipped));
-	}
-
-	Ref<Subtitle> subtitle;
-	subtitle.instantiate();
-	TypedArray<SubtitleSegment> array;
-	for (const Ref<SubtitleSegment> &segment : segments) {
-		array.push_back(segment);
-	}
-	subtitle->set_segments(array);
-	if (r_error) {
-		*r_error = OK;
-	}
-	return subtitle;
-}
-
-void ResourceFormatLoaderSubtitleSRT::get_recognized_extensions(List<String> *p_extensions) const {
-	p_extensions->push_back("srt");
-}
-
-bool ResourceFormatLoaderSubtitleSRT::handles_type(const String &p_type) const {
-	return p_type == "Subtitle";
-}
-
-String ResourceFormatLoaderSubtitleSRT::get_resource_type(const String &p_path) const {
-	return p_path.has_extension("srt") ? "Subtitle" : "";
-}
-
-// ResourceFormatSaverSubtitleSRT
-
-Error ResourceFormatSaverSubtitleSRT::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
-	const Ref<Subtitle> subtitle = p_resource;
-	ERR_FAIL_COND_V(subtitle.is_null(), ERR_INVALID_PARAMETER);
-	return subtitle->save_to_file(p_path);
-}
-
-void ResourceFormatSaverSubtitleSRT::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (Object::cast_to<Subtitle>(*p_resource)) {
-		p_extensions->push_back("srt");
-	}
-}
-
-bool ResourceFormatSaverSubtitleSRT::recognize(const Ref<Resource> &p_resource) const {
-	return Object::cast_to<Subtitle>(*p_resource) != nullptr;
 }

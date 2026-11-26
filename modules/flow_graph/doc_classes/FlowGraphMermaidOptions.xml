@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphMermaidOptions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Options of [method FlowGraphMermaid.serialize].
+	</brief_description>
+	<description>
+		Controls how [method FlowGraphMermaid.serialize] writes a [FlowGraph]. The defaults write a lossless file. Turn off [member include_data_comments] for a plain diagram in documentation, which loads back only with generic nodes.
+		[codeblocks]
+		[gdscript]
+		var options := FlowGraphMermaidOptions.new()
+		options.direction = FlowGraphMermaidOptions.DIRECTION_LEFT_RIGHT
+		options.include_editor_data = false
+		var text := FlowGraphMermaid.serialize(graph, options)
+		[/gdscript]
+		[csharp]
+		var options = new FlowGraphMermaidOptions();
+		options.Direction = FlowGraphMermaidOptions.DirectionEnum.LeftRight;
+		options.IncludeEditorData = false;
+		string text = FlowGraphMermaid.Serialize(graph, options);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="direction" type="int" setter="set_direction" getter="get_direction" enum="FlowGraphMermaidOptions.Direction" default="0">
+			The direction of the flowchart in the header line ([code]flowchart TD[/code], [code]LR[/code], [code]BT[/code] or [code]RL[/code]). Only the rendering depends on it; it is not read back.
+		</member>
+		<member name="draw_data_connections" type="bool" setter="set_draw_data_connections" getter="is_drawing_data_connections" default="true">
+			If [code]true[/code], data connections are drawn as dotted edges [code]-.-&gt;|output:input|[/code]. If [code]false[/code], the diagram shows only the control flow and data connections are kept in [code]%% flow:edge[/code] comment lines (only with [member include_data_comments]).
+		</member>
+		<member name="include_data_comments" type="bool" setter="set_include_data_comments" getter="is_including_data_comments" default="true">
+			If [code]true[/code], node types, properties, frames and graph properties are written in [code]%% flow:[/code] comment lines, so the file loads back unchanged. If [code]false[/code], the file is a plain Mermaid diagram; loading it creates generic nodes as for a hand-written flowchart.
+		</member>
+		<member name="include_editor_data" type="bool" setter="set_include_editor_data" getter="is_including_editor_data" default="true">
+			If [code]true[/code], [member FlowNode.editor_position], [member FlowNode.editor_size], [member FlowNode.editor_comment], [member FlowFrame.rect] and [member FlowFrame.color] are written. If [code]false[/code], they are left out and reset on load.
+		</member>
+	</members>
+	<constants>
+		<constant name="DIRECTION_TOP_DOWN" value="0" enum="Direction">
+			Top to bottom ([code]TD[/code]).
+		</constant>
+		<constant name="DIRECTION_LEFT_RIGHT" value="1" enum="Direction">
+			Left to right ([code]LR[/code]).
+		</constant>
+		<constant name="DIRECTION_BOTTOM_UP" value="2" enum="Direction">
+			Bottom to top ([code]BT[/code]).
+		</constant>
+		<constant name="DIRECTION_RIGHT_LEFT" value="3" enum="Direction">
+			Right to left ([code]RL[/code]).
+		</constant>
+		<constant name="DIRECTION_MAX" value="4" enum="Direction">
+			The number of directions.
+		</constant>
+	</constants>
+</class>

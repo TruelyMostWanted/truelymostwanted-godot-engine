@@ -178,6 +178,12 @@
 				- [code]hash[/code] - Full Git commit hash as a String;
 				- [code]timestamp[/code] - Holds the Git commit date UNIX timestamp in seconds as an int, or [code]0[/code] if unavailable;
 				- [code]string[/code] - [code]major[/code], [code]minor[/code], [code]patch[/code], [code]status[/code], and [code]build[/code] in a single String.
+				The version of the Truely engine fork (from [code]truely/version.txt[/code], Semantic Versioning) is added on top of the Godot base version above:
+				- [code]truely_major[/code] - Truely major version number as an int (raised for a new Godot major or minor base version and for breaking API changes);
+				- [code]truely_minor[/code] - Truely minor version number as an int (raised for new features);
+				- [code]truely_patch[/code] - Truely patch version number as an int (raised for fixes only);
+				- [code]truely_hex[/code] - Truely version encoded as a hexadecimal int like [code]hex[/code], e.g. "0.1.0" is [code]0x000100[/code];
+				- [code]truely_version[/code] - Truely version as a String, always with three numbers (e.g. "0.1.0").
 				The [code]hex[/code] value is encoded as follows, from left to right: one byte for the major, one byte for the minor, one byte for the patch version. For example, "3.1.12" would be [code]0x03010C[/code].
 				[b]Note:[/b] The [code]hex[/code] value is still an [int] internally, and printing it will give you its decimal representation, which is not particularly meaningful. Use hexadecimal literals for quick version comparisons from code:
 				[codeblocks]

@@ -48,6 +48,7 @@
 #include "core/os/time.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/version.h"
 #include "editor/animation/animation_player_editor_plugin.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
@@ -155,6 +156,7 @@
 #include "editor/themes/editor_theme_manager.h"
 #include "editor/translations/editor_translation_parser.h"
 #include "editor/translations/packed_scene_translation_parser_plugin.h"
+#include "editor/translations/resource_translation_parser_plugin.h"
 #include "editor/version_control/version_control_editor_plugin.h"
 #include "main/main.h"
 #include "scene/2d/node_2d.h"
@@ -400,7 +402,7 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME + " (" TRUELY_VERSION_FULL_NAME ")");
 	if (project_title) {
 		project_title->set_text(title);
 	}
@@ -9764,6 +9766,11 @@ EditorNode::EditorNode() {
 
 	EditorExport::get_singleton()->add_export_plugin(shader_baker_export_plugin);
 #endif // RD_ENABLED
+
+	// Before the scene parser, which also claims "res".
+	Ref<ResourceTranslationParserPlugin> resource_translation_parser_plugin;
+	resource_translation_parser_plugin.instantiate();
+	EditorTranslationParser::get_singleton()->add_parser(resource_translation_parser_plugin, EditorTranslationParser::STANDARD);
 
 	Ref<PackedSceneEditorTranslationParserPlugin> packed_scene_translation_parser_plugin;
 	packed_scene_translation_parser_plugin.instantiate();

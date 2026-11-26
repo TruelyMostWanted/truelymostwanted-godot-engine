@@ -50,8 +50,10 @@
 
 class TileMapLayer;
 class TileMapLayerEditor;
+class TileMapPathGraphEditor;
 class TileSetSourceItemList;
 class GridContainer;
+class ConfirmationDialog;
 
 class SwitchSeparator : public MarginContainer {
 	GDCLASS(SwitchSeparator, MarginContainer);
@@ -377,6 +379,17 @@ class TileMapLayerEditor : public EditorDock {
 private:
 	bool tile_map_layer_changed_needs_update = false;
 
+	// truely-godot-engine: converting painted cells after `tile_layout` or the coordinate system of the TileSet changed.
+	ObjectID known_tile_set_id;
+	TileSet::TileLayout known_tile_layout = TileSet::TILE_LAYOUT_STACKED;
+	TileSet::CoordinateSystem known_coordinate_system;
+	TileSet::TileLayout convert_from_layout = TileSet::TILE_LAYOUT_STACKED;
+	TileSet::CoordinateSystem convert_from_system;
+	ConfirmationDialog *convert_cells_dialog = nullptr;
+	Vector<TileMapLayer *> _get_layers_with_tile_set(const Ref<TileSet> &p_tile_set) const;
+	void _check_coordinate_settings();
+	void _convert_cells_confirmed();
+
 	ObjectID edited_tile_map_layer_id;
 	bool is_multi_node_edit = false;
 	Vector<TileMapLayer *> tile_map_layers_in_scene_cache;
@@ -420,6 +433,8 @@ private:
 
 	Button *toggle_grid_button = nullptr;
 	void _on_grid_toggled(bool p_pressed);
+
+	TileMapPathGraphEditor *path_graph_editor = nullptr; // truely-godot-engine: path graph overlay.
 
 	enum {
 		ADVANCED_MENU_REPLACE_WITH_PROXIES,

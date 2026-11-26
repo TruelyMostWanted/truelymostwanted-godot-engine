@@ -33,6 +33,7 @@
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include "servers/subtitle/subtitle_format_srt.h"
+#include "servers/subtitle/subtitle_formats.h"
 
 // SubtitleSegment
 
@@ -383,38 +384,95 @@ Ref<SubtitleValidation> Subtitle::validate(double p_max_characters_per_second) c
 	return result;
 }
 
+Subtitle::Format Subtitle::get_format_for_extension(const String &p_extension) {
+	const String extension = p_extension.to_lower();
+	if (extension == "srt") {
+		return FORMAT_SRT;
+	} else if (extension == "vtt") {
+		return FORMAT_VTT;
+	} else if (extension == "ttml" || extension == "dfxp") {
+		return FORMAT_TTML;
+	} else if (extension == "ass" || extension == "ssa") {
+		return FORMAT_ASS;
+	} else if (extension == "sbv") {
+		return FORMAT_SBV;
+	}
+	return FORMAT_MAX;
+}
+
+PackedStringArray Subtitle::get_recognized_extensions() {
+	return PackedStringArray({ "srt", "vtt", "ttml", "dfxp", "ass", "ssa", "sbv" });
+}
+
+Error Subtitle::parse_text(const String &p_text, Format p_format, Vector<Ref<SubtitleSegment>> &r_segments, int *r_skipped, String *r_language) {
+	switch (p_format) {
+		case FORMAT_SRT:
+			return SubtitleFormatSRT::parse(p_text, r_segments, r_skipped);
+		case FORMAT_VTT:
+			return SubtitleFormatVTT::parse(p_text, r_segments, r_skipped);
+		case FORMAT_TTML:
+			return SubtitleFormatTTML::parse(p_text, r_segments, r_skipped, r_language);
+		case FORMAT_ASS:
+			return SubtitleFormatASS::parse(p_text, r_segments, r_skipped);
+		case FORMAT_SBV:
+			return SubtitleFormatSBV::parse(p_text, r_segments, r_skipped);
+		default:
+			ERR_FAIL_V(ERR_INVALID_PARAMETER);
+	}
+}
+
 String Subtitle::to_text(Format p_format) const {
-	ERR_FAIL_INDEX_V(p_format, FORMAT_MAX, String());
-	return SubtitleFormatSRT::write(segments, time_offset);
+	switch (p_format) {
+		case FORMAT_SRT:
+			return SubtitleFormatSRT::write(segments, time_offset);
+		case FORMAT_VTT:
+			return SubtitleFormatVTT::write(segments, time_offset);
+		case FORMAT_TTML:
+			return SubtitleFormatTTML::write(segments, time_offset, language);
+		case FORMAT_ASS:
+			return SubtitleFormatASS::write(segments, time_offset);
+		case FORMAT_SBV:
+			return SubtitleFormatSBV::write(segments, time_offset);
+		default:
+			ERR_FAIL_V(String());
+	}
 }
 
 Error Subtitle::load_from_text(const String &p_text, Format p_format) {
 	ERR_FAIL_INDEX_V(p_format, FORMAT_MAX, ERR_INVALID_PARAMETER);
 	Vector<Ref<SubtitleSegment>> parsed;
-	const Error err = SubtitleFormatSRT::parse(p_text, parsed);
+	String parsed_language;
+	const Error err = parse_text(p_text, p_format, parsed, nullptr, &parsed_language);
 	if (err != OK) {
 		return err;
 	}
 	segments = parsed;
 	time_offset = 0.0;
+	if (!parsed_language.is_empty()) {
+		language = parsed_language;
+	}
 	emit_changed();
 	return OK;
 }
 
 Error Subtitle::load_from_file(const String &p_path) {
+	const Format format = get_format_for_extension(p_path.get_extension());
+	ERR_FAIL_COND_V_MSG(format == FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("Not a subtitle file extension: '%s'.", p_path));
 	Error err = OK;
 	const Vector<uint8_t> bytes = FileAccess::get_file_as_bytes(p_path, &err);
 	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Cannot read subtitle file '%s'.", p_path));
-	err = load_from_text(SubtitleFormatSRT::decode(bytes), FORMAT_SRT);
+	err = load_from_text(SubtitleFormatSRT::decode(bytes), format);
 	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Cannot parse subtitle file '%s'.", p_path));
 	return OK;
 }
 
 Error Subtitle::save_to_file(const String &p_path) const {
+	const Format format = get_format_for_extension(p_path.get_extension());
+	ERR_FAIL_COND_V_MSG(format == FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("Not a subtitle file extension: '%s'.", p_path));
 	Error err = OK;
 	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
 	ERR_FAIL_COND_V_MSG(file.is_null(), err, vformat("Cannot write subtitle file '%s'.", p_path));
-	file->store_string(to_text(FORMAT_SRT));
+	file->store_string(to_text(format));
 	return file->get_error() == OK ? OK : ERR_FILE_CANT_WRITE;
 }
 
@@ -451,5 +509,9 @@ void Subtitle::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_translate"), "set_auto_translate", "is_auto_translate");
 
 	BIND_ENUM_CONSTANT(FORMAT_SRT);
+	BIND_ENUM_CONSTANT(FORMAT_VTT);
+	BIND_ENUM_CONSTANT(FORMAT_TTML);
+	BIND_ENUM_CONSTANT(FORMAT_ASS);
+	BIND_ENUM_CONSTANT(FORMAT_SBV);
 	BIND_ENUM_CONSTANT(FORMAT_MAX);
 }

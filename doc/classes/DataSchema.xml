@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DataSchema" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Describes the fields of a data file and validates data against them, for any format.
+	</brief_description>
+	<description>
+		A [DataSchema] is an ordered list of [DataField]s that describes the keys, columns or attributes of a data file, independent of its format: [CSV], [INI], [JSON], [TOML], [YAML] and [XML]. [method validate] checks parsed data and returns a [DataValidation] with every issue and its position. Save a schema as a [code].tres[/code] file and edit it in the inspector, or create one in code with [method create_from_dictionary].
+		[method validate] understands three shapes of data: a [Dictionary] (fields by key, such as a JSON object or the sections of an [INI] file), an [Array] of [Dictionary] records (such as a JSON array; the index is the issue row) and an [Array] of rows ([PackedStringArray], fields by position). [method TextDataFormat.validate] validates the data of a format resource and adds lines; [CSV] matches its columns to the fields by header name.
+		Nested data is validated through [member DataField.schema] ([Dictionary] values) and [member DataField.element_schema] or [member DataField.element_type] ([Array] values), at any depth.
+		[codeblocks]
+		[gdscript]
+		var schema = DataSchema.create_from_dictionary({
+			"id": TYPE_INT,
+			"name": TYPE_STRING,
+			"stats": { "attack": TYPE_INT },
+			"tags": [TYPE_STRING],
+		})
+		schema.get_field("id").unique = true
+
+		var result = schema.validate(JSON.parse_string(FileAccess.get_file_as_string("res://data/items.json")))
+		for i in result.get_issue_count():
+			print("%s: %s" % [result.get_issue_path(i), result.get_issue_message(i)])
+		[/gdscript]
+		[csharp]
+		var schema = DataSchema.CreateFromDictionary(new Godot.Collections.Dictionary
+		{
+			{ "id", (int)Variant.Type.Int },
+			{ "name", (int)Variant.Type.String },
+			{ "stats", new Godot.Collections.Dictionary { { "attack", (int)Variant.Type.Int } } },
+			{ "tags", new Godot.Collections.Array { (int)Variant.Type.String } },
+		});
+		schema.GetField("id").Unique = true;
+
+		DataValidation result = schema.Validate(Json.ParseString(FileAccess.GetFileAsString("res://data/items.json")));
+		for (int i = 0; i &lt; result.GetIssueCount(); i++)
+		{
+			GD.Print($"{result.GetIssuePath(i)}: {result.GetIssueMessage(i)}");
+		}
+		[/csharp]
+		[/codeblocks]
+		Validation is explicit: nothing is validated on load or when data changes.
+		[b]Note:[/b] Validation only reads the schema, so it can run on any thread while the schema is not changed.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_field">
+			<return type="void" />
+			<param index="0" name="field" type="DataField" />
+			<description>
+				Adds [param field] at the end of [member fields].
+			</description>
+		</method>
+		<method name="convert_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="field_name" type="StringName" />
+			<param index="1" name="text" type="String" />
+			<description>
+				Converts [param text] (a CSV cell, an XML attribute) to the type of the field [param field_name]. Empty text gives [member DataField.default_value]. Returns [code]null[/code] if the text does not convert, and prints an error if the field does not exist.
+			</description>
+		</method>
+		<method name="create_from_dictionary" qualifiers="static">
+			<return type="DataSchema" />
+			<param index="0" name="dictionary" type="Dictionary" />
+			<description>
+				Creates a schema from a short form: each key is a field name, each value a [enum Variant.Type], a [Dictionary] (a [Dictionary] field with that nested schema) or an [Array] with one element (an [Array] field with that element type or element schema). The fields are [member DataField.required].
+			</description>
+		</method>
+		<method name="find_field" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the index of the field [param name] in [member fields], or [code]-1[/code].
+			</description>
+		</method>
+		<method name="get_field" qualifiers="const">
+			<return type="DataField" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the field [param name], or [code]null[/code].
+			</description>
+		</method>
+		<method name="remove_field">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the field at [param index] from [member fields].
+			</description>
+		</method>
+		<method name="validate" qualifiers="const">
+			<return type="DataValidation" />
+			<param index="0" name="data" type="Variant" />
+			<param index="1" name="options" type="DataValidationOptions" default="null" />
+			<description>
+				Validates [param data] (a [Dictionary], an [Array] of [Dictionary] records or an [Array] of rows) and returns every issue with its field, path, row and column. Other data gives one [constant DataValidation.ISSUE_KIND_TYPE_MISMATCH]. [param options] limits the number of issues; [code]null[/code] keeps at most 1000.
+				Each value is checked in this order: missing ([member DataField.required]), empty ([member DataField.allow_empty]), type ([member DataField.type]), range or enum ([member DataField.hint]), [member DataField.pattern], nested schemas; then [member DataField.unique] across rows. Keys that are not fields are handled by [member extra_fields].
+				[b]Note:[/b] [method validate] has no text, so issues get no lines. Use [method TextDataFormat.validate], or [method DataValidation.resolve_lines] with the text (for [JSON]).
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="extra_field_template" type="DataField" setter="set_extra_field_template" getter="get_extra_field_template">
+			With [constant EXTRA_FIELDS_MATCH_TEMPLATE], every key that is not in [member fields] is validated against this field. For example, a template of type [Dictionary] with a nested [member DataField.schema] validates every section of an [INI] file.
+		</member>
+		<member name="extra_fields" type="int" setter="set_extra_fields" getter="get_extra_fields" enum="DataSchema.ExtraFields" default="0">
+			What happens with keys and columns that are not in [member fields].
+		</member>
+		<member name="fields" type="DataField[]" setter="set_fields" getter="get_fields" default="[]">
+			The fields, in file order (the column order of a CSV file without header).
+		</member>
+		<member name="file_patterns" type="PackedStringArray" setter="set_file_patterns" getter="get_file_patterns" default="PackedStringArray()">
+			Glob patterns of the files this schema describes (such as [code]"res://data/items_*.csv"[/code]). Used by the editor to find the schema of an open file when this schema is listed in [member ProjectSettings.filesystem/data/schema_files]; not used at runtime, where the schema is passed to [method validate] directly.
+		</member>
+	</members>
+	<constants>
+		<constant name="EXTRA_FIELDS_REJECT" value="0" enum="ExtraFields">
+			Keys and columns that are not in [member fields] are reported as [constant DataValidation.ISSUE_KIND_UNKNOWN_FIELD]. Catches typos.
+		</constant>
+		<constant name="EXTRA_FIELDS_ALLOW" value="1" enum="ExtraFields">
+			Keys and columns that are not in [member fields] are accepted without checks.
+		</constant>
+		<constant name="EXTRA_FIELDS_MATCH_TEMPLATE" value="2" enum="ExtraFields">
+			Keys and columns that are not in [member fields] are validated against [member extra_field_template].
+		</constant>
+		<constant name="EXTRA_FIELDS_MAX" value="3" enum="ExtraFields">
+			Represents the size of the [enum ExtraFields] enum.
+		</constant>
+	</constants>
+</class>
