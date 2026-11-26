@@ -41,8 +41,8 @@
 // and decal filter) and Canvas2D (default canvas item texture filter and repeat, pixel snap, SDF, canvas shadow
 // atlas size) (TextureSettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
-// The per-viewport values also go to the viewports passed to add_viewport() and to every Viewport in the group
-// get_viewport_group() when it enters the tree. The projector filter, decal filter and canvas shadow atlas size
+// The per-viewport values also go to the viewports passed to add_viewport() and, by viewport_target, to the viewports
+// in the group get_viewport_group() or to every viewport in ViewportServer, also when they enter the tree. The projector filter, decal filter and canvas shadow atlas size
 // are global (RenderingServer).
 // Values the current renderer ignores are stored, but not pushed (is_value_supported()).
 // Defaults are the project settings. Precedence: player's file > project settings.
@@ -58,6 +58,7 @@ class TextureSettingsServer : public SettingsServer {
 	// Settings whose skipped value was already reported, so the warning is printed once per value.
 	HashSet<StringName> warned;
 	LocalVector<ObjectID> extra_viewports;
+	ViewportTargetMode viewport_target = VIEWPORT_TARGET_GROUP;
 	bool defaults_captured = false;
 
 	static Variant _get_project_value(const StringName &p_name);
@@ -134,6 +135,8 @@ public:
 	void add_viewport(Viewport *p_viewport);
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
+	void set_viewport_target(ViewportTargetMode p_target);
+	ViewportTargetMode get_viewport_target() const;
 
 	TextureSettingsServer();
 	~TextureSettingsServer();

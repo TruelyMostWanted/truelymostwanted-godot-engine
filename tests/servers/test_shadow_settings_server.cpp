@@ -312,6 +312,32 @@ TEST_CASE("[SceneTree][ShadowSettingsServer] Added viewports and viewports in th
 	memdelete(server);
 }
 
+TEST_CASE("[SceneTree][ShadowSettingsServer] With all viewports as target every viewport gets the positional atlas") {
+	TestSetup setup;
+	RootState state;
+	Viewport *root = state.root;
+
+	ShadowSettingsServer *server = memnew(ShadowSettingsServer);
+	server->set_file_path(temp_file("viewport_target.ini"));
+	server->set_positional_shadow_atlas_size(1024);
+	SubViewport *other = memnew(SubViewport);
+	root->add_child(other);
+	CHECK(other->get_positional_shadow_atlas_size() == 2048);
+
+	server->set_viewport_target(SettingsServer::VIEWPORT_TARGET_ALL_VIEWPORTS);
+	CHECK(other->get_positional_shadow_atlas_size() == 1024);
+	SubViewport *late = memnew(SubViewport);
+	root->add_child(late);
+	CHECK(late->get_positional_shadow_atlas_size() == 1024);
+
+	root->remove_child(late);
+	root->remove_child(other);
+	memdelete(late);
+	memdelete(other);
+	server->reset_to_defaults();
+	memdelete(server);
+}
+
 TEST_CASE("[ShadowSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
 	ShadowSettingsServer *server = memnew(ShadowSettingsServer);

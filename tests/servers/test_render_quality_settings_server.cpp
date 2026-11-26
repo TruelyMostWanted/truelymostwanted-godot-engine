@@ -379,6 +379,54 @@ TEST_CASE("[SceneTree][RenderQualitySettingsServer] Added viewports and viewport
 	memdelete(server);
 }
 
+TEST_CASE("[SceneTree][RenderQualitySettingsServer] The viewport target selects the viewports that get the values") {
+	TestSetup setup;
+	RootState state;
+	Viewport *root = state.root;
+
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
+	server->set_file_path(temp_file("viewport_target.ini"));
+	CHECK(server->get_viewport_target() == SettingsServer::VIEWPORT_TARGET_GROUP);
+	server->set_msaa_3d(Viewport::MSAA_4X);
+
+	SubViewport *grouped = memnew(SubViewport);
+	grouped->add_to_group(RenderQualitySettingsServer::get_viewport_group());
+	root->add_child(grouped);
+	SubViewport *other = memnew(SubViewport);
+	root->add_child(other);
+	CHECK(grouped->get_msaa_3d() == Viewport::MSAA_4X);
+	CHECK(other->get_msaa_3d() == Viewport::MSAA_DISABLED);
+
+	// All viewports: every viewport in the tree gets the values at once, viewports that enter it later too.
+	server->set_viewport_target(SettingsServer::VIEWPORT_TARGET_ALL_VIEWPORTS);
+	CHECK(other->get_msaa_3d() == Viewport::MSAA_4X);
+	server->set_msaa_3d(Viewport::MSAA_2X);
+	CHECK(root->get_msaa_3d() == Viewport::MSAA_2X);
+	CHECK(grouped->get_msaa_3d() == Viewport::MSAA_2X);
+	CHECK(other->get_msaa_3d() == Viewport::MSAA_2X);
+	SubViewport *late = memnew(SubViewport);
+	other->add_child(late);
+	CHECK(late->get_msaa_3d() == Viewport::MSAA_2X);
+
+	// Root only: the other viewports keep the values they have.
+	server->set_viewport_target(SettingsServer::VIEWPORT_TARGET_ROOT_ONLY);
+	server->set_msaa_3d(Viewport::MSAA_8X);
+	CHECK(root->get_msaa_3d() == Viewport::MSAA_8X);
+	CHECK(grouped->get_msaa_3d() == Viewport::MSAA_2X);
+	CHECK(other->get_msaa_3d() == Viewport::MSAA_2X);
+
+	ERR_PRINT_OFF;
+	server->set_viewport_target(SettingsServer::ViewportTargetMode(7));
+	ERR_PRINT_ON;
+	CHECK(server->get_viewport_target() == SettingsServer::VIEWPORT_TARGET_ROOT_ONLY);
+
+	root->remove_child(other);
+	root->remove_child(grouped);
+	memdelete(other); // Frees `late` too.
+	memdelete(grouped);
+	memdelete(server);
+}
+
 TEST_CASE("[RenderQualitySettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
 	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
