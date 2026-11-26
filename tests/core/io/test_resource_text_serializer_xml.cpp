@@ -369,7 +369,8 @@ TEST_CASE("[ResourceTextSerializer][XML] Other XML files are left to other loade
 		REQUIRE(file.is_valid());
 		file->store_string("<?xml version=\"1.0\"?>\n<class name=\"Node\" type=\"XMLTestEntry\">\n  <name>Not a resource</name>\n</class>\n");
 	}
-	CHECK(ResourceLoader::get_resource_type(path).is_empty());
+	// Without a marker the file is a plain data file and loads as XML (#268).
+	CHECK(ResourceLoader::get_resource_type(path) == "XML");
 	CHECK(ResourceTextSerializer::get_xml_marker_type(FileAccess::get_file_as_string(path)).is_empty());
 
 	Ref<Resource> resource;
