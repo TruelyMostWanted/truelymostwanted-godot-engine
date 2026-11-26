@@ -114,6 +114,7 @@
 #include "core/string/localization_catalog.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/regex.h"
+#include "core/string/resource_localization_server.h"
 #include "core/string/text_insertion_server.h"
 #include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
@@ -185,6 +186,7 @@ static ResourceUID *resource_uid = nullptr;
 static SeedServer *seed_server = nullptr;
 static TextInsertionServer *text_insertion_server = nullptr;
 static TextLocalizationServer *text_localization_server = nullptr;
+static ResourceLocalizationServer *resource_localization_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -378,6 +380,8 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(LocalizationServer);
 	GDREGISTER_ABSTRACT_CLASS(TextLocalizationServer);
 	text_localization_server = memnew(TextLocalizationServer);
+	GDREGISTER_ABSTRACT_CLASS(ResourceLocalizationServer);
+	resource_localization_server = memnew(ResourceLocalizationServer);
 	GDREGISTER_CLASS(UndoRedo);
 	GDREGISTER_CLASS(TriangleMesh);
 
@@ -526,6 +530,7 @@ void register_core_settings() {
 	StreamingAssetsServer::register_settings();
 	TextInsertionServer::register_settings();
 	LocalizationServer::register_settings();
+	ResourceLocalizationServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -549,6 +554,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TextInsertionServer", TextInsertionServer::get_singleton(), "TextInsertionServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TextLocalizationServer", TextLocalizationServer::get_singleton(), "TextLocalizationServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceLocalizationServer", ResourceLocalizationServer::get_singleton(), "ResourceLocalizationServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
@@ -622,6 +628,7 @@ void unregister_core_types() {
 	memdelete(resource_uid);
 
 	memdelete(seed_server);
+	memdelete(resource_localization_server);
 	memdelete(text_localization_server);
 	memdelete(text_insertion_server);
 	memdelete(_resource_text_serializer);

@@ -9,7 +9,7 @@
 		[b]Locale chain:[/b] a text is looked up for the locale, then for its parent locales and then for the fallback locale, for example [code]de_DE[/code] → [code]de[/code] → [code]en[/code] (see [method get_locale_chain]).
 		[b]Priority:[/b] the chain comes first (a text for [code]de_DE[/code] beats a text for [code]de[/code]), then the layers: the catalog with the higher priority wins; with equal priority, the catalog added later wins. A typical order is game (0) &lt; DLC (50) &lt; mods (100).
 		[b]On-demand locales:[/b] catalogs loaded from [code].lcat[/code] files read a locale only when it is needed. The server reads the locales of the active chain and unloads the other locales of file-backed catalogs on a locale change.
-		[b]Project settings:[/b] the catalogs of [member ProjectSettings.internationalization/localization/catalogs] and [member ProjectSettings.internationalization/localization/external_catalogs] are loaded at startup (see [method load_project_catalogs]).
+		[b]Project settings:[/b] the catalogs of [member ProjectSettings.internationalization/localization/catalogs] and [member ProjectSettings.internationalization/localization/external_catalogs] (for [ResourceLocalizationServer]: [member ProjectSettings.internationalization/localization/resource_catalogs] and [member ProjectSettings.internationalization/localization/resource_external_catalogs]) are loaded at startup (see [method load_project_catalogs]).
 		[b]Threads:[/b] reading is lock-free. Changes of catalogs and the locale are applied on the main thread; calls from other threads are deferred. Signals are emitted on the main thread.
 		[codeblocks]
 		[gdscript]
@@ -100,7 +100,7 @@
 		<method name="load_project_catalogs">
 			<return type="int" />
 			<description>
-				Adds the catalogs of [member ProjectSettings.internationalization/localization/catalogs] with priority 0 and those of [member ProjectSettings.internationalization/localization/external_catalogs] with [member ProjectSettings.internationalization/localization/external_catalogs_priority], as with [method add_catalog_list], and returns the number of catalogs added. The engine calls it at startup; call it again after mods were installed.
+				Adds the catalogs of [member ProjectSettings.internationalization/localization/catalogs] with priority 0 and those of [member ProjectSettings.internationalization/localization/external_catalogs] with [member ProjectSettings.internationalization/localization/external_catalogs_priority], as with [method add_catalog_list], and returns the number of catalogs added. [ResourceLocalizationServer] reads its own settings instead (see there) and adds the project's [code]internationalization/locale/translation_remaps[/code] as the first layer. The engine calls it at startup; call it again after mods were installed.
 			</description>
 		</method>
 		<method name="remove_catalog">

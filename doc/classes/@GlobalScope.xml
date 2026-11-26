@@ -1707,6 +1707,8 @@
 		<member name="ResourceLoader" type="ResourceLoader" setter="" getter="">
 			The [ResourceLoader] singleton.
 		</member>
+		<member name="ResourceLocalizationServer" type="ResourceLocalizationServer" setter="" getter="">
+		</member>
 		<member name="ResourceSaver" type="ResourceSaver" setter="" getter="">
 			The [ResourceSaver] singleton.
 		</member>
