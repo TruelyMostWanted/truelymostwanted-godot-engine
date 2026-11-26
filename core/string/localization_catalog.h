@@ -207,7 +207,7 @@ public:
 	Dictionary to_translation_remaps();
 };
 
-// Catalog files with a priority; paths may hold the wildcards `*` and `?` in the file name.
+// Catalog files with a priority; paths may hold the wildcards `*` and `?` in folder and file names.
 class LocalizationCatalogList : public Resource {
 	GDCLASS(LocalizationCatalogList, Resource);
 
@@ -235,6 +235,8 @@ public:
 	void clear();
 
 	PackedStringArray get_catalog_paths() const;
+	// Files of one entry, wildcards expanded (C++ access for the servers, #343).
+	PackedStringArray get_entry_catalog_paths(int p_index) const;
 };
 
 class ResourceFormatLoaderLocalizationCatalog : public ResourceFormatLoader {

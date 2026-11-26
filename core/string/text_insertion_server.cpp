@@ -35,6 +35,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/thread.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 
 static const char *SETTING_DEFAULT_VALUES = "internationalization/text_insertion/default_values";
@@ -208,8 +209,13 @@ bool TextInsertionServer::_resolve(const StringName &p_name, const Dictionary &p
 Variant TextInsertionServer::_apply_modifier(const TextInsertionTemplate::Modifier &p_modifier, const Variant &p_value, const Dictionary &p_args, int p_depth) const {
 	switch (p_modifier.kind) {
 		case TextInsertionTemplate::MODIFIER_T: {
+			const StringName key = p_value.operator String();
+			const TextLocalizationServer *text_localization_server = TextLocalizationServer::get_singleton();
+			if (text_localization_server && text_localization_server->has_translation(key)) {
+				return text_localization_server->translate(key);
+			}
 			const TranslationServer *translation_server = TranslationServer::get_singleton();
-			return translation_server ? String(translation_server->translate(StringName(p_value.operator String()))) : p_value.operator String();
+			return translation_server ? String(translation_server->translate(key)) : String(key);
 		}
 		case TextInsertionTemplate::MODIFIER_UPPER:
 			return p_value.operator String().to_upper();
