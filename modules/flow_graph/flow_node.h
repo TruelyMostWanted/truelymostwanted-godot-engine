@@ -91,7 +91,6 @@ public:
 	Ref<FlowPort> find_input_port(const StringName &p_name) const;
 	Ref<FlowPort> find_output_port(const StringName &p_name) const;
 	void notify_ports_changed();
-	bool has_flow_ports() const;
 
 	String get_title() const;
 	String get_category() const;

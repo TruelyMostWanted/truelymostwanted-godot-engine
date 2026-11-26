@@ -124,21 +124,6 @@ void FlowNode::notify_ports_changed() {
 	emit_changed();
 }
 
-bool FlowNode::has_flow_ports() const {
-	_update_ports();
-	for (const Ref<FlowPort> &port : input_ports) {
-		if (port->get_kind() == FlowPort::PORT_KIND_FLOW) {
-			return true;
-		}
-	}
-	for (const Ref<FlowPort> &port : output_ports) {
-		if (port->get_kind() == FlowPort::PORT_KIND_FLOW) {
-			return true;
-		}
-	}
-	return false;
-}
-
 String FlowNode::get_title() const {
 	if (!title_override.is_empty()) {
 		return title_override;

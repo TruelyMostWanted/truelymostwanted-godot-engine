@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowBranchNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Continues with one of two flow outputs depending on a condition.
+	</brief_description>
+	<description>
+		The branch node has the flow input [code]in[/code], the data input [code]condition[/code] (a [bool], default [code]false[/code]) and two flow outputs, [code]true[/code] and [code]false[/code]. The execution continues at the output that matches the value of [code]condition[/code]. Connect the condition from a data output such as the [code]value[/code] of a [FlowGetVariableNode] or the [code]result[/code] of a [FlowExpressionNode].
+		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		[codeblocks]
+		[gdscript]
+		var branch_id := graph.add_node(FlowBranchNode.new())
+		graph.connect_nodes(start_id, "out", branch_id, "in")
+		graph.connect_nodes(has_key_id, "value", branch_id, "condition")
+		graph.connect_nodes(branch_id, "true", open_id, "in")
+		graph.connect_nodes(branch_id, "false", locked_id, "in")
+		[/gdscript]
+		[csharp]
+		int branchId = graph.AddNode(new FlowBranchNode());
+		graph.ConnectNodes(startId, "out", branchId, "in");
+		graph.ConnectNodes(hasKeyId, "value", branchId, "condition");
+		graph.ConnectNodes(branchId, "true", openId, "in");
+		graph.ConnectNodes(branchId, "false", lockedId, "in");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+</class>
