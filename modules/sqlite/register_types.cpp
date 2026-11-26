@@ -37,7 +37,20 @@
 #include "core/error/error_macros.h"
 #include "core/object/class_db.h"
 
+#ifdef TOOLS_ENABLED
+#include "editor/plugins/editor_plugin.h"
+#include "editor/sqlite_editor_plugin.h"
+#endif
+
+static Ref<ResourceFormatLoaderSQLite> resource_loader_sqlite;
+
 void initialize_sqlite_module(ModuleInitializationLevel p_level) {
+#ifdef TOOLS_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::add_by_type<SQLiteEditorPlugin>();
+	}
+#endif
+
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
@@ -46,14 +59,21 @@ void initialize_sqlite_module(ModuleInitializationLevel p_level) {
 		ERR_PRINT("SQLite: initialization failed.");
 	}
 
+	GDREGISTER_CLASS(SQLiteColumn);
 	GDREGISTER_CLASS(SQLiteDatabase);
 	GDREGISTER_CLASS(SQLiteStatement);
+
+	resource_loader_sqlite.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_sqlite);
 }
 
 void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_sqlite);
+	resource_loader_sqlite.unref();
 
 	SQLiteVFS::finalize();
 }

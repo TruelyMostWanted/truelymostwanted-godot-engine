@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowExpressionNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Evaluates a Godot [Expression] and outputs the result.
+	</brief_description>
+	<description>
+		The expression node computes a value from its inputs. [member expression] is a Godot [Expression]; every name in [member input_names] becomes a data input port of that name (type: any), and can be used as a variable in the expression. The single data output port is [code]result[/code], with the type [member result_type]. The node has no flow ports, so it is evaluated on demand when another node reads its [code]result[/code].
+		The ports follow [member input_names] and [member result_type] automatically. If you change them while connections exist, connections to ports that no longer exist are reported by [method FlowGraph.validate] as [constant FlowGraphValidation.ISSUE_KIND_UNKNOWN_PORT]. An empty or unparsable expression is reported as a configuration warning ([method FlowNode.get_configuration_warnings]).
+		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		[codeblocks]
+		[gdscript]
+		var expression := FlowExpressionNode.new()
+		expression.input_names = PackedStringArray(["gold", "price"])
+		expression.expression = "gold &gt;= price"
+		expression.result_type = TYPE_BOOL
+		var expression_id := graph.add_node(expression)
+		graph.connect_nodes(expression_id, "result", branch_id, "condition")
+		[/gdscript]
+		[csharp]
+		var expression = new FlowExpressionNode
+		{
+		    InputNames = ["gold", "price"],
+		    Expression = "gold &gt;= price",
+		    ResultType = Variant.Type.Bool,
+		};
+		int expressionId = graph.AddNode(expression);
+		graph.ConnectNodes(expressionId, "result", branchId, "condition");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="expression" type="String" setter="set_expression" getter="get_expression" default="&quot;&quot;">
+			The expression text, in the syntax of [Expression]. Shown as a single line in the graph node.
+		</member>
+		<member name="input_names" type="PackedStringArray" setter="set_input_names" getter="get_input_names" default="PackedStringArray()">
+			The names of the input variables. One data input port is created per name. Changing the array refreshes the ports of the node.
+		</member>
+		<member name="result_type" type="int" setter="set_result_type" getter="get_result_type" enum="Variant.Type" default="0">
+			The [enum Variant.Type] of the data output [code]result[/code]. [constant @GlobalScope.TYPE_NIL] means any type. Connections to typed inputs are only accepted when the types fit, so set it for expressions that feed a typed input such as the [code]condition[/code] of a [FlowBranchNode].
+		</member>
+	</members>
+</class>

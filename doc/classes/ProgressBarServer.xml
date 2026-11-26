@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ProgressBarServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A server for many world-space progress bars, such as health bars over units.
+	</brief_description>
+	<description>
+		Draws progress bars attached to [CanvasItem]s without one node per bar. Each bar is a canvas item that is a child of its parent's canvas item, so it moves with the parent and is hidden with it at no per-frame cost. A bar is redrawn only when its ratio, visibility, offset or [ProgressBarStyle] changes; bars that share [StyleBox]es are batched by the renderer. Only bars whose style uses [constant ProgressBarStyle.FOLLOW_MODE_POSITION_ONLY] are updated once per frame.
+		When a parent is deleted, the server frees its bars on the next frame. Freeing them yourself with [method bar_free] (for example in [method Node._exit_tree]) is still the cleanest way.
+		The returned bar [RID] is the [RID] of the bar's canvas item: [RenderingServer] calls such as [method RenderingServer.canvas_item_set_z_index] work on it, but never free it with [method RenderingServer.free_rid]. Call the server from the main thread.
+		[codeblocks]
+		[gdscript]
+		@export var bar_style: ProgressBarStyle
+		var health_bar: RID
+
+		func _ready():
+		    health_bar = ProgressBarServer.bar_create(self, bar_style)
+
+		func _exit_tree():
+		    ProgressBarServer.bar_free(health_bar)
+
+		func take_damage(health, max_health):
+		    ProgressBarServer.bar_set_ratio(health_bar, health / max_health)
+		[/gdscript]
+		[csharp]
+		[Export]
+		public ProgressBarStyle BarStyle { get; set; }
+		private Rid _healthBar;
+
+		public override void _Ready()
+		{
+		    _healthBar = ProgressBarServer.BarCreate(this, BarStyle);
+		}
+
+		public override void _ExitTree()
+		{
+		    ProgressBarServer.BarFree(_healthBar);
+		}
+
+		public void TakeDamage(float health, float maxHealth)
+		{
+		    ProgressBarServer.BarSetRatio(_healthBar, health / maxHealth);
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="bar_create">
+			<return type="RID" />
+			<param index="0" name="parent" type="CanvasItem" />
+			<param index="1" name="style" type="ProgressBarStyle" />
+			<description>
+				Creates a bar drawn with [param style] as a child of [param parent]'s canvas item and returns its [RID]. New bars are full (ratio [code]1.0[/code]). Returns an empty [RID] if [param parent] or [param style] is [code]null[/code].
+			</description>
+		</method>
+		<method name="bar_free">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<description>
+				Frees the bar and its canvas item.
+			</description>
+		</method>
+		<method name="bar_get_ratio" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bar" type="RID" />
+			<description>
+				Returns the fill ratio of the bar, between [code]0.0[/code] and [code]1.0[/code].
+			</description>
+		</method>
+		<method name="bar_set_modulate">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<param index="1" name="color" type="Color" />
+			<description>
+				Multiplies the colors of the bar with [param color], for example to tint enemy bars red. Does not redraw the bar.
+			</description>
+		</method>
+		<method name="bar_set_offset">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<param index="1" name="offset" type="Vector2" />
+			<description>
+				Moves this bar by [param offset] in addition to [member ProgressBarStyle.offset], for example to stack a mana bar below a health bar that share a style.
+			</description>
+		</method>
+		<method name="bar_set_ratio">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<param index="1" name="ratio" type="float" />
+			<description>
+				Sets the fill ratio of the bar. The value is clamped between [code]0.0[/code] and [code]1.0[/code]. The bar is redrawn only if the ratio changes.
+			</description>
+		</method>
+		<method name="bar_set_style">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<param index="1" name="style" type="ProgressBarStyle" />
+			<description>
+				Draws the bar with another style, for example when a unit changes its team.
+			</description>
+		</method>
+		<method name="bar_set_visible">
+			<return type="void" />
+			<param index="0" name="bar" type="RID" />
+			<param index="1" name="visible" type="bool" />
+			<description>
+				Shows or hides the bar. A bar is also hidden when its parent is hidden, and by [member ProgressBarStyle.hide_when_full] and [member ProgressBarStyle.hide_when_empty].
+			</description>
+		</method>
+		<method name="bars_set_ratios">
+			<return type="void" />
+			<param index="0" name="bars" type="RID[]" />
+			<param index="1" name="ratios" type="PackedFloat32Array" />
+			<description>
+				Sets the ratios of many bars in one call: [code]bars[i][/code] gets [code]ratios[i][/code]. Both arrays must have the same size. Useful for data-oriented game code that updates thousands of units per frame.
+			</description>
+		</method>
+		<method name="get_bar_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of bars that exist.
+			</description>
+		</method>
+	</methods>
+</class>

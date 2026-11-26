@@ -91,6 +91,22 @@ TEST_CASE("[SceneTree][Window]") {
 		memdelete(c);
 		memdelete(w);
 	}
+
+	SUBCASE("Window keeps its requested size when the display server limits the native window") {
+		// Regression (#264): taking the size back from the display server made popups keep an OS-clamped size.
+		DisplayServerMock *ds = (DisplayServerMock *)(DisplayServer::get_singleton());
+		const Size2i old_size = root->get_size();
+
+		ds->set_max_window_size(Size2i(800, 600));
+		root->set_size(Size2i(800, 900));
+		CHECK(ds->window_get_size() == Size2i(800, 600));
+		CHECK(root->get_size() == Size2i(800, 900));
+
+		ds->set_max_window_size(Size2i());
+		root->set_size(old_size);
+		CHECK(root->get_size() == old_size);
+		CHECK(ds->window_get_size() == old_size);
+	}
 }
 
 } // namespace TestWindow

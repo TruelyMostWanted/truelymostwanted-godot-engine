@@ -603,8 +603,8 @@ TEST_CASE("[TOML] Resource API: dotted table paths and plain files") {
 	CHECK(toml->has_table_key("server.limits", "players"));
 	CHECK(int(toml->get_value("server.limits", "players")) == 8);
 	CHECK(toml->get_value("missing", "key", 3) == Variant(3));
-	CHECK(toml->get_tables() == PackedStringArray({ "server", "server.limits", "a\.b" }));
-	CHECK(TOML::split_table_path("a\.b.c") == Vector<String>({ "a.b", "c" }));
+	CHECK(toml->get_tables() == PackedStringArray({ "server", "server.limits", "a\\.b" }));
+	CHECK(TOML::split_table_path("a\\.b.c") == Vector<String>({ "a.b", "c" }));
 	CHECK(toml->get_table_keys("") == PackedStringArray({ "server", "title", "a.b" }));
 	toml->erase_table_key("server.limits", "players");
 	CHECK_FALSE(toml->has_table_key("server.limits", "players"));

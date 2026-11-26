@@ -130,8 +130,8 @@
 		</method>
 	</methods>
 	<members>
-		<member name="data" type="Variant" setter="set_data" getter="get_data">
-			The parsed content: the type depends on the format ([Dictionary] for [INI], [XML] and [TOML], [Array] of [PackedStringArray] rows for [CSV], any [Variant] for [YAML]). Setting it drops the kept parsed text. Setting a value of the wrong type for the format prints an error.
+		<member name="data" type="Variant" setter="set_data" getter="get_data" default="{}">
+			The parsed content: the type depends on the format ([Dictionary] for [INI], [XML] and [TOML], [Array] of [PackedStringArray] rows for [CSV], any [Variant] for [YAML]). Setting it drops the kept parsed text and clears the error of the last [method parse]. Setting a value of the wrong type for the format prints an error.
 		</member>
 		<member name="options" type="SerializerOptions" setter="set_options" getter="get_options">
 			The options used by [method parse], [method encode_to_text] and [method save]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code].

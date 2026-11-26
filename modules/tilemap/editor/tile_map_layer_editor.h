@@ -50,6 +50,7 @@
 
 class TileMapLayer;
 class TileMapLayerEditor;
+class TileMapPathGraphEditor;
 class TileSetSourceItemList;
 class GridContainer;
 class ConfirmationDialog;
@@ -432,6 +433,8 @@ private:
 
 	Button *toggle_grid_button = nullptr;
 	void _on_grid_toggled(bool p_pressed);
+
+	TileMapPathGraphEditor *path_graph_editor = nullptr; // truely-godot-engine: path graph overlay.
 
 	enum {
 		ADVANCED_MENU_REPLACE_WITH_PROXIES,
