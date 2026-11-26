@@ -215,7 +215,7 @@ Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 	if (p_mode != OPEN_MODE_READ_ONLY && SQLiteVFS::is_read_only_path(utf8_path.get_data())) {
 		return set_error(ERR_FILE_NO_PERMISSION, "Databases in res:// are read-only. Open them with OPEN_MODE_READ_ONLY, or copy them to user:// first.");
 	}
-	if (p_mode != OPEN_MODE_READ_WRITE_CREATE && !FileAccess::exists(p_path)) {
+	if (p_mode != OPEN_MODE_CREATE && !FileAccess::exists(p_path)) {
 		return set_error(ERR_FILE_NOT_FOUND, vformat("Database file not found: \"%s\".", p_path));
 	}
 
@@ -407,7 +407,7 @@ String SQLiteDatabase::get_last_error_message() const {
 }
 
 void SQLiteDatabase::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("open", "path", "mode"), &SQLiteDatabase::open, DEFVAL(OPEN_MODE_READ_WRITE_CREATE));
+	ClassDB::bind_method(D_METHOD("open", "path", "mode"), &SQLiteDatabase::open, DEFVAL(OPEN_MODE_CREATE));
 	ClassDB::bind_method(D_METHOD("close"), &SQLiteDatabase::close);
 	ClassDB::bind_method(D_METHOD("is_open"), &SQLiteDatabase::is_open);
 	ClassDB::bind_method(D_METHOD("get_path"), &SQLiteDatabase::get_path);
@@ -429,7 +429,7 @@ void SQLiteDatabase::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(OPEN_MODE_READ_ONLY);
 	BIND_ENUM_CONSTANT(OPEN_MODE_READ_WRITE);
-	BIND_ENUM_CONSTANT(OPEN_MODE_READ_WRITE_CREATE);
+	BIND_ENUM_CONSTANT(OPEN_MODE_CREATE);
 }
 
 SQLiteDatabase::~SQLiteDatabase() {

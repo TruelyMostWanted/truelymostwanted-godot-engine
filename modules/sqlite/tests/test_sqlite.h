@@ -59,7 +59,7 @@ TEST_CASE("[SQLite] Open, create, execute and query") {
 	REQUIRE(db->open(db_path) == OK);
 	CHECK(db->is_open());
 	CHECK(db->get_path() == db_path);
-	CHECK(db->get_open_mode() == SQLiteDatabase::OPEN_MODE_READ_WRITE_CREATE);
+	CHECK(db->get_open_mode() == SQLiteDatabase::OPEN_MODE_CREATE);
 
 	CHECK(db->execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, weight REAL, data BLOB, flag INTEGER);") == OK);
 	PackedByteArray blob;
@@ -117,7 +117,7 @@ TEST_CASE("[SQLite] Errors") {
 
 	CHECK(db->open(db_path, SQLiteDatabase::OPEN_MODE_READ_WRITE) == ERR_FILE_NOT_FOUND);
 	CHECK(db->open(db_path, SQLiteDatabase::OPEN_MODE_READ_ONLY) == ERR_FILE_NOT_FOUND);
-	CHECK(db->open("res://sqlite_test_never_written.db", SQLiteDatabase::OPEN_MODE_READ_WRITE_CREATE) == ERR_FILE_NO_PERMISSION);
+	CHECK(db->open("res://sqlite_test_never_written.db", SQLiteDatabase::OPEN_MODE_CREATE) == ERR_FILE_NO_PERMISSION);
 	CHECK_FALSE(db->get_last_error_message().is_empty());
 
 	REQUIRE(db->open(db_path) == OK);

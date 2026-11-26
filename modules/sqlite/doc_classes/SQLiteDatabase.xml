@@ -106,7 +106,7 @@
 			<param index="1" name="mode" type="int" enum="SQLiteDatabase.OpenMode" default="2" />
 			<description>
 				Opens the database at [param path], closing a database that is already open. [param path] can be any path [FileAccess] can open, such as [code]user://save.db[/code] or [code]res://data/items.db[/code].
-				Returns [constant ERR_FILE_NOT_FOUND] if the file does not exist and [param mode] is not [constant OPEN_MODE_READ_WRITE_CREATE], [constant ERR_FILE_NO_PERMISSION] for a writable mode on a [code]res://[/code] path, [constant ERR_FILE_CORRUPT] if the file is not an SQLite database, and [constant ERR_FILE_CANT_OPEN] if the file can't be opened.
+				Returns [constant ERR_FILE_NOT_FOUND] if the file does not exist and [param mode] is not [constant OPEN_MODE_CREATE], [constant ERR_FILE_NO_PERMISSION] for a writable mode on a [code]res://[/code] path, [constant ERR_FILE_CORRUPT] if the file is not an SQLite database, and [constant ERR_FILE_CANT_OPEN] if the file can't be opened.
 			</description>
 		</method>
 		<method name="prepare">
@@ -138,7 +138,7 @@
 		<constant name="OPEN_MODE_READ_WRITE" value="1" enum="OpenMode">
 			Opens an existing database for reading and writing.
 		</constant>
-		<constant name="OPEN_MODE_READ_WRITE_CREATE" value="2" enum="OpenMode">
+		<constant name="OPEN_MODE_CREATE" value="2" enum="OpenMode">
 			Opens a database for reading and writing and creates the file if it does not exist.
 		</constant>
 	</constants>

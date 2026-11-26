@@ -46,13 +46,13 @@ public:
 	enum OpenMode {
 		OPEN_MODE_READ_ONLY,
 		OPEN_MODE_READ_WRITE,
-		OPEN_MODE_READ_WRITE_CREATE,
+		OPEN_MODE_CREATE,
 	};
 
 private:
 	sqlite3 *db = nullptr;
 	String path;
-	OpenMode open_mode = OPEN_MODE_READ_WRITE_CREATE;
+	OpenMode open_mode = OPEN_MODE_CREATE;
 	Error last_error = OK;
 	String last_error_message;
 
@@ -76,7 +76,7 @@ public:
 	Error set_error(Error p_error, const String &p_message);
 	sqlite3 *get_handle() const { return db; }
 
-	Error open(const String &p_path, OpenMode p_mode = OPEN_MODE_READ_WRITE_CREATE);
+	Error open(const String &p_path, OpenMode p_mode = OPEN_MODE_CREATE);
 	void close();
 	bool is_open() const;
 	String get_path() const;
