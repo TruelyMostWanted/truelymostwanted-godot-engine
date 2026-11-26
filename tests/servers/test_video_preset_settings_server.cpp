@@ -39,11 +39,11 @@ TEST_FORCE_LINK(test_video_preset_settings_server)
 #include "core/io/resource_saver.h"
 #include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
+#include "servers/settings/render_effect_settings_server.h"
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/shadow_settings_server.h"
 #include "servers/settings/texture_settings_server.h"
-#include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
@@ -81,7 +81,7 @@ struct Servers {
 		domains[0] = memnew(RenderQualitySettingsServer);
 		domains[1] = memnew(TextureSettingsServer);
 		domains[2] = memnew(ShadowSettingsServer);
-		domains[3] = memnew(VideoEffectSettingsServer);
+		domains[3] = memnew(RenderEffectSettingsServer);
 		preset = memnew(VideoPresetSettingsServer);
 		preset->set_file_path(_path("video_preset" + p_suffix + ".ini", p_remove_files));
 		for (SettingsServer *domain : domains) {
@@ -200,7 +200,7 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 	REQUIRE(ultra->get_texture().is_valid());
 	CHECK(int(low->get_texture()->get_anisotropic_filtering_level()) < int(ultra->get_texture()->get_anisotropic_filtering_level()));
 	CHECK(low->get_shadow()->get_directional_shadow_atlas_size() < ultra->get_shadow()->get_directional_shadow_atlas_size());
-	CHECK(int(low->get_video_effect()->get_ssao_quality()) < int(ultra->get_video_effect()->get_ssao_quality()));
+	CHECK(int(low->get_render_effect()->get_ssao_quality()) < int(ultra->get_render_effect()->get_ssao_quality()));
 	CHECK(low->get_render_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
 
 	// Every value of a built-in preset exists in its domain.
@@ -242,7 +242,7 @@ TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the fo
 
 	CHECK_FALSE(servers.get("render_quality")->is_dirty());
 	CHECK_FALSE(servers.get("shadow")->is_dirty());
-	CHECK_FALSE(servers.get("video_effect")->is_dirty());
+	CHECK_FALSE(servers.get("render_effect")->is_dirty());
 	CHECK(texture->is_dirty());
 	CHECK(texture->get_apply_mode() == SettingsServer::APPLY_MODE_MANUAL);
 	CHECK(servers.get("render_quality")->get_apply_mode() == SettingsServer::APPLY_MODE_IMMEDIATE);
@@ -405,10 +405,10 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		const Ref<VideoPreset> loaded_high = server->get_preset("High");
 		REQUIRE(loaded_high->get_shadow().is_valid());
 		CHECK(loaded_high->get_shadow()->get_directional_shadow_atlas_size() == 16384);
-		CHECK_FALSE(loaded_high->has_domain_settings("video_effect"));
-		CHECK(loaded_high->get_video_effect().is_null());
+		CHECK_FALSE(loaded_high->has_domain_settings("render_effect"));
+		CHECK(loaded_high->get_render_effect().is_null());
 
-		// Potato leaves `shadow` and `video_effect` as they are.
+		// Potato leaves `shadow` and `render_effect` as they are.
 		SettingsServer *shadow = servers.get("shadow");
 		ERR_PRINT_OFF;
 		shadow->set_value("directional_shadow_atlas_size", 1024);
@@ -449,10 +449,10 @@ TEST_CASE("[VideoPresetSettingsServer] Presets are added and removed at runtime"
 	Ref<VideoPreset> potato;
 	potato.instantiate();
 	potato->set_preset_name("Potato");
-	Ref<VideoEffectSettings> potato_effect;
+	Ref<RenderEffectSettings> potato_effect;
 	potato_effect.instantiate();
 	potato_effect->set_allow_glow(false);
-	potato->set_video_effect(potato_effect);
+	potato->set_render_effect(potato_effect);
 	server->add_preset(potato);
 	CHECK(server->has_preset("Potato"));
 	CHECK(server->get_preset("Potato") == potato);
@@ -503,10 +503,10 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 	CHECK(preset->get_render_quality()->get_msaa_3d() == Viewport::MSAA_4X);
 
 	// Generic access checks the class of the domain.
-	Ref<VideoEffectSettings> effect;
+	Ref<RenderEffectSettings> effect;
 	effect.instantiate();
-	preset->set_domain_settings("video_effect", effect);
-	CHECK(preset->get_video_effect() == effect);
+	preset->set_domain_settings("render_effect", effect);
+	CHECK(preset->get_render_effect() == effect);
 	ERR_PRINT_OFF;
 	preset->set_domain_settings("shadow", effect);
 	CHECK(preset->get_shadow().is_null());
@@ -516,8 +516,8 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 	CHECK_FALSE(preset->has_domain_settings("window"));
 
 	// Null: the preset leaves the domain as it is again.
-	preset->set_domain_settings("video_effect", Ref<Resource>());
-	CHECK_FALSE(preset->has_domain_settings("video_effect"));
+	preset->set_domain_settings("render_effect", Ref<Resource>());
+	CHECK_FALSE(preset->has_domain_settings("render_effect"));
 }
 
 } // namespace TestVideoPresetSettingsServer

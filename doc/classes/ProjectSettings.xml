@@ -3851,6 +3851,15 @@
 		<member name="settings/language/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"language"[/code] domain ([LanguageSettingsServer]) stores its file in [member settings/language/format] instead of [member settings/general/default_format].
 		</member>
+		<member name="settings/render_effect/file_name" type="String" setter="" getter="" default="&quot;render_effect&quot;">
+			The name of the settings file of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/render_effect/format] with [member settings/render_effect/override_format]). It may contain a relative subfolder, for example [code]profiles/render_effect[/code] for [code]user://settings/profiles/render_effect.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/render_effect/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/render_effect/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/render_effect/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]) stores its file in [member settings/render_effect/format] instead of [member settings/general/default_format].
+		</member>
 		<member name="settings/render_quality/file_name" type="String" setter="" getter="" default="&quot;render_quality&quot;">
 			The name of the settings file of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/render_quality/format] with [member settings/render_quality/override_format]). It may contain a relative subfolder, for example [code]profiles/render_quality[/code] for [code]user://settings/profiles/render_quality.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
 		</member>
@@ -3901,15 +3910,6 @@
 		</member>
 		<member name="settings/tts_personas/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]) stores its file in [member settings/tts_personas/format] instead of [member settings/general/default_format].
-		</member>
-		<member name="settings/video_effect/file_name" type="String" setter="" getter="" default="&quot;video_effect&quot;">
-			The name of the settings file of the [code]"video_effect"[/code] domain ([VideoEffectSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/video_effect/format] with [member settings/video_effect/override_format]). It may contain a relative subfolder, for example [code]profiles/video_effect[/code] for [code]user://settings/profiles/video_effect.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
-		</member>
-		<member name="settings/video_effect/format" type="int" setter="" getter="" default="1">
-			The text format of the [code]"video_effect"[/code] domain ([VideoEffectSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/video_effect/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
-		</member>
-		<member name="settings/video_effect/override_format" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], the [code]"video_effect"[/code] domain ([VideoEffectSettingsServer]) stores its file in [member settings/video_effect/format] instead of [member settings/general/default_format].
 		</member>
 		<member name="settings/video_preset/file_name" type="String" setter="" getter="" default="&quot;video_preset&quot;">
 			The name of the settings file of the [code]"video_preset"[/code] domain ([VideoPresetSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/video_preset/format] with [member settings/video_preset/override_format]). It may contain a relative subfolder, for example [code]profiles/video_preset[/code] for [code]user://settings/profiles/video_preset.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.

@@ -1686,6 +1686,9 @@
 		<member name="ProjectSettings" type="ProjectSettings" setter="" getter="">
 			The [ProjectSettings] singleton.
 		</member>
+		<member name="RenderEffectSettingsServer" type="RenderEffectSettingsServer" setter="" getter="">
+			The [RenderEffectSettingsServer] singleton.
+		</member>
 		<member name="RenderQualitySettingsServer" type="RenderQualitySettingsServer" setter="" getter="">
 			The [RenderQualitySettingsServer] singleton.
 		</member>
@@ -1751,9 +1754,6 @@
 		</member>
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
-		</member>
-		<member name="VideoEffectSettingsServer" type="VideoEffectSettingsServer" setter="" getter="">
-			The [VideoEffectSettingsServer] singleton.
 		</member>
 		<member name="VideoPresetSettingsServer" type="VideoPresetSettingsServer" setter="" getter="">
 			The [VideoPresetSettingsServer] singleton.

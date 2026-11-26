@@ -95,6 +95,8 @@
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
+#include "servers/settings/render_effect_settings.h"
+#include "servers/settings/render_effect_settings_server.h"
 #include "servers/settings/render_quality_settings.h"
 #include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server.h"
@@ -107,8 +109,6 @@
 #include "servers/settings/texture_streaming_settings_server.h"
 #include "servers/settings/tts_persona_settings.h"
 #include "servers/settings/tts_persona_settings_server.h"
-#include "servers/settings/video_effect_settings.h"
-#include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
@@ -209,7 +209,7 @@ static EngineSettingsServer *engine_settings_server = nullptr;
 static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
 static ShadowSettingsServer *shadow_settings_server = nullptr;
 static TextureSettingsServer *texture_settings_server = nullptr;
-static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
+static RenderEffectSettingsServer *render_effect_settings_server = nullptr;
 static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
 static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
@@ -320,11 +320,11 @@ void register_server_types() {
 	texture_settings_server = memnew(TextureSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TextureSettingsServer", TextureSettingsServer::get_singleton(), "TextureSettingsServer"));
 	settings_server_manager->register_server(texture_settings_server);
-	GDREGISTER_CLASS(VideoEffectSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoEffectSettingsServer);
-	video_effect_settings_server = memnew(VideoEffectSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoEffectSettingsServer", VideoEffectSettingsServer::get_singleton(), "VideoEffectSettingsServer"));
-	settings_server_manager->register_server(video_effect_settings_server);
+	GDREGISTER_CLASS(RenderEffectSettings);
+	GDREGISTER_ABSTRACT_CLASS(RenderEffectSettingsServer);
+	render_effect_settings_server = memnew(RenderEffectSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderEffectSettingsServer", RenderEffectSettingsServer::get_singleton(), "RenderEffectSettingsServer"));
+	settings_server_manager->register_server(render_effect_settings_server);
 	// After the four video domains it applies presets to (#25).
 	GDREGISTER_CLASS(VideoPreset);
 	GDREGISTER_CLASS(VideoPresetSettings);
@@ -624,8 +624,8 @@ void unregister_server_types() {
 #endif
 	memdelete(video_preset_settings_server);
 	video_preset_settings_server = nullptr;
-	memdelete(video_effect_settings_server);
-	video_effect_settings_server = nullptr;
+	memdelete(render_effect_settings_server);
+	render_effect_settings_server = nullptr;
 	memdelete(tts_persona_settings_server);
 	tts_persona_settings_server = nullptr;
 	memdelete(accessibility_settings_server);

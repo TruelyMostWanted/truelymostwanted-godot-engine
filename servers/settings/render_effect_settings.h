@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_effect_settings.h                                               */
+/*  render_effect_settings.h                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -33,12 +33,12 @@
 #include "core/io/resource.h"
 #include "servers/rendering/rendering_server.h"
 
-// Data of the `video_effect` settings domain (#24): the global quality of SSAO, SSIL, SDFGI, VoxelGI,
+// Data of the `render_effect` settings domain (#24): the global quality of SSAO, SSIL, SDFGI, VoxelGI,
 // volumetric fog, subsurface scattering and depth of field, and the player's environment overrides (effects
 // turned off for every environment, brightness, contrast and saturation).
-// VideoEffectSettingsServer pushes the values to RenderingServer.
-class VideoEffectSettings : public Resource {
-	GDCLASS(VideoEffectSettings, Resource);
+// RenderEffectSettingsServer pushes the values to RenderingServer.
+class RenderEffectSettings : public Resource {
+	GDCLASS(RenderEffectSettings, Resource);
 
 	RenderingServerEnums::EnvironmentSSAOQuality ssao_quality = RenderingServerEnums::ENV_SSAO_QUALITY_MEDIUM;
 	bool ssao_half_size = true;
