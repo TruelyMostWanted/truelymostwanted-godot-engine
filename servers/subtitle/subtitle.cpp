@@ -196,11 +196,40 @@ void SubtitleValidation::_bind_methods() {
 
 // Subtitle
 
+void Subtitle::_segment_changed() {
+	emit_changed();
+}
+
+void Subtitle::_connect_segment(const Ref<SubtitleSegment> &p_segment) {
+	if (p_segment.is_valid()) {
+		p_segment->connect_changed(callable_mp(this, &Subtitle::_segment_changed));
+	}
+}
+
+void Subtitle::_disconnect_segment(const Ref<SubtitleSegment> &p_segment) {
+	if (p_segment.is_valid()) {
+		p_segment->disconnect_changed(callable_mp(this, &Subtitle::_segment_changed));
+	}
+}
+
+void Subtitle::_disconnect_all_segments() {
+	for (const Ref<SubtitleSegment> &segment : segments) {
+		_disconnect_segment(segment);
+	}
+}
+
+Subtitle::~Subtitle() {
+	_disconnect_all_segments();
+}
+
 void Subtitle::set_segments(const TypedArray<SubtitleSegment> &p_segments) {
+	_disconnect_all_segments();
 	segments.clear();
 	for (int i = 0; i < p_segments.size(); i++) {
 		// The Inspector adds empty slots while an array is edited; keep them so the edit can be finished.
-		segments.push_back(Ref<SubtitleSegment>(p_segments[i]));
+		Ref<SubtitleSegment> segment = p_segments[i];
+		_connect_segment(segment);
+		segments.push_back(segment);
 	}
 	emit_changed();
 }
@@ -248,11 +277,13 @@ void Subtitle::add_segment(const Ref<SubtitleSegment> &p_segment) {
 		index--;
 	}
 	segments.insert(index, p_segment);
+	_connect_segment(p_segment);
 	emit_changed();
 }
 
 void Subtitle::remove_segment(int p_index) {
 	ERR_FAIL_INDEX(p_index, segments.size());
+	_disconnect_segment(segments[p_index]);
 	segments.remove_at(p_index);
 	emit_changed();
 }
@@ -267,6 +298,7 @@ int Subtitle::get_segment_count() const {
 }
 
 void Subtitle::clear_segments() {
+	_disconnect_all_segments();
 	segments.clear();
 	emit_changed();
 }
@@ -446,7 +478,11 @@ Error Subtitle::load_from_text(const String &p_text, Format p_format) {
 	if (err != OK) {
 		return err;
 	}
+	_disconnect_all_segments();
 	segments = parsed;
+	for (const Ref<SubtitleSegment> &segment : segments) {
+		_connect_segment(segment);
+	}
 	time_offset = 0.0;
 	if (!parsed_language.is_empty()) {
 		language = parsed_language;
