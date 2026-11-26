@@ -104,13 +104,14 @@ bool SerializerOptions::is_csv_headers() const {
 	return csv_headers;
 }
 
-void SerializerOptions::set_ini_plain_values(bool p_enable) {
-	ini_plain_values = p_enable;
+void SerializerOptions::set_ini_value_style(IniValueStyle p_style) {
+	ERR_FAIL_INDEX(p_style, INI_VALUE_STYLE_MAX);
+	ini_value_style = p_style;
 	emit_changed();
 }
 
-bool SerializerOptions::is_ini_plain_values() const {
-	return ini_plain_values;
+SerializerOptions::IniValueStyle SerializerOptions::get_ini_value_style() const {
+	return ini_value_style;
 }
 
 void SerializerOptions::set_xml_declaration(bool p_enable) {
@@ -139,8 +140,8 @@ void SerializerOptions::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_csv_delimiter"), &SerializerOptions::get_csv_delimiter);
 	ClassDB::bind_method(D_METHOD("set_csv_headers", "enable"), &SerializerOptions::set_csv_headers);
 	ClassDB::bind_method(D_METHOD("is_csv_headers"), &SerializerOptions::is_csv_headers);
-	ClassDB::bind_method(D_METHOD("set_ini_plain_values", "enable"), &SerializerOptions::set_ini_plain_values);
-	ClassDB::bind_method(D_METHOD("is_ini_plain_values"), &SerializerOptions::is_ini_plain_values);
+	ClassDB::bind_method(D_METHOD("set_ini_value_style", "style"), &SerializerOptions::set_ini_value_style);
+	ClassDB::bind_method(D_METHOD("get_ini_value_style"), &SerializerOptions::get_ini_value_style);
 	ClassDB::bind_method(D_METHOD("set_xml_declaration", "enable"), &SerializerOptions::set_xml_declaration);
 	ClassDB::bind_method(D_METHOD("is_xml_declaration"), &SerializerOptions::is_xml_declaration);
 
@@ -155,7 +156,11 @@ void SerializerOptions::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "csv_delimiter"), "set_csv_delimiter", "get_csv_delimiter");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "csv_headers"), "set_csv_headers", "is_csv_headers");
 	ADD_GROUP("INI", "ini_");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ini_plain_values"), "set_ini_plain_values", "is_ini_plain_values");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "ini_value_style", PROPERTY_HINT_ENUM, "Plain,Godot Variant"), "set_ini_value_style", "get_ini_value_style");
 	ADD_GROUP("XML", "xml_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "xml_declaration"), "set_xml_declaration", "is_xml_declaration");
+
+	BIND_ENUM_CONSTANT(INI_VALUE_STYLE_PLAIN);
+	BIND_ENUM_CONSTANT(INI_VALUE_STYLE_GODOT_VARIANT);
+	BIND_ENUM_CONSTANT(INI_VALUE_STYLE_MAX);
 }

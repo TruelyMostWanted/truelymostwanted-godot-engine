@@ -174,8 +174,8 @@ Error FlowGraph::_check_connection(int p_from_id, const StringName &p_from_port,
 		r_reason = "A flow port can only be connected to a flow port, a data port only to a data port.";
 		return ERR_INVALID_PARAMETER;
 	}
-	if (output->get_kind() == FlowPort::PORT_KIND_DATA && !FlowPort::is_type_compatible(output->get_type(), input->get_type())) {
-		r_reason = vformat("The type %s doesn't fit the type %s.", Variant::get_type_name(output->get_type()), Variant::get_type_name(input->get_type()));
+	if (output->get_kind() == FlowPort::PORT_KIND_DATA && !FlowPort::is_type_compatible(output->get_port_type(), input->get_port_type())) {
+		r_reason = vformat("The type %s doesn't fit the type %s.", Variant::get_type_name(output->get_port_type()), Variant::get_type_name(input->get_port_type()));
 		return ERR_INVALID_PARAMETER;
 	}
 	_ensure_index();
@@ -507,7 +507,7 @@ Ref<FlowGraphValidation> FlowGraph::validate() const {
 			result->add_issue(FlowGraphValidation::ISSUE_KIND_UNKNOWN_PORT, output.is_null() ? c.from_id : c.to_id, vformat(RTR("The connection %d:%s -> %d:%s uses a node or port that does not exist."), c.from_id, c.from_port, c.to_id, c.to_port));
 			continue;
 		}
-		if (output->get_kind() != input->get_kind() || (output->get_kind() == FlowPort::PORT_KIND_DATA && !FlowPort::is_type_compatible(output->get_type(), input->get_type()))) {
+		if (output->get_kind() != input->get_kind() || (output->get_kind() == FlowPort::PORT_KIND_DATA && !FlowPort::is_type_compatible(output->get_port_type(), input->get_port_type()))) {
 			result->add_issue(FlowGraphValidation::ISSUE_KIND_TYPE_MISMATCH, c.to_id, vformat(RTR("The output '%s' of node %d doesn't fit the input '%s' of node %d."), c.from_port, c.from_id, c.to_port, c.to_id));
 		}
 		if (output->get_kind() == FlowPort::PORT_KIND_FLOW) {

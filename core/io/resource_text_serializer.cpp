@@ -151,7 +151,7 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_options(const Ref<Se
 	options.full_precision_floats = p_options->is_full_precision_floats();
 	options.csv_delimiter = p_options->get_csv_delimiter();
 	options.csv_headers = p_options->is_csv_headers();
-	options.ini_plain_values = p_options->is_ini_plain_values();
+	options.ini_plain_values = p_options->get_ini_value_style() == SerializerOptions::INI_VALUE_STYLE_PLAIN;
 	options.xml_declaration = p_options->is_xml_declaration();
 	return options;
 }

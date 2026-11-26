@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		Knows every [Viewport] (including [SubViewport]s and [Window]s) that is inside the [SceneTree], so settings and tools don't have to search the tree for them. It also finds the node behind a viewport [RID] or a window ID.
+		The graphics settings servers use it for [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS], for example [member RenderQualitySettingsServer.viewport_target].
 		[codeblocks]
 		[gdscript]
 		func _ready():

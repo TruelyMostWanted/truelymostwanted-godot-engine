@@ -68,8 +68,8 @@ public:
 	StringName get_port_name() const { return port_name; }
 	void set_kind(PortKind p_kind);
 	PortKind get_kind() const { return kind; }
-	void set_type(Variant::Type p_type);
-	Variant::Type get_type() const { return type; }
+	void set_port_type(Variant::Type p_type);
+	Variant::Type get_port_type() const { return type; }
 	void set_class_hint(const StringName &p_class_hint);
 	StringName get_class_hint() const { return class_hint; }
 	void set_default_value(const Variant &p_value);
