@@ -59,13 +59,13 @@ struct VideoPresetBuiltinValue {
 // Enum values are the values of the engine enums (see the hints of the domain resources).
 static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	// Resolution scale (bilinear), mesh LOD threshold in pixels.
-	{ "video_quality", "scaling_3d_scale", Variant::FLOAT, { 0.75, 1.0, 1.0, 1.0 } },
-	{ "video_quality", "mesh_lod_threshold", Variant::FLOAT, { 4.0, 2.0, 1.0, 0.5 } },
+	{ "render_quality", "scaling_3d_scale", Variant::FLOAT, { 0.75, 1.0, 1.0, 1.0 } },
+	{ "render_quality", "mesh_lod_threshold", Variant::FLOAT, { 4.0, 2.0, 1.0, 0.5 } },
 	// MSAA 3D: Disabled, Disabled, 2x, 4x. Screen-space AA: FXAA, FXAA, Disabled, Disabled.
-	{ "video_quality", "msaa_3d", Variant::INT, { 0, 0, 1, 2 } },
-	{ "video_quality", "screen_space_aa", Variant::INT, { 1, 1, 0, 0 } },
-	{ "video_quality", "use_taa", Variant::BOOL, { 0, 0, 0, 1 } },
-	{ "video_quality", "use_debanding", Variant::BOOL, { 0, 0, 1, 1 } },
+	{ "render_quality", "msaa_3d", Variant::INT, { 0, 0, 1, 2 } },
+	{ "render_quality", "screen_space_aa", Variant::INT, { 1, 1, 0, 0 } },
+	{ "render_quality", "use_taa", Variant::BOOL, { 0, 0, 0, 1 } },
+	{ "render_quality", "use_debanding", Variant::BOOL, { 0, 0, 1, 1 } },
 	// Anisotropic filtering: 2x, 4x, 8x, 16x. 2D SDF scale: 25%, 50%, 50%, 100%.
 	{ "video_texture", "anisotropic_filtering_level", Variant::INT, { 1, 2, 3, 4 } },
 	{ "video_texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
@@ -129,8 +129,8 @@ static bool video_preset_values_equal(const Variant &p_a, const Variant &p_b) {
 // if the domain is not registered.
 static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 	Ref<Resource> base;
-	if (p_domain == "video_quality") {
-		base = Ref<Resource>(memnew(VideoQualitySettings));
+	if (p_domain == "render_quality") {
+		base = Ref<Resource>(memnew(RenderQualitySettings));
 	} else if (p_domain == "video_texture") {
 		base = Ref<Resource>(memnew(VideoTextureSettings));
 	} else if (p_domain == "video_shadow") {

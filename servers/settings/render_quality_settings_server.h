@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_quality_settings_server.h                                       */
+/*  render_quality_settings_server.h                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -37,17 +37,17 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `video_quality` (#21): 3D scaling (mode, scale, FSR sharpness), mesh LOD, anti-aliasing
-// (MSAA 2D/3D, FXAA/SMAA, TAA, debanding), variable rate shading and occlusion culling (VideoQualitySettings).
+// Settings domain `render_quality` (#21): 3D scaling (mode, scale, FSR sharpness), mesh LOD, anti-aliasing
+// (MSAA 2D/3D, FXAA/SMAA, TAA, debanding), variable rate shading and occlusion culling (RenderQualitySettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
 // The per-viewport values also go to the viewports passed to add_viewport() and to every Viewport in the group
 // get_viewport_group() when it enters the tree. The two occlusion values are global (RenderingServer).
 // Values the current renderer, hardware or build ignores are stored, but not pushed (is_value_supported()).
 // Defaults are the project settings. Precedence: player's file > project settings.
-class VideoQualitySettingsServer : public SettingsServer {
-	GDCLASS(VideoQualitySettingsServer, SettingsServer);
+class RenderQualitySettingsServer : public SettingsServer {
+	GDCLASS(RenderQualitySettingsServer, SettingsServer);
 
-	static VideoQualitySettingsServer *singleton;
+	static RenderQualitySettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -86,8 +86,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_quality`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoQualitySettingsServer *get_singleton();
+	static RenderQualitySettingsServer *get_singleton();
 
 	// The group of viewports that get the per-viewport values when they enter the tree.
 	static StringName get_viewport_group();
@@ -138,6 +141,6 @@ public:
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
 
-	VideoQualitySettingsServer();
-	~VideoQualitySettingsServer();
+	RenderQualitySettingsServer();
+	~RenderQualitySettingsServer();
 };

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_quality_settings_server.cpp                                */
+/*  test_render_quality_settings_server.cpp                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_quality_settings_server)
+TEST_FORCE_LINK(test_render_quality_settings_server)
 
 // The tested values are 3D viewport settings, which do not exist without 3D.
 #ifndef _3D_DISABLED
@@ -43,9 +43,9 @@ TEST_FORCE_LINK(test_video_quality_settings_server)
 #include "scene/main/scene_tree.h"
 #include "scene/main/viewport.h"
 #include "scene/main/window.h"
+#include "servers/settings/render_quality_settings.h"
+#include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_quality_settings.h"
-#include "servers/settings/video_quality_settings_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -53,7 +53,7 @@ TEST_FORCE_LINK(test_video_quality_settings_server)
 #include "servers/rendering/rendering_device.h"
 #endif
 
-namespace TestVideoQualitySettingsServer {
+namespace TestRenderQualitySettingsServer {
 
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
@@ -107,7 +107,7 @@ struct RootState {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_quality_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("render_quality_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -115,17 +115,17 @@ static String temp_file(const String &p_name) {
 	return path;
 }
 
-TEST_CASE("[VideoQualitySettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[RenderQualitySettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	VideoQualitySettingsServer *server = VideoQualitySettingsServer::get_singleton();
+	RenderQualitySettingsServer *server = RenderQualitySettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoQualitySettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_quality") == server);
-	CHECK(server->get_domain() == StringName("video_quality"));
+	CHECK(Engine::get_singleton()->has_singleton("RenderQualitySettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("render_quality") == server);
+	CHECK(server->get_domain() == StringName("render_quality"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(server->get_file_path() == "user://settings/video_quality.ini");
-	CHECK(Object::cast_to<VideoQualitySettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(VideoQualitySettingsServer::get_viewport_group() == StringName("video_quality_settings"));
+	CHECK(server->get_file_path() == "user://settings/render_quality.ini");
+	CHECK(Object::cast_to<RenderQualitySettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(RenderQualitySettingsServer::get_viewport_group() == StringName("render_quality_settings"));
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 13);
@@ -138,7 +138,7 @@ TEST_CASE("[VideoQualitySettingsServer] The domain is an engine singleton regist
 	CHECK_FALSE(names.has("window_mode")); // #20.
 }
 
-TEST_CASE("[VideoQualitySettingsServer] Defaults are the project settings") {
+TEST_CASE("[RenderQualitySettingsServer] Defaults are the project settings") {
 	TestSetup setup;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	const Variant old_msaa_3d = project_settings->get_setting("rendering/anti_aliasing/quality/msaa_3d", 0);
@@ -148,7 +148,7 @@ TEST_CASE("[VideoQualitySettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/scaling_3d/scale", 0.75);
 	project_settings->set_setting("rendering/occlusion_culling/occlusion_rays_per_thread", 256);
 
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	CHECK(server->get_msaa_3d() == Viewport::MSAA_4X);
 	CHECK(server->get_scaling_3d_scale() == doctest::Approx(0.75));
@@ -161,9 +161,9 @@ TEST_CASE("[VideoQualitySettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/occlusion_culling/occlusion_rays_per_thread", old_rays);
 }
 
-TEST_CASE("[VideoQualitySettingsServer] Values out of range are clamped with a warning") {
+TEST_CASE("[RenderQualitySettingsServer] Values out of range are clamped with a warning") {
 	TestSetup setup;
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -199,11 +199,11 @@ TEST_CASE("[VideoQualitySettingsServer] Values out of range are clamped with a w
 	memdelete(server);
 }
 
-TEST_CASE("[VideoQualitySettingsServer] Values are saved and loaded") {
+TEST_CASE("[RenderQualitySettingsServer] Values are saved and loaded") {
 	TestSetup setup;
-	const String path = temp_file("video_quality.ini");
+	const String path = temp_file("render_quality.ini");
 	{
-		VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+		RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_scaling_3d_mode(Viewport::SCALING_3D_MODE_FSR2);
@@ -223,7 +223,7 @@ TEST_CASE("[VideoQualitySettingsServer] Values are saved and loaded") {
 		memdelete(server);
 	}
 
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	ERR_PRINT_OFF;
@@ -243,14 +243,14 @@ TEST_CASE("[VideoQualitySettingsServer] Values are saved and loaded") {
 	memdelete(server);
 }
 
-TEST_CASE("[VideoQualitySettingsServer] Supported values follow the renderer") {
+TEST_CASE("[RenderQualitySettingsServer] Supported values follow the renderer") {
 	TestSetup setup;
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(temp_file("supported.ini"));
 
 	const PackedStringArray unsupported = server->get_unsupported_setting_names();
 	for (const String &name : server->get_setting_names()) {
-		CHECK_MESSAGE(server->is_value_supported(name) == VideoQualitySettingsServer::is_renderer_supported(name), name);
+		CHECK_MESSAGE(server->is_value_supported(name) == RenderQualitySettingsServer::is_renderer_supported(name), name);
 		CHECK_MESSAGE(unsupported.has(name) == !server->is_value_supported(name), name);
 	}
 	CHECK_FALSE(server->is_value_supported("missing"));
@@ -259,19 +259,19 @@ TEST_CASE("[VideoQualitySettingsServer] Supported values follow the renderer") {
 	for (const char *name : { "scaling_3d_mode", "scaling_3d_scale", "mesh_lod_threshold", "msaa_2d", "msaa_3d" }) {
 		CHECK_MESSAGE(server->is_value_supported(name), name);
 	}
-	CHECK(VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_BILINEAR));
-	CHECK(VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_NEAREST));
-	CHECK_FALSE(VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_MAX));
+	CHECK(RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_BILINEAR));
+	CHECK(RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_NEAREST));
+	CHECK_FALSE(RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_MAX));
 
 	const String method = OS::get_singleton()->get_current_rendering_method();
 	if (method == "gl_compatibility") {
 		for (const char *name : { "fsr_sharpness", "screen_space_aa", "use_taa", "use_debanding", "vrs_mode" }) {
 			CHECK_FALSE_MESSAGE(server->is_value_supported(name), name);
 		}
-		CHECK_FALSE(VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_FSR));
+		CHECK_FALSE(RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_FSR));
 	} else if (method == "mobile") {
 		CHECK_FALSE(server->is_value_supported("use_taa"));
-		CHECK_FALSE(VideoQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_FSR2));
+		CHECK_FALSE(RenderQualitySettingsServer::is_scaling_3d_mode_supported(Viewport::SCALING_3D_MODE_FSR2));
 	}
 	// Variable rate shading needs a RenderingDevice with VRS attachments.
 #ifdef RD_ENABLED
@@ -285,12 +285,12 @@ TEST_CASE("[VideoQualitySettingsServer] Supported values follow the renderer") {
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoQualitySettingsServer] Each value reaches the root viewport at once") {
+TEST_CASE("[SceneTree][RenderQualitySettingsServer] Each value reaches the root viewport at once") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(temp_file("root.ini"));
 	server->set_scaling_3d_mode(Viewport::SCALING_3D_MODE_NEAREST);
 	CHECK(root->get_scaling_3d_mode() == Viewport::SCALING_3D_MODE_NEAREST);
@@ -336,12 +336,12 @@ TEST_CASE("[SceneTree][VideoQualitySettingsServer] Each value reaches the root v
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoQualitySettingsServer] Added viewports and viewports in the group get the values") {
+TEST_CASE("[SceneTree][RenderQualitySettingsServer] Added viewports and viewports in the group get the values") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_file_path(temp_file("viewports.ini"));
 	server->set_msaa_3d(Viewport::MSAA_4X);
 
@@ -359,7 +359,7 @@ TEST_CASE("[SceneTree][VideoQualitySettingsServer] Added viewports and viewports
 
 	// In the group: gets the values when it enters the tree, and later changes while it is in it.
 	SubViewport *grouped = memnew(SubViewport);
-	grouped->add_to_group(VideoQualitySettingsServer::get_viewport_group());
+	grouped->add_to_group(RenderQualitySettingsServer::get_viewport_group());
 	root->add_child(grouped);
 	CHECK(grouped->get_msaa_3d() == Viewport::MSAA_4X);
 	CHECK(grouped->get_mesh_lod_threshold() == doctest::Approx(2.0));
@@ -379,9 +379,9 @@ TEST_CASE("[SceneTree][VideoQualitySettingsServer] Added viewports and viewports
 	memdelete(server);
 }
 
-TEST_CASE("[VideoQualitySettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[RenderQualitySettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	VideoQualitySettingsServer *server = memnew(VideoQualitySettingsServer);
+	RenderQualitySettingsServer *server = memnew(RenderQualitySettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "scaling_3d_scale_changed");
 
@@ -413,6 +413,6 @@ TEST_CASE("[VideoQualitySettingsServer] Typed signals fire once per applied chan
 	memdelete(server);
 }
 
-} // namespace TestVideoQualitySettingsServer
+} // namespace TestRenderQualitySettingsServer
 
 #endif // _3D_DISABLED

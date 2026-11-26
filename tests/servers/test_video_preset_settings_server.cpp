@@ -39,12 +39,12 @@ TEST_FORCE_LINK(test_video_preset_settings_server)
 #include "core/io/resource_saver.h"
 #include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
+#include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server_manager.h"
 #include "servers/settings/video_effect_settings_server.h"
 #include "servers/settings/video_preset.h"
 #include "servers/settings/video_preset_settings.h"
 #include "servers/settings/video_preset_settings_server.h"
-#include "servers/settings/video_quality_settings_server.h"
 #include "servers/settings/video_shadow_settings_server.h"
 #include "servers/settings/video_texture_settings_server.h"
 #include "tests/test_utils.h"
@@ -78,7 +78,7 @@ struct Servers {
 	SettingsServer *domains[4] = {};
 
 	explicit Servers(const String &p_suffix = String(), bool p_remove_files = true) {
-		domains[0] = memnew(VideoQualitySettingsServer);
+		domains[0] = memnew(RenderQualitySettingsServer);
 		domains[1] = memnew(VideoTextureSettingsServer);
 		domains[2] = memnew(VideoShadowSettingsServer);
 		domains[3] = memnew(VideoEffectSettingsServer);
@@ -196,12 +196,12 @@ TEST_CASE("[VideoPresetSettingsServer] Built-in presets") {
 		CHECK(low->has_domain_settings(domain));
 		CHECK(low->get_domain_settings(domain) != ultra->get_domain_settings(domain));
 	}
-	REQUIRE(low->get_video_quality().is_valid());
+	REQUIRE(low->get_render_quality().is_valid());
 	REQUIRE(ultra->get_video_texture().is_valid());
 	CHECK(int(low->get_video_texture()->get_anisotropic_filtering_level()) < int(ultra->get_video_texture()->get_anisotropic_filtering_level()));
 	CHECK(low->get_video_shadow()->get_directional_shadow_atlas_size() < ultra->get_video_shadow()->get_directional_shadow_atlas_size());
 	CHECK(int(low->get_video_effect()->get_ssao_quality()) < int(ultra->get_video_effect()->get_ssao_quality()));
-	CHECK(low->get_video_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
+	CHECK(low->get_render_quality()->get_scaling_3d_scale() == doctest::Approx(0.75));
 
 	// Every value of a built-in preset exists in its domain.
 	for (const String &domain : VideoPreset::get_domains()) {
@@ -240,12 +240,12 @@ TEST_CASE("[VideoPresetSettingsServer] apply_preset() sets every value of the fo
 	CHECK(preset_changed_count >= 1);
 	CHECK(preset_changed_name == "Low");
 
-	CHECK_FALSE(servers.get("video_quality")->is_dirty());
+	CHECK_FALSE(servers.get("render_quality")->is_dirty());
 	CHECK_FALSE(servers.get("video_shadow")->is_dirty());
 	CHECK_FALSE(servers.get("video_effect")->is_dirty());
 	CHECK(texture->is_dirty());
 	CHECK(texture->get_apply_mode() == SettingsServer::APPLY_MODE_MANUAL);
-	CHECK(servers.get("video_quality")->get_apply_mode() == SettingsServer::APPLY_MODE_IMMEDIATE);
+	CHECK(servers.get("render_quality")->get_apply_mode() == SettingsServer::APPLY_MODE_IMMEDIATE);
 
 	ERR_PRINT_OFF;
 	CHECK(server->apply_preset("Ultra") == OK);
@@ -383,10 +383,10 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 	potato_texture.instantiate();
 	potato_texture->set_anisotropic_filtering_level(Viewport::ANISOTROPY_DISABLED);
 	potato->set_video_texture(potato_texture);
-	Ref<VideoQualitySettings> potato_quality;
+	Ref<RenderQualitySettings> potato_quality;
 	potato_quality.instantiate();
 	potato_quality->set_scaling_3d_scale(0.5);
-	potato->set_video_quality(potato_quality);
+	potato->set_render_quality(potato_quality);
 	CHECK(ResourceSaver::save(potato, potato_path) == OK);
 
 	PackedStringArray paths;
@@ -416,7 +416,7 @@ TEST_CASE("[VideoPresetSettingsServer] Projects replace and add presets") {
 		ERR_PRINT_ON;
 		CHECK(server->get_current_preset() == "Potato");
 		CHECK(int(servers.get("video_texture")->get_value("anisotropic_filtering_level")) == 0);
-		CHECK(float(servers.get("video_quality")->get_value("scaling_3d_scale")) == doctest::Approx(0.5));
+		CHECK(float(servers.get("render_quality")->get_value("scaling_3d_scale")) == doctest::Approx(0.5));
 		CHECK(int(shadow->get_value("directional_shadow_atlas_size")) == 1024);
 
 		// A change in a domain the preset doesn't touch keeps the preset.
@@ -494,13 +494,13 @@ TEST_CASE("[VideoPreset] Typed settings per domain") {
 		CHECK(preset->get_domain_settings(domain).is_null());
 	}
 
-	Ref<VideoQualitySettings> quality;
+	Ref<RenderQualitySettings> quality;
 	quality.instantiate();
 	quality->set_msaa_3d(Viewport::MSAA_4X);
-	preset->set_video_quality(quality);
-	CHECK(preset->has_domain_settings("video_quality"));
-	CHECK(preset->get_domain_settings("video_quality") == Ref<Resource>(quality));
-	CHECK(preset->get_video_quality()->get_msaa_3d() == Viewport::MSAA_4X);
+	preset->set_render_quality(quality);
+	CHECK(preset->has_domain_settings("render_quality"));
+	CHECK(preset->get_domain_settings("render_quality") == Ref<Resource>(quality));
+	CHECK(preset->get_render_quality()->get_msaa_3d() == Viewport::MSAA_4X);
 
 	// Generic access checks the class of the domain.
 	Ref<VideoEffectSettings> effect;
