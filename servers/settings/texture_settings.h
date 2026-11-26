@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_texture_settings.h                                              */
+/*  texture_settings.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -34,12 +34,12 @@
 #include "scene/main/viewport.h"
 #include "servers/rendering/rendering_server.h"
 
-// Data of the `video_texture` settings domain (#22): texture filtering (anisotropic filtering, mipmap bias,
+// Data of the `texture` settings domain (#22): texture filtering (anisotropic filtering, mipmap bias,
 // light projector and decal filter) and Canvas2D (default canvas item texture filter and repeat, pixel snap,
 // SDF oversize and scale, canvas shadow atlas size).
-// VideoTextureSettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
-class VideoTextureSettings : public Resource {
-	GDCLASS(VideoTextureSettings, Resource);
+// TextureSettingsServer pushes the values to the root Viewport (and further viewports) and RenderingServer.
+class TextureSettings : public Resource {
+	GDCLASS(TextureSettings, Resource);
 
 	Viewport::AnisotropicFiltering anisotropic_filtering_level = Viewport::ANISOTROPY_4X;
 	float texture_mipmap_bias = 0.0;

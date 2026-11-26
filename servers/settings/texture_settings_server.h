@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_texture_settings_server.h                                       */
+/*  texture_settings_server.h                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -37,19 +37,19 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `video_texture` (#22): texture filtering (anisotropic filtering, mipmap bias, light projector
+// Settings domain `texture` (#22): texture filtering (anisotropic filtering, mipmap bias, light projector
 // and decal filter) and Canvas2D (default canvas item texture filter and repeat, pixel snap, SDF, canvas shadow
-// atlas size) (VideoTextureSettings).
+// atlas size) (TextureSettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
 // The per-viewport values also go to the viewports passed to add_viewport() and to every Viewport in the group
 // get_viewport_group() when it enters the tree. The projector filter, decal filter and canvas shadow atlas size
 // are global (RenderingServer).
 // Values the current renderer ignores are stored, but not pushed (is_value_supported()).
 // Defaults are the project settings. Precedence: player's file > project settings.
-class VideoTextureSettingsServer : public SettingsServer {
-	GDCLASS(VideoTextureSettingsServer, SettingsServer);
+class TextureSettingsServer : public SettingsServer {
+	GDCLASS(TextureSettingsServer, SettingsServer);
 
-	static VideoTextureSettingsServer *singleton;
+	static TextureSettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -88,8 +88,11 @@ protected:
 	virtual void _read_settings_from_engine(const Ref<Resource> &p_settings) override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
 
+	// `video_texture`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
+
 public:
-	static VideoTextureSettingsServer *get_singleton();
+	static TextureSettingsServer *get_singleton();
 
 	// The group of viewports that get the per-viewport values when they enter the tree.
 	static StringName get_viewport_group();
@@ -132,6 +135,6 @@ public:
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
 
-	VideoTextureSettingsServer();
-	~VideoTextureSettingsServer();
+	TextureSettingsServer();
+	~TextureSettingsServer();
 };

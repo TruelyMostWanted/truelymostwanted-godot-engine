@@ -37,7 +37,7 @@
 #include "servers/settings/video_preset.h"
 
 // Settings domain `video_preset` (#25): graphics presets ("Low", "Medium", "High", "Ultra" or the project's own)
-// over the video domains `render_quality`, `video_texture`, `video_shadow` and `video_effect`.
+// over the video domains `render_quality`, `texture`, `video_shadow` and `video_effect`.
 // apply_preset() sets all values of each domain resource of a preset (RenderQualitySettings, ...) in one step (one
 // apply() and at most one confirmation per domain); a null resource leaves its domain as it is, and values a
 // domain does not support on the current renderer keep their value. The domain stores only

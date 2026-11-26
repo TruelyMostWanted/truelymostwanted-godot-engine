@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_texture_settings_server.cpp                                */
+/*  test_texture_settings_server.cpp                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_texture_settings_server)
+TEST_FORCE_LINK(test_texture_settings_server)
 
 // The tested values are 3D viewport settings, which do not exist without 3D.
 #ifndef _3D_DISABLED
@@ -44,10 +44,10 @@ TEST_FORCE_LINK(test_video_texture_settings_server)
 #include "scene/main/viewport.h"
 #include "scene/main/window.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_texture_settings.h"
-#include "servers/settings/video_texture_settings_server.h"
-#include "servers/settings/video_texture_streaming_settings.h"
-#include "servers/settings/video_texture_streaming_settings_server.h"
+#include "servers/settings/texture_settings.h"
+#include "servers/settings/texture_settings_server.h"
+#include "servers/settings/texture_streaming_settings.h"
+#include "servers/settings/texture_streaming_settings_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -55,7 +55,7 @@ TEST_FORCE_LINK(test_video_texture_settings_server)
 #include "modules/texture_streaming/texture_streaming.h"
 #endif
 
-namespace TestVideoTextureSettingsServer {
+namespace TestTextureSettingsServer {
 
 // Autosave off; the project settings a test changes are restored afterwards.
 struct TestSetup {
@@ -103,7 +103,7 @@ struct RootState {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_texture_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("texture_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -111,17 +111,17 @@ static String temp_file(const String &p_name) {
 	return path;
 }
 
-TEST_CASE("[VideoTextureSettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[TextureSettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	VideoTextureSettingsServer *server = VideoTextureSettingsServer::get_singleton();
+	TextureSettingsServer *server = TextureSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoTextureSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_texture") == server);
-	CHECK(server->get_domain() == StringName("video_texture"));
+	CHECK(Engine::get_singleton()->has_singleton("TextureSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("texture") == server);
+	CHECK(server->get_domain() == StringName("texture"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_SCENE);
-	CHECK(server->get_file_path() == "user://settings/video_texture.ini");
-	CHECK(Object::cast_to<VideoTextureSettings>(server->get_settings().ptr()) != nullptr);
-	CHECK(VideoTextureSettingsServer::get_viewport_group() == StringName("video_texture_settings"));
+	CHECK(server->get_file_path() == "user://settings/texture.ini");
+	CHECK(Object::cast_to<TextureSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(TextureSettingsServer::get_viewport_group() == StringName("texture_settings"));
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 11);
@@ -134,7 +134,7 @@ TEST_CASE("[VideoTextureSettingsServer] The domain is an engine singleton regist
 	CHECK_FALSE(names.has("msaa_3d")); // #21.
 }
 
-TEST_CASE("[VideoTextureSettingsServer] Defaults are the project settings") {
+TEST_CASE("[TextureSettingsServer] Defaults are the project settings") {
 	TestSetup setup;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	const Variant old_anisotropy = project_settings->get_setting("rendering/textures/default_filters/anisotropic_filtering_level", 2);
@@ -144,7 +144,7 @@ TEST_CASE("[VideoTextureSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/textures/canvas_textures/default_texture_filter", int(Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST));
 	project_settings->set_setting("rendering/2d/shadow_atlas/size", 1024);
 
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	CHECK(server->get_anisotropic_filtering_level() == Viewport::ANISOTROPY_16X);
 	CHECK(server->get_canvas_item_default_texture_filter() == Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
@@ -157,9 +157,9 @@ TEST_CASE("[VideoTextureSettingsServer] Defaults are the project settings") {
 	project_settings->set_setting("rendering/2d/shadow_atlas/size", old_atlas);
 }
 
-TEST_CASE("[VideoTextureSettingsServer] Values out of range are clamped with a warning") {
+TEST_CASE("[TextureSettingsServer] Values out of range are clamped with a warning") {
 	TestSetup setup;
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -192,11 +192,11 @@ TEST_CASE("[VideoTextureSettingsServer] Values out of range are clamped with a w
 	memdelete(server);
 }
 
-TEST_CASE("[VideoTextureSettingsServer] Values are saved and loaded") {
+TEST_CASE("[TextureSettingsServer] Values are saved and loaded") {
 	TestSetup setup;
-	const String path = temp_file("video_texture.ini");
+	const String path = temp_file("texture.ini");
 	{
-		VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+		TextureSettingsServer *server = memnew(TextureSettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_anisotropic_filtering_level(Viewport::ANISOTROPY_16X);
@@ -217,7 +217,7 @@ TEST_CASE("[VideoTextureSettingsServer] Values are saved and loaded") {
 		memdelete(server);
 	}
 
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	ERR_PRINT_OFF;
@@ -238,14 +238,14 @@ TEST_CASE("[VideoTextureSettingsServer] Values are saved and loaded") {
 	memdelete(server);
 }
 
-TEST_CASE("[VideoTextureSettingsServer] Supported values follow the renderer") {
+TEST_CASE("[TextureSettingsServer] Supported values follow the renderer") {
 	TestSetup setup;
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(temp_file("supported.ini"));
 
 	const PackedStringArray unsupported = server->get_unsupported_setting_names();
 	for (const String &name : server->get_setting_names()) {
-		CHECK_MESSAGE(server->is_value_supported(name) == VideoTextureSettingsServer::is_renderer_supported(name), name);
+		CHECK_MESSAGE(server->is_value_supported(name) == TextureSettingsServer::is_renderer_supported(name), name);
 		CHECK_MESSAGE(unsupported.has(name) == !server->is_value_supported(name), name);
 	}
 	CHECK_FALSE(server->is_value_supported("missing"));
@@ -260,12 +260,12 @@ TEST_CASE("[VideoTextureSettingsServer] Supported values follow the renderer") {
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoTextureSettingsServer] Each value reaches the root viewport at once") {
+TEST_CASE("[SceneTree][TextureSettingsServer] Each value reaches the root viewport at once") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(temp_file("root.ini"));
 	server->set_anisotropic_filtering_level(Viewport::ANISOTROPY_16X);
 	CHECK(root->get_anisotropic_filtering_level() == Viewport::ANISOTROPY_16X);
@@ -305,12 +305,12 @@ TEST_CASE("[SceneTree][VideoTextureSettingsServer] Each value reaches the root v
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoTextureSettingsServer] Added viewports and viewports in the group get the values") {
+TEST_CASE("[SceneTree][TextureSettingsServer] Added viewports and viewports in the group get the values") {
 	TestSetup setup;
 	RootState state;
 	Viewport *root = state.root;
 
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_file_path(temp_file("viewports.ini"));
 	server->set_canvas_item_default_texture_filter(Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
 
@@ -328,7 +328,7 @@ TEST_CASE("[SceneTree][VideoTextureSettingsServer] Added viewports and viewports
 
 	// In the group: gets the values when it enters the tree, and later changes while it is in it.
 	SubViewport *grouped = memnew(SubViewport);
-	grouped->add_to_group(VideoTextureSettingsServer::get_viewport_group());
+	grouped->add_to_group(TextureSettingsServer::get_viewport_group());
 	root->add_child(grouped);
 	CHECK(grouped->get_default_canvas_item_texture_filter() == Viewport::DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
 	server->set_anisotropic_filtering_level(Viewport::ANISOTROPY_2X);
@@ -372,22 +372,22 @@ struct StreamingProjectState {
 	}
 };
 
-TEST_CASE("[VideoTextureStreamingSettingsServer] The domain exists with the texture_streaming module") {
+TEST_CASE("[TextureStreamingSettingsServer] The domain exists with the texture_streaming module") {
 	TestSetup setup;
-	VideoTextureStreamingSettingsServer *server = VideoTextureStreamingSettingsServer::get_singleton();
+	TextureStreamingSettingsServer *server = TextureStreamingSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoTextureStreamingSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_texture_streaming") == server);
-	CHECK(server->get_domain() == StringName("video_texture_streaming"));
+	CHECK(Engine::get_singleton()->has_singleton("TextureStreamingSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("texture_streaming") == server);
+	CHECK(server->get_domain() == StringName("texture_streaming"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_PRE_DISPLAY);
-	CHECK(server->get_file_path() == "user://settings/video_texture_streaming.ini");
-	CHECK(Object::cast_to<VideoTextureStreamingSettings>(server->get_settings().ptr()) != nullptr);
+	CHECK(server->get_file_path() == "user://settings/texture_streaming.ini");
+	CHECK(Object::cast_to<TextureStreamingSettings>(server->get_settings().ptr()) != nullptr);
 
 	const PackedStringArray names = server->get_setting_names();
 	CHECK(names.size() == 5);
 	for (const char *name : { "enabled", "memory_budget_enabled", "memory_budget_mb", "min_lod", "max_lod" }) {
 		CHECK_MESSAGE(names.has(name), name);
-		CHECK_MESSAGE(server->is_value_supported(name) == VideoTextureStreamingSettingsServer::is_renderer_supported(), name);
+		CHECK_MESSAGE(server->is_value_supported(name) == TextureStreamingSettingsServer::is_renderer_supported(), name);
 	}
 	// Only `enabled` needs a restart: the renderers compile the streaming shader path at startup.
 	CHECK(server->get_setting_flags("enabled").has_flag(SettingsServer::SETTING_FLAG_RESTART_REQUIRED));
@@ -395,16 +395,16 @@ TEST_CASE("[VideoTextureStreamingSettingsServer] The domain exists with the text
 	CHECK_FALSE(server->get_setting_flags("memory_budget_enabled").has_flag(SettingsServer::SETTING_FLAG_RESTART_REQUIRED));
 }
 
-TEST_CASE("[VideoTextureStreamingSettingsServer] Defaults, ranges, storage and restart") {
+TEST_CASE("[TextureStreamingSettingsServer] Defaults, ranges, storage and restart") {
 	TestSetup setup;
 	StreamingProjectState project_state;
 	ProjectSettings *project_settings = ProjectSettings::get_singleton();
 	const Variant old_budget = project_settings->get_setting("rendering/textures/streaming/memory_budget_mb", 512);
 	project_settings->set_setting("rendering/textures/streaming/memory_budget_mb", 256);
 
-	const String path = temp_file("video_texture_streaming.ini");
+	const String path = temp_file("texture_streaming.ini");
 	{
-		VideoTextureStreamingSettingsServer *server = memnew(VideoTextureStreamingSettingsServer);
+		TextureStreamingSettingsServer *server = memnew(TextureStreamingSettingsServer);
 		server->set_file_path(path);
 		CHECK(server->get_memory_budget_mb() == 256);
 		CHECK(server->get_min_lod() == int(project_settings->get_setting("rendering/textures/streaming/min_lod", 0)));
@@ -427,7 +427,7 @@ TEST_CASE("[VideoTextureStreamingSettingsServer] Defaults, ranges, storage and r
 		CHECK(server->get_restart_required_names().has("enabled"));
 		CHECK_FALSE(server->get_restart_required_names().has("memory_budget_mb"));
 
-		if (VideoTextureStreamingSettingsServer::is_renderer_supported() && TextureStreaming::get_singleton() != nullptr) {
+		if (TextureStreamingSettingsServer::is_renderer_supported() && TextureStreaming::get_singleton() != nullptr) {
 			TextureStreaming *texture_streaming = TextureStreaming::get_singleton();
 			CHECK(texture_streaming->get_memory_budget_mb_override() == 128);
 			CHECK(texture_streaming->get_min_lod_override() == 1);
@@ -438,7 +438,7 @@ TEST_CASE("[VideoTextureStreamingSettingsServer] Defaults, ranges, storage and r
 		memdelete(server);
 	}
 
-	VideoTextureStreamingSettingsServer *server = memnew(VideoTextureStreamingSettingsServer);
+	TextureStreamingSettingsServer *server = memnew(TextureStreamingSettingsServer);
 	server->set_file_path(path);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	ERR_PRINT_OFF;
@@ -455,9 +455,9 @@ TEST_CASE("[VideoTextureStreamingSettingsServer] Defaults, ranges, storage and r
 
 #endif // MODULE_TEXTURE_STREAMING_ENABLED
 
-TEST_CASE("[VideoTextureSettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[TextureSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	VideoTextureSettingsServer *server = memnew(VideoTextureSettingsServer);
+	TextureSettingsServer *server = memnew(TextureSettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "texture_mipmap_bias_changed");
 
@@ -489,6 +489,6 @@ TEST_CASE("[VideoTextureSettingsServer] Typed signals fire once per applied chan
 	memdelete(server);
 }
 
-} // namespace TestVideoTextureSettingsServer
+} // namespace TestTextureSettingsServer
 
 #endif // _3D_DISABLED

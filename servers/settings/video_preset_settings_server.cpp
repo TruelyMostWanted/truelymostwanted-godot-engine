@@ -67,9 +67,9 @@ static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	{ "render_quality", "use_taa", Variant::BOOL, { 0, 0, 0, 1 } },
 	{ "render_quality", "use_debanding", Variant::BOOL, { 0, 0, 1, 1 } },
 	// Anisotropic filtering: 2x, 4x, 8x, 16x. 2D SDF scale: 25%, 50%, 50%, 100%.
-	{ "video_texture", "anisotropic_filtering_level", Variant::INT, { 1, 2, 3, 4 } },
-	{ "video_texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
-	{ "video_texture", "canvas_shadow_atlas_size", Variant::INT, { 1024, 2048, 2048, 4096 } },
+	{ "texture", "anisotropic_filtering_level", Variant::INT, { 1, 2, 3, 4 } },
+	{ "texture", "sdf_scale", Variant::INT, { 2, 1, 1, 0 } },
+	{ "texture", "canvas_shadow_atlas_size", Variant::INT, { 1024, 2048, 2048, 4096 } },
 	// Shadow atlas sizes; filter quality: Soft Very Low, Soft Low, Soft Medium, Soft High.
 	{ "video_shadow", "directional_shadow_atlas_size", Variant::INT, { 2048, 4096, 4096, 8192 } },
 	{ "video_shadow", "directional_soft_shadow_filter_quality", Variant::INT, { 1, 2, 3, 4 } },
@@ -131,8 +131,8 @@ static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 	Ref<Resource> base;
 	if (p_domain == "render_quality") {
 		base = Ref<Resource>(memnew(RenderQualitySettings));
-	} else if (p_domain == "video_texture") {
-		base = Ref<Resource>(memnew(VideoTextureSettings));
+	} else if (p_domain == "texture") {
+		base = Ref<Resource>(memnew(TextureSettings));
 	} else if (p_domain == "video_shadow") {
 		base = Ref<Resource>(memnew(VideoShadowSettings));
 	} else if (p_domain == "video_effect") {

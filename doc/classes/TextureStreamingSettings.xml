@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="VideoTextureStreamingSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="TextureStreamingSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings resource of [VideoTextureStreamingSettingsServer]: texture streaming and its VRAM budget.
+		Settings resource of [TextureStreamingSettingsServer]: texture streaming and its VRAM budget.
 	</brief_description>
 	<description>
-		The data of the settings domain [code]"video_texture_streaming"[/code]. [VideoTextureStreamingSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/video_texture_streaming.ini[/code]. Change the values through the methods of [VideoTextureStreamingSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
-		The setters store values as they are; [VideoTextureStreamingSettingsServer] clamps values out of range with a warning when they are set or loaded.
+		The data of the settings domain [code]"texture_streaming"[/code]. [TextureStreamingSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/texture_streaming.ini[/code]. Change the values through the methods of [TextureStreamingSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [TextureStreamingSettingsServer] clamps values out of range with a warning when they are set or loaded.
 		[b]Note:[/b] This class only exists when the engine is built with the [code]texture_streaming[/code] module (not in the Web export, which has no [RenderingDevice]).
 	</description>
 	<tutorials>
