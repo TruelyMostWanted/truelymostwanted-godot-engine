@@ -259,6 +259,10 @@ TEST_CASE("[SQLite] Prepared statements") {
 	}
 	CHECK(count == 4);
 	CHECK(select->step() == SQLiteStatement::STEP_RESULT_DONE);
+	CHECK(select->step() == SQLiteStatement::STEP_RESULT_DONE); // Stays done until reset().
+	CHECK(select->reset() == OK);
+	CHECK(select->step() == SQLiteStatement::STEP_RESULT_ROW);
+	CHECK(select->get_column_int(0) == 0);
 
 	// The last row was bound with bind_values(): an empty BLOB stays a BLOB.
 	Ref<SQLiteStatement> last = db->prepare("SELECT * FROM t WHERE i = 10;");

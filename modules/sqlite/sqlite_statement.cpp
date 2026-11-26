@@ -121,12 +121,17 @@ Error SQLiteStatement::clear_bindings() {
 
 SQLiteStatement::StepResult SQLiteStatement::step() {
 	ERR_FAIL_COND_V_MSG(!_is_valid(), STEP_RESULT_ERROR, "The statement's database is closed.");
+	if (finished) {
+		// SQLite would restart the statement on its own; reset() makes that explicit.
+		return STEP_RESULT_DONE;
+	}
 	const int result = sqlite3_step(stmt);
 	database->set_result(result);
 	if (result == SQLITE_ROW) {
 		return STEP_RESULT_ROW;
 	}
 	if (result == SQLITE_DONE) {
+		finished = true;
 		return STEP_RESULT_DONE;
 	}
 	return STEP_RESULT_ERROR;
@@ -136,6 +141,7 @@ Error SQLiteStatement::reset() {
 	ERR_FAIL_COND_V_MSG(!_is_valid(), ERR_UNCONFIGURED, "The statement's database is closed.");
 	// sqlite3_reset() repeats the error of the last step; the reset itself succeeds.
 	sqlite3_reset(stmt);
+	finished = false;
 	return database->set_error(OK, String());
 }
 

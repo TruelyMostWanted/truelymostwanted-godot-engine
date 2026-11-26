@@ -60,6 +60,7 @@ private:
 	Ref<SQLiteDatabase> database;
 	sqlite3 *db = nullptr; // The connection the statement belongs to.
 	sqlite3_stmt *stmt = nullptr;
+	bool finished = false; // Last step() returned DONE; stays DONE until reset().
 
 	bool _is_valid() const;
 	Error _bind_result(int p_result);

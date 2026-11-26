@@ -171,7 +171,7 @@
 		<method name="step">
 			<return type="int" enum="SQLiteStatement.StepResult" />
 			<description>
-				Runs the statement until the next result row. Returns [constant STEP_RESULT_ROW] when a row is available through the [code]get_column_*[/code] methods, [constant STEP_RESULT_DONE] when the statement has finished, and [constant STEP_RESULT_ERROR] on failure (see [method SQLiteDatabase.get_last_error_message]). Call [method reset] before running the statement again.
+				Runs the statement until the next result row. Returns [constant STEP_RESULT_ROW] when a row is available through the [code]get_column_*[/code] methods, [constant STEP_RESULT_DONE] when the statement has finished, and [constant STEP_RESULT_ERROR] on failure (see [method SQLiteDatabase.get_last_error_message]). After [constant STEP_RESULT_DONE], further calls return [constant STEP_RESULT_DONE] until [method reset] is called; call [method reset] before running the statement again.
 			</description>
 		</method>
 	</methods>
