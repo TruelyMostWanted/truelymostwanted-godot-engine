@@ -69,7 +69,11 @@ TEST_CASE("[SceneTree][ViewportServer] Initial scan and lookups") {
 
 	const TypedArray<Window> windows = server->get_windows();
 	CHECK(windows.has(root));
-	CHECK_FALSE(windows.has(early));
+	bool early_in_windows = false; // `has()` on a TypedArray<Window> rejects a SubViewport with an error.
+	for (const Variant &window : windows) {
+		early_in_windows = early_in_windows || window == Variant(early);
+	}
+	CHECK_FALSE(early_in_windows);
 
 	REQUIRE(early->get_viewport_rid().is_valid());
 	CHECK(server->get_viewport_by_rid(early->get_viewport_rid()) == early);
@@ -134,9 +138,9 @@ TEST_CASE("[SceneTree][ViewportServer] Signals on add and remove") {
 	SIGNAL_DISCARD("viewport_added");
 	CHECK(server->has_viewport(sub));
 
-	memdelete(holder);
 	{
-		const Array args = { { nested } };
+		const Array args = { { nested } }; // Built before `nested` is freed.
+		memdelete(holder);
 		SIGNAL_CHECK("viewport_removed", args);
 	}
 	memdelete(sub);
