@@ -127,7 +127,13 @@ void SQLiteTableOverview::_count_rows() {
 
 void SQLiteTableOverview::_edit_table(TreeItem *p_item, int p_column, int p_id, MouseButton p_button) {
 	if (p_button == MouseButton::LEFT && p_id == BUTTON_EDIT && SQLiteTableEditor::get_singleton()) {
-		SQLiteTableEditor::get_singleton()->edit(path, p_item->get_text(COLUMN_TABLE));
+		SQLiteTableEditor *table_editor = SQLiteTableEditor::get_singleton();
+		table_editor->edit(path, p_item->get_text(COLUMN_TABLE));
+		// Read the row counts again when the window closes: a save may have changed them.
+		const Callable refresh = callable_mp(this, &SQLiteTableOverview::_update);
+		if (!table_editor->is_connected(SceneStringName(visibility_changed), refresh)) {
+			table_editor->connect(SceneStringName(visibility_changed), refresh, CONNECT_ONE_SHOT);
+		}
 	}
 }
 
