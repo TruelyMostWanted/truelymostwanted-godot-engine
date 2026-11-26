@@ -256,7 +256,10 @@ TEST_CASE("[SceneTree][TileMapPathGraph] Paths respect blocked cells and costs; 
 	const Rect2i rect(-4, -3, 9, 7);
 	const Vector2i from(-4, 0);
 	const Vector2i to(4, 0);
-	const Vector2i gap(0, 3);
+	// Two gap cells: in stacked layouts with sides only, odd rows are shifted, so one cell at x = 0
+	// touches only one side of the wall and crossing needs a cell of an even and of an odd row.
+	const Vector2i gap(0, 2);
+	const Vector2i gap_2(0, 3);
 
 	for (const MapType &map_type : map_types) {
 		for (int corner_mode = 0; corner_mode < 2; corner_mode++) {
@@ -281,7 +284,7 @@ TEST_CASE("[SceneTree][TileMapPathGraph] Paths respect blocked cells and costs; 
 			// A wall at x = 0 with one gap.
 			TypedArray<Vector2i> changed;
 			for (int y = rect.position.y; y < rect.get_end().y; y++) {
-				if (Vector2i(0, y) != gap) {
+				if (Vector2i(0, y) != gap && Vector2i(0, y) != gap_2) {
 					layer->set_cell(Vector2i(0, y), 0, WALL);
 					changed.push_back(Vector2i(0, y));
 				}
@@ -289,20 +292,24 @@ TEST_CASE("[SceneTree][TileMapPathGraph] Paths respect blocked cells and costs; 
 			graph->update_cells(changed);
 			CHECK(graph->is_cell_blocked(Vector2i(0, 0)));
 			CHECK_FALSE(graph->is_cell_blocked(gap));
+			CHECK_FALSE(graph->is_cell_blocked(gap_2));
 			TypedArray<Vector2i> path = graph->get_cell_path(from, to);
 			CHECK(is_valid_path(graph, tile_set, path, from, to, corners));
-			CHECK(path.has(gap));
+			CHECK((path.has(gap) || path.has(gap_2)));
 
 			// Close the gap in the layer but update another cell: the graph keeps the gap open.
 			layer->set_cell(gap, 0, WALL);
+			layer->set_cell(gap_2, 0, WALL);
 			TypedArray<Vector2i> other;
 			other.push_back(from);
 			graph->update_cells(other);
-			CHECK(graph->get_cell_path(from, to).has(gap));
+			path = graph->get_cell_path(from, to);
+			CHECK((path.has(gap) || path.has(gap_2)));
 
 			// Update the gap: no path any more, a partial path ends on the left side.
 			TypedArray<Vector2i> gap_cells;
 			gap_cells.push_back(gap);
+			gap_cells.push_back(gap_2);
 			graph->update_cells(gap_cells);
 			CHECK(graph->get_cell_path(from, to).is_empty());
 			const TypedArray<Vector2i> partial = graph->get_cell_path(from, to, true);
@@ -315,14 +322,16 @@ TEST_CASE("[SceneTree][TileMapPathGraph] Paths respect blocked cells and costs; 
 				layer->set_cell(changed[i], 0, MUD);
 			}
 			layer->set_cell(gap, 0, FLOOR);
+			layer->set_cell(gap_2, 0, FLOOR);
 			changed.push_back(gap);
+			changed.push_back(gap_2);
 			graph->update_cells(changed);
 			CHECK(graph->get_cell_cost(Vector2i(0, 0)) == doctest::Approx(20.0));
 			CHECK(graph->get_cell_cost(gap) == doctest::Approx(1.0));
 			CHECK_FALSE(graph->is_cell_blocked(Vector2i(0, 0)));
 			path = graph->get_cell_path(from, to);
 			CHECK(is_valid_path(graph, tile_set, path, from, to, corners));
-			CHECK(path.has(gap));
+			CHECK((path.has(gap) || path.has(gap_2)));
 
 			memdelete(layer);
 		}
