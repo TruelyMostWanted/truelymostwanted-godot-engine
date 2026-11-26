@@ -36,6 +36,7 @@ TEST_FORCE_LINK(test_localization_catalog)
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
+#include "core/object/message_queue.h"
 #include "core/string/localization_catalog.h"
 #include "core/string/translation.h"
 #include "tests/signal_watcher.h"
@@ -152,6 +153,7 @@ TEST_CASE("[LocalizationCatalog] Binary format loads one locale at a time") {
 
 	SIGNAL_WATCH(loaded.ptr(), SNAME("locale_loaded"));
 	CHECK(loaded->get_text("HELLO", "de", "menu") == String(U"Hallo (Menü)"));
+	MessageQueue::get_singleton()->flush(); // Deferred when not on the main thread.
 	SIGNAL_CHECK("locale_loaded", { { "de" } });
 	SIGNAL_UNWATCH(loaded.ptr(), SNAME("locale_loaded"));
 	CHECK(loaded->is_locale_loaded("de"));
