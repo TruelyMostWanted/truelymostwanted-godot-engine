@@ -42,7 +42,7 @@
 		<method name="add_key">
 			<return type="int" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Adds a row for [param key] and [param context] and returns its row number. If the row exists, returns its row number without a change.
 			</description>
@@ -63,7 +63,7 @@
 		<method name="find_key" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the row number of [param key] with [param context], or [code]-1[/code] if the catalog has no such row.
 			</description>
@@ -99,7 +99,7 @@
 		<method name="has_key" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns [code]true[/code] if the catalog has a row for [param key] with [param context].
 			</description>
@@ -143,7 +143,7 @@
 		<method name="remove_key">
 			<return type="void" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Removes the row of [param key] with [param context] from all locales. The rows after it move up by one.
 			</description>
@@ -178,10 +178,10 @@
 		</method>
 	</methods>
 	<members>
-		<member name="key_count" type="int" setter="" getter="get_key_count">
+		<member name="key_count" type="int" setter="" getter="get_key_count" default="0">
 			The number of rows (keys with their context).
 		</member>
-		<member name="locales" type="PackedStringArray" setter="" getter="get_locales">
+		<member name="locales" type="PackedStringArray" setter="" getter="get_locales" default="PackedStringArray()">
 			The locales of the catalog, in column order, loaded or not.
 		</member>
 	</members>
