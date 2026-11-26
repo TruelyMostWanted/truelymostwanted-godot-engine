@@ -43,7 +43,7 @@ protected:
 
 	GDVIRTUAL3R(Error, _save, Ref<Resource>, String, BitField<ResourceSaverConstants::SaverFlags>)
 #ifndef DISABLE_DEPRECATED
-	GDVIRTUAL3R_COMPAT(_save_bind_compat_367, _save, Error, Ref<Resource>, String, uint32_t)
+	GDVIRTUAL3R_COMPAT(_save_bind_compat_367, Error, _save, Ref<Resource>, String, uint32_t)
 #endif
 	GDVIRTUAL2R(Error, _set_uid, String, ResourceUID::ID)
 	GDVIRTUAL1RC(bool, _recognize, Ref<Resource>)

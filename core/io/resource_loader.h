@@ -73,7 +73,7 @@ protected:
 
 	GDVIRTUAL4RC_REQUIRED(Variant, _load, String, String, bool, CacheMode)
 #ifndef DISABLE_DEPRECATED
-	GDVIRTUAL4RC_COMPAT(_load_bind_compat_367, _load, Variant, String, String, bool, int)
+	GDVIRTUAL4RC_COMPAT(_load_bind_compat_367, Variant, _load, String, String, bool, int)
 #endif
 
 public:
