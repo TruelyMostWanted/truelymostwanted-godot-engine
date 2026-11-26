@@ -10,7 +10,7 @@ upstream/master
  └─► master                               reine Kopie von upstream, keine eigenen Commits
       ├─► 195-feature-opus-audio, …        mitgeführte Godot-PRs (upstream-prs.tsv), merge-chain.ps1
       ├─► <pr-branch>                      Beitrag an Godot  ──► PR an godotengine/godot
-      └──(merge)──► truely-godot-engine    die eigene Engine: Entwicklung, CI, keine Releases
+      └──(merge)──► truely-godot-engine    die eigene Engine: Entwicklung, keine CI, keine Releases
                       ├─► <nn>-feature-…   Feature-Branches (Squash-Merge, bleiben bestehen)
                       └──(Fast-forward, release.ps1)──► truely-godot-engine-releases
                                                          freigegebene Stände: CI → Builds → Release
@@ -75,7 +75,7 @@ Bei einem Konflikt hält das Skript an; lösen, committen, erneut starten (erled
 
 ## Releases
 
-Entwicklung und Veröffentlichung sind getrennt: `truely-godot-engine` ist der Entwicklungsstand (Merges, CI, **keine** Releases), `truely-godot-engine-releases` enthält nur freigegebene Stände.
+Entwicklung und Veröffentlichung sind getrennt: `truely-godot-engine` ist der Entwicklungsstand (Merges, lokal geprüft, **keine** CI und **keine** Releases), `truely-godot-engine-releases` enthält nur freigegebene Stände.
 
 ```powershell
 ./truely/release.ps1                  # Spitze von origin/truely-godot-engine freigeben
