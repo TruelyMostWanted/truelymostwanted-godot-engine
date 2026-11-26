@@ -465,7 +465,7 @@ int EditorXMLSyntaxHighlighter::_highlight_line(const String &p_line, int p_stat
 			} break;
 			case STATE_VALUE_DOUBLE_QUOTED:
 			case STATE_VALUE_SINGLE_QUOTED: {
-				if (c == (state == STATE_VALUE_DOUBLE_QUOTED ? '"' : '\'')) {
+				if (c == char32_t(state == STATE_VALUE_DOUBLE_QUOTED ? '"' : '\'')) {
 					state = STATE_TAG;
 					_set_color(r_colors, i + 1, text_color);
 				}
