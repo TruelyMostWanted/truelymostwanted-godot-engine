@@ -331,6 +331,39 @@ TEST_CASE("[DataSchema] XML attributes and child elements as fields") {
 	CHECK(result->get_issue_path(0) == "item/1/id");
 }
 
+TEST_CASE("[DataSchema] resolve_lines() for many JSON records, in and out of order") {
+	// One record per line: record n is on line n + 2.
+	String json = "[\n";
+	for (int i = 0; i < 2990; i++) {
+		json += vformat("{\"id\": %d, \"hp\": %d},\n", i, i % 3 == 0 ? 500 : 5);
+	}
+	json += "{\"id\": 2990, \"hp\": 5}\n]";
+	Dictionary shape;
+	shape["id"] = Variant::INT;
+	shape["hp"] = Variant::INT;
+	Ref<DataSchema> schema = DataSchema::create_from_dictionary(shape);
+	schema->get_field("hp")->set_range(0, 100);
+
+	Ref<DataValidation> result = schema->validate(JSON::parse_string(json));
+	REQUIRE(result->get_issue_count() == 997);
+	// Issues out of order and a key that is not in the text.
+	result->add_issue(DataValidation::ISSUE_KIND_OUT_OF_RANGE, "x", "hp", "3/hp", 3);
+	result->add_issue(DataValidation::ISSUE_KIND_MISSING_FIELD, "x", "mana", "4/mana", 4);
+	result->add_issue(DataValidation::ISSUE_KIND_OUT_OF_RANGE, "x", "hp", "5000/hp", 5000);
+
+	const uint64_t start = OS::get_singleton()->get_ticks_msec();
+	result->resolve_lines(json);
+	MESSAGE(vformat("Lines of 1000 issues resolved in %d ms.", OS::get_singleton()->get_ticks_msec() - start));
+	bool lines_match = true;
+	for (int i = 0; i < 997; i++) {
+		lines_match = lines_match && result->get_issue_line(i) == result->get_issue_row(i) + 2;
+	}
+	CHECK(lines_match);
+	CHECK(result->get_issue_line(997) == 5);
+	CHECK(result->get_issue_line(998) == DataValidation::POSITION_NONE);
+	CHECK(result->get_issue_line(999) == DataValidation::POSITION_NONE);
+}
+
 TEST_CASE("[DataSchema] Many CSV rows validate") {
 	String text = "id,name,hp\n";
 	for (int i = 0; i < 20000; i++) {

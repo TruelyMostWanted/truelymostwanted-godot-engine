@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/templates/local_vector.h"
 #include "scene/resources/syntax_highlighter.h"
 
 class EditorSyntaxHighlighter : public SyntaxHighlighter {
@@ -140,6 +141,99 @@ public:
 	virtual Ref<EditorSyntaxHighlighter> _create() const override;
 
 	EditorConfigFileSyntaxHighlighter() { highlighter.instantiate(); }
+};
+
+// Base of highlighters whose lines depend on the end state of the previous line (a quoted CSV cell or an
+// XML comment over several lines). End states are computed in line order and dropped from an edited line on.
+class EditorLineStateSyntaxHighlighter : public EditorSyntaxHighlighter {
+	GDCLASS(EditorLineStateSyntaxHighlighter, EditorSyntaxHighlighter)
+
+	LocalVector<int> line_end_states;
+
+	void _lines_edited_from(int p_from_line, int p_to_line);
+
+protected:
+	// Adds the colors of `p_line`, which starts in `p_state`, and returns the state at its end (0 = none).
+	virtual int _highlight_line(const String &p_line, int p_state, Dictionary &r_colors) const { return 0; }
+	static void _set_color(Dictionary &r_colors, int p_column, const Color &p_color);
+
+public:
+	virtual void _update_cache() override;
+	virtual void _clear_highlighting_cache() override { line_end_states.clear(); }
+	virtual Dictionary _get_line_syntax_highlighting_impl(int p_line) override;
+};
+
+class EditorCSVSyntaxHighlighter : public EditorLineStateSyntaxHighlighter {
+	GDCLASS(EditorCSVSyntaxHighlighter, EditorLineStateSyntaxHighlighter)
+
+	static constexpr int COLUMN_COLOR_COUNT = 6;
+	Color column_colors[COLUMN_COLOR_COUNT];
+	Color symbol_color;
+	char32_t delimiter = ',';
+
+protected:
+	virtual int _highlight_line(const String &p_line, int p_state, Dictionary &r_colors) const override;
+
+public:
+	virtual void _update_cache() override;
+
+	virtual PackedStringArray _get_supported_languages() const override { return PackedStringArray{ "csv" }; }
+	virtual String _get_name() const override { return TTR("CSV"); }
+
+	virtual Ref<EditorSyntaxHighlighter> _create() const override;
+};
+
+class EditorXMLSyntaxHighlighter : public EditorLineStateSyntaxHighlighter {
+	GDCLASS(EditorXMLSyntaxHighlighter, EditorLineStateSyntaxHighlighter)
+
+	enum State {
+		STATE_TEXT,
+		STATE_TAG,
+		STATE_VALUE_DOUBLE_QUOTED,
+		STATE_VALUE_SINGLE_QUOTED,
+		STATE_COMMENT,
+		STATE_CDATA,
+		STATE_DECLARATION,
+	};
+
+	Color text_color;
+	Color symbol_color;
+	Color tag_color;
+	Color attribute_color;
+	Color string_color;
+	Color comment_color;
+	Color keyword_color;
+
+protected:
+	virtual int _highlight_line(const String &p_line, int p_state, Dictionary &r_colors) const override;
+
+public:
+	virtual void _update_cache() override;
+
+	virtual PackedStringArray _get_supported_languages() const override { return PackedStringArray{ "xml" }; }
+	virtual String _get_name() const override { return TTR("XML"); }
+
+	virtual Ref<EditorSyntaxHighlighter> _create() const override;
+};
+
+// Base of highlighters that color the key (or section) of a line over a CodeHighlighter (TOML and YAML
+// modules).
+class EditorKeyValueSyntaxHighlighter : public EditorSyntaxHighlighter {
+	GDCLASS(EditorKeyValueSyntaxHighlighter, EditorSyntaxHighlighter)
+
+protected:
+	Ref<CodeHighlighter> highlighter;
+	Color text_color;
+	Color key_color;
+	Color section_color;
+
+	// Returns the end column of the key or section of `p_line` and sets its start, or -1 if there is none.
+	virtual int _find_key(const String &p_line, int &r_start, bool &r_section) const { return -1; }
+
+public:
+	virtual Dictionary _get_line_syntax_highlighting_impl(int p_line) override;
+
+	EditorKeyValueSyntaxHighlighter() { highlighter.instantiate(); }
 };
 
 class GDShaderSyntaxHighlighter : public EditorSyntaxHighlighter {
