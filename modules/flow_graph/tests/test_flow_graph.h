@@ -48,7 +48,7 @@ static Ref<FlowGraph> make_graph(int &r_start, int &r_branch, int &r_end, int &r
 	Ref<FlowVariable> variable;
 	variable.instantiate();
 	variable->set_variable_name("ready");
-	variable->set_type(Variant::BOOL);
+	variable->set_variable_type(Variant::BOOL);
 	TypedArray<FlowVariable> variables;
 	variables.push_back(variable);
 	graph->set_variables(variables);
@@ -101,7 +101,7 @@ TEST_CASE("[FlowGraph] Ports, titles and categories of built-in nodes") {
 	CHECK(branch->get_category() == "Flow");
 	REQUIRE(branch->find_input_port("condition").is_valid());
 	CHECK(branch->find_input_port("condition")->get_kind() == FlowPort::PORT_KIND_DATA);
-	CHECK(branch->find_input_port("condition")->get_type() == Variant::BOOL);
+	CHECK(branch->find_input_port("condition")->get_port_type() == Variant::BOOL);
 	CHECK(branch->find_output_port("true")->get_kind() == FlowPort::PORT_KIND_FLOW);
 	CHECK(branch->get_output_ports().size() == 2);
 
