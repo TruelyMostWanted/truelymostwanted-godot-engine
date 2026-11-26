@@ -22,21 +22,21 @@
 		[/codeblocks]
 	</description>
 	<tutorials>
-		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/341-feature-localization-catalog</link>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Localization-Catalogs</link>
 	</tutorials>
 	<methods>
 		<method name="add_translation_remaps">
 			<return type="void" />
 			<param index="0" name="remaps" type="Dictionary" />
 			<description>
-				Adds the entries of [param remaps], a [Dictionary] in the form of the project setting [code]internationalization/locale/translation_remaps[/code]: each key is a resource path, each value a [PackedStringArray] of [code]"localized_path:locale"[/code]. The expected type of each key is the resource type of its file, when the file exists.
+				Adds the entries of [param remaps], a [Dictionary] in the form of the project setting [code]internationalization/locale/translation_remaps[/code]: each key is a resource path, each value a [PackedStringArray] of [code]"localized_path:locale"[/code]. No file is opened: the expected type of each key comes from its file when it is requested (see [method get_expected_type]).
 			</description>
 		</method>
 		<method name="get_expected_type" qualifiers="const">
 			<return type="StringName" />
 			<param index="0" name="key" type="StringName" />
 			<description>
-				Returns the resource type expected for [param key], or an empty [StringName].
+				Returns the resource type expected for [param key]: the type set with [method set_expected_type], else the resource type of the file [param key] (resolved on each call, not stored). Returns an empty [StringName] if the key is unknown or neither is available.
 			</description>
 		</method>
 		<method name="get_localized_path" qualifiers="const">
