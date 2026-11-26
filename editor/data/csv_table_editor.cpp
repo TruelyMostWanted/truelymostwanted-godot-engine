@@ -269,23 +269,23 @@ void CSVTableEditor::_render_catalog() {
 	tree->set_column_custom_minimum_width(0, 60 * EDSCALE);
 	for (int field = 0; field < column_count; field++) {
 		const String &name = catalog_fields[field];
-		String title;
+		String column_title;
 		String tooltip;
 		if (field == 0) {
-			title = TTR("Key");
+			column_title = TTR("Key");
 		} else if (field == 1) {
-			title = TTR("Context");
+			column_title = TTR("Context");
 		} else if (field == 2) {
-			title = name == "_plural" ? TTR("Plural Key") : TTR("Type");
+			column_title = name == "_plural" ? TTR("Plural Key") : TTR("Type");
 			tooltip = name == "_plural" ? TTR("The plural key (msgid_plural). Keys with plural forms show one child row per form.") : TTR("The resource type the localized paths must have.");
 		} else if (name.begins_with("_")) {
-			title = vformat(TTR("Note: %s"), name.substr(1));
+			column_title = vformat(TTR("Note: %s"), name.substr(1));
 			tooltip = TTR("Translator note: for translators only, not used at runtime.");
 		} else {
-			title = name;
+			column_title = name;
 			tooltip = vformat(TTR("%s: %d of %d translated"), TranslationServer::get_singleton()->get_locale_name(name), catalog->get_translated_count(name), row_count);
 		}
-		tree->set_column_title(field + 1, title);
+		tree->set_column_title(field + 1, column_title);
 		tree->set_column_title_tooltip_text(field + 1, tooltip);
 		tree->set_column_custom_minimum_width(field + 1, 100 * EDSCALE);
 		tree->set_column_clip_content(field + 1, true);

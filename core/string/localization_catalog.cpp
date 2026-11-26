@@ -814,8 +814,8 @@ Ref<DataValidation> LocalizationCatalog::validate(const Ref<DataValidationOption
 		ERR_CONTINUE(!column);
 		for (uint32_t row = 0; row < ids.size() && !result->is_full(); row++) {
 			if (column->cells.get_length(row) == 0) {
-				const String name = entry_name(row);
-				result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("\"%s\" has no \"%s\" translation.", name, column->locale), column->locale, DataValidation::join_path(String(), name), row, i);
+				const String entry = entry_name(row);
+				result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("\"%s\" has no \"%s\" translation.", entry, column->locale), column->locale, DataValidation::join_path(String(), entry), row, i);
 			}
 		}
 	}
