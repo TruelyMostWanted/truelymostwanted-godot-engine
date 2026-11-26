@@ -54,6 +54,15 @@ jobs:
           ref: ${{ steps.run.outputs.sha }}
           fetch-depth: 0
 
+      # The packaging scripts come from this workflow's commit (they may be newer than the release).
+      - name: Scripts of this workflow
+        run: |
+          mkdir -p "$RUNNER_TEMP/truely"
+          for f in package-release.sh verify-release.py; do
+            git show "$GITHUB_SHA:.github/truely/$f" > "$RUNNER_TEMP/truely/$f"
+          done
+          echo "TOOLS=$RUNNER_TEMP/truely" >> "$GITHUB_ENV"
+
       - name: Compute names
         run: |
           python3 - <<'PY'
@@ -89,10 +98,10 @@ jobs:
       - name: Package
         run: |
           if [ "${{ inputs.partial }}" = "true" ]; then export PARTIAL=1; fi
-          bash .github/truely/package-release.sh artifacts release "$NAME" "$CONFIG"
+          DIST="$PWD/misc/dist" bash "$TOOLS/package-release.sh" artifacts release "$NAME" "$CONFIG"
 
       - name: Verify release files
-        run: python3 .github/truely/verify-release.py release "$NAME" "$CONFIG"
+        run: python3 "$TOOLS/verify-release.py" release "$NAME" "$CONFIG"
 
       - name: Release notes
         run: |

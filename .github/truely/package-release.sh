@@ -17,7 +17,7 @@ mkdir -p "$2"
 OUT="$(cd "$2" && pwd)"
 NAME="$3"
 CONFIG="$4"
-DIST="$(cd "$(dirname "$0")/../../misc/dist" && pwd)"
+DIST="${DIST:-$(cd "$(dirname "$0")/../../misc/dist" && pwd)}"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
