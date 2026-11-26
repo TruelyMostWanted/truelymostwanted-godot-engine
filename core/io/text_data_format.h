@@ -32,6 +32,7 @@
 
 #include "core/io/resource.h"
 #include "core/io/serializer_options.h"
+#include "core/templates/list.h"
 #include "core/variant/variant.h"
 
 // Base of the data file classes INI, CSV, XML, TOML and YAML (and of formats added by modules or extensions).
@@ -42,12 +43,12 @@
 class TextDataFormat : public Resource {
 	GDCLASS(TextDataFormat, Resource);
 
-	Variant data;
-	Ref<SerializerOptions> options;
-	String text;
-	String error_message;
-	int error_line = 0;
-	int error_column = 0;
+	Variant format_data;
+	Ref<SerializerOptions> serializer_options;
+	String parsed_text;
+	String parse_error_message;
+	int parse_error_line = 0;
+	int parse_error_column = 0;
 
 protected:
 	static void _bind_methods();
@@ -69,14 +70,14 @@ protected:
 	// For subclasses that change `data` in place: drops the kept text and emits `changed`.
 	void _mark_data_changed();
 	// Direct access for subclasses; call _mark_data_changed() after a change.
-	Variant &_get_data_ref() { return data; }
+	Variant &_get_data_ref() { return format_data; }
 
 public:
 	void set_data(const Variant &p_data);
-	Variant get_data() const { return data; }
+	Variant get_data() const { return format_data; }
 
 	void set_options(const Ref<SerializerOptions> &p_options);
-	Ref<SerializerOptions> get_options() const { return options; }
+	Ref<SerializerOptions> get_options() const { return serializer_options; }
 
 	// Parses `p_text` into `data`. With `p_keep_text`, the text is kept for get_parsed_text() (also on error).
 	Error parse(const String &p_text, bool p_keep_text = false);
@@ -91,10 +92,10 @@ public:
 	// Writes the text of get_save_text() to a file (like ConfigFile.save()).
 	Error save(const String &p_path);
 
-	String get_parsed_text() const { return text; }
-	String get_error_message() const { return error_message; }
-	int get_error_line() const { return error_line; }
-	int get_error_column() const { return error_column; }
+	String get_parsed_text() const { return parsed_text; }
+	String get_error_message() const { return parse_error_message; }
+	int get_error_line() const { return parse_error_line; }
+	int get_error_column() const { return parse_error_column; }
 
 	void get_recognized_extensions_list(List<String> *r_extensions) const { _get_extensions(r_extensions); }
 	PackedStringArray get_recognized_extensions() const;

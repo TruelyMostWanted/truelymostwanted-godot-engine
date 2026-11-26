@@ -1423,9 +1423,9 @@ void TOML::erase_table(const String &p_table_path) {
 		parent_path += (i == 0 ? "" : ".") + escape_table_name(parts[i]);
 	}
 	Dictionary parent;
-	const String &name = parts[parts.size() - 1];
-	ERR_FAIL_COND_MSG(!_resolve_table(get_data(), parent_path, false, parent) || parent.get(name, Variant()).get_type() != Variant::DICTIONARY, vformat("Cannot erase nonexistent table \"%s\".", p_table_path));
-	parent.erase(name);
+	const String &table_name = parts[parts.size() - 1];
+	ERR_FAIL_COND_MSG(!_resolve_table(get_data(), parent_path, false, parent) || parent.get(table_name, Variant()).get_type() != Variant::DICTIONARY, vformat("Cannot erase nonexistent table \"%s\".", p_table_path));
+	parent.erase(table_name);
 	_mark_data_changed();
 }
 

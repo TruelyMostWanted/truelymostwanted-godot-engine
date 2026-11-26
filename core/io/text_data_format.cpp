@@ -44,21 +44,21 @@ Error TextDataFormat::_encode_data(const Variant &p_data, const Ref<SerializerOp
 }
 
 void TextDataFormat::_mark_data_changed() {
-	text = String();
+	parsed_text = String();
 	emit_changed();
 }
 
 void TextDataFormat::set_data(const Variant &p_data) {
 	const Variant::Type type = _get_data_type();
 	ERR_FAIL_COND_MSG(type != Variant::NIL && p_data.get_type() != type, vformat("%s data must be of type %s, not %s.", get_class(), Variant::get_type_name(type), Variant::get_type_name(p_data.get_type())));
-	data = p_data;
-	text = String();
+	format_data = p_data;
+	parsed_text = String();
 	_data_replaced();
 	emit_changed();
 }
 
 void TextDataFormat::set_options(const Ref<SerializerOptions> &p_options) {
-	options = p_options;
+	serializer_options = p_options;
 	emit_changed();
 }
 
@@ -67,18 +67,18 @@ Error TextDataFormat::parse(const String &p_text, bool p_keep_text) {
 	String parse_error;
 	int line = 0;
 	int column = 0;
-	const Error err = _parse_data(p_text, options, parsed, parse_error, line, column);
-	text = p_keep_text ? p_text : String();
+	const Error err = _parse_data(p_text, serializer_options, parsed, parse_error, line, column);
+	parsed_text = p_keep_text ? p_text : String();
 	if (err != OK) {
-		data = _get_empty_data();
-		error_message = parse_error;
-		error_line = line;
-		error_column = column;
+		format_data = _get_empty_data();
+		parse_error_message = parse_error;
+		parse_error_line = line;
+		parse_error_column = column;
 	} else {
-		data = parsed;
-		error_message = String();
-		error_line = 0;
-		error_column = 0;
+		format_data = parsed;
+		parse_error_message = String();
+		parse_error_line = 0;
+		parse_error_column = 0;
 	}
 	_data_replaced();
 	emit_changed();
@@ -88,7 +88,7 @@ Error TextDataFormat::parse(const String &p_text, bool p_keep_text) {
 String TextDataFormat::encode_to_text() const {
 	String result;
 	String encode_error;
-	if (_encode_data(data, options, result, encode_error) != OK) {
+	if (_encode_data(format_data, serializer_options, result, encode_error) != OK) {
 		ERR_PRINT(vformat("Can't encode %s data: %s", get_class(), encode_error));
 		return String();
 	}
@@ -96,19 +96,19 @@ String TextDataFormat::encode_to_text() const {
 }
 
 Error TextDataFormat::get_save_text(String &r_text, String &r_error) const {
-	if (!text.is_empty()) {
-		r_text = text;
+	if (!parsed_text.is_empty()) {
+		r_text = parsed_text;
 		return OK;
 	}
-	return _encode_data(data, options, r_text, r_error);
+	return _encode_data(format_data, serializer_options, r_text, r_error);
 }
 
 void TextDataFormat::clear() {
-	data = _get_empty_data();
-	text = String();
-	error_message = String();
-	error_line = 0;
-	error_column = 0;
+	format_data = _get_empty_data();
+	parsed_text = String();
+	parse_error_message = String();
+	parse_error_line = 0;
+	parse_error_column = 0;
 	_cleared();
 	_data_replaced();
 	emit_changed();

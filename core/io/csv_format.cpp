@@ -229,7 +229,7 @@ int CSV::get_column_count() const {
 	int count = header.size();
 	const Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
-		count = MAX(count, PackedStringArray(rows[i]).size());
+		count = MAX(count, (int)PackedStringArray(rows[i]).size());
 	}
 	return count;
 }
