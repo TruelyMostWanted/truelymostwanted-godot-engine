@@ -1,0 +1,76 @@
+/**************************************************************************/
+/*  graphics_preset.h                                                     */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#pragma once
+
+#include "core/io/resource.h"
+#include "servers/settings/render_effect_settings.h"
+#include "servers/settings/render_quality_settings.h"
+#include "servers/settings/shadow_settings.h"
+#include "servers/settings/texture_settings.h"
+
+// A graphics preset (#25): a name and one settings resource per video settings domain (`render_quality`,
+// `texture`, `shadow`, `render_effect`), the same classes the domains store. A domain resource sets
+// all values of its domain; a null resource leaves the domain as it is.
+// GraphicsPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
+// replace presets with `.tres` files (project setting `settings/graphics_preset/presets`).
+class GraphicsPreset : public Resource {
+	GDCLASS(GraphicsPreset, Resource);
+
+	String preset_name;
+	Ref<RenderQualitySettings> render_quality;
+	Ref<TextureSettings> texture;
+	Ref<ShadowSettings> shadow;
+	Ref<RenderEffectSettings> render_effect;
+
+protected:
+	static void _bind_methods();
+
+public:
+	// The settings domains a preset covers, in the order they are applied.
+	static PackedStringArray get_domains();
+
+	void set_preset_name(const String &p_name);
+	String get_preset_name() const;
+
+	void set_render_quality(const Ref<RenderQualitySettings> &p_settings);
+	Ref<RenderQualitySettings> get_render_quality() const;
+	void set_texture(const Ref<TextureSettings> &p_settings);
+	Ref<TextureSettings> get_texture() const;
+	void set_shadow(const Ref<ShadowSettings> &p_settings);
+	Ref<ShadowSettings> get_shadow() const;
+	void set_render_effect(const Ref<RenderEffectSettings> &p_settings);
+	Ref<RenderEffectSettings> get_render_effect() const;
+
+	// Generic access by domain name (one of get_domains()); `p_settings` must be the class of the domain or null.
+	void set_domain_settings(const StringName &p_domain, const Ref<Resource> &p_settings);
+	Ref<Resource> get_domain_settings(const StringName &p_domain) const;
+	bool has_domain_settings(const StringName &p_domain) const;
+};

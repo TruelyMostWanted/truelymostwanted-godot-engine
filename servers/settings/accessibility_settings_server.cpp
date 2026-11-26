@@ -94,7 +94,7 @@ void AccessibilitySettingsServer::_push_ui_scale(float p_scale) {
 	const float scale = MAX(p_scale, 0.01f);
 	Window *root = _get_root();
 	if (root != nullptr) {
-		// The root window has the factor of the video window domain (or the project) times the UI scale.
+		// The root window has the factor of the window domain (or the project) times the UI scale.
 		const real_t base = root->get_content_scale_factor() / MAX(pushed_ui_scale, 0.01f);
 		root->set_content_scale_factor(MAX(base * scale, real_t(0.01)));
 	}
