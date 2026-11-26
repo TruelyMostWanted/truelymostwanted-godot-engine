@@ -1686,6 +1686,9 @@
 		<member name="PhysicsServer3DManager" type="PhysicsServer3DManager" setter="" getter="">
 			The [PhysicsServer3DManager] singleton.
 		</member>
+		<member name="ProgressBarServer" type="ProgressBarServer" setter="" getter="">
+			The [ProgressBarServer] singleton.
+		</member>
 		<member name="ProjectSettings" type="ProjectSettings" setter="" getter="">
 			The [ProjectSettings] singleton.
 		</member>
