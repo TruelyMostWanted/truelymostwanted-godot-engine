@@ -188,6 +188,10 @@ scons platform=android target=template_debug arch=arm64
 cd platform/android/java && ./gradlew generateGodotTemplates   # gradlew.bat on Windows
 ```
 
+iOS templates need a Mac with Xcode; follow Godot's [compiling for iOS](https://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_ios.html) (the same commands work in this fork).
+
+The Windows builds come with a `.console.exe`; keep it as `windows_debug_x86_64_console.exe` / `windows_release_x86_64_console.exe` next to the template.
+
 **Where the templates go.** The editor looks in a folder named after the Godot version with status (and `.mono` for .NET), e.g. `4.8.beta5` or `4.8.beta5.mono`, and expects the official file names:
 
 | Built file in `bin/` | Name in the templates folder |
