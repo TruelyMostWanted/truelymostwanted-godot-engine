@@ -95,6 +95,10 @@ Das Skript schiebt den Release-Branch per Fast-forward auf den Commit. Der Push 
 - **Lokal packen:** `./truely/pack-release.ps1` packt die Windows-Builds aus `bin/` mit denselben Namen nach `P:/Projects/GitHub/truely-releases/<Name>/` (Parameter `-OutDir`). Der Name kommt aus `<exe> --version`. **Lokale Packs enthalten nur Windows-Templates.** Vorher mit `production=yes` bauen, bei Mono danach Glue und `build_assemblies.py` (`FEATURE-WORKFLOW.md`, Abschnitt 3). Nach einem Wechsel des Status ohne SCons-Cache bauen (`$env:TRUELY_SCONS_CACHE = ''`), sonst landen alte Versionsstrings im Build.
 - **Packen im Workflow:** [`package-release.sh`](../.github/truely/package-release.sh) setzt die Artefakte der Build-Jobs zu Zips und `.tpz` zusammen.
 
+## Glossar
+
+[`GLOSSARY.md`](../GLOSSARY.md) erklärt die Begriffe dieser Fork und ordnet Features ihren Dateien zu (Datei-Index). Neue öffentliche Begriffe bekommen dort einen Eintrag.
+
 ## Wichtig
 
 - **PRs auf GitHub:** Vor dem Absenden das *base repository* prüfen: `TruelyMostWanted/truelymostwanted-godot-engine` für interne PRs, `godotengine/godot` nur für Beiträge. `gh` ist per `gh repo set-default` auf den Fork eingestellt.
