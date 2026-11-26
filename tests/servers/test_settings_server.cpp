@@ -459,10 +459,7 @@ TEST_CASE("[SettingsServer] The file of the old domain name is read once") {
 		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
 		REQUIRE(file.is_valid());
 		// The old file names the class of the settings before the rename.
-		file->store_string("[root]
-$type=OldDomainSettings
-quality=2
-");
+		file->store_string("[root]\n$type=OldDomainSettings\nquality=2\n");
 	}
 	TestDomainServer *server = memnew(TestDomainServer);
 	server->set_file_path(path);
@@ -491,9 +488,7 @@ quality=2
 	{
 		Ref<FileAccess> file = FileAccess::open(legacy_path, FileAccess::WRITE);
 		REQUIRE(file.is_valid());
-		file->store_string("[root]
-quality=0
-");
+		file->store_string("[root]\nquality=0\n");
 	}
 	TestEngine::quality = 1;
 	TestDomainServer *restarted = memnew(TestDomainServer);
