@@ -32,6 +32,8 @@
 
 #include "core/config/project_settings.h"
 #include "core/object/class_db.h"
+#include "scene/resources/audio/audio_stream_tags.h"
+#include "scene/resources/texture.h"
 #include "servers/audio/audio_driver.h"
 #include "servers/audio/audio_server.h"
 
@@ -253,8 +255,10 @@ Ref<AudioStreamPlayback> AudioStream::instantiate_playback() {
 
 double AudioStream::get_length() const {
 	double ret = 0;
-	GDVIRTUAL_CALL(_get_length, ret);
-	return ret;
+	if (GDVIRTUAL_CALL(_get_length, ret)) {
+		return ret;
+	}
+	return stream_info ? stream_info->length : 0.0;
 }
 
 bool AudioStream::is_monophonic() const {
@@ -334,6 +338,143 @@ Ref<AudioSample> AudioStream::generate_sample() const {
 	return sample;
 }
 
+struct AudioStream::StreamInfo {
+	String title;
+	String artist;
+	String album;
+	String album_artist;
+	String genre;
+	String composer;
+	String copyright;
+	String comment;
+	int track_number = 0;
+	int track_count = 0;
+	int disc_number = 0;
+	int disc_count = 0;
+	int year = 0;
+	Ref<Texture2D> cover;
+	Vector<uint8_t> cover_data; // Encoded picture as stored in the file, decoded into `cover` on first access.
+	// Format of streams without audio data (`load_info()`).
+	double length = 0.0;
+	int sample_rate = 0;
+	int channel_count = 0;
+	int bitrate = 0;
+};
+
+AudioStream::StreamInfo *AudioStream::_stream_info_ptrw() {
+	if (!stream_info) {
+		stream_info = memnew(StreamInfo);
+	}
+	return stream_info;
+}
+
+void AudioStream::clear_track_info() {
+	if (stream_info) {
+		memdelete(stream_info);
+		stream_info = nullptr;
+	}
+}
+
+AudioStream::~AudioStream() {
+	clear_track_info();
+}
+
+int AudioStream::get_sample_rate() const {
+	return stream_info ? stream_info->sample_rate : 0;
+}
+
+int AudioStream::get_channel_count() const {
+	return stream_info ? stream_info->channel_count : 0;
+}
+
+int AudioStream::get_bitrate() const {
+	return stream_info ? stream_info->bitrate : 0;
+}
+
+String AudioStream::get_codec() const {
+	return String();
+}
+
+void AudioStream::set_format_info(double p_length, int p_sample_rate, int p_channel_count, int p_bitrate) {
+	StreamInfo *si = _stream_info_ptrw();
+	si->length = p_length;
+	si->sample_rate = p_sample_rate;
+	si->channel_count = p_channel_count;
+	si->bitrate = p_bitrate;
+}
+
+// Setters allocate the info only for non-empty values, so streams without tags stay at one null pointer.
+#define AUDIO_STREAM_INFO_FIELD(m_type, m_arg_type, m_name) \
+	void AudioStream::set_##m_name(m_arg_type p_value) { \
+		if (stream_info || p_value != m_type()) { \
+			_stream_info_ptrw()->m_name = p_value; \
+		} \
+	} \
+	m_type AudioStream::get_##m_name() const { \
+		return stream_info ? stream_info->m_name : m_type(); \
+	}
+
+AUDIO_STREAM_INFO_FIELD(String, const String &, title)
+AUDIO_STREAM_INFO_FIELD(String, const String &, artist)
+AUDIO_STREAM_INFO_FIELD(String, const String &, album)
+AUDIO_STREAM_INFO_FIELD(String, const String &, album_artist)
+AUDIO_STREAM_INFO_FIELD(String, const String &, genre)
+AUDIO_STREAM_INFO_FIELD(String, const String &, composer)
+AUDIO_STREAM_INFO_FIELD(String, const String &, copyright)
+AUDIO_STREAM_INFO_FIELD(String, const String &, comment)
+AUDIO_STREAM_INFO_FIELD(int, int, track_number)
+AUDIO_STREAM_INFO_FIELD(int, int, track_count)
+AUDIO_STREAM_INFO_FIELD(int, int, disc_number)
+AUDIO_STREAM_INFO_FIELD(int, int, disc_count)
+AUDIO_STREAM_INFO_FIELD(int, int, year)
+
+#undef AUDIO_STREAM_INFO_FIELD
+
+void AudioStream::set_cover(const Ref<Texture2D> &p_cover) {
+	if (!stream_info && p_cover.is_null()) {
+		return;
+	}
+	StreamInfo *si = _stream_info_ptrw();
+	si->cover = p_cover;
+	si->cover_data.clear(); // A texture set by hand replaces the picture of the file.
+	notify_property_list_changed();
+}
+
+Ref<Texture2D> AudioStream::get_cover() const {
+	if (!stream_info) {
+		return Ref<Texture2D>();
+	}
+	if (stream_info->cover.is_null() && !stream_info->cover_data.is_empty()) {
+		stream_info->cover = AudioStreamTags::decode_picture(stream_info->cover_data);
+	}
+	return stream_info->cover;
+}
+
+void AudioStream::set_cover_data(const Vector<uint8_t> &p_cover_data) {
+	if (!stream_info && p_cover_data.is_empty()) {
+		return;
+	}
+	StreamInfo *si = _stream_info_ptrw();
+	si->cover_data = p_cover_data;
+	si->cover.unref(); // Decoded again on the next get_cover().
+	notify_property_list_changed();
+}
+
+Vector<uint8_t> AudioStream::get_cover_data() const {
+	return stream_info ? stream_info->cover_data : Vector<uint8_t>();
+}
+
+Ref<AudioStream> AudioStream::load_info(const String &p_path) {
+	return AudioStreamTags::load_info(p_path);
+}
+
+void AudioStream::_validate_property(PropertyInfo &p_property) const {
+	// A cover decoded from `cover_data` is shown, but not saved a second time as a texture.
+	if (p_property.name == "cover" && stream_info && !stream_info->cover_data.is_empty()) {
+		p_property.usage = PROPERTY_USAGE_EDITOR;
+	}
+}
+
 void AudioStream::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_length"), &AudioStream::get_length);
 	ClassDB::bind_method(D_METHOD("is_monophonic"), &AudioStream::is_monophonic);
@@ -356,4 +497,62 @@ void AudioStream::_bind_methods() {
 	GDVIRTUAL_BIND(_get_bar_beats);
 
 	ADD_SIGNAL(MethodInfo("parameter_list_changed"));
+
+	ClassDB::bind_method(D_METHOD("get_sample_rate"), &AudioStream::get_sample_rate);
+	ClassDB::bind_method(D_METHOD("get_channel_count"), &AudioStream::get_channel_count);
+	ClassDB::bind_method(D_METHOD("get_bitrate"), &AudioStream::get_bitrate);
+	ClassDB::bind_method(D_METHOD("get_codec"), &AudioStream::get_codec);
+	ClassDB::bind_static_method("AudioStream", D_METHOD("load_info", "path"), &AudioStream::load_info);
+
+	ClassDB::bind_method(D_METHOD("set_title", "title"), &AudioStream::set_title);
+	ClassDB::bind_method(D_METHOD("get_title"), &AudioStream::get_title);
+	ClassDB::bind_method(D_METHOD("set_artist", "artist"), &AudioStream::set_artist);
+	ClassDB::bind_method(D_METHOD("get_artist"), &AudioStream::get_artist);
+	ClassDB::bind_method(D_METHOD("set_album", "album"), &AudioStream::set_album);
+	ClassDB::bind_method(D_METHOD("get_album"), &AudioStream::get_album);
+	ClassDB::bind_method(D_METHOD("set_album_artist", "album_artist"), &AudioStream::set_album_artist);
+	ClassDB::bind_method(D_METHOD("get_album_artist"), &AudioStream::get_album_artist);
+	ClassDB::bind_method(D_METHOD("set_track_number", "track_number"), &AudioStream::set_track_number);
+	ClassDB::bind_method(D_METHOD("get_track_number"), &AudioStream::get_track_number);
+	ClassDB::bind_method(D_METHOD("set_track_count", "track_count"), &AudioStream::set_track_count);
+	ClassDB::bind_method(D_METHOD("get_track_count"), &AudioStream::get_track_count);
+	ClassDB::bind_method(D_METHOD("set_disc_number", "disc_number"), &AudioStream::set_disc_number);
+	ClassDB::bind_method(D_METHOD("get_disc_number"), &AudioStream::get_disc_number);
+	ClassDB::bind_method(D_METHOD("set_disc_count", "disc_count"), &AudioStream::set_disc_count);
+	ClassDB::bind_method(D_METHOD("get_disc_count"), &AudioStream::get_disc_count);
+	ClassDB::bind_method(D_METHOD("set_year", "year"), &AudioStream::set_year);
+	ClassDB::bind_method(D_METHOD("get_year"), &AudioStream::get_year);
+	ClassDB::bind_method(D_METHOD("set_genre", "genre"), &AudioStream::set_genre);
+	ClassDB::bind_method(D_METHOD("get_genre"), &AudioStream::get_genre);
+	ClassDB::bind_method(D_METHOD("set_composer", "composer"), &AudioStream::set_composer);
+	ClassDB::bind_method(D_METHOD("get_composer"), &AudioStream::get_composer);
+	ClassDB::bind_method(D_METHOD("set_copyright", "copyright"), &AudioStream::set_copyright);
+	ClassDB::bind_method(D_METHOD("get_copyright"), &AudioStream::get_copyright);
+	ClassDB::bind_method(D_METHOD("set_comment", "comment"), &AudioStream::set_comment);
+	ClassDB::bind_method(D_METHOD("get_comment"), &AudioStream::get_comment);
+	ClassDB::bind_method(D_METHOD("set_cover", "cover"), &AudioStream::set_cover);
+	ClassDB::bind_method(D_METHOD("get_cover"), &AudioStream::get_cover);
+	ClassDB::bind_method(D_METHOD("set_cover_data", "cover_data"), &AudioStream::set_cover_data);
+	ClassDB::bind_method(D_METHOD("get_cover_data"), &AudioStream::get_cover_data);
+
+	ADD_GROUP("Track", "");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "title"), "set_title", "get_title");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "artist"), "set_artist", "get_artist");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "album"), "set_album", "get_album");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "album_artist"), "set_album_artist", "get_album_artist");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "track_number", PROPERTY_HINT_RANGE, "0,999,1,or_greater"), "set_track_number", "get_track_number");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "track_count", PROPERTY_HINT_RANGE, "0,999,1,or_greater"), "set_track_count", "get_track_count");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "disc_number", PROPERTY_HINT_RANGE, "0,99,1,or_greater"), "set_disc_number", "get_disc_number");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "disc_count", PROPERTY_HINT_RANGE, "0,99,1,or_greater"), "set_disc_count", "get_disc_count");
+	ADD_GROUP("Release", "");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "year", PROPERTY_HINT_RANGE, "0,9999,1"), "set_year", "get_year");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "genre"), "set_genre", "get_genre");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "composer"), "set_composer", "get_composer");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "copyright"), "set_copyright", "get_copyright");
+	ADD_GROUP("Artwork", "");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "cover", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_cover", "get_cover");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "cover_data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_cover_data", "get_cover_data");
+	ADD_GROUP("Notes", "");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "comment", PROPERTY_HINT_MULTILINE_TEXT), "set_comment", "get_comment");
+	ADD_GROUP("", "");
 }
