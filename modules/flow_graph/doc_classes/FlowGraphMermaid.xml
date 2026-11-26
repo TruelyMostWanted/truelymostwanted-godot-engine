@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphMermaid" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Reads and writes a [FlowGraph] as a Mermaid flowchart ([code].mmd[/code]).
+	</brief_description>
+	<description>
+		Mermaid flowcharts render on GitHub and in many tools, and they diff line by line. [FlowGraphMermaid] writes the structure of a [FlowGraph] as plain Mermaid and keeps everything else in [code]%% flow:[/code] comment lines, which Mermaid ignores. The round trip is lossless: node types, properties, ports, connections, frames, variables and editor data come back unchanged. Files with the extension [code].mmd[/code] load and save as [FlowGraph] through [ResourceLoader] and [ResourceSaver].
+		[b]Mapping:[/b]
+		- A node with id [code]3[/code] is [code]n3["Title"][/code] (start and end nodes as stadium [code]n3(["Title"])[/code], branch nodes as rhombus [code]n3{"Title"}[/code]), followed by [code]%% flow:node n3 {...}[/code] with its type and stored properties as JSON (the tree of the JSON format of [ResourceTextSerializer]).
+		- A flow connection is [code]n3 --&gt;|out| n5[/code]. The label is the output port; [code]out:enter[/code] if the input port is not [code]in[/code].
+		- A data connection is the dotted [code]n4 -.-&gt;|value:condition| n1[/code], or [code]%% flow:edge n4 value n1 condition[/code] if [member FlowGraphMermaidOptions.draw_data_connections] is [code]false[/code].
+		- A frame is [code]subgraph f0["Title"][/code] listing its nodes, then [code]end[/code] and [code]%% flow:frame f0 {...}[/code].
+		- The properties of the graph are in [code]%% flow:graph {...}[/code].
+		[b]Hand-written flowcharts:[/b] a node without [code]%% flow:node[/code] line gets its type from its shape and edges: a rhombus [code]{...}[/code] is a [FlowBranchNode], a node without incoming flow edge a [FlowStartNode] (the first one becomes [member FlowGraph.start_node_id]), a node without outgoing flow edge a [FlowEndNode], any other a [FlowEmitEventNode] with the label as [member FlowEmitEventNode.event_name]. The label becomes [member FlowNode.title_override]. Ids other than [code]n&lt;number&gt;[/code] get new ids in order of appearance. An edge label that names an output port of the source uses it; any other label (such as [code]yes[/code]/[code]no[/code]) takes the next unused flow output, so the first edge of a branch leaves [code]true[/code] and the second [code]false[/code]. Dotted (data) edges need a label [code]output:input[/code].
+		[b]Supported subset:[/b] the header [code]flowchart[/code] or [code]graph[/code] (any direction), ids of letters, digits and [code]_[/code], node shapes with quoted or plain labels, edges [code]--&gt;[/code], [code]---[/code], [code]==&gt;[/code], [code]-.-&gt;[/code], [code]-.-[/code] with [code]|label|[/code] or [code]-- label --&gt;[/code], chains such as [code]a --&gt; b --&gt; c[/code], [code]subgraph[/code]/[code]end[/code] and a trailing [code];[/code]. Ignored and lost on load: [code]classDef[/code], [code]class[/code], [code]style[/code], [code]linkStyle[/code], [code]click[/code], [code]direction[/code] inside subgraphs, [code]:::class[/code] suffixes, other comments and hand formatting (saving rewrites the file). Errors with line and message: other diagram types, [code]&amp;[/code] groups, edge ids, arrow heads [code]x[/code]/[code]o[/code].
+		Errors are kept per instance, so graphs can be read on several threads at once.
+		[codeblocks]
+		[gdscript]
+		var text := FlowGraphMermaid.serialize(graph)
+
+		var mermaid := FlowGraphMermaid.new()
+		if mermaid.parse(text) == OK:
+			var loaded := mermaid.get_graph()
+		else:
+			print("Line ", mermaid.get_error_line(), ": ", mermaid.get_error_message())
+		[/gdscript]
+		[csharp]
+		string text = FlowGraphMermaid.Serialize(graph);
+
+		var mermaid = new FlowGraphMermaid();
+		if (mermaid.Parse(text) == Error.Ok)
+		{
+		    FlowGraph loaded = mermaid.GetGraph();
+		}
+		else
+		{
+		    GD.Print("Line ", mermaid.GetErrorLine(), ": ", mermaid.GetErrorMessage());
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+		<link title="Mermaid flowchart syntax">https://mermaid.js.org/syntax/flowchart.html</link>
+	</tutorials>
+	<methods>
+		<method name="deserialize" qualifiers="static">
+			<return type="FlowGraph" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Creates a [FlowGraph] from Mermaid [param text]. Returns [code]null[/code] and prints an error with line and message if the text can't be read. Use [method parse] to get the error instead.
+			</description>
+		</method>
+		<method name="get_error_line" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the line (starting at 1) of the error of the last [method parse], or [code]0[/code] if it succeeded.
+			</description>
+		</method>
+		<method name="get_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the error message of the last [method parse], or an empty string if it succeeded.
+			</description>
+		</method>
+		<method name="get_graph" qualifiers="const">
+			<return type="FlowGraph" />
+			<description>
+				Returns the graph read by the last successful [method parse], or [code]null[/code].
+			</description>
+		</method>
+		<method name="parse">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Reads Mermaid [param text] into a new [FlowGraph] (see [method get_graph]). Returns [constant OK], or [constant ERR_PARSE_ERROR] and keeps the line and message of the error (see [method get_error_line] and [method get_error_message]).
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="graph" type="FlowGraph" />
+			<param index="1" name="options" type="FlowGraphMermaidOptions" default="null" />
+			<description>
+				Writes [param graph] as a Mermaid flowchart. Without [param options], the defaults of [FlowGraphMermaidOptions] are used (top-down, lossless).
+			</description>
+		</method>
+	</methods>
+</class>

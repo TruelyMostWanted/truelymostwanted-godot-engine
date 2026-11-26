@@ -4314,6 +4314,14 @@ DocumentEditorContainer::DocumentEditorContainer(bool p_is_main_editor, const St
 	config_file_syntax_highlighter.instantiate();
 	register_syntax_highlighter(config_file_syntax_highlighter);
 
+	Ref<EditorCSVSyntaxHighlighter> csv_syntax_highlighter;
+	csv_syntax_highlighter.instantiate();
+	register_syntax_highlighter(csv_syntax_highlighter);
+
+	Ref<EditorXMLSyntaxHighlighter> xml_syntax_highlighter;
+	xml_syntax_highlighter.instantiate();
+	register_syntax_highlighter(xml_syntax_highlighter);
+
 	Ref<GDShaderSyntaxHighlighter> gdshader_syntax_highlighter;
 	gdshader_syntax_highlighter.instantiate();
 	register_syntax_highlighter(gdshader_syntax_highlighter);

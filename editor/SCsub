@@ -77,6 +77,7 @@ if env.editor_build:
     SConscript("animation/SCsub")
     SConscript("asset_library/SCsub")
     SConscript("audio/SCsub")
+    SConscript("data/SCsub")
     SConscript("debugger/SCsub")
     SConscript("doc/SCsub")
     SConscript("docks/SCsub")

@@ -32,40 +32,102 @@
 
 #include "core/io/json.h"
 #include "core/io/text_data_format.h"
+#include "core/object/callable_mp.h"
+#include "core/templates/hash_set.h"
+#include "editor/script/data_schema_lookup.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
 
 void TextEditor::_validate_script() {
 	TextEditorBase::_validate_script();
 
+	// Live errors of data files (JSON, INI, CSV, XML, TOML, YAML): the parse error, or the issues of the
+	// DataSchema whose `file_patterns` match the file (project setting `filesystem/data/schema_files`).
 	Ref<JSON> json_file = edited_res;
-	if (json_file.is_valid()) {
-		CodeEdit *te = code_editor->get_text_editor();
-
-		te->set_line_background_color(code_editor->get_error_pos().x, Color(0, 0, 0, 0));
-		code_editor->set_error("");
-
-		if (json_file->parse(te->get_text(), true) != OK) {
-			code_editor->set_error(json_file->get_error_message().replace("[", "[lb]"));
-			code_editor->set_error_pos(json_file->get_error_line(), 0);
-			te->set_line_background_color(code_editor->get_error_pos().x, EDITOR_GET("text_editor/theme/highlighting/mark_color"));
-		}
-	}
-
-	// Live parse errors for plain data files (INI, CSV, XML, TOML, YAML), like JSON above.
 	Ref<TextDataFormat> data_file = edited_res;
-	if (data_file.is_valid()) {
-		CodeEdit *te = code_editor->get_text_editor();
+	if (json_file.is_null() && data_file.is_null()) {
+		return;
+	}
 
-		te->set_line_background_color(code_editor->get_error_pos().x, Color(0, 0, 0, 0));
-		code_editor->set_error("");
-
-		if (data_file->parse(te->get_text(), true) != OK) {
-			code_editor->set_error(data_file->get_error_message().replace("[", "[lb]"));
-			code_editor->set_error_pos(MAX(data_file->get_error_line() - 1, 0), MAX(data_file->get_error_column() - 1, 0));
-			te->set_line_background_color(code_editor->get_error_pos().x, EDITOR_GET("text_editor/theme/highlighting/mark_color"));
+	CodeEdit *te = code_editor->get_text_editor();
+	for (int line : issue_lines) {
+		if (line >= 0 && line < te->get_line_count()) {
+			te->set_line_background_color(line, Color(0, 0, 0, 0));
 		}
 	}
+	issue_lines.clear();
+	code_editor->set_error("");
+
+	const String text = te->get_text();
+	const int64_t mib = 1024 * 1024;
+	if (text.length() > int64_t(EDITOR_GET("text_editor/data_files/live_parse_max_size_mb")) * mib) {
+		return;
+	}
+
+	String error;
+	int error_column = 0;
+	Ref<DataValidation> validation;
+	const Ref<DataSchema> schema = text.length() > int64_t(EDITOR_GET("text_editor/data_files/schema_validation_max_size_mb")) * mib ? Ref<DataSchema>() : EditorDataSchemaLookup::find_schema(edited_res->get_path());
+	if (json_file.is_valid()) {
+		if (json_file->parse(text, true) != OK) {
+			error = json_file->get_error_message();
+			issue_lines.push_back(json_file->get_error_line());
+		} else if (schema.is_valid()) {
+			validation = schema->validate(json_file->get_data(), validation_options);
+			validation->resolve_lines(text);
+		}
+	} else if (data_file->parse(text, true) != OK) {
+		error = data_file->get_error_message();
+		issue_lines.push_back(MAX(data_file->get_error_line() - 1, 0));
+		error_column = MAX(data_file->get_error_column() - 1, 0);
+	} else if (schema.is_valid()) {
+		validation = data_file->validate(schema, validation_options);
+	}
+
+	if (validation.is_valid() && !validation->is_valid()) {
+		const int count = validation->get_issue_count();
+		HashSet<int> marked;
+		for (int i = 0; i < count; i++) {
+			const int line = validation->get_issue_line(i) - 1;
+			if (line >= 0 && line < te->get_line_count() && !marked.has(line)) {
+				marked.insert(line);
+				issue_lines.push_back(line);
+			}
+		}
+		issue_lines.sort();
+		const int first_line = validation->get_issue_line(0);
+		const String first = first_line > 0 ? vformat(TTR("Line %d: %s"), first_line, validation->get_issue_message(0)) : validation->get_issue_message(0);
+		error = count == 1 ? first : vformat(TTR("%s issues. %s"), count >= MAX_ISSUES ? itos(count) + "+" : itos(count), first);
+	}
+	if (error.is_empty()) {
+		return;
+	}
+
+	code_editor->set_error(error.replace("[", "[lb]"));
+	code_editor->set_error_pos(issue_lines.is_empty() ? 0 : issue_lines[0], error_column);
+	const Color mark_color = EDITOR_GET("text_editor/theme/highlighting/mark_color");
+	for (int line : issue_lines) {
+		if (line >= 0 && line < te->get_line_count()) {
+			te->set_line_background_color(line, mark_color);
+		}
+	}
+}
+
+void TextEditor::_caret_changed() {
+	// A click on the status goes to the error position; moving it to the next issue below the caret lets
+	// repeated clicks cycle through all marked lines.
+	if (issue_lines.size() < 2) {
+		return;
+	}
+	const int caret_line = code_editor->get_text_editor()->get_caret_line();
+	int next = issue_lines[0];
+	for (int line : issue_lines) {
+		if (line > caret_line) {
+			next = line;
+			break;
+		}
+	}
+	code_editor->set_error_pos(next, 0);
 }
 
 void TextEditor::apply_code() {
@@ -99,4 +161,9 @@ void TextEditor::register_editor() {
 
 TextEditor::TextEditor() {
 	add_child(code_editor);
+	code_editor->get_text_editor()->connect("caret_changed", callable_mp(this, &TextEditor::_caret_changed));
+
+	validation_options.instantiate();
+	validation_options->set_keep_positions(true);
+	validation_options->set_max_issues(MAX_ISSUES);
 }

@@ -30,11 +30,11 @@
 
 #include "resource_importer_csv_translation.h"
 
+#include "core/io/csv_format.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_saver.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/translation_server.h"
-#include "core/templates/hash_set.h"
 
 String ResourceImporterCSVTranslation::get_importer_name() const {
 	return "csv_translation";
@@ -102,48 +102,30 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 		// Header problems are collected and reported once per file, not once per column.
 		// A column whose language code is unknown is still imported as a locale (custom locales),
 		// unless no column has a known language code: then the file is most likely a data CSV.
-		HashSet<String> known_languages;
-		for (const String &language : TranslationServer::get_singleton()->get_all_languages()) {
-			known_languages.insert(language);
+		CSV::TranslationHeader header;
+		Ref<DataValidation> header_issues;
+		header_issues.instantiate();
+		CSV::check_translation_header(line, header, header_issues.ptr());
+		for (int i = 0; i < header_issues->get_issue_count(); i++) {
+			if (header_issues->get_issue_kind(i) == DataValidation::ISSUE_KIND_DUPLICATE_KEY) {
+				ERR_PRINT(vformat("Error importing CSV translation: Multiple '%s' columns found. Only one is allowed. Subsequent ones will be ignored.", header_issues->get_issue_field(i)));
+			}
 		}
-		HashMap<int, String> locale_columns;
+		context_column = header.context_column;
+		plural_column = header.plural_column;
 		Vector<String> invalid_columns; // Not a locale at all (e.g. an empty header cell).
 		Vector<String> unknown_columns; // A locale whose language code is not known.
 		Vector<String> not_known_columns; // Both of the above, in column order.
-		bool has_known_language = false;
-
 		for (int i = 1; i < line.size(); i++) {
-			if (line[i].left(1) == "_") {
-				continue;
-			}
-			if (line[i].to_lower() == "?context") {
-				ERR_CONTINUE_MSG(context_column != -1, "Error importing CSV translation: Multiple '?context' columns found. Only one is allowed. Subsequent ones will be ignored.");
-				context_column = i;
-				continue;
-			}
-			if (line[i].to_lower() == "?plural") {
-				ERR_CONTINUE_MSG(plural_column != -1, "Error importing CSV translation: Multiple '?plural' columns found. Only one is allowed. Subsequent ones will be ignored.");
-				plural_column = i;
-				continue;
-			}
-
-			const String column_desc = vformat("'%s' (column %d)", line[i], i + 1);
-			const String locale = TranslationServer::get_singleton()->standardize_locale(line[i]);
-			if (locale.is_empty()) {
-				invalid_columns.push_back(column_desc);
-				not_known_columns.push_back(column_desc);
-				continue;
-			}
-			if (known_languages.has(locale.get_slicec('_', 0))) {
-				has_known_language = true;
-			} else {
-				unknown_columns.push_back(column_desc);
+			const bool invalid = header.invalid_columns.has(i);
+			if (invalid || header.unknown_columns.has(i)) {
+				const String column_desc = vformat("'%s' (column %d)", line[i], i + 1);
+				(invalid ? invalid_columns : unknown_columns).push_back(column_desc);
 				not_known_columns.push_back(column_desc);
 			}
-			locale_columns[i] = locale;
 		}
 
-		if (!has_known_language) {
+		if (!header.has_known_language) {
 			if (not_known_columns.is_empty()) {
 				WARN_PRINT(vformat("CSV file '%s' does not contain any translation.", p_source_file));
 			} else {
@@ -159,7 +141,7 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 			WARN_PRINT(vformat("CSV translation '%s': Unknown language code in %s. These columns are imported as locales anyway. Prefix a column name with '_' to ignore the column.", p_source_file, String(", ").join(unknown_columns)));
 		}
 
-		for (const KeyValue<int, String> &E : locale_columns) {
+		for (const KeyValue<int, String> &E : header.locale_columns) {
 			Ref<Translation> translation;
 			translation.instantiate();
 			translation->set_locale(E.value);

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DialogueChoiceNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A choice between dialogue options in a [FlowGraph].
+	</brief_description>
+	<description>
+		A dialogue choice node offers the player a list of [member options]. It has the flow input [code]in[/code] and one flow output per option, named by [method get_option_port].
+		At runtime the node waits ([constant FlowGraphPlayback.ENTER_RESULT_WAIT]). The dialogue UI reads the options with [method FlowGraphPlayback.get_available_exits]: one [FlowExit] per option, in the order of [member options], with the translated option text as label. An option is disabled ([member FlowExit.enabled] is [code]false[/code]) when its [member DialogueOption.condition] is false or when it is a [member DialogueOption.once] option that was already taken in this run. The UI hides or grays out disabled options and calls [method FlowGraphPlayback.choose] with the index of the chosen one. [method FlowGraphPlayback.advance] takes the first enabled option.
+		Taken [member DialogueOption.once] options are stored in the node memory of the playback, so they are part of [FlowGraphState] and are forgotten when the graph is started again. To hide an option for the whole savegame, set a variable when it is taken and test it in the condition.
+		If every option has a condition or is shown once, the node shows a configuration warning: when none is available, the dialogue can't continue. Add an option without a condition as a fallback.
+		[codeblocks]
+		[gdscript]
+		func show_choices() -&gt; void:
+			var exits := playback.get_available_exits()
+			var index := 0
+			for exit: FlowExit in exits:
+				var button := Button.new()
+				button.text = exit.label
+				button.disabled = not exit.enabled
+				button.pressed.connect(playback.choose.bind(index))
+				choice_box.add_child(button)
+				index += 1
+		[/gdscript]
+		[csharp]
+		private void ShowChoices()
+		{
+			var exits = _playback.GetAvailableExits();
+			int index = 0;
+			foreach (FlowExit exit in exits)
+			{
+				int choice = index++;
+				var button = new Button { Text = exit.Label, Disabled = !exit.Enabled };
+				button.Pressed += () =&gt; _playback.Choose(choice);
+				_choiceBox.AddChild(button);
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_option_port" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the name of the flow output of the option at [param index]: its [member DialogueOption.port], or [code]option_&lt;index&gt;[/code] if that is empty. Use it to connect the option with [method FlowGraph.connect_nodes].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="options" type="DialogueOption[]" setter="set_options" getter="get_options" default="[]">
+			The options of the choice. Each option is one flow output. Changing an option updates the outputs.
+		</member>
+		<member name="translation_context" type="StringName" setter="set_translation_context" getter="get_translation_context" default="&amp;&quot;&quot;">
+			The translation context of the option texts.
+		</member>
+	</members>
+</class>

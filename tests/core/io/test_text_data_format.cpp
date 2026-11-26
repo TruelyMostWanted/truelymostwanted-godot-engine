@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_text_data_format)
 
+#include "core/config/project_settings.h"
 #include "core/io/config_file.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
@@ -39,6 +40,7 @@ TEST_FORCE_LINK(test_text_data_format)
 #include "core/io/json.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/io/serializer_options.h"
 #include "core/io/text_data_format.h"
 #include "core/io/xml_format.h"
@@ -108,6 +110,11 @@ TEST_CASE("[TextDataFormat] Base API through INI") {
 	CHECK(ini->get_error_column() == 0);
 	CHECK(Dictionary(ini->get_data()).is_empty());
 
+	// Setting valid data clears the parse error.
+	ini->set_data(Dictionary());
+	CHECK(ini->get_error_message().is_empty());
+	CHECK(ini->get_error_line() == 0);
+
 	ini->set_value("a", "b", 1);
 	ini->clear();
 	CHECK(Dictionary(ini->get_data()).is_empty());
@@ -174,6 +181,25 @@ TEST_CASE("[SerializerOptions] ini_value_style") {
 	CHECK(ini->encode_to_text().contains("name=\"Ann\""));
 	options->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	CHECK(ini->encode_to_text().contains("name=Ann\n"));
+}
+
+TEST_CASE("[ResourceTextSerializer] Project setting ini_value_style and the old bool ini_plain_values") {
+	ProjectSettings *settings = ProjectSettings::get_singleton();
+	REQUIRE(settings != nullptr);
+	const String style_key = "filesystem/resources/text_formats/ini_value_style";
+	const String legacy_key = "filesystem/resources/text_formats/ini_plain_values";
+	const Variant previous = settings->get_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
+
+	settings->set_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_PLAIN));
+	CHECK(ResourceTextSerializer::get_default_options().ini_plain_values);
+	settings->set_setting(style_key, int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
+	CHECK_FALSE(ResourceTextSerializer::get_default_options().ini_plain_values);
+	// An old project.godot with the bool is still read while ini_value_style is the default.
+	settings->set_setting(legacy_key, true);
+	CHECK(ResourceTextSerializer::get_default_options().ini_plain_values);
+
+	settings->set_setting(legacy_key, Variant());
+	settings->set_setting(style_key, previous);
 }
 
 TEST_CASE("[CSV] Rows, cells and columns by index") {
@@ -334,6 +360,42 @@ TEST_CASE("[TextDataFormat] Type check reads only the head of big files") {
 	const Ref<TextDataEntry> entry = ResourceLoader::load(marked_path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 	REQUIRE(entry.is_valid());
 	CHECK(entry->get_title().length() == 20000);
+}
+
+TEST_CASE("[CSV] Blocks of cells for copy, paste and undo") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("name,hp,speed\nknight,100,4\narcher,60\n") == OK);
+
+	// Missing cells read as empty, rows past the end are left out.
+	const Array block = csv->get_cells(0, 1, 5, 2);
+	REQUIRE(block.size() == 2);
+	CHECK(PackedStringArray(block[0]) == PackedStringArray({ "100", "4" }));
+	CHECK(PackedStringArray(block[1]) == PackedStringArray({ "60", "" }));
+
+	// A pasted tab-separated block overwrites cells and appends rows.
+	Ref<SerializerOptions> tsv_options;
+	tsv_options.instantiate();
+	tsv_options->set_csv_delimiter("\t");
+	tsv_options->set_csv_headers(false);
+	const Array tsv = CSV::parse_string("70\t5\r\n50\t3\r\n", tsv_options);
+	csv->set_cells(1, 1, tsv);
+	CHECK(csv->get_row_count() == 3);
+	CHECK(csv->get_row(1) == PackedStringArray({ "archer", "70", "5" }));
+	CHECK(csv->get_row(2) == PackedStringArray({ "", "50", "3" }));
+
+	// Writing the old block back and removing the appended row restores the data (the table editor's undo).
+	Array old_block;
+	old_block.push_back(PackedStringArray({ "60", "" }));
+	csv->set_cells(1, 1, old_block);
+	csv->remove_row(2);
+	CHECK(csv->get_cell(1, 1) == "60");
+	CHECK(csv->get_row_count() == 2);
+
+	ERR_PRINT_OFF;
+	csv->set_cells(5, 0, tsv);
+	ERR_PRINT_ON;
+	CHECK(csv->get_row_count() == 2);
 }
 
 TEST_CASE("[TextDataFormat] Instance load() and save()") {

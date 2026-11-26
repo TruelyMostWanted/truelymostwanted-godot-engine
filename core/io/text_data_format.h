@@ -30,10 +30,13 @@
 
 #pragma once
 
+#include "core/io/data_validation.h"
 #include "core/io/resource.h"
 #include "core/io/serializer_options.h"
 #include "core/templates/list.h"
 #include "core/variant/variant.h"
+
+class DataSchema;
 
 // Base of the data file classes INI, CSV, XML, TOML and YAML (and of formats added by modules or extensions).
 // One instance holds the parsed `data` of one text file. Like JSON, the classes are Resources: load() of a
@@ -67,6 +70,11 @@ protected:
 	// Called by clear(), for state of subclasses beside `data`.
 	virtual void _cleared() {}
 
+	// Validates `data` against a schema (default: DataSchema.validate(data)).
+	virtual Ref<DataValidation> _validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const;
+	// Sets the lines of the issues from the kept text (default: DataValidation.resolve_lines()).
+	virtual void _resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const;
+
 	// For subclasses that change `data` in place: drops the kept text and emits `changed`.
 	void _mark_data_changed();
 	// Direct access for subclasses; call _mark_data_changed() after a change.
@@ -86,6 +94,10 @@ public:
 	// Text for saving: the kept text if `data` was not changed since parse(), otherwise the encoded `data`.
 	Error get_save_text(String &r_text, String &r_error) const;
 	void clear();
+
+	// Validates `data` against `p_schema`. After a failed parse(), the result is the parse error. With
+	// DataValidationOptions.keep_positions and the text kept by parse(), issues get their line.
+	Ref<DataValidation> validate(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options = Ref<DataValidationOptions>()) const;
 
 	// Reads and parses a file (like ConfigFile.load(); no resource cache, resource_path unchanged).
 	Error load(const String &p_path);

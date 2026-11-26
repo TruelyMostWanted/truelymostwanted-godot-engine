@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/data_validation.h"
 #include "editor/script/script_editor_base.h"
 
 class TextEditor : public TextEditorBase {
@@ -38,6 +39,13 @@ class TextEditor : public TextEditorBase {
 	static ScriptEditorBase *create_editor(const Ref<Resource> &p_resource);
 
 	static inline EditMenus *edit_menus = nullptr;
+
+	// Live errors of data files: at most this many schema issues per check, all with a line are marked.
+	static constexpr int MAX_ISSUES = 200;
+	Ref<DataValidationOptions> validation_options;
+	LocalVector<int> issue_lines; // Marked lines (0-based), sorted.
+
+	void _caret_changed();
 
 protected:
 	class EditMenusTEB : public EditMenus {

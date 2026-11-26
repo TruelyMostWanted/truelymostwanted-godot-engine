@@ -75,7 +75,7 @@ void FlowVariable::set_variable_name(const StringName &p_name) {
 	emit_changed();
 }
 
-void FlowVariable::set_type(Variant::Type p_type) {
+void FlowVariable::set_variable_type(Variant::Type p_type) {
 	ERR_FAIL_INDEX(p_type, Variant::VARIANT_MAX);
 	type = p_type;
 	emit_changed();
@@ -94,15 +94,15 @@ void FlowVariable::set_description(const String &p_description) {
 void FlowVariable::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_variable_name", "name"), &FlowVariable::set_variable_name);
 	ClassDB::bind_method(D_METHOD("get_variable_name"), &FlowVariable::get_variable_name);
-	ClassDB::bind_method(D_METHOD("set_type", "type"), &FlowVariable::set_type);
-	ClassDB::bind_method(D_METHOD("get_type"), &FlowVariable::get_type);
+	ClassDB::bind_method(D_METHOD("set_variable_type", "type"), &FlowVariable::set_variable_type);
+	ClassDB::bind_method(D_METHOD("get_variable_type"), &FlowVariable::get_variable_type);
 	ClassDB::bind_method(D_METHOD("set_default_value", "value"), &FlowVariable::set_default_value);
 	ClassDB::bind_method(D_METHOD("get_default_value"), &FlowVariable::get_default_value);
 	ClassDB::bind_method(D_METHOD("set_description", "description"), &FlowVariable::set_description);
 	ClassDB::bind_method(D_METHOD("get_description"), &FlowVariable::get_description);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "name"), "set_variable_name", "get_variable_name");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, FlowPort::get_type_hint_string()), "set_type", "get_type");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, FlowPort::get_type_hint_string()), "set_variable_type", "get_variable_type");
 	ADD_PROPERTY(PropertyInfo(Variant::NIL, "default_value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_NIL_IS_VARIANT), "set_default_value", "get_default_value");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "description", PROPERTY_HINT_MULTILINE_TEXT), "set_description", "get_description");
 }
