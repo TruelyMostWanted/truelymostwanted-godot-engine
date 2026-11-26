@@ -540,7 +540,7 @@ bool RenderQualitySettingsServer::has_viewport(Viewport *p_viewport) const {
 	return p_viewport != nullptr && extra_viewports.has(p_viewport->get_instance_id());
 }
 
-void RenderQualitySettingsServer::set_viewport_target(ViewportTarget p_target) {
+void RenderQualitySettingsServer::set_viewport_target(ViewportTargetMode p_target) {
 	ERR_FAIL_INDEX(int(p_target), int(VIEWPORT_TARGET_ALL_VIEWPORTS) + 1);
 	viewport_target = p_target;
 	// The viewports that are targets now get the current values; the root has them already.
@@ -553,7 +553,7 @@ void RenderQualitySettingsServer::set_viewport_target(ViewportTarget p_target) {
 	_connect_tree();
 }
 
-SettingsServer::ViewportTarget RenderQualitySettingsServer::get_viewport_target() const {
+SettingsServer::ViewportTargetMode RenderQualitySettingsServer::get_viewport_target() const {
 	return viewport_target;
 }
 

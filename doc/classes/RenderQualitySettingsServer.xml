@@ -261,7 +261,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="viewport_target" type="int" setter="set_viewport_target" getter="get_viewport_target" enum="SettingsServer.ViewportTarget">
+		<member name="viewport_target" type="int" setter="set_viewport_target" getter="get_viewport_target" enum="SettingsServer.ViewportTargetMode">
 			Which viewports get the per-viewport values besides the root viewport and the viewports added with [method add_viewport]: [constant SettingsServer.VIEWPORT_TARGET_GROUP] (the default) the viewports in the group [method get_viewport_group], [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] every viewport in [ViewportServer], [constant SettingsServer.VIEWPORT_TARGET_ROOT_ONLY] no others. Viewports that enter the tree later get the values if they are targets.
 			When the target changes, the viewports that are targets now get the current values at once; viewports that stop being targets keep the values they have. This is a choice of the game, not a player setting: it is not stored in the settings file. Set it in an autoload, for example. In the editor, [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] also reaches the editor's own viewports.
 		</member>

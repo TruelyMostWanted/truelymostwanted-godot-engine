@@ -85,7 +85,7 @@ public:
 
 	// The viewports a graphics settings server with per-viewport values gives them to (#251). The root viewport and
 	// the viewports passed to add_viewport() get them with every target.
-	enum ViewportTarget {
+	enum ViewportTargetMode {
 		VIEWPORT_TARGET_ROOT_ONLY,
 		VIEWPORT_TARGET_GROUP, // Also the viewports in the server's group.
 		VIEWPORT_TARGET_ALL_VIEWPORTS, // Also every viewport in ViewportServer.
@@ -223,9 +223,9 @@ protected:
 	// For the graphics settings servers with per-viewport values: the root viewport, the viewports in `r_extra`
 	// (freed ones are removed from it) and, by `p_target`, the viewports in `p_group` or every viewport in
 	// ViewportServer. Each viewport once, the root first.
-	static LocalVector<Viewport *> _get_target_viewports(ViewportTarget p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra);
+	static LocalVector<Viewport *> _get_target_viewports(ViewportTargetMode p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra);
 	// Whether a viewport that enters the tree is a target by `p_target` alone (not as root or extra viewport).
-	static bool _is_viewport_targeted(ViewportTarget p_target, const StringName &p_group, const Viewport *p_viewport);
+	static bool _is_viewport_targeted(ViewportTargetMode p_target, const StringName &p_group, const Viewport *p_viewport);
 
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
@@ -324,5 +324,5 @@ public:
 };
 
 VARIANT_ENUM_CAST(SettingsServer::ApplyMode);
-VARIANT_ENUM_CAST(SettingsServer::ViewportTarget);
+VARIANT_ENUM_CAST(SettingsServer::ViewportTargetMode);
 VARIANT_BITFIELD_CAST(SettingsServer::SettingFlags);

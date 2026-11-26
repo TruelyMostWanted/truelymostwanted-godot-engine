@@ -565,13 +565,13 @@
 		<constant name="APPLY_PHASE_MAX" value="3" enum="ApplyPhase">
 			Represents the size of the [enum ApplyPhase] enum.
 		</constant>
-		<constant name="VIEWPORT_TARGET_ROOT_ONLY" value="0" enum="ViewportTarget">
+		<constant name="VIEWPORT_TARGET_ROOT_ONLY" value="0" enum="ViewportTargetMode">
 			The per-viewport values of a graphics settings server ([RenderQualitySettingsServer], [ShadowSettingsServer], [TextureSettingsServer]) go to the root viewport and to the viewports added with the server's [code]add_viewport()[/code] only.
 		</constant>
-		<constant name="VIEWPORT_TARGET_GROUP" value="1" enum="ViewportTarget">
+		<constant name="VIEWPORT_TARGET_GROUP" value="1" enum="ViewportTargetMode">
 			The per-viewport values also go to every [Viewport] in the server's group ([code]get_viewport_group()[/code]), also when it enters the tree later. The default.
 		</constant>
-		<constant name="VIEWPORT_TARGET_ALL_VIEWPORTS" value="2" enum="ViewportTarget">
+		<constant name="VIEWPORT_TARGET_ALL_VIEWPORTS" value="2" enum="ViewportTargetMode">
 			The per-viewport values also go to every viewport in [ViewportServer] ([SubViewport]s, embedded and native [Window]s), also when it enters the tree later.
 		</constant>
 		<constant name="SETTING_FLAG_NONE" value="0" enum="SettingFlags" is_bitfield="true">

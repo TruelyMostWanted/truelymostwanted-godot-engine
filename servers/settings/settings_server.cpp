@@ -1425,7 +1425,7 @@ bool SettingsServer::is_started() const {
 /////////////////////////////////////////////////////////////////////////////
 // Bindings.
 
-LocalVector<Viewport *> SettingsServer::_get_target_viewports(ViewportTarget p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra) {
+LocalVector<Viewport *> SettingsServer::_get_target_viewports(ViewportTargetMode p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra) {
 	LocalVector<Viewport *> targets;
 	SceneTree *tree = SceneTree::get_singleton();
 	if (tree != nullptr && tree->get_root().ptr() != nullptr) {
@@ -1462,7 +1462,7 @@ LocalVector<Viewport *> SettingsServer::_get_target_viewports(ViewportTarget p_t
 	return targets;
 }
 
-bool SettingsServer::_is_viewport_targeted(ViewportTarget p_target, const StringName &p_group, const Viewport *p_viewport) {
+bool SettingsServer::_is_viewport_targeted(ViewportTargetMode p_target, const StringName &p_group, const Viewport *p_viewport) {
 	return p_target == VIEWPORT_TARGET_ALL_VIEWPORTS || (p_target == VIEWPORT_TARGET_GROUP && p_viewport->is_in_group(p_group));
 }
 

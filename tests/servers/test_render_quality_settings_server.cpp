@@ -416,7 +416,7 @@ TEST_CASE("[SceneTree][RenderQualitySettingsServer] The viewport target selects 
 	CHECK(other->get_msaa_3d() == Viewport::MSAA_2X);
 
 	ERR_PRINT_OFF;
-	server->set_viewport_target(SettingsServer::ViewportTarget(7));
+	server->set_viewport_target(SettingsServer::ViewportTargetMode(7));
 	ERR_PRINT_ON;
 	CHECK(server->get_viewport_target() == SettingsServer::VIEWPORT_TARGET_ROOT_ONLY);
 

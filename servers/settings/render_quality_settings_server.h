@@ -56,7 +56,7 @@ class RenderQualitySettingsServer : public SettingsServer {
 	// Settings whose skipped value was already reported, so the warning is printed once per value.
 	HashSet<StringName> warned;
 	LocalVector<ObjectID> extra_viewports;
-	ViewportTarget viewport_target = VIEWPORT_TARGET_GROUP;
+	ViewportTargetMode viewport_target = VIEWPORT_TARGET_GROUP;
 	bool defaults_captured = false;
 
 	static Variant _get_project_value(const StringName &p_name);
@@ -141,8 +141,8 @@ public:
 	void add_viewport(Viewport *p_viewport);
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
-	void set_viewport_target(ViewportTarget p_target);
-	ViewportTarget get_viewport_target() const;
+	void set_viewport_target(ViewportTargetMode p_target);
+	ViewportTargetMode get_viewport_target() const;
 
 	RenderQualitySettingsServer();
 	~RenderQualitySettingsServer();
