@@ -6,7 +6,7 @@
 	<description>
 		[TextureSettingsServer] is the settings domain [code]"texture"[/code]: it stores the texture filtering ([member Viewport.anisotropic_filtering_level], [member Viewport.texture_mipmap_bias], [method RenderingServer.light_projectors_set_filter], [method RenderingServer.decals_set_filter]) and the Canvas2D options ([member Viewport.canvas_item_default_texture_filter], [member Viewport.canvas_item_default_texture_repeat], [member Viewport.snap_2d_transforms_to_pixel], [member Viewport.snap_2d_vertices_to_pixel], [member Viewport.sdf_oversize], [member Viewport.sdf_scale], [method RenderingServer.canvas_set_shadow_texture_size]) for the player. Every value takes effect at once. The settings resource is a [TextureSettings]; the file is [code]user://settings/texture.ini[/code] by default, in the format of [member ProjectSettings.settings/general/default_format] (or of its domain group [code]settings/&lt;domain&gt;/[/code]). If it does not exist yet, the file of the former domain name ([code]user://settings/video_texture.ini[/code]) is read once at startup and written under the new name; the old file is kept.
 		When the game starts, the stored values are applied in [constant SettingsServer.APPLY_PHASE_SCENE], after the root viewport exists and before the main scene is loaded. Values set earlier wait until then. The defaults are the project settings ([member ProjectSettings.rendering/textures/default_filters/anisotropic_filtering_level], [member ProjectSettings.rendering/textures/default_filters/texture_mipmap_bias], [member ProjectSettings.rendering/textures/light_projectors/filter], [member ProjectSettings.rendering/textures/decals/filter], [member ProjectSettings.rendering/textures/canvas_textures/default_texture_filter], [member ProjectSettings.rendering/textures/canvas_textures/default_texture_repeat], [member ProjectSettings.rendering/2d/snap/snap_2d_transforms_to_pixel], [member ProjectSettings.rendering/2d/snap/snap_2d_vertices_to_pixel], [member ProjectSettings.rendering/2d/sdf/oversize], [member ProjectSettings.rendering/2d/sdf/scale], [member ProjectSettings.rendering/2d/shadow_atlas/size]), with their feature overrides such as [code].mobile[/code].
-		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and to every [Viewport] in the group [method get_viewport_group], for example a [SubViewport] that renders a pixel-art game at a low resolution.
+		[b]Further viewports:[/b] the per-viewport values also go to the viewports added with [method add_viewport] and, by [member viewport_target], to every [Viewport] in the group [method get_viewport_group] (the default) or to every viewport in [ViewportServer], for example a [SubViewport] that renders a pixel-art game at a low resolution.
 		[b]Renderers:[/b] every value works in every renderer, except the light projector filter and the decal filter, which the Compatibility renderer (default in the Web export) ignores. [method SettingsServer.is_value_supported] returns [code]false[/code] for them there and [method get_unsupported_setting_names] lists them, so that a settings menu can gray them out. Such values are still stored, but not pushed; a warning names them once.
 		Values out of range are clamped with a warning: [code]texture_mipmap_bias[/code] [code]-2.0[/code] to [code]2.0[/code], [code]canvas_shadow_atlas_size[/code] [code]128[/code] to [code]16384[/code]. An enum value out of range is replaced by the default.
 		Texture streaming has its own domain, [TextureStreamingSettingsServer], which exists only when the engine is built with the [code]texture_streaming[/code] module.
@@ -114,7 +114,7 @@
 		<method name="get_viewport_group" qualifiers="static">
 			<return type="StringName" />
 			<description>
-				Returns the group [code]&amp;"texture_settings"[/code]. Every [Viewport] in this group gets the per-viewport values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
+				Returns the group [code]&amp;"texture_settings"[/code]. With [member viewport_target] [constant SettingsServer.VIEWPORT_TARGET_GROUP] (the default), every [Viewport] in this group gets the per-viewport values when it enters the tree and every later change while it is in the tree, without [method add_viewport].
 			</description>
 		</method>
 		<method name="has_viewport" qualifiers="const">
@@ -228,6 +228,12 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="viewport_target" type="int" setter="set_viewport_target" getter="get_viewport_target" enum="SettingsServer.ViewportTargetMode">
+			Which viewports get the per-viewport values besides the root viewport and the viewports added with [method add_viewport]: [constant SettingsServer.VIEWPORT_TARGET_GROUP] (the default) the viewports in the group [method get_viewport_group], [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] every viewport in [ViewportServer], [constant SettingsServer.VIEWPORT_TARGET_ROOT_ONLY] no others. Viewports that enter the tree later get the values if they are targets.
+			When the target changes, the viewports that are targets now get the current values at once; viewports that stop being targets keep the values they have. This is a choice of the game, not a player setting: it is not stored in the settings file. Set it in an autoload, for example. In the editor, [constant SettingsServer.VIEWPORT_TARGET_ALL_VIEWPORTS] also reaches the editor's own viewports.
+		</member>
+	</members>
 	<signals>
 		<signal name="anisotropic_filtering_level_changed">
 			<param index="0" name="level" type="int" enum="Viewport.AnisotropicFiltering" />

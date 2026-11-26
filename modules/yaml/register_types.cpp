@@ -33,6 +33,7 @@
 #include "resource_format_yaml.h"
 #include "yaml.h"
 
+#include "core/io/resource_format_text_data.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
@@ -40,6 +41,8 @@
 
 static Ref<ResourceFormatLoaderResourceYAML> resource_loader_yaml;
 static Ref<ResourceFormatSaverResourceYAML> resource_saver_yaml;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_yaml;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_yaml;
 static Ref<ResourceFormatLoaderResourceYAML> resource_loader_yml;
 static Ref<ResourceFormatSaverResourceYAML> resource_saver_yml;
 
@@ -62,6 +65,12 @@ void initialize_yaml_module(ModuleInitializationLevel p_level) {
 	resource_saver_yml->set_extension("yml");
 	ResourceSaver::add_resource_format_saver(resource_saver_yml);
 
+	// Plain YAML files (no type marker) as YAML resources, after the type-marked loaders above.
+	resource_loader_text_data_yaml.instantiate("YAML", Vector<String>{ "yaml", "yml" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_yaml);
+	resource_saver_text_data_yaml.instantiate("YAML");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_yaml);
+
 	// ResourceTextSerializer.serialize(resource, FORMAT_YAML) and deserialize(text, FORMAT_YAML).
 	ResourceTextSerializer::register_format(ResourceTextSerializer::FORMAT_YAML, &YAML::write_resource, &YAML::parse_format);
 }
@@ -72,6 +81,10 @@ void uninitialize_yaml_module(ModuleInitializationLevel p_level) {
 	}
 
 	ResourceTextSerializer::unregister_format(ResourceTextSerializer::FORMAT_YAML);
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_yaml);
+	resource_loader_text_data_yaml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_yaml);
+	resource_saver_text_data_yaml.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_yaml);
 	resource_loader_yaml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_yaml);

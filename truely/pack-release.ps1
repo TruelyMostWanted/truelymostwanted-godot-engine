@@ -8,11 +8,12 @@
       godot.windows.editor.x86_64.mono[.console].exe + GodotSharp/   Editor (Mono)
       godot.windows.template_{debug,release}.x86_64[.mono][.console].exe   Templates
 
-    Der Name kommt aus "<exe> --version" (z. B. 4.8.beta5.truely.a1b2c3d4e):
-      Truely_Godot4.8-beta5_a1b2c3d_win64.zip
-      Truely_Godot4.8-beta5_a1b2c3d_mono_win64.zip
-      Truely_Godot4.8-beta5_a1b2c3d_export_templates.tpz        (nur Windows-Templates)
-      Truely_Godot4.8-beta5_a1b2c3d_mono_export_templates.tpz   (nur Windows-Templates)
+    Der Name kommt aus "<exe> --truely-version" (z. B. 0.1.0) und "<exe> --version"
+    (z. B. 4.8.beta5.truely.a1b2c3d4e):
+      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_win64.zip
+      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_mono_win64.zip
+      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_export_templates.tpz        (nur Windows-Templates)
+      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_mono_export_templates.tpz   (nur Windows-Templates)
 
     Jede Editor-Zip enthaelt einen Ordner mit den Exes und ._sc_ (Self-contained-Modus:
     Einstellungen und Export-Templates bleiben neben der Exe). Die .tpz enthalten templates/
@@ -24,10 +25,13 @@
     Ordner mit den Builds. Standard: bin/ im Repo.
 
 .PARAMETER OutDir
-    Zielordner. Standard: P:/Projects/GitHub/truely-releases/<Truely_Godot...>/
+    Zielordner. Standard: P:/Projects/GitHub/truely-releases/<Truely-v...>/
 
 .PARAMETER Version
     Nur zum Testen: Versionsstring statt "<exe> --version" (z. B. 4.8.beta5.truely.a1b2c3d4e).
+
+.PARAMETER TruelyVersion
+    Nur zum Testen: Truely-Version statt "<exe> --truely-version" (z. B. 0.1.0).
 
 .EXAMPLE
     ./truely/pack-release.ps1
@@ -37,7 +41,8 @@
 param(
     [string]$BinDir = '',
     [string]$OutDir = '',
-    [string]$Version = ''
+    [string]$Version = '',
+    [string]$TruelyVersion = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,12 +60,12 @@ function Get-Bin([string]$name) {
 }
 
 # "4.8.beta5.mono.truely.a1b2c3d4e" -> Config 4.8.beta5.mono, Base 4.8-beta5, Hash a1b2c3d
-function Read-Version([string]$exe, [string]$given) {
+function Read-Version([string]$exe, [string]$given, [string]$givenTruely) {
+    # The console wrapper forwards stdout; the GUI exe does not print to a pipe.
+    $console = $exe -replace '\.exe$', '.console.exe'
+    $run = if (Test-Path $console) { $console } else { $exe }
     $text = $given
     if (-not $text) {
-        # The console wrapper forwards stdout; the GUI exe does not print to a pipe.
-        $console = $exe -replace '\.exe$', '.console.exe'
-        $run = if (Test-Path $console) { $console } else { $exe }
         $text = (& $run --version 2>$null | Where-Object { $_ -match '^\d+\.\d+' } | Select-Object -Last 1)
         if (-not $text) { throw "$run --version printed no version." }
     }
@@ -73,11 +78,21 @@ function Read-Version([string]$exe, [string]$given) {
     $hash = if ($parts.Count -gt $i + 1) { $parts[$i + 1] } else { '' }
     if ($hash.Length -gt 7) { $hash = $hash.Substring(0, 7) }
     if (-not $hash) { throw "Version '$text' has no commit hash." }
+    $truely = $givenTruely
+    if (-not $truely) {
+        # Builds before #265 do not know the option and would start the editor instead: ask --help first.
+        if (-not (& $run --help 2>$null | Select-String -SimpleMatch -Quiet -Pattern '--truely-version')) {
+            throw "$run has no --truely-version (built before #265). Rebuild with ./truely/build.ps1 or pass -TruelyVersion."
+        }
+        $truely =(& $run --truely-version 2>$null | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Select-Object -Last 1)
+        if (-not $truely) { throw "$run --truely-version printed no version. Build with ./truely/build.ps1 (#265 or newer)." }
+    }
     return [pscustomobject]@{
         Text   = $text.Trim()
         Config = ($config -join '.')
         Base   = "$($numbers -join '.')-$status"
         Hash   = $hash
+        Truely = $truely.Trim()
     }
 }
 
@@ -104,14 +119,14 @@ $monoTemplate = Get-Bin 'godot.windows.template_release.x86_64.mono.exe'
 
 $std = $null
 $mono = $null
-if ($stdEditor) { $std = Read-Version $stdEditor $Version }
-if ($monoEditor) { $mono = Read-Version $monoEditor $(if ($Version) { $Version -replace '^(\d+\.\d+(?:\.\d+)?\.[^.]+)', '$1.mono' } else { '' }) }
+if ($stdEditor) { $std = Read-Version $stdEditor $Version $TruelyVersion }
+if ($monoEditor) { $mono = Read-Version $monoEditor $(if ($Version) { $Version -replace '^(\d+\.\d+(?:\.\d+)?\.[^.]+)', '$1.mono' } else { '' }) $TruelyVersion }
 $ref = if ($std) { $std } elseif ($mono) { $mono } else { throw "No editor build in $BinDir." }
-if ($std -and $mono -and ($std.Hash -ne $mono.Hash -or $std.Base -ne $mono.Base)) {
+if ($std -and $mono -and ($std.Hash -ne $mono.Hash -or $std.Base -ne $mono.Base -or $std.Truely -ne $mono.Truely)) {
     throw "Standard ($($std.Text)) and Mono ($($mono.Text)) editors come from different builds. Rebuild one of them."
 }
 
-$name = "Truely_Godot$($ref.Base)_$($ref.Hash)"
+$name = "Truely-v$($ref.Truely)_Godot$($ref.Base)_$($ref.Hash)"
 if (-not $OutDir) { $OutDir = "P:/Projects/GitHub/truely-releases/$name" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $OutDir = (Resolve-Path $OutDir).Path

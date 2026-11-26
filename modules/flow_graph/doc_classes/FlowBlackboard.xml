@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowBlackboard" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		The variable values of a running graph.
+	</brief_description>
+	<description>
+		A [FlowBlackboard] stores the current values of the variables of a [FlowGraph] under their names. A playback of a graph owns one blackboard, or several playbacks share one to exchange state, for example quest or dialogue state. The declarations (name, type, default) are [FlowVariable]s in [member FlowGraph.variables]; the blackboard does not check names or types against them.
+		[signal variable_changed] is emitted for every change, which lets a user interface follow the state. The blackboard is a [Resource], so it can be saved and loaded like one.
+		[codeblocks]
+		[gdscript]
+		var blackboard := FlowBlackboard.new()
+		blackboard.variable_changed.connect(func(name, value): print(name, " = ", value))
+		blackboard.set_variable("gold", 50)
+		print(blackboard.get_variable("gold", 0)) # 50
+		print(blackboard.get_variable("silver", 0)) # 0
+		[/gdscript]
+		[csharp]
+		var blackboard = new FlowBlackboard();
+		blackboard.VariableChanged += (name, value) =&gt; GD.Print(name, " = ", value);
+		blackboard.SetVariable("gold", 50);
+		GD.Print(blackboard.GetVariable("gold", 0)); // 50
+		GD.Print(blackboard.GetVariable("silver", 0)); // 0
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_variable" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value of the variable [param name], or [param default] if there is no such variable.
+			</description>
+		</method>
+		<method name="get_variable_names" qualifiers="const">
+			<return type="StringName[]" />
+			<description>
+				Returns the names of all variables that currently have a value.
+			</description>
+		</method>
+		<method name="has_variable" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the variable [param name] has a value.
+			</description>
+		</method>
+		<method name="remove_variable">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the variable [param name]. Does nothing if it has no value. Emits [signal variable_changed] with a [code]null[/code] value if the variable existed.
+			</description>
+		</method>
+		<method name="set_variable">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Sets the value of the variable [param name] and emits [signal variable_changed]. An empty [param name] is an error and changes nothing.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="variables" type="Dictionary" setter="set_variables" getter="get_variables" default="{}">
+			All values, keyed by variable name. Assigning a dictionary replaces all values and does not emit [signal variable_changed]. Prefer [method set_variable] to change single values.
+		</member>
+	</members>
+	<signals>
+		<signal name="variable_changed">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Emitted when [method set_variable] sets a value, and when [method remove_variable] removes one (then [param value] is [code]null[/code]).
+			</description>
+		</signal>
+	</signals>
+</class>

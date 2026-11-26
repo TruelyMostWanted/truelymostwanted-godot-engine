@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowNode" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Base class of all node types of a [FlowGraph].
+	</brief_description>
+	<description>
+		A [FlowNode] is one step of a [FlowGraph]. It defines its ports ([FlowPort]), its title and category, and warnings about its configuration. The graph owns the node ids; a node itself does not know its id. Use [method FlowGraph.find_node_id] to get it.
+		[b]Node types.[/b] The built-in node types ([FlowStartNode], [FlowEndNode], [FlowBranchNode], [FlowExpressionNode], [FlowGetVariableNode], [FlowSetVariableNode], [FlowEmitEventNode], [FlowSubgraphNode], [FlowWaitNode]) are subclasses. You add your own node types by extending [FlowNode] in GDScript, in C# (with [code][GlobalClass][/code]) or in C++ (GDExtension), and overriding the virtual methods below. Use properties for the settings of the node; they are saved with the graph like those of any resource. If your node needs different ports after a property changed, call [method notify_ports_changed].
+		[b]Ports.[/b] The ports are asked for once and cached. Call [method notify_ports_changed] when the result of [method _get_input_ports] or [method _get_output_ports] changes. A script override takes precedence over the ports of a built-in node type.
+		[b]Ownership.[/b] A node belongs to at most one graph. [method FlowGraph.add_node] refuses a node that is still in another graph (or already in the same one); remove it with [method FlowGraph.remove_node] first, or add a [code]duplicate()[/code] of it.
+		[b]Runtime.[/b] This class only holds data. Its runtime behavior comes with the playback, which is a later feature. The playback's virtual methods will be added to [FlowNode] with that feature.
+		[codeblocks]
+		[gdscript]
+		class_name HasItemNode
+		extends FlowNode
+
+		func _get_input_ports() -&gt; Array[FlowPort]:
+			return [FlowPort.create_flow("in"), FlowPort.create_data("item", TYPE_STRING)]
+
+		func _get_output_ports() -&gt; Array[FlowPort]:
+			return [FlowPort.create_flow("yes"), FlowPort.create_flow("no")]
+
+		func _get_category() -&gt; String:
+			return "Inventory"
+
+		func _get_inline_properties() -&gt; PackedStringArray:
+			return PackedStringArray(["title_override"])
+		[/gdscript]
+		[csharp]
+		[GlobalClass]
+		public partial class HasItemNode : FlowNode
+		{
+		    public override Godot.Collections.Array&lt;FlowPort&gt; _GetInputPorts()
+		    {
+		        return new Godot.Collections.Array&lt;FlowPort&gt;
+		        {
+		            FlowPort.CreateFlow("in"),
+		            FlowPort.CreateData("item", Variant.Type.String),
+		        };
+		    }
+
+		    public override Godot.Collections.Array&lt;FlowPort&gt; _GetOutputPorts()
+		    {
+		        return new Godot.Collections.Array&lt;FlowPort&gt;
+		        {
+		            FlowPort.CreateFlow("yes"),
+		            FlowPort.CreateFlow("no"),
+		        };
+		    }
+
+		    public override string _GetCategory() =&gt; "Inventory";
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="_get_category" qualifiers="virtual const">
+			<return type="String" />
+			<description>
+				Override to return the category of the node, used to group node types in the node menu of the graph editor, for example [code]Flow[/code] or [code]Inventory[/code]. The built-in node types use [code]Flow[/code], [code]Data[/code], [code]Variables[/code] and [code]Events[/code]. If not overridden, the category of a built-in node type is used, and an empty string for a script node type.
+			</description>
+		</method>
+		<method name="_get_configuration_warnings" qualifiers="virtual const">
+			<return type="PackedStringArray" />
+			<description>
+				Override to return warnings about the configuration of the node, for example a missing property. Each string is one warning. The warnings are added to those of a built-in node type, and [method FlowGraph.validate] reports every warning as [constant FlowGraphValidation.ISSUE_KIND_NODE_WARNING]. Return an empty array if the node is fine.
+			</description>
+		</method>
+		<method name="_get_inline_properties" qualifiers="virtual const">
+			<return type="PackedStringArray" />
+			<description>
+				Override to return the names of the properties that the graph editor shows inside the node, so the user does not need to select it. If overridden, the result replaces the inline properties of a built-in node type.
+			</description>
+		</method>
+		<method name="_get_input_ports" qualifiers="virtual const">
+			<return type="FlowPort[]" />
+			<description>
+				Override to return the input ports of the node. The result is cached until [method notify_ports_changed] is called. Entries that are [code]null[/code] are ignored, and port names must be unique.
+				If not overridden, the input ports of a built-in node type are used, and a script node type has none.
+			</description>
+		</method>
+		<method name="_get_output_ports" qualifiers="virtual const">
+			<return type="FlowPort[]" />
+			<description>
+				Override to return the output ports of the node. The result is cached until [method notify_ports_changed] is called. Entries that are [code]null[/code] are ignored, and port names must be unique.
+				If not overridden, the output ports of a built-in node type are used, and a script node type has none.
+			</description>
+		</method>
+		<method name="_get_title" qualifiers="virtual const">
+			<return type="String" />
+			<description>
+				Override to return the title of the node. [member title_override] takes precedence. If the result is empty or the method is not overridden, the title is the name of the script class ([code]class_name[/code]) or of the native class, without the [code]Flow[/code] prefix and the [code skip-lint]Node[/code] suffix, in words (for example [code]GetVariableNode[/code] becomes [code]Get Variable[/code]).
+			</description>
+		</method>
+		<method name="_get_translatable_strings" qualifiers="virtual const">
+			<return type="PackedStringArray[]" />
+			<description>
+				Override to return the texts of the node that should be translated, for example a dialogue line. Each entry is one string, described as a [PackedStringArray] in the order of the translation extractor: message id, context, plural id, comment (trailing items may be left out). [method FlowGraph.get_translatable_strings] collects the entries of all nodes of a graph. Return an empty array if the node has no texts.
+			</description>
+		</method>
+		<method name="find_input_port" qualifiers="const">
+			<return type="FlowPort" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the input port named [param name], or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="find_output_port" qualifiers="const">
+			<return type="FlowPort" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the output port named [param name], or [code]null[/code] if there is none.
+			</description>
+		</method>
+		<method name="get_category" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the category of the node, see [method _get_category].
+			</description>
+		</method>
+		<method name="get_configuration_warnings" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the warnings of the node: those of the built-in node type, followed by those of [method _get_configuration_warnings]. An empty array means the node is fine.
+			</description>
+		</method>
+		<method name="get_inline_properties" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the properties shown inside the node, see [method _get_inline_properties].
+			</description>
+		</method>
+		<method name="get_input_ports" qualifiers="const">
+			<return type="FlowPort[]" />
+			<description>
+				Returns the input ports of the node, see [method _get_input_ports]. The array is a copy; the [FlowPort] objects are shared with the node, so do not change them.
+			</description>
+		</method>
+		<method name="get_output_ports" qualifiers="const">
+			<return type="FlowPort[]" />
+			<description>
+				Returns the output ports of the node, see [method _get_output_ports]. The array is a copy; the [FlowPort] objects are shared with the node, so do not change them.
+			</description>
+		</method>
+		<method name="get_title" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the title of the node: [member title_override] if it is set, otherwise the result of [method _get_title], otherwise the name of the class (see [method _get_title]).
+			</description>
+		</method>
+		<method name="get_translatable_strings" qualifiers="const">
+			<return type="PackedStringArray[]" />
+			<description>
+				Returns the translatable strings of the node, see [method _get_translatable_strings].
+			</description>
+		</method>
+		<method name="notify_ports_changed">
+			<return type="void" />
+			<description>
+				Tells the node that its ports changed, so the next call of [method get_input_ports], [method get_output_ports], [method find_input_port] or [method find_output_port] asks for them again. Also emits [signal Resource.changed]. Built-in node types call it when a property that changes their ports is set. Call it from your own setters when the ports depend on a property. Connections that use a port that no longer exists are not removed; [method FlowGraph.validate] reports them.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="editor_comment" type="String" setter="set_editor_comment" getter="get_editor_comment" default="&quot;&quot;">
+			A free comment of the author that the graph editor shows with the node. It has no effect on the graph.
+		</member>
+		<member name="editor_position" type="Vector2" setter="set_editor_position" getter="get_editor_position" default="Vector2(0, 0)">
+			The position of the node in the graph editor, in pixels. [method FlowGraph.add_node] sets it from its [code]position[/code] argument.
+		</member>
+		<member name="editor_size" type="Vector2" setter="set_editor_size" getter="get_editor_size" default="Vector2(0, 0)">
+			The size of the node in the graph editor, in pixels. [code]Vector2(0, 0)[/code] means the editor picks the size.
+		</member>
+		<member name="title_override" type="String" setter="set_title_override" getter="get_title_override" default="&quot;&quot;">
+			If not empty, this text is the title of the node instead of the one from [method _get_title].
+		</member>
+	</members>
+</class>
