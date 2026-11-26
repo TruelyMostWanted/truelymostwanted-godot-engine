@@ -32,6 +32,8 @@
 
 #include "flow_graph.h"
 #include "flow_graph_data.h"
+#include "flow_graph_playback.h"
+#include "flow_graph_player.h"
 #include "flow_node.h"
 #include "flow_nodes.h"
 #include "flow_port.h"
@@ -69,6 +71,10 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(FlowEmitEventNode);
 	GDREGISTER_CLASS(FlowSubgraphNode);
 	GDREGISTER_CLASS(FlowWaitNode);
+	GDREGISTER_CLASS(FlowExit);
+	GDREGISTER_CLASS(FlowGraphState);
+	GDREGISTER_CLASS(FlowGraphPlayback);
+	GDREGISTER_CLASS(FlowGraphPlayer);
 }
 
 void uninitialize_flow_graph_module(ModuleInitializationLevel p_level) {

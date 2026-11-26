@@ -13,10 +13,14 @@ def get_doc_classes():
         "FlowConnection",
         "FlowEmitEventNode",
         "FlowEndNode",
+        "FlowExit",
         "FlowExpressionNode",
         "FlowFrame",
         "FlowGetVariableNode",
         "FlowGraph",
+        "FlowGraphPlayback",
+        "FlowGraphPlayer",
+        "FlowGraphState",
         "FlowGraphValidation",
         "FlowNode",
         "FlowPort",
@@ -31,3 +35,7 @@ def get_doc_classes():
 
 def get_doc_path():
     return "doc_classes"
+
+
+def get_icons_path():
+    return "icons"
