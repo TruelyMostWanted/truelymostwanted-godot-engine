@@ -167,6 +167,9 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 **Stand (2026-11-27, Nachmittag):** Alle Issues der Nacht gemergt, zuletzt #277–#280, #332 (YAML im Editor mit Leerzeichen), CI-Fixes (float/enum, signed/unsigned, SCU-Testordner). CI auf `truely-godot-engine` grün (`fff0779c6e`). Release v0.1.0 gestartet: `truely-godot-engine-releases` = `995b042db8`, CI dort grün; Release-Workflow 45826619814 hängt an macOS-Runner-Kapazität (Jobs werden nicht vergeben) → Wiederholungen laufen. Wiki: alle Guides überarbeitet (Stil-Brief `P:/wt/brief-wiki-style.md`, Vorbild Audio-Bus-Settings), Text-Format-Guides neu mit Screenshots (Editor + Inspector), Data-Schemas neu, Class-Seiten aus XML (`P:/wt/tools/classref_md.py`), 36 Screenshots neu/ersetzt.
 - **Offen:** Release veröffentlichen (bei Erfolg: alten Entwurf `truely-godot4.8-beta5-3bd081f` löschen, beim alten Pre-Release die Assets entfernen und auf v0.1.0 verweisen); danach `truely/version.txt` erst beim nächsten Release erhöhen. Untertitel #322–#325, #12/#8 (Besitzer am Bildschirm), 9 Screenshots ohne Werkzeug-Schritt (Laufzeit-Bilder, Menüs).
 
+
+**Release v0.1.0 veröffentlicht (2026-11-27):** auf dem bisherigen Post (alter Tag `truely-godot4.8-beta5-3bd081f` → `truely-v0.1.0-godot4.8-beta5`), 7 Dateien, alter Entwurf gelöscht. macOS (.NET) fehlt (Runner-Kapazität): Hintergrund-Wiederholung des Jobs in Lauf 45826619814, danach `gh workflow run truely_release_update.yml -f run_id=45826619814 -f partial=false`. Neu: #334 Release-Update-Workflow, #337 Namensschema + „dotnet“ statt „mono“ (bei Gelegenheit).
+
 ## Übergabe
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
