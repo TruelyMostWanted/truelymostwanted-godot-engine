@@ -146,18 +146,18 @@
 				[codeblocks]
 				[gdscript]
 				for file in DirAccess.get_files_at("user://music"):
-				    var info = AudioStream.load_info("user://music/" + file)
-				    if info:
-				        print("%d. %s - %s" % [info.track_number, info.artist, info.title])
+					var info = AudioStream.load_info("user://music/" + file)
+					if info:
+						print("%d. %s - %s" % [info.track_number, info.artist, info.title])
 				[/gdscript]
 				[csharp]
 				foreach (string file in DirAccess.GetFilesAt("user://music"))
 				{
-				    AudioStream info = AudioStream.LoadInfo("user://music/" + file);
-				    if (info != null)
-				    {
-				        GD.Print($"{info.TrackNumber}. {info.Artist} - {info.Title}");
-				    }
+					AudioStream info = AudioStream.LoadInfo("user://music/" + file);
+					if (info != null)
+					{
+						GD.Print($"{info.TrackNumber}. {info.Artist} - {info.Title}");
+					}
 				}
 				[/csharp]
 				[/codeblocks]
