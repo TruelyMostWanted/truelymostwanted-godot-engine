@@ -32,9 +32,15 @@
 
 #include "../dialogue/dialogue_nodes.h"
 
+#include "core/io/resource_saver.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
 #include "tests/test_macros.h"
+#include "tests/test_utils.h"
+
+#ifdef TOOLS_ENABLED
+#include "editor/translations/resource_translation_parser_plugin.h"
+#endif
 
 namespace TestFlowGraphDialogue {
 
@@ -213,5 +219,28 @@ TEST_CASE("[FlowGraphDialogue] Translatable strings") {
 	CHECK(ids.has("Any news?"));
 	CHECK(ids.has("Bye"));
 }
+
+#ifdef TOOLS_ENABLED
+TEST_CASE("[FlowGraphDialogue] POT parser reads the strings of a saved graph") {
+	int line_id, choice_id;
+	const Ref<FlowGraph> graph = make_shop_graph(line_id, choice_id);
+	const String path = TestUtils::get_temp_path("flow_graph_dialogue.tres");
+	REQUIRE(ResourceSaver::save(graph, path) == OK);
+
+	Ref<ResourceTranslationParserPlugin> parser;
+	parser.instantiate();
+	List<String> extensions;
+	parser->get_recognized_extensions(&extensions);
+	CHECK(extensions.find("tres") != nullptr);
+	CHECK(extensions.find("res") != nullptr);
+	CHECK(extensions.find("mmd") != nullptr);
+
+	Vector<Vector<String>> strings;
+	CHECK(parser->parse_file(path, &strings) == OK);
+	REQUIRE(strings.size() == 6);
+	CHECK(strings.has(Vector<String>({ "DLG_SHOP_HELLO", "", "", "Speaker: merchant" })));
+	CHECK(strings.has(Vector<String>({ "Bye", "", "", "Dialogue option" })));
+}
+#endif // TOOLS_ENABLED
 
 } // namespace TestFlowGraphDialogue
