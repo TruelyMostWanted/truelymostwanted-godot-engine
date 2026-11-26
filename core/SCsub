@@ -227,6 +227,13 @@ env.CommandNoCache(
     env.Run(core_builders.version_info_builder),
 )
 
+# Generate the Truely fork version (truely/version.txt)
+env.CommandNoCache(
+    "truely_version.gen.h",
+    env.Value(truely_version_builders.get_truely_version_info()),
+    env.Run(truely_version_builders.truely_version_builder),
+)
+
 # Generate version hash
 gen_hash = env.CommandNoCache(
     "version_hash.gen.cpp", env.Value(methods.get_git_info()), env.Run(core_builders.version_hash_builder)
