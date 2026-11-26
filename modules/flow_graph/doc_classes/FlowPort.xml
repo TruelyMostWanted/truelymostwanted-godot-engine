@@ -56,7 +56,7 @@
 		<member name="name" type="StringName" setter="set_port_name" getter="get_port_name" default="&amp;&quot;&quot;">
 			The name of the port, used in [method FlowGraph.connect_nodes] and in saved connections. It must be unique among the inputs, and among the outputs, of one node.
 		</member>
-		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="0">
+		<member name="type" type="int" setter="set_port_type" getter="get_port_type" enum="Variant.Type" default="0">
 			The [enum Variant.Type] of the values of a data port. [constant @GlobalScope.TYPE_NIL] means any type. Ignored by flow ports.
 		</member>
 	</members>
