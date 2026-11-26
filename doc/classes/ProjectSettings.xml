@@ -1944,6 +1944,15 @@
 			[b]Note:[/b] The driver in use can be overridden at runtime via the [code]--text-driver[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
 			[b]Note:[/b] There is an additional [code]Dummy[/code] text driver available, which disables all text rendering and font-related functionality. This driver is not listed in the project settings, but it can be enabled when running the editor or project using the [code]--text-driver Dummy[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
 		</member>
+		<member name="internationalization/text_insertion/default_values" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Paths of [TextInsertionValues] resources that [TextInsertionServer] adds on its first use, as with [method TextInsertionServer.add_values].
+		</member>
+		<member name="internationalization/text_insertion/escape_bbcode" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [method TextInsertionServer.insert] and [method TextInsertionServer.insert_template] escape the inserted values for [RichTextLabel] when called with [constant TextInsertionServer.ESCAPE_DEFAULT].
+		</member>
+		<member name="internationalization/text_insertion/warn_missing_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [TextInsertionServer] prints a warning once per name when a placeholder has no value or uses an unknown modifier. Only in debug builds.
+		</member>
 		<member name="layer_names/2d_navigation/layer_1" type="String" setter="" getter="" default="&quot;&quot;">
 			Optional name for the 2D navigation layer 1. If left empty, the layer will display as "Layer 1".
 		</member>

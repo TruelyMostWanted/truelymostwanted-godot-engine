@@ -113,6 +113,7 @@
 #include "core/string/fuzzy_search.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/regex.h"
+#include "core/string/text_insertion_server.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
 #ifndef DISABLE_DEPRECATED
@@ -178,6 +179,7 @@ extern void unregister_global_constants();
 
 static ResourceUID *resource_uid = nullptr;
 static SeedServer *seed_server = nullptr;
+static TextInsertionServer *text_insertion_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -355,6 +357,10 @@ void register_core_types() {
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
 	GDREGISTER_CLASS(TranslationDomain);
+	GDREGISTER_CLASS(TextInsertionValues);
+	GDREGISTER_CLASS(TextInsertionTemplate);
+	GDREGISTER_ABSTRACT_CLASS(TextInsertionServer);
+	text_insertion_server = memnew(TextInsertionServer);
 	GDREGISTER_CLASS(OptimizedTranslation);
 	GDREGISTER_CLASS(UndoRedo);
 	GDREGISTER_CLASS(TriangleMesh);
@@ -502,6 +508,7 @@ void register_core_settings() {
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 	ResourceTextSerializer::register_settings();
 	StreamingAssetsServer::register_settings();
+	TextInsertionServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -523,6 +530,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceSaver", CoreBind::ResourceSaver::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", CoreBind::Marshalls::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextInsertionServer", TextInsertionServer::get_singleton(), "TextInsertionServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
@@ -596,6 +604,7 @@ void unregister_core_types() {
 	memdelete(resource_uid);
 
 	memdelete(seed_server);
+	memdelete(text_insertion_server);
 	memdelete(_resource_text_serializer);
 
 	memdelete(ip);
