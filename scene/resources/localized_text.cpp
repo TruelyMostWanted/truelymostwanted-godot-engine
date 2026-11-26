@@ -521,7 +521,9 @@ String LocalizedText::get_text() {
 	return result;
 }
 
-void LocalizedText::bind(Object *p_target, const StringName &p_property) {
+void LocalizedText::bind(Object *p_target, const StringName &p_property_or_empty) {
+	// Empty means "text": C# passes the default of a StringName parameter as empty.
+	const StringName p_property = p_property_or_empty == StringName() ? SNAME("text") : p_property_or_empty;
 	ERR_FAIL_NULL(p_target);
 	ERR_FAIL_COND_MSG(!Thread::is_main_thread(), "LocalizedText: bind() must be called on the main thread.");
 	// The binding is the metadata `localized_text`: this text (binds `text`) or a dictionary property -> text.
@@ -548,7 +550,9 @@ void LocalizedText::bind(Object *p_target, const StringName &p_property) {
 	_bind(p_target, p_property);
 }
 
-void LocalizedText::unbind(Object *p_target, const StringName &p_property) {
+void LocalizedText::unbind(Object *p_target, const StringName &p_property_or_empty) {
+	// Empty means "text": C# passes the default of a StringName parameter as empty.
+	const StringName p_property = p_property_or_empty == StringName() ? SNAME("text") : p_property_or_empty;
 	ERR_FAIL_NULL(p_target);
 	const Ref<LocalizedText> keep(this); // The metadata may hold the last reference.
 	const StringName meta_name = SNAME("localized_text");
@@ -572,7 +576,9 @@ void LocalizedText::unbind(Object *p_target, const StringName &p_property) {
 	_unbind(p_target, p_property);
 }
 
-bool LocalizedText::is_bound(Object *p_target, const StringName &p_property) const {
+bool LocalizedText::is_bound(Object *p_target, const StringName &p_property_or_empty) const {
+	// Empty means "text": C# passes the default of a StringName parameter as empty.
+	const StringName p_property = p_property_or_empty == StringName() ? SNAME("text") : p_property_or_empty;
 	ERR_FAIL_NULL_V(p_target, false);
 	const ObjectID id = p_target->get_instance_id();
 	for (const Binding &binding : bindings) {
