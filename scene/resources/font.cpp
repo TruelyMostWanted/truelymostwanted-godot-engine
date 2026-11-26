@@ -3321,6 +3321,9 @@ void SystemFont::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_font_weight", "weight"), &SystemFont::set_font_weight);
 	ClassDB::bind_method(D_METHOD("set_font_stretch", "stretch"), &SystemFont::set_font_stretch);
 
+	ClassDB::bind_static_method("SystemFont", D_METHOD("find", "name", "weight", "italic", "stretch"), &SystemFont::find, DEFVAL(400), DEFVAL(false), DEFVAL(100));
+	ClassDB::bind_static_method("SystemFont", D_METHOD("find_first", "names", "weight", "italic", "stretch"), &SystemFont::find_first, DEFVAL(400), DEFVAL(false), DEFVAL(100));
+
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "font_names"), "set_font_names", "get_font_names");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "font_italic"), "set_font_italic", "get_font_italic");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "font_weight", PROPERTY_HINT_RANGE, "100,999,25"), "set_font_weight", "get_font_weight");

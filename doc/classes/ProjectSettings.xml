@@ -1907,6 +1907,9 @@
 			The localization catalogs of the game, DLCs and mods as a list of [FilesManifest]s, loaded at startup by [method LocalizationServer.load_project_catalogs]. The list order is the priority: the catalogs of a later manifest win over those of an earlier one. The [member FilesManifest.type_hint] of a manifest names the catalog kind: [code skip-lint]TextLocalizationCatalog[/code] (also when empty) for [TextLocalizationServer], [code skip-lint]ResourceLocalizationCatalog[/code] for [ResourceLocalizationServer]. Without [member FilesManifest.extensions], all catalog formats are listed. Folders may hold wildcards, for example [code]user://mods/*/translations[/code]; missing folders are skipped. On the Web, only paths in [code]user://[/code] or the PCK can be read.
 			[b]Note:[/b] Resource catalogs replace the remaps of the Localization tab ([code]internationalization/locale/translation_remaps[/code]), which are still imported as the first resource layer.
 		</member>
+		<member name="internationalization/localization/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], the text catalogs (CSV, JSON, YAML, TOML, INI, XML) listed by [member internationalization/localization/catalog_manifests] are exported as binary [code].lcat[/code] files: the text is parsed once in the editor, and the game loads only the keys and reads one locale at a time. The original path keeps working through a remap, so manifests and [method ResourceLoader.load] need no change. Catalogs in [code].lcat[/code], [code].tres[/code] or [code].res[/code] are exported unchanged.
+		</member>
 		<member name="internationalization/pseudolocalization/double_vowels" type="bool" setter="" getter="" default="false">
 			Double vowels in strings during pseudolocalization to simulate the lengthening of text due to localization.
 		</member>

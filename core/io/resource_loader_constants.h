@@ -44,4 +44,5 @@ enum CacheMode {
 
 } // namespace ResourceLoaderConstants
 
-VARIANT_ENUM_CAST(ResourceLoaderConstants::CacheMode)
+// Exposed as `ResourceFormatLoader.CacheMode`, where the enum is bound.
+VARIANT_ENUM_CAST_EXT(ResourceLoaderConstants::CacheMode, ResourceFormatLoader::CacheMode)

@@ -34,6 +34,7 @@
 #include "core/io/json.h"
 #include "core/io/missing_resource.h"
 #include "core/io/resource_loader.h"
+#include "core/io/text_data_format.h"
 #include "core/math/aabb.h"
 #include "core/math/basis.h"
 #include "core/math/color.h"
@@ -2493,4 +2494,20 @@ ResourceTextSerializer::ResourceTextSerializer() {
 ResourceTextSerializer::~ResourceTextSerializer() {
 	clear_formats();
 	singleton = nullptr;
+}
+
+Ref<TextDataFormat> ResourceTextSerializer::create_data_format(Format p_format, const Ref<SerializerOptions> &p_options) {
+	static const char *format_classes[FORMAT_MAX] = { nullptr, "INI", "CSV", "XML", "TOML", "YAML" };
+	ERR_FAIL_INDEX_V((int)p_format, (int)FORMAT_MAX, Ref<TextDataFormat>());
+	if (!format_classes[p_format]) {
+		return Ref<TextDataFormat>();
+	}
+	const StringName format_class = format_classes[p_format];
+	ERR_FAIL_COND_V_MSG(!ClassDB::class_exists(format_class), Ref<TextDataFormat>(), vformat("The %s format is not available in this build.", format_class));
+	Ref<TextDataFormat> format = Object::cast_to<TextDataFormat>(ClassDB::instantiate(format_class));
+	ERR_FAIL_COND_V(format.is_null(), format);
+	if (p_options.is_valid()) {
+		format->set_options(p_options);
+	}
+	return format;
 }
