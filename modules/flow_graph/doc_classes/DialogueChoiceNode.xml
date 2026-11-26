@@ -12,22 +12,25 @@
 		[gdscript]
 		func show_choices() -&gt; void:
 			var exits := playback.get_available_exits()
-			for i in exits.size():
+			var index := 0
+			for exit: FlowExit in exits:
 				var button := Button.new()
-				button.text = exits[i].label
-				button.disabled = not exits[i].enabled
-				button.pressed.connect(playback.choose.bind(i))
+				button.text = exit.label
+				button.disabled = not exit.enabled
+				button.pressed.connect(playback.choose.bind(index))
 				choice_box.add_child(button)
+				index += 1
 		[/gdscript]
 		[csharp]
 		private void ShowChoices()
 		{
 			var exits = _playback.GetAvailableExits();
-			for (int i = 0; i &lt; exits.Count; i++)
+			int index = 0;
+			foreach (FlowExit exit in exits)
 			{
-				int index = i;
-				var button = new Button { Text = exits[i].Label, Disabled = !exits[i].Enabled };
-				button.Pressed += () =&gt; _playback.Choose(index);
+				int choice = index++;
+				var button = new Button { Text = exit.Label, Disabled = !exit.Enabled };
+				button.Pressed += () =&gt; _playback.Choose(choice);
 				_choiceBox.AddChild(button);
 			}
 		}

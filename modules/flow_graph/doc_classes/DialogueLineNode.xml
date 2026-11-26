@@ -60,7 +60,7 @@
 		<member name="speaker_name" type="String" setter="set_speaker_name" getter="get_speaker_name" default="&quot;&quot;">
 			The name of the speaker as shown to the player. Translatable, see [method get_translated_speaker_name].
 		</member>
-		<member name="subtitle" type="Subtitle" setter="set_subtitle" getter="get_subtitle" default="null">
+		<member name="subtitle" type="Subtitle" setter="set_subtitle" getter="get_subtitle">
 			Optional subtitles for [member voice], for example to show the line in sync with the recording.
 		</member>
 		<member name="text" type="String" setter="set_text" getter="get_text" default="&quot;&quot;">
@@ -69,7 +69,7 @@
 		<member name="translation_context" type="StringName" setter="set_translation_context" getter="get_translation_context" default="&amp;&quot;&quot;">
 			The translation context of [member text] and [member speaker_name], for texts that are the same in the source language but need different translations.
 		</member>
-		<member name="voice" type="AudioStream" setter="set_voice" getter="get_voice" default="null">
+		<member name="voice" type="AudioStream" setter="set_voice" getter="get_voice">
 			Optional voice recording of the line. The node does not play it; the dialogue UI does.
 		</member>
 	</members>
