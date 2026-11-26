@@ -195,7 +195,7 @@ TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
 			ERR_PRINT_OFF;
 			const String server_path = ResourceLoader::path_remap(path);
 			ERR_PRINT_ON;
-			CHECK_MESSAGE(server_path == godot_path, vformat("%s %s", locale, path).utf8().get_data());
+			CHECK_MESSAGE(server_path == godot_path, vformat("%s %s", locale, path));
 		}
 	}
 	// `ja` points to a missing file: both fall back to the original path.
@@ -363,7 +363,7 @@ TEST_CASE("[ResourceLocalizationServer] Remap cost") {
 	CHECK(length > 0);
 	CHECK(ResourceLoader::path_remap(path) == godot_path);
 	CHECK(godot_path == folder.path_join("pl_500.bin"));
-	MESSAGE(vformat("path_remap with 1000 remaps x 12 locales: Godot %.0f ns, server %.0f ns, server lookup alone %.0f ns", godot_ns, server_ns, lookup_ns).utf8().get_data());
+	MESSAGE(vformat("path_remap with 1000 remaps x 12 locales: Godot %.0f ns, server %.0f ns, server lookup alone %.0f ns", godot_ns, server_ns, lookup_ns));
 }
 
 } // namespace TestResourceLocalizationServer

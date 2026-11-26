@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LocalizedText" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A translated text with inserted values that keeps bound control properties up to date.
+	</brief_description>
+	<description>
+		[LocalizedText] describes a text by its translation [member key] and [member context], fills its [code]{name}[/code] placeholders from [member args] and [TextInsertionServer], and picks the plural form from [member count_argument]. [method get_text] returns the current text.
+		Bound to a property of a node (for example [member Label.text], [member Button.text], [member RichTextLabel.text], [member Control.tooltip_text]), it sets that property again only when its text can have changed: when the locale of its channel changes ([signal TranslationServer.locale_changed]), when a value used by its placeholders changes ([signal TextInsertionServer.value_changed]), when catalogs change ([signal LocalizationServer.catalogs_changed]) or when one of its own properties changes. Refreshes are collected and run once at the end of the frame; a property is only set when its text is different.
+		A binding is the node metadata [code]localized_text[/code]: a [LocalizedText] binds [code]text[/code], a [Dictionary] binds each property name to its [LocalizedText] (for example [code]{ "text": ..., "tooltip_text": ... }[/code]). Add it in the inspector with [b]Add Metadata[/b] (name [code]localized_text[/code], type [Object] to create or pick a [LocalizedText], or type [Dictionary]), or call [method bind]. Metadata bindings are applied when the node enters the scene tree at run time (not in the editor) and removed when it leaves; nodes without this one key cost a single lookup.
+		[codeblocks]
+		[gdscript]
+		# An NPC greeting: "Hello {player_name}!" in the catalog.
+		var greeting = LocalizedText.new()
+		greeting.key = &amp;"NPC_GREETING"
+		greeting.bind($GreetingLabel)
+		TextInsertionServer.set_value(&amp;"player_name", "Ada") # The label shows "Hello Ada!".
+
+		# A HUD line with a plural: "{enemy.count} enemy left" / "{enemy.count} enemies left".
+		var enemies = LocalizedText.new()
+		enemies.key = &amp;"ENEMIES_LEFT"
+		enemies.count_argument = &amp;"enemy.count"
+		enemies.bind($EnemiesLabel)
+		TextInsertionServer.set_value(&amp;"enemy.count", 3) # "3 enemies left"
+		[/gdscript]
+		[csharp]
+		// An NPC greeting: "Hello {player_name}!" in the catalog.
+		var greeting = new LocalizedText();
+		greeting.Key = "NPC_GREETING";
+		greeting.Bind(GetNode&lt;Label&gt;("GreetingLabel"));
+		TextInsertionServer.SetValue("player_name", "Ada"); // The label shows "Hello Ada!".
+
+		// A HUD line with a plural: "{enemy.count} enemy left" / "{enemy.count} enemies left".
+		var enemies = new LocalizedText();
+		enemies.Key = "ENEMIES_LEFT";
+		enemies.CountArgument = "enemy.count";
+		enemies.Bind(GetNode&lt;Label&gt;("EnemiesLabel"));
+		TextInsertionServer.SetValue("enemy.count", 3); // "3 enemies left"
+		[/csharp]
+		[/codeblocks]
+		A bound node gets [constant Node.AUTO_TRANSLATE_MODE_DISABLED] so its text is not translated twice; the previous [member Node.auto_translate_mode] comes back when its last binding is removed. Other text properties of that node are then not translated automatically either: bind them with their own [LocalizedText].
+		Keys that no [TextLocalizationCatalog] has are looked up in the [TranslationDomain] of the channel, so [Translation] resources keep working.
+		[b]Note:[/b] Bindings and refreshes run on the main thread. [method get_text] can be called on any thread.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="bind">
+			<return type="void" />
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="property" type="StringName" default="&amp;&quot;text&quot;" />
+			<description>
+				Binds [param property] of [param target] to this text: stores this resource in the metadata [code]localized_text[/code] of [param target] (as the value for [code]text[/code], otherwise in a [Dictionary] by property name) and sets the property to [method get_text] now and whenever the text changes. A [LocalizedText] bound before to the same property is unbound. The channel of the binding is the translation domain ([method Object.get_translation_domain]) of [param target] at this moment, unless [member channel] is set.
+			</description>
+		</method>
+		<method name="get_text">
+			<return type="String" />
+			<description>
+				Returns the translated text with its placeholders filled, in the locale of [member channel] (or of [code]interface[/code] when [member channel] is empty). Called on the main thread, it also makes [signal text_changed] fire when the text changes later.
+			</description>
+		</method>
+		<method name="is_bound" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="property" type="StringName" default="&amp;&quot;text&quot;" />
+			<description>
+				Returns [code]true[/code] if [param property] of [param target] is bound to this text.
+			</description>
+		</method>
+		<method name="unbind">
+			<return type="void" />
+			<param index="0" name="target" type="Object" />
+			<param index="1" name="property" type="StringName" default="&amp;&quot;text&quot;" />
+			<description>
+				Removes the binding of [param property] of [param target] and its entry in the metadata [code]localized_text[/code]. The property keeps its last text. When it was the last binding of the node, the node's [member Node.auto_translate_mode] is restored.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="args" type="Dictionary" setter="set_args" getter="get_args" default="{}">
+			Values for the placeholders of the text, by name. They win over the values of [TextInsertionServer]. Assign a new dictionary (or the same one again) after changing it, so bound properties refresh.
+		</member>
+		<member name="channel" type="StringName" setter="set_channel" getter="get_channel" default="&amp;&quot;&quot;">
+			The locale channel of the text ([code]interface[/code], [code]audio[/code], [code]subtitles[/code] or a custom one, see [method TranslationServer.set_locale_for]). Empty: each binding follows the translation domain ([method Object.get_translation_domain]) of its node (the main domain is [code]interface[/code]), and [method get_text] uses [code]interface[/code].
+		</member>
+		<member name="context" type="StringName" setter="set_context" getter="get_context" default="&amp;&quot;&quot;">
+			The translation context of [member key].
+		</member>
+		<member name="count_argument" type="StringName" setter="set_count_argument" getter="get_count_argument" default="&amp;&quot;&quot;">
+			The name of the value that selects the plural form, for example [code]enemy.count[/code]. It is read from [member args], then from [method TextInsertionServer.get_value]; a change of that value refreshes the text. Empty: no plural.
+		</member>
+		<member name="key" type="StringName" setter="set_key" getter="get_key" default="&amp;&quot;&quot;">
+			The translation key, looked up with [method TextLocalizationServer.translate]. A key without a translation is used as the text (its placeholders are filled too).
+		</member>
+		<member name="refresh_mode" type="int" setter="set_refresh_mode" getter="get_refresh_mode" enum="LocalizedText.RefreshMode" default="0">
+			When bound properties are refreshed. Use [constant REFRESH_EVERY_FRAME] for HUD texts whose values come from [method TextInsertionServer.register_provider] providers without [method TextInsertionServer.notify_changed].
+		</member>
+	</members>
+	<signals>
+		<signal name="text_changed">
+			<param index="0" name="text" type="String" />
+			<description>
+				Emitted when the text of the resource's own channel (see [method get_text]) changed after a refresh. Only checked while the signal has connections and the text is bound or was read with [method get_text].
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="REFRESH_ON_CHANGE" value="0" enum="RefreshMode">
+			Refreshes when the locale of the channel, a used placeholder value, a catalog or the resource changes. The default.
+		</constant>
+		<constant name="REFRESH_EVERY_FRAME" value="1" enum="RefreshMode">
+			Also refreshes every frame ([signal SceneTree.process_frame]); a property is still only set when its text changed.
+		</constant>
+	</constants>
+</class>
