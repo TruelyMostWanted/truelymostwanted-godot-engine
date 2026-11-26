@@ -209,7 +209,7 @@ struct YAMLReader {
 	int error_line = 0;
 	int error_column = 0;
 
-	Variant root;
+	Array documents; // At least one; an empty text is one null document.
 
 	struct State {
 		int pos = 0;
@@ -398,53 +398,61 @@ bool YAMLReader::parse(const String &p_text) {
 		}
 		advance();
 	}
-	if (indent == -1 && !at_end() && peek() == '-') {
-		// Document start "---".
-		for (int i = 0; i < 3; i++) {
+	// Documents, each optionally started by "---" and ended by "...".
+	documents.clear();
+	while (true) {
+		bool started = false;
+		if (indent == -1 && !at_end() && peek() == '-') {
+			// Document start "---".
+			for (int i = 0; i < 3; i++) {
+				advance();
+			}
+			skip_blanks();
+			skip_comment();
+			if (!at_end() && peek() != '\n') {
+				return fail("Content on the line of '---' is not supported; start the document on the next line.");
+			}
 			advance();
+			if (!next_content_line(indent)) {
+				return false;
+			}
+			started = true;
 		}
-		skip_blanks();
-		skip_comment();
-		if (!at_end() && peek() != '\n') {
-			return fail("Content on the line of '---' is not supported; start the document on the next line.");
+		Variant document;
+		if (indent >= 0) {
+			if (!parse_block_node(-1, false, document, 0)) {
+				return false;
+			}
+			if (!next_content_line(indent)) {
+				return false;
+			}
+			if (indent >= 0) {
+				return fail("Unexpected content after the document; check the indentation.");
+			}
+			started = true;
 		}
-		advance();
-		if (!next_content_line(indent)) {
-			return false;
+		if (started || documents.is_empty()) {
+			documents.push_back(document);
+		}
+		if (at_end()) {
+			return true;
+		}
+		if (peek() == '.') {
+			// Document end "...".
+			for (int i = 0; i < 3; i++) {
+				advance();
+			}
+			if (!finish_line()) {
+				return false;
+			}
+			if (!next_content_line(indent)) {
+				return false;
+			}
+			if (at_end()) {
+				return true;
+			}
 		}
 	}
-	root = Variant();
-	if (indent >= 0) {
-		if (!parse_block_node(-1, false, root, 0)) {
-			return false;
-		}
-		if (!next_content_line(indent)) {
-			return false;
-		}
-	}
-	if (at_end()) {
-		return true;
-	}
-	if (indent >= 0) {
-		return fail("Unexpected content after the document; check the indentation.");
-	}
-	if (peek() == '-') {
-		return fail("More than one document is not supported (found a second '---').");
-	}
-	// Document end "...": only comments and empty lines may follow.
-	for (int i = 0; i < 3; i++) {
-		advance();
-	}
-	if (!finish_line()) {
-		return false;
-	}
-	if (!next_content_line(indent)) {
-		return false;
-	}
-	if (!at_end()) {
-		return fail("More than one document is not supported (found content after '...').");
-	}
-	return true;
 }
 
 bool YAMLReader::parse_block_node(int p_parent_indent, bool p_allow_sequence_at_parent, Variant &r_value, int p_depth) {
@@ -1694,16 +1702,22 @@ struct YAMLWriter {
 /////////////////////////////////////////////////////////////////////////////
 // YAML.
 
-Error YAML::parse_text(const String &p_text, Variant &r_data, String &r_error, int &r_line, int &r_column) {
+Error YAML::parse_text(const String &p_text, Variant &r_data, String &r_error, int &r_line, int &r_column, Array *r_documents) {
 	YAMLReader reader;
 	if (!reader.parse(p_text)) {
 		r_data = Variant();
+		if (r_documents) {
+			r_documents->clear();
+		}
 		r_error = reader.error;
 		r_line = reader.error_line;
 		r_column = reader.error_column;
 		return ERR_PARSE_ERROR;
 	}
-	r_data = reader.root;
+	r_data = reader.documents[0];
+	if (r_documents) {
+		*r_documents = reader.documents;
+	}
 	r_error = String();
 	r_line = 0;
 	r_column = 0;
@@ -1787,11 +1801,43 @@ Error YAML::parse_format(const String &p_text, const String &p_type_hint, const 
 }
 
 Error YAML::_parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) {
-	return parse_text(p_text, r_data, r_error, r_line, r_column);
+	Array documents;
+	const Error err = parse_text(p_text, r_data, r_error, r_line, r_column, &documents);
+	extra_documents = documents.slice(1);
+	return err;
 }
 
 Error YAML::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const {
-	return write_text(p_data, ResourceTextSerializer::get_options(p_options), r_text, r_error);
+	const ResourceTextSerializer::Options options = ResourceTextSerializer::get_options(p_options);
+	Error err = write_text(p_data, options, r_text, r_error);
+	for (int i = 0; i < extra_documents.size() && err == OK; i++) {
+		String document;
+		err = write_text(extra_documents[i], options, document, r_error);
+		r_text += "---\n" + document;
+	}
+	return err;
+}
+
+Variant YAML::get_document(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, get_document_count(), Variant());
+	return p_index == 0 ? get_data() : extra_documents[p_index - 1];
+}
+
+void YAML::add_document(const Variant &p_data) {
+	extra_documents.push_back(p_data);
+	_mark_data_changed();
+}
+
+void YAML::remove_document(int p_index) {
+	ERR_FAIL_INDEX(p_index, get_document_count());
+	if (p_index > 0) {
+		extra_documents.remove_at(p_index - 1);
+		_mark_data_changed();
+	} else if (extra_documents.is_empty()) {
+		clear();
+	} else {
+		set_data(extra_documents.pop_front());
+	}
 }
 
 void YAML::_get_extensions(List<String> *r_extensions) const {
@@ -1967,6 +2013,10 @@ void YAML::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_value", "path", "value"), &YAML::set_value);
 	ClassDB::bind_method(D_METHOD("has_value", "path"), &YAML::has_value);
 	ClassDB::bind_method(D_METHOD("erase_value", "path"), &YAML::erase_value);
+	ClassDB::bind_method(D_METHOD("get_document_count"), &YAML::get_document_count);
+	ClassDB::bind_method(D_METHOD("get_document", "index"), &YAML::get_document);
+	ClassDB::bind_method(D_METHOD("add_document", "data"), &YAML::add_document);
+	ClassDB::bind_method(D_METHOD("remove_document", "index"), &YAML::remove_document);
 
 	ClassDB::bind_static_method("YAML", D_METHOD("parse_string", "text"), &YAML::parse_string);
 	ClassDB::bind_static_method("YAML", D_METHOD("stringify", "data", "options"), &YAML::stringify, DEFVAL(Ref<SerializerOptions>()));
