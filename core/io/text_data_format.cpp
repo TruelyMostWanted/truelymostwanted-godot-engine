@@ -53,6 +53,9 @@ void TextDataFormat::set_data(const Variant &p_data) {
 	ERR_FAIL_COND_MSG(type != Variant::NIL && p_data.get_type() != type, vformat("%s data must be of type %s, not %s.", get_class(), Variant::get_type_name(type), Variant::get_type_name(p_data.get_type())));
 	format_data = p_data;
 	parsed_text = String();
+	parse_error_message = String();
+	parse_error_line = 0;
+	parse_error_column = 0;
 	_data_replaced();
 	emit_changed();
 }
