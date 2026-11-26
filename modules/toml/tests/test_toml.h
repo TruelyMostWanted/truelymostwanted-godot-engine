@@ -33,6 +33,7 @@
 #include "../toml.h"
 
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/math/math_defs.h"
@@ -588,6 +589,36 @@ TEST_CASE("[TOML] Registered as text format FORMAT_TOML") {
 	const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_TOML);
 	CHECK(text == TOML::serialize(settings));
 	check_toml_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_TOML));
+}
+
+TEST_CASE("[TOML] Resource API: dotted table paths and plain files") {
+	Ref<TOML> toml;
+	toml.instantiate();
+	CHECK(toml->get_recognized_extensions() == PackedStringArray({ "toml" }));
+	toml->set_value("server.limits", "players", 8);
+	toml->set_value("", "title", "Game");
+	toml->set_value(TOML::escape_table_name("a.b"), "x", 1);
+	CHECK(toml->has_table("server"));
+	CHECK(toml->has_table("server.limits"));
+	CHECK(toml->has_table_key("server.limits", "players"));
+	CHECK(int(toml->get_value("server.limits", "players")) == 8);
+	CHECK(toml->get_value("missing", "key", 3) == Variant(3));
+	CHECK(toml->get_tables() == PackedStringArray({ "server", "server.limits", "a\.b" }));
+	CHECK(TOML::split_table_path("a\.b.c") == Vector<String>({ "a.b", "c" }));
+	CHECK(toml->get_table_keys("") == PackedStringArray({ "server", "title", "a.b" }));
+	toml->erase_table_key("server.limits", "players");
+	CHECK_FALSE(toml->has_table_key("server.limits", "players"));
+	toml->erase_table("server");
+	CHECK_FALSE(toml->has_table("server"));
+
+	const String path = TestUtils::get_temp_path("toml_plain.toml");
+	REQUIRE(ResourceSaver::save(toml, path) == OK);
+	CHECK_FALSE(FileAccess::get_file_as_string(path).contains("$type"));
+	CHECK(ResourceLoader::get_resource_type(path) == "TOML");
+	const Ref<TOML> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_value("", "title") == "Game");
+	DirAccess::remove_absolute(path);
 }
 
 } // namespace TestTOML

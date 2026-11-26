@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_resource_text_serializer)
 
+#include "core/io/csv_format.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -499,10 +500,10 @@ TEST_CASE("[ResourceTextSerializer] CSV round trip") {
 		const Ref<TextFormatList> from_file = ResourceLoader::load(path, "TextFormatList", ResourceFormatLoader::CACHE_MODE_IGNORE);
 		REQUIRE(from_file.is_valid());
 		CHECK(from_file->get_entries().size() == 2);
-		// CSV has no type in the file: without a hint it can't be loaded.
-		ERR_PRINT_OFF;
-		CHECK(ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE).is_null());
-		ERR_PRINT_ON;
+		// CSV has no type in the file: without a hint it loads as a plain CSV resource.
+		const Ref<CSV> plain = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+		REQUIRE(plain.is_valid());
+		CHECK(plain->get_row_count() == 2);
 		DirAccess::remove_absolute(path);
 	}
 

@@ -217,6 +217,10 @@ void INI::erase_section_key(const String &p_section, const String &p_key) {
 	Dictionary section_keys = keys;
 	ERR_FAIL_COND_MSG(!section_keys.has(p_key), vformat("Cannot erase nonexistent key \"%s\" from section \"%s\".", p_key, p_section));
 	section_keys.erase(p_key);
+	if (section_keys.is_empty()) {
+		// Like ConfigFile: an empty section is erased.
+		sections.erase(p_section);
+	}
 	_mark_data_changed();
 }
 
