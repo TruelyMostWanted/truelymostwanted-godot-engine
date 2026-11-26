@@ -30,10 +30,12 @@
 
 #include "xml_format.h"
 
+#include "core/io/data_schema.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/xml_parser.h"
 #include "core/io/xml_writer.h"
 #include "core/object/class_db.h"
+#include "core/templates/hash_set.h"
 
 namespace {
 
@@ -318,6 +320,62 @@ Error XML::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 
 void XML::_get_extensions(List<String> *r_extensions) const {
 	r_extensions->push_back("xml");
+}
+
+// An element as validation data: attributes and child elements are the keys (repeated children, and children
+// whose field is an Array, become an Array), other text is the key "#text". An element with neither
+// attributes nor children is its text.
+static Variant _xml_validation_value(const Dictionary &p_element, const Ref<DataSchema> &p_schema) {
+	const Dictionary attributes = p_element.get(XML::KEY_ATTRIBUTES, Dictionary());
+	const Array children = p_element.get(XML::KEY_CHILDREN, Array());
+	Dictionary result = attributes.duplicate();
+	HashSet<String> lists;
+	bool has_elements = false;
+	for (const Variant &child : children) {
+		if (child.get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		has_elements = true;
+		const Dictionary child_element = child;
+		const String child_name = child_element.get(XML::KEY_NAME, String());
+		const Ref<DataField> field = p_schema.is_valid() ? p_schema->get_field(child_name) : Ref<DataField>();
+		const bool is_list = field.is_valid() && field->get_type() == Variant::ARRAY;
+		const Variant value = _xml_validation_value(child_element, field.is_null() ? Ref<DataSchema>() : (is_list ? field->get_element_schema() : field->get_schema()));
+		if (lists.has(child_name)) {
+			Array list = result[child_name];
+			list.push_back(value);
+		} else if (is_list || result.has(child_name)) {
+			Array list;
+			if (result.has(child_name)) {
+				list.push_back(result[child_name]);
+			}
+			list.push_back(value);
+			result[child_name] = list;
+			lists.insert(child_name);
+		} else {
+			result[child_name] = value;
+		}
+	}
+	const String text = p_element.get(XML::KEY_TEXT, String());
+	if (attributes.is_empty() && !has_elements) {
+		return text;
+	}
+	if (!text.strip_edges().is_empty()) {
+		result["#text"] = text;
+	}
+	return result;
+}
+
+Ref<DataValidation> XML::_validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const {
+	const Dictionary root = get_data();
+	Variant value = root.is_empty() ? Variant(Dictionary()) : _xml_validation_value(root, p_schema);
+	if (value.get_type() != Variant::DICTIONARY) {
+		// A root element with only text.
+		Dictionary text_only;
+		text_only["#text"] = value;
+		value = text_only;
+	}
+	return p_schema->validate(value, p_options);
 }
 
 Ref<XMLElement> XML::get_root() {

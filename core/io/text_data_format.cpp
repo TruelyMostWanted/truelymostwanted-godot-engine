@@ -30,6 +30,7 @@
 
 #include "text_data_format.h"
 
+#include "core/io/data_schema.h"
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 
@@ -41,6 +42,29 @@ Error TextDataFormat::_parse_data(const String &p_text, const Ref<SerializerOpti
 Error TextDataFormat::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const {
 	r_error = "This format does not implement encoding.";
 	return ERR_UNAVAILABLE;
+}
+
+Ref<DataValidation> TextDataFormat::_validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const {
+	return p_schema->validate(format_data, p_options);
+}
+
+void TextDataFormat::_resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const {
+	p_validation->resolve_lines(p_text);
+}
+
+Ref<DataValidation> TextDataFormat::validate(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const {
+	ERR_FAIL_COND_V(p_schema.is_null(), Ref<DataValidation>());
+	if (!parse_error_message.is_empty()) {
+		Ref<DataValidation> result;
+		result.instantiate();
+		result->add_issue(DataValidation::ISSUE_KIND_PARSE_ERROR, parse_error_message, StringName(), String(), DataValidation::POSITION_NONE, DataValidation::POSITION_NONE, parse_error_line > 0 ? parse_error_line : DataValidation::POSITION_NONE);
+		return result;
+	}
+	Ref<DataValidation> result = _validate_data(p_schema, p_options);
+	if (result.is_valid() && p_options.is_valid() && p_options->is_keep_positions() && !parsed_text.is_empty()) {
+		_resolve_issue_lines(result, parsed_text);
+	}
+	return result;
 }
 
 void TextDataFormat::_mark_data_changed() {
@@ -167,6 +191,7 @@ void TextDataFormat::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("parse", "text", "keep_text"), &TextDataFormat::parse, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("encode_to_text"), &TextDataFormat::encode_to_text);
 	ClassDB::bind_method(D_METHOD("clear"), &TextDataFormat::clear);
+	ClassDB::bind_method(D_METHOD("validate", "schema", "options"), &TextDataFormat::validate, DEFVAL(Ref<DataValidationOptions>()));
 	ClassDB::bind_method(D_METHOD("load", "path"), &TextDataFormat::load);
 	ClassDB::bind_method(D_METHOD("save", "path"), &TextDataFormat::save);
 	ClassDB::bind_method(D_METHOD("get_parsed_text"), &TextDataFormat::get_parsed_text);
