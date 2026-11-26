@@ -94,4 +94,33 @@ TEST_CASE("[FilesManifestServer] Register, edit, validate, watch") {
 	DirAccess::remove_absolute(root);
 }
 
+TEST_CASE("[FilesManifestServer] Wildcard folders are validated by their base") {
+	FilesManifestServer *server = FilesManifestServer::get_singleton();
+	REQUIRE(server);
+	const String root = OS::get_singleton()->get_cache_path().path_join("test_files_manifest_server_wildcards");
+	DirAccess::make_dir_recursive_absolute(root.path_join("mods/a/tr"));
+	_write(root.path_join("mods/a/tr/one.tres"));
+
+	Ref<FilesManifest> manifest;
+	manifest.instantiate();
+	manifest->set_folder_paths({ root.path_join("mods/*/tr"), root.path_join("missing/*/tr") });
+	CHECK(server->register_manifest("fms_wildcards", manifest) == OK);
+	ERR_PRINT_OFF;
+	CHECK(server->get_file_paths("fms_wildcards").size() == 1);
+	ERR_PRINT_ON;
+	const Ref<FilesManifestValidation> result = server->validate("fms_wildcards");
+	REQUIRE(result.is_valid());
+	CHECK(result->get_missing_folders() == PackedStringArray({ root.path_join("missing/*/tr") }));
+	CHECK(server->create_missing_folders("fms_wildcards") == OK);
+	CHECK(DirAccess::dir_exists_absolute(root.path_join("missing")));
+
+	CHECK(server->unregister_manifest("fms_wildcards") == OK);
+	DirAccess::remove_absolute(root.path_join("mods/a/tr/one.tres"));
+	DirAccess::remove_absolute(root.path_join("mods/a/tr"));
+	DirAccess::remove_absolute(root.path_join("mods/a"));
+	DirAccess::remove_absolute(root.path_join("mods"));
+	DirAccess::remove_absolute(root.path_join("missing"));
+	DirAccess::remove_absolute(root);
+}
+
 } // namespace TestFilesManifestServer

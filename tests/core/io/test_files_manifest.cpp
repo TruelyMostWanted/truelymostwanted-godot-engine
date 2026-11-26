@@ -194,6 +194,84 @@ TEST_CASE("[FilesManifest] Missing folders report an error or are created") {
 	remove_tree(root);
 }
 
+TEST_CASE("[FilesManifest] Paths keep the load order") {
+	const String root = create_tree("files_manifest_order");
+	Ref<Resource> res;
+	res.instantiate();
+	REQUIRE(ResourceSaver::save(res, root.path_join("z.tres")) == OK);
+
+	Ref<FilesManifest> manifest;
+	manifest.instantiate();
+	// Inside a folder, files are sorted by path, subfolders included.
+	manifest->set_folder_paths({ root });
+	CHECK(manifest->get_paths() == make_paths(root, { "a.tres", "b.res", "m.tres", "sub/c.tres", "z.tres" }));
+
+	// Folders first in list order, then files in list order; a path that appears again keeps its first position.
+	manifest->set_folder_paths({ root.path_join("sub"), root });
+	manifest->set_file_paths({ root.path_join("z.tres"), root.path_join("sub/c.tres") });
+	CHECK(manifest->get_paths() == make_paths(root, { "sub/c.tres", "a.tres", "b.res", "m.tres", "z.tres" }));
+
+	manifest->set_folder_paths(PackedStringArray());
+	manifest->set_file_paths({ root.path_join("m.tres"), root.path_join("a.tres"), root.path_join("m.tres") });
+	CHECK(manifest->get_paths() == make_paths(root, { "m.tres", "a.tres" }));
+
+	// The preview counts the files per entry, without creating folders or printing errors.
+	const String missing = root.path_join("missing");
+	manifest->set_folder_paths({ missing, root.path_join("sub") });
+	manifest->set_file_paths({ root.path_join("a.tres"), root.path_join("nothing.tres") });
+	manifest->set_create_missing_folders(true);
+	LocalVector<int> counts;
+	CHECK(manifest->get_paths(nullptr, &counts) == make_paths(root, { "sub/c.tres", "a.tres" }));
+	REQUIRE(counts.size() == 4);
+	CHECK(counts[0] == 0);
+	CHECK(counts[1] == 1);
+	CHECK(counts[2] == 1);
+	CHECK(counts[3] == 0);
+	CHECK_FALSE(DirAccess::dir_exists_absolute(missing));
+
+	remove_tree(root);
+}
+
+TEST_CASE("[FilesManifest] Wildcard folders match one level, sorted by name") {
+	CHECK(FilesManifest::get_folder_base("user://mods/*/translations") == "user://mods/");
+	CHECK(FilesManifest::get_folder_base("user://mods/mod_?") == "user://mods/");
+	CHECK(FilesManifest::get_folder_base("user://mods") == "user://mods");
+	CHECK(FilesManifest::get_folder_base("*/translations") == "res://");
+
+	const String temp = TestUtils::get_temp_path("files_manifest_wildcards");
+	remove_tree(temp);
+	Ref<Resource> res;
+	res.instantiate();
+	for (const String &file : { "mods/b/tr/x.tres", "mods/a/tr/y.tres", "mods/a_extra/other/z.tres", "mods/c/tr/sub/w.tres" }) {
+		REQUIRE(DirAccess::make_dir_recursive_absolute(temp.path_join(file).get_base_dir()) == OK);
+		REQUIRE(ResourceSaver::save(res, temp.path_join(file)) == OK);
+	}
+	const String root = FilesManifest::normalize_path(temp);
+
+	Ref<FilesManifest> manifest;
+	manifest.instantiate();
+	// Matches without the rest of the path (`a_extra`) are skipped.
+	manifest->set_folder_paths({ root.path_join("mods/*/tr") });
+	Error err = FAILED;
+	CHECK(manifest->get_paths(&err) == make_paths(root, { "mods/a/tr/y.tres", "mods/b/tr/x.tres", "mods/c/tr/sub/w.tres" }));
+	CHECK(err == OK);
+
+	manifest->set_folder_paths({ root.path_join("mods/a*") });
+	CHECK(manifest->get_paths() == make_paths(root, { "mods/a/tr/y.tres", "mods/a_extra/other/z.tres" }));
+
+	// No match is not an error, a missing base is.
+	manifest->set_folder_paths({ root.path_join("mods/*/nothing") });
+	CHECK(manifest->get_paths(&err).is_empty());
+	CHECK(err == OK);
+	manifest->set_folder_paths({ root.path_join("missing/*/tr") });
+	ERR_PRINT_OFF;
+	CHECK(manifest->get_paths(&err).is_empty());
+	ERR_PRINT_ON;
+	CHECK(err == ERR_FILE_NOT_FOUND);
+
+	remove_tree(temp);
+}
+
 TEST_CASE("[FilesManifest] All resources are loaded, blocking and threaded") {
 	const String root = create_tree("files_manifest_load");
 
