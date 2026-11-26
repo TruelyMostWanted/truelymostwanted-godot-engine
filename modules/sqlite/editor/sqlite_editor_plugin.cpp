@@ -31,9 +31,11 @@
 #include "sqlite_editor_plugin.h"
 
 #include "../sqlite_database.h"
+#include "sqlite_table_editor.h"
 
 #include "core/io/file_access.h"
 #include "core/object/callable_mp.h"
+#include "editor/editor_node.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
@@ -104,11 +106,11 @@ void SQLiteTableOverview::_update() {
 		for (int tree_column = 0; tree_column < COLUMN_MAX; tree_column++) {
 			item->set_tooltip_text(tree_column, tooltip);
 		}
-		item->add_button(COLUMN_TABLE, edit_icon, BUTTON_EDIT, true, TTR("Edit the table (comes with the SQLite table editor)."));
+		item->add_button(COLUMN_TABLE, edit_icon, BUTTON_EDIT, false, TTR("Edit the rows of the table."));
 	}
 	database->close();
 
-	summary_label->set_text(vformat(TTR("%d tables, %s, read-only."), tables.size(), String::humanize_size(file_size)));
+	summary_label->set_text(vformat(TTR("%d tables, %s."), tables.size(), String::humanize_size(file_size)));
 }
 
 void SQLiteTableOverview::_count_rows() {
@@ -120,6 +122,12 @@ void SQLiteTableOverview::_count_rows() {
 	database.instantiate();
 	if (database->open(path, SQLiteDatabase::OPEN_MODE_READ_ONLY) == OK) {
 		item->set_text(COLUMN_ROWS, itos(database->get_row_count(item->get_text(COLUMN_TABLE))));
+	}
+}
+
+void SQLiteTableOverview::_edit_table(TreeItem *p_item, int p_column, int p_id, MouseButton p_button) {
+	if (p_button == MouseButton::LEFT && p_id == BUTTON_EDIT && SQLiteTableEditor::get_singleton()) {
+		SQLiteTableEditor::get_singleton()->edit(path, p_item->get_text(COLUMN_TABLE));
 	}
 }
 
@@ -161,6 +169,7 @@ SQLiteTableOverview::SQLiteTableOverview(const String &p_path) {
 	}
 	tree->set_custom_minimum_size(Size2(0, 200) * EDSCALE);
 	tree->connect("item_activated", callable_mp(this, &SQLiteTableOverview::_count_rows));
+	tree->connect("button_clicked", callable_mp(this, &SQLiteTableOverview::_edit_table));
 	add_child(tree);
 }
 
@@ -184,4 +193,6 @@ SQLiteEditorPlugin::SQLiteEditorPlugin() {
 	Ref<EditorInspectorPluginSQLite> plugin;
 	plugin.instantiate();
 	add_inspector_plugin(plugin);
+
+	EditorNode::get_singleton()->get_gui_base()->add_child(memnew(SQLiteTableEditor));
 }

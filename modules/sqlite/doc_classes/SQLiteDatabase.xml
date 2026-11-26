@@ -19,7 +19,7 @@
 		Parameters are passed as an [Array] for positional placeholders ([code]?[/code], [code]?1[/code]) or as a [Dictionary] for named placeholders ([code]:name[/code], [code]@name[/code], [code]$name[/code]; the keys are written without the prefix). Values map to SQLite types as follows: [code]null[/code] to NULL, [bool] and [int] to INTEGER, [float] to REAL, [String] and [StringName] to TEXT, [PackedByteArray] to BLOB. Other types are rejected with [constant ERR_INVALID_PARAMETER]. Results come back as [int], [float], [String], [PackedByteArray] or [code]null[/code].
 		Methods return an [enum Error]; [method get_last_error_message] gives the details of the last failure. SQL errors are not printed to the output.
 		The build includes FTS5 full-text search, the JSON functions and the math functions. Write-ahead logging (WAL) and loadable extensions are not available. Locks are not used: open each database file through one [SQLiteDatabase] at a time, and use one [SQLiteDatabase] from one thread at a time.
-		[SQLiteDatabase] is a [Resource]: files ending in [code].db[/code], [code].sqlite[/code], [code].sqlite3[/code] or [code].db3[/code] can be loaded with [method @GDScript.load] or assigned to an exported property. Loading only creates the object; [method open] without a path then opens the loaded file. In the editor, selecting such a file shows its tables in the Inspector. The files are exported as they are.
+		[SQLiteDatabase] is a [Resource]: files ending in [code].db[/code], [code].sqlite[/code], [code].sqlite3[/code] or [code].db3[/code] can be loaded with [method @GDScript.load] or assigned to an exported property. Loading only creates the object; [method open] without a path then opens the loaded file. In the editor, selecting such a file shows its tables in the Inspector; the [b]Edit[/b] button next to a table opens a window to edit, insert and delete its rows. The files are exported as they are.
 		[codeblock]
 		var db: SQLiteDatabase = load("res://data/items.db")
 		db.open() # Read-only, like every file in res://.
@@ -28,7 +28,7 @@
 		[/codeblock]
 		The schema methods ([method get_table_names], [method has_table], [method get_columns], [method get_column_names], [method get_column_count], [method get_row_count]) take plain table names (no schema prefix) and never paste them into SQL unquoted. For an unknown table they return an empty result or [code]-1[/code] and set [method get_last_error] to [constant ERR_DOES_NOT_EXIST].
 		[b]Note:[/b] [method @GDScript.load] returns the same object for the same file while it is in use. For a second, separate connection, create one with [code]SQLiteDatabase.new()[/code] and open the path explicitly.
-		[b]Note:[/b] Databases in [code]res://[/code] are read-only, also in the editor. To modify a database shipped with the project, copy it to [code]user://[/code] first, for example with [method DirAccess.copy_absolute].
+		[b]Note:[/b] Databases in [code]res://[/code] are read-only for scripts, also in the editor (the Inspector's table editor can still change them). To modify a database shipped with the project, copy it to [code]user://[/code] first, for example with [method DirAccess.copy_absolute].
 		[b]Note:[/b] On the Web, the rollback journal is kept in memory and the database file is written to IndexedDB on every commit.
 	</description>
 	<tutorials>
