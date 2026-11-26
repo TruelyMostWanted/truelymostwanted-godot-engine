@@ -17,6 +17,8 @@ def get_doc_classes():
         "FlowFrame",
         "FlowGetVariableNode",
         "FlowGraph",
+        "FlowGraphMermaid",
+        "FlowGraphMermaidOptions",
         "FlowGraphValidation",
         "FlowNode",
         "FlowPort",

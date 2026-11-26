@@ -1347,6 +1347,9 @@
 			- [b]Legacy[/b] is the old focus strategy up until Godot 4.8. It shouldn't be used for new projects, as the new default (Balloon) yields more intuitive results.
 			- [b]Balloon[/b] searches for both the closest and most aligned [Control] node in the input direction, akin to an expanding balloon which stops at the first node it finds.
 		</member>
+		<member name="flow_graph/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [FlowGraph] files in text formats ([code]mmd[/code] and the JSON, YAML and TOML formats of [ResourceTextSerializer]) are converted to binary [code]res[/code] files on export, so exported projects load them without parsing text. [code]tres[/code] files follow [member editor/export/convert_text_resources_to_binary].
+		</member>
 		<member name="gui/common/default_scroll_deadzone" type="int" setter="" getter="" default="0">
 			Default value for [member ScrollContainer.scroll_deadzone], which will be used for all [ScrollContainer]s unless overridden.
 		</member>
