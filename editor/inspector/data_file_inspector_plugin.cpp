@@ -398,9 +398,9 @@ void DataFileInspectorView::_update() {
 	}
 	summary_label->set_text(vformat("%s: %s", resource->get_class(), counts));
 
+	// Only plain data files open in the script editor (see ScriptEditorPlugin::handles()).
 	const String path = resource->get_path();
-	const Ref<TextDataFormat> file_format = resource;
-	text_button->set_disabled(file_format.is_valid() ? !file_format->is_recognized_path(path) : path.get_extension().to_lower() != "json");
+	text_button->set_disabled(format.is_valid() ? !format->is_recognized_path(path) : path.get_extension().to_lower() != "json");
 	table_button->set_visible(csv);
 	search->set_visible(!csv);
 
