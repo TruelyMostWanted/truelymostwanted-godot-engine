@@ -65,7 +65,9 @@ static constexpr const char *SETTING_SORT_KEYS = "filesystem/resources/text_form
 static constexpr const char *SETTING_FULL_PRECISION_FLOATS = "filesystem/resources/text_formats/full_precision_floats";
 static constexpr const char *SETTING_CSV_DELIMITER = "filesystem/resources/text_formats/csv_delimiter";
 static constexpr const char *SETTING_CSV_HEADERS = "filesystem/resources/text_formats/csv_headers";
-static constexpr const char *SETTING_INI_PLAIN_VALUES = "filesystem/resources/text_formats/ini_plain_values";
+static constexpr const char *SETTING_INI_VALUE_STYLE = "filesystem/resources/text_formats/ini_value_style";
+// Bool setting before ini_value_style; still read if a project.godot has it and ini_value_style is the default.
+static constexpr const char *SETTING_INI_PLAIN_VALUES_LEGACY = "filesystem/resources/text_formats/ini_plain_values";
 static constexpr const char *SETTING_XML_DECLARATION = "filesystem/resources/text_formats/xml_declaration";
 
 // Set while a resource is encoded with SerializerOptions.full_precision_floats (see _plain_real()).
@@ -100,7 +102,7 @@ void ResourceTextSerializer::register_settings() {
 	GLOBAL_DEF(SETTING_FULL_PRECISION_FLOATS, false);
 	GLOBAL_DEF(SETTING_CSV_DELIMITER, ",");
 	GLOBAL_DEF(SETTING_CSV_HEADERS, true);
-	GLOBAL_DEF(SETTING_INI_PLAIN_VALUES, false);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_INI_VALUE_STYLE, PROPERTY_HINT_ENUM, "Plain,Godot Variant"), int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
 	GLOBAL_DEF(SETTING_XML_DECLARATION, true);
 }
 
@@ -128,8 +130,11 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_default_options() {
 	if (settings->has_setting(SETTING_CSV_HEADERS)) {
 		options.csv_headers = settings->get_setting_with_override(SETTING_CSV_HEADERS);
 	}
-	if (settings->has_setting(SETTING_INI_PLAIN_VALUES)) {
-		options.ini_plain_values = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES);
+	const int ini_style = settings->has_setting(SETTING_INI_VALUE_STYLE) ? int(settings->get_setting_with_override(SETTING_INI_VALUE_STYLE)) : int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT);
+	if (ini_style != SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT) {
+		options.ini_plain_values = ini_style == SerializerOptions::INI_VALUE_STYLE_PLAIN;
+	} else if (settings->has_setting(SETTING_INI_PLAIN_VALUES_LEGACY)) {
+		options.ini_plain_values = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES_LEGACY);
 	}
 	if (settings->has_setting(SETTING_XML_DECLARATION)) {
 		options.xml_declaration = settings->get_setting_with_override(SETTING_XML_DECLARATION);
