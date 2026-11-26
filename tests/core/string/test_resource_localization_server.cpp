@@ -236,4 +236,63 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	SIGNAL_UNWATCH(server, SNAME("resources_relocalized"));
 }
 
+// Prints the cost of one path_remap() with 1000 remapped paths: Godot's table vs the server (both check that the
+// localized file exists), and the server's lookup alone.
+TEST_CASE("[ResourceLocalizationServer] Remap cost") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	const String folder = make_folder("resource_localization_cost");
+	const PackedStringArray locales = { "ar", "de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr", "zh" };
+	Dictionary remaps;
+	for (int index = 0; index < 1000; index++) {
+		PackedStringArray paths;
+		for (const String &locale : locales) {
+			paths.push_back(folder.path_join(vformat("%s_%d.bin", locale, index)) + ":" + locale);
+		}
+		remaps[folder.path_join(vformat("file_%d.bin", index))] = paths;
+	}
+	const String path = folder.path_join("file_500.bin");
+	for (const String &file : PackedStringArray({ "file_500.bin", "pl_500.bin" })) {
+		Ref<FileAccess> f = FileAccess::open(folder.path_join(file), FileAccess::WRITE);
+		REQUIRE(f.is_valid());
+		f->store_8(0);
+	}
+	const Variant previous_remaps = ProjectSettings::get_singleton()->get_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, Dictionary());
+	ProjectSettings::get_singleton()->set_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, remaps);
+	ResourceLoader::load_translation_remaps();
+	ProjectSettings::get_singleton()->set_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, previous_remaps);
+	Ref<ResourceLocalizationCatalog> catalog;
+	catalog.instantiate();
+	catalog->add_translation_remaps(remaps);
+	server->add_catalog(catalog);
+	LocalizationServer::set_locale("pl_PL");
+
+	constexpr int calls = 2000;
+	int64_t length = 0; // Keeps the calls from being optimized away.
+	const ResourceLoader::PathLocalizer localizer = ResourceLoader::path_localizer;
+	ResourceLoader::path_localizer = nullptr;
+	uint64_t start = OS::get_singleton()->get_ticks_usec();
+	for (int call = 0; call < calls; call++) {
+		length += ResourceLoader::path_remap(path).length();
+	}
+	const double godot_ns = (OS::get_singleton()->get_ticks_usec() - start) * 1000.0 / calls;
+	const String godot_path = ResourceLoader::path_remap(path);
+	ResourceLoader::path_localizer = localizer;
+	start = OS::get_singleton()->get_ticks_usec();
+	for (int call = 0; call < calls; call++) {
+		length += ResourceLoader::path_remap(path).length();
+	}
+	const double server_ns = (OS::get_singleton()->get_ticks_usec() - start) * 1000.0 / calls;
+	start = OS::get_singleton()->get_ticks_usec();
+	for (int call = 0; call < calls; call++) {
+		length += server->get_localized_path(path).length();
+	}
+	const double lookup_ns = (OS::get_singleton()->get_ticks_usec() - start) * 1000.0 / calls;
+
+	CHECK(length > 0);
+	CHECK(ResourceLoader::path_remap(path) == godot_path);
+	CHECK(godot_path == folder.path_join("pl_500.bin"));
+	MESSAGE(vformat("path_remap with 1000 remaps x 12 locales: Godot %.0f ns, server %.0f ns, server lookup alone %.0f ns", godot_ns, server_ns, lookup_ns).utf8().get_data());
+}
+
 } // namespace TestResourceLocalizationServer
