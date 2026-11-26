@@ -394,8 +394,8 @@ void DataFileInspectorView::_update_tree() {
 	const Ref<Font> font = get_theme_font(SceneStringName(font), SNAME("Tree"));
 	const int font_size = get_theme_font_size(SceneStringName(font_size), SNAME("Tree"));
 	const int row_height = (int)(font.is_valid() ? font->get_height(font_size) + get_theme_constant(SNAME("v_separation"), SNAME("Tree")) : 24 * EDSCALE);
-	const int top_level = MIN(DataFileTreeAdapter::get_child_count(root_value, xml), CHILD_PAGE);
-	tree->set_custom_minimum_size(Size2(0, (CLAMP(top_level, 3, 14) + 2) * row_height));
+	const int top_level_count = MIN(DataFileTreeAdapter::get_child_count(root_value, xml), CHILD_PAGE);
+	tree->set_custom_minimum_size(Size2(0, (CLAMP(top_level_count, 3, 14) + 2) * row_height));
 }
 
 void DataFileInspectorView::_queue_update() {
@@ -419,17 +419,17 @@ void DataFileInspectorView::_update() {
 		}
 	}
 
-	const Variant data = format.is_valid() ? format->get_data() : json->get_data();
+	const Variant file_data = format.is_valid() ? format->get_data() : json->get_data();
 	const bool csv = Object::cast_to<CSV>(*resource) != nullptr;
 	xml = Object::cast_to<XML>(*resource) != nullptr;
 
-	root_value = data;
+	root_value = file_data;
 	String counts;
 	if (csv) {
 		const Ref<CSV> csv_file = resource;
 		counts = vformat(TTR("%d rows, %d columns"), csv_file->get_row_count(), csv_file->get_column_count());
 	} else if (Object::cast_to<INI>(*resource)) {
-		const Dictionary sections = data;
+		const Dictionary sections = file_data;
 		int key_count = 0;
 		for (const KeyValue<Variant, Variant> &kv : sections) {
 			key_count += Dictionary(kv.value).size();
@@ -437,7 +437,7 @@ void DataFileInspectorView::_update() {
 		counts = vformat(TTR("%d sections, %d keys"), sections.size(), key_count);
 	} else if (xml) {
 		// The tree shows the root element itself as the only top-level node.
-		const Dictionary root = data;
+		const Dictionary root = file_data;
 		Array nodes;
 		if (!root.is_empty()) {
 			nodes.push_back(root);
@@ -445,12 +445,12 @@ void DataFileInspectorView::_update() {
 		root_value = nodes;
 		counts = root.is_empty() ? TTR("No root element") : vformat(TTR("Root element <%s>, %d child nodes"), root.get(XML::KEY_NAME, String()), Array(root.get(XML::KEY_CHILDREN, Array())).size());
 	} else {
-		const DataFileTreeAdapter::Entry entry = DataFileTreeAdapter::make_entry(String(), data, false);
+		const DataFileTreeAdapter::Entry entry = DataFileTreeAdapter::make_entry(String(), file_data, false);
 		counts = entry.data.is_array() || entry.data.get_type() == Variant::DICTIONARY ? entry.type + ", " + entry.value : entry.type;
 	}
 	summary_label->set_text(vformat("%s: %s", resource->get_class(), counts));
 
-	// Only plain data files open in the script editor (see ScriptEditorPlugin::handles()).
+	// Only plain file_data files open in the script editor (see ScriptEditorPlugin::handles()).
 	const String path = resource->get_path();
 	text_button->set_disabled(format.is_valid() ? !format->is_recognized_path(path) : path.get_extension().to_lower() != "json");
 	table_button->set_visible(csv);
