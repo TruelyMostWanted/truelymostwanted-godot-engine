@@ -108,11 +108,13 @@
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
+#include "scene/main/progress_bar_server.h"
 #include "scene/main/resource_preloader.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/screenshot_server.h"
 #include "scene/main/shader_globals_override.h"
 #include "scene/main/status_indicator.h"
+#include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
 #include "scene/main/viewport.h"
 #include "scene/main/viewport_server.h"
@@ -165,6 +167,7 @@
 #include "scene/resources/particle_process_material.h"
 #include "scene/resources/placeholder_textures.h"
 #include "scene/resources/portable_compressed_texture.h"
+#include "scene/resources/progress_bar_style.h"
 #include "scene/resources/resource_format_text.h"
 #include "scene/resources/shader_include.h"
 #include "scene/resources/shader_include_resource_format.h"
@@ -398,6 +401,7 @@ static AudioMixerServer *audio_mixer_server = nullptr;
 static ScreenshotServer *screenshot_server = nullptr;
 static ViewportServer *viewport_server = nullptr;
 static InputIconServer *input_icon_server = nullptr;
+static ProgressBarServer *progress_bar_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
 static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
@@ -519,6 +523,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(HTTPRequestTarget);
 	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
+	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
@@ -1079,6 +1084,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(StyleBoxLine);
 	GDREGISTER_CLASS(Theme);
 	GDREGISTER_CLASS(InputIconSet);
+	GDREGISTER_CLASS(ProgressBarStyle);
 
 	GDREGISTER_CLASS(BitMap);
 	GDREGISTER_CLASS(Gradient);
@@ -1436,6 +1442,10 @@ void unregister_scene_types() {
 		memdelete(input_icon_server);
 		input_icon_server = nullptr;
 	}
+	if (progress_bar_server) {
+		memdelete(progress_bar_server);
+		progress_bar_server = nullptr;
+	}
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
@@ -1544,6 +1554,10 @@ void register_scene_singletons() {
 	GDREGISTER_CLASS(InputIconServer);
 	input_icon_server = memnew(InputIconServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputIconServer", InputIconServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ProgressBarServer);
+	progress_bar_server = memnew(ProgressBarServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ProgressBarServer", ProgressBarServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }

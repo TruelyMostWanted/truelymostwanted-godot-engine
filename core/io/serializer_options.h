@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/io/resource.h"
+#include "core/variant/binder_common.h"
 
 // Typed options of the text formats of ResourceTextSerializer (JSON, INI, CSV, XML, TOML).
 // A Resource, so a set of options can be edited in the Inspector and saved as a preset (.tres).
@@ -38,6 +39,14 @@
 class SerializerOptions : public Resource {
 	GDCLASS(SerializerOptions, Resource);
 
+public:
+	enum IniValueStyle {
+		INI_VALUE_STYLE_PLAIN, // Plain text that other tools can read (`name=Ann`, `size=1, 2`).
+		INI_VALUE_STYLE_GODOT_VARIANT, // Godot Variant syntax like ConfigFile (`name="Ann"`, `size=Vector2(1, 2)`).
+		INI_VALUE_STYLE_MAX,
+	};
+
+private:
 	String indent = "  ";
 	bool enums_as_names = true;
 	Ref<Resource> defaults;
@@ -46,7 +55,7 @@ class SerializerOptions : public Resource {
 	bool full_precision_floats = false;
 	String csv_delimiter = ",";
 	bool csv_headers = true;
-	bool ini_plain_values = false;
+	IniValueStyle ini_value_style = INI_VALUE_STYLE_GODOT_VARIANT;
 	bool xml_declaration = true;
 
 protected:
@@ -77,9 +86,11 @@ public:
 	void set_csv_headers(bool p_enable);
 	bool is_csv_headers() const;
 
-	void set_ini_plain_values(bool p_enable);
-	bool is_ini_plain_values() const;
+	void set_ini_value_style(IniValueStyle p_style);
+	IniValueStyle get_ini_value_style() const;
 
 	void set_xml_declaration(bool p_enable);
 	bool is_xml_declaration() const;
 };
+
+VARIANT_ENUM_CAST(SerializerOptions::IniValueStyle);

@@ -24,7 +24,7 @@
 		<member name="exit_names" type="PackedStringArray" setter="set_exit_names" getter="get_exit_names" default="PackedStringArray()">
 			Extra flow outputs, one per name. When the inner graph ends at a [FlowEndNode] whose [member FlowEndNode.end_name] is in this list, the node continues through the output of that name; any other end continues through [code]out[/code].
 		</member>
-		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph" default="null">
+		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph">
 			The graph to run. It is a separate resource and keeps its own nodes, variables and start node.
 		</member>
 	</members>

@@ -71,7 +71,7 @@ void FlowPort::set_kind(PortKind p_kind) {
 	emit_changed();
 }
 
-void FlowPort::set_type(Variant::Type p_type) {
+void FlowPort::set_port_type(Variant::Type p_type) {
 	ERR_FAIL_INDEX(p_type, Variant::VARIANT_MAX);
 	type = p_type;
 	emit_changed();
@@ -100,8 +100,8 @@ void FlowPort::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_port_name"), &FlowPort::get_port_name);
 	ClassDB::bind_method(D_METHOD("set_kind", "kind"), &FlowPort::set_kind);
 	ClassDB::bind_method(D_METHOD("get_kind"), &FlowPort::get_kind);
-	ClassDB::bind_method(D_METHOD("set_type", "type"), &FlowPort::set_type);
-	ClassDB::bind_method(D_METHOD("get_type"), &FlowPort::get_type);
+	ClassDB::bind_method(D_METHOD("set_port_type", "type"), &FlowPort::set_port_type);
+	ClassDB::bind_method(D_METHOD("get_port_type"), &FlowPort::get_port_type);
 	ClassDB::bind_method(D_METHOD("set_class_hint", "class_hint"), &FlowPort::set_class_hint);
 	ClassDB::bind_method(D_METHOD("get_class_hint"), &FlowPort::get_class_hint);
 	ClassDB::bind_method(D_METHOD("set_default_value", "value"), &FlowPort::set_default_value);
@@ -111,7 +111,7 @@ void FlowPort::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "name"), "set_port_name", "get_port_name");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "kind", PROPERTY_HINT_ENUM, "Flow,Data"), "set_kind", "get_kind");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, get_type_hint_string()), "set_type", "get_type");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, get_type_hint_string()), "set_port_type", "get_port_type");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "class_hint"), "set_class_hint", "get_class_hint");
 	ADD_PROPERTY(PropertyInfo(Variant::NIL, "default_value", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_NIL_IS_VARIANT), "set_default_value", "get_default_value");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "label"), "set_label", "get_label");
