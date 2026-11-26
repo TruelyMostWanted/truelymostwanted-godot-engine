@@ -33,25 +33,15 @@
 #include "core/math/expression.h"
 #include "core/object/class_db.h"
 
-static const StringName &_port_in() {
-	static const StringName name = "in";
-	return name;
-}
-
-static const StringName &_port_out() {
-	static const StringName name = "out";
-	return name;
-}
-
 static TypedArray<FlowPort> _flow_in() {
 	TypedArray<FlowPort> ports;
-	ports.push_back(FlowPort::create_flow(_port_in()));
+	ports.push_back(FlowPort::create_flow(SNAME("in")));
 	return ports;
 }
 
 static TypedArray<FlowPort> _flow_out() {
 	TypedArray<FlowPort> ports;
-	ports.push_back(FlowPort::create_flow(_port_out()));
+	ports.push_back(FlowPort::create_flow(SNAME("out")));
 	return ports;
 }
 
