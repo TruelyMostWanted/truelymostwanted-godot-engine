@@ -553,6 +553,12 @@
 /modules/yaml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/yaml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
 /modules/yaml/tests/                          @TruelyMostWanted @godotengine/tests
+/modules/sqlite/                              @TruelyMostWanted
+/modules/sqlite/**/*.py                       @TruelyMostWanted @godotengine/buildsystem
+/modules/sqlite/**/SCsub                      @TruelyMostWanted @godotengine/buildsystem
+/modules/sqlite/doc_classes/                  @TruelyMostWanted @godotengine/documentation
+/modules/sqlite/tests/                        @TruelyMostWanted @godotengine/tests
+/thirdparty/sqlite/                           @TruelyMostWanted @godotengine/buildsystem
 /servers/settings/                            @TruelyMostWanted
 /servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
 /modules/mono/tests/                          @TruelyMostWanted @godotengine/dotnet @godotengine/tests
