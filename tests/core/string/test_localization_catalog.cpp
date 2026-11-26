@@ -79,6 +79,7 @@ TEST_CASE("[LocalizationCatalog] CSV follows the importer rules") {
 	CHECK(catalog->get_plural_text("APPLE", "de", 5) == String(U"%d Äpfel"));
 	CHECK(catalog->get_plural_rule("de") == PLURAL_RULE);
 	CHECK(catalog->get_text("BYE", "de").is_empty());
+	CHECK(catalog->get_note("HELLO") == "greeting");
 	CHECK(catalog->get_translated_count("de") == 4);
 	CHECK(catalog->get_missing_rows("de") == PackedInt32Array({ 4 }));
 	CHECK(catalog->get_key(1) == "HELLO");
@@ -165,6 +166,9 @@ TEST_CASE("[LocalizationCatalog] Binary format loads one locale at a time") {
 	loaded->unload_locale("de");
 	CHECK_FALSE(loaded->is_locale_loaded("de"));
 	CHECK(loaded->load_locale("de") == OK);
+	// Translator notes are not stored in the binary format.
+	CHECK(loaded->get_note_columns().is_empty());
+	catalog->set_note("HELLO", String());
 	CHECK(loaded->get("data") == catalog->get("data"));
 
 	// A changed catalog no longer reads from the file.
@@ -178,6 +182,59 @@ TEST_CASE("[LocalizationCatalog] Binary format loads one locale at a time") {
 	ERR_PRINT_OFF;
 	CHECK(wrong->load_from_file(path) == ERR_INVALID_DATA);
 	ERR_PRINT_ON;
+	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[LocalizationCatalog] Translator notes round trip in every text format") {
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	CHECK(catalog->get_note_columns() == PackedStringArray({ "notes" }));
+	CHECK(catalog->get_note("HELLO", "menu").is_empty());
+	catalog->set_note("HELLO", "Main menu button", "menu");
+	catalog->set_note("APPLE", "12", StringName(), "max_length");
+	catalog->set_note("LINE", "Two lines\nkeep it short");
+	CHECK(catalog->get_note_columns() == PackedStringArray({ "notes", "max_length" }));
+	CHECK(catalog->get_note("APPLE", StringName(), "max_length") == "12");
+	CHECK(catalog->get_note("MISSING").is_empty());
+	// The reserved columns are no notes.
+	ERR_PRINT_OFF;
+	catalog->set_note("HELLO", "x", StringName(), "plural");
+	ERR_PRINT_ON;
+	CHECK(catalog->get_note("HELLO", StringName(), "plural").is_empty());
+	CHECK(catalog->get_note_columns().size() == 2);
+
+	for (int format = 0; format < ResourceTextSerializer::FORMAT_MAX; format++) {
+		const char *format_classes[] = { "JSON", "INI", "CSV", "XML", "TOML", "YAML" };
+		if (!ClassDB::class_exists(format_classes[format])) {
+			continue; // Module disabled.
+		}
+		CAPTURE(format_classes[format]);
+		Ref<TextLocalizationCatalog> copy;
+		copy.instantiate();
+		REQUIRE(copy->load_from_text(catalog->to_text(ResourceTextSerializer::Format(format)), ResourceTextSerializer::Format(format)) == OK);
+		CHECK(copy->get_note("HELLO") == "greeting");
+		CHECK(copy->get_note("HELLO", "menu") == "Main menu button");
+		CHECK(copy->get_note("APPLE", StringName(), "max_length") == "12");
+		CHECK(copy->get_note("LINE") == "Two lines\nkeep it short");
+		CHECK(copy->get_plural_text("APPLE", "de", 3) == String(U"%d Äpfel"));
+		CHECK(copy->get("data") == catalog->get("data"));
+	}
+
+	// Notes move with their rows.
+	catalog->remove_key("HELLO");
+	CHECK(catalog->get_note("HELLO", "menu") == "Main menu button");
+	CHECK(catalog->get_note("APPLE", StringName(), "max_length") == "12");
+
+	// ResourceLoader (the localization servers) loads text catalogs without notes outside the editor.
+	const String path = TestUtils::get_temp_path("localization_catalog_notes.csv");
+	REQUIRE(catalog->save_to_file(path) == OK);
+	const Ref<TextLocalizationCatalog> loaded = ResourceLoader::load(path, "TextLocalizationCatalog", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_text("HELLO", "de", "menu") == String(U"Hallo (Menü)"));
+	CHECK(loaded->get_note_columns().is_empty());
+	Ref<TextLocalizationCatalog> tool;
+	tool.instantiate();
+	REQUIRE(tool->load_from_file(path) == OK);
+	CHECK(tool->get_note("HELLO", "menu") == "Main menu button");
 	DirAccess::remove_absolute(path);
 }
 

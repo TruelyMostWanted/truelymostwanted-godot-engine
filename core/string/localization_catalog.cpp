@@ -30,6 +30,7 @@
 
 #include "localization_catalog.h"
 
+#include "core/config/engine.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -463,6 +464,9 @@ void LocalizationCatalog::remove_key(const StringName &p_key, const StringName &
 		_remove_row(column->plural_forms, row);
 	}
 	_remove_row(row_extras, row);
+	for (NoteColumn &note_column : note_columns) {
+		_remove_row(note_column.notes, row);
+	}
 	_rebuild_index();
 	emit_changed();
 }
@@ -565,8 +569,65 @@ void LocalizationCatalog::clear() {
 	}
 	columns.clear();
 	row_extras.clear();
+	note_columns.clear();
 	source_path = String();
 	emit_changed();
+}
+
+LocalizationCatalog::NoteColumn *LocalizationCatalog::_get_note_column(const String &p_field) {
+	if (skip_notes || p_field == "_key" || p_field == "_context" || p_field == "_" + _get_extra_name()) {
+		return nullptr;
+	}
+	const StringName column_name = p_field.substr(1);
+	for (NoteColumn &note_column : note_columns) {
+		if (note_column.name == column_name) {
+			return &note_column;
+		}
+	}
+	if (column_name.is_empty()) {
+		return nullptr;
+	}
+	NoteColumn note_column;
+	note_column.name = column_name;
+	note_columns.push_back(note_column);
+	return &note_columns[note_columns.size() - 1];
+}
+
+void LocalizationCatalog::_set_note(uint32_t p_row, NoteColumn *p_column, const String &p_note) {
+	if (p_note.is_empty()) {
+		p_column->notes.erase(p_row);
+	} else {
+		p_column->notes[p_row] = p_note;
+	}
+}
+
+void LocalizationCatalog::set_note(const StringName &p_key, const String &p_note, const StringName &p_context, const StringName &p_column) {
+	// An empty column is "notes": C# passes the default of a StringName parameter as empty.
+	const StringName column = p_column == StringName() ? StringName("notes") : p_column;
+	NoteColumn *note_column = _get_note_column("_" + String(column));
+	ERR_FAIL_NULL_MSG(note_column, vformat("\"%s\" is not a note column: \"key\", \"context\" and \"%s\" are reserved.", column, _get_extra_name()));
+	_set_note(add_key(p_key, p_context), note_column, p_note);
+	emit_changed();
+}
+
+String LocalizationCatalog::get_note(const StringName &p_key, const StringName &p_context, const StringName &p_column) const {
+	const StringName column = p_column == StringName() ? StringName("notes") : p_column;
+	const int row = find_key(p_key, p_context);
+	for (const NoteColumn &note_column : note_columns) {
+		if (note_column.name == column) {
+			const String *note = row < 0 ? nullptr : note_column.notes.getptr(row);
+			return note ? *note : String();
+		}
+	}
+	return String();
+}
+
+PackedStringArray LocalizationCatalog::get_note_columns() const {
+	PackedStringArray names;
+	for (const NoteColumn &note_column : note_columns) {
+		names.push_back(note_column.name);
+	}
+	return names;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -605,6 +666,12 @@ Dictionary LocalizationCatalog::_get_data() const {
 		const String extra = _get_row_extra(row);
 		if (!extra.is_empty()) {
 			entry[extra_field] = extra;
+		}
+		for (const NoteColumn &note_column : note_columns) {
+			const String *note = note_column.notes.getptr(row);
+			if (note) {
+				entry["_" + String(note_column.name)] = *note;
+			}
 		}
 		for (const LocaleColumn *column : columns) {
 			const Vector<String> *forms = column->plural_forms.getptr(row);
@@ -668,6 +735,10 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 		for (const KeyValue<Variant, Variant> &field : entry) {
 			const String field_name = field.key;
 			if (field_name.begins_with("_")) {
+				NoteColumn *note_column = _get_note_column(field_name);
+				if (note_column) {
+					_set_note(row, note_column, field.value);
+				}
 				continue;
 			}
 			LocaleColumn *column = column_for(field_name);
@@ -685,7 +756,8 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 	emit_changed();
 }
 
-// XML: <catalog locales="en,de"><plural_rule locale="..">..</plural_rule><message key="" context="" plural=""><text locale="">..</text></message></catalog>
+// XML: <catalog locales="en,de"><plural_rule locale="..">..</plural_rule><message key="" context="" plural="">
+// <note name="notes">..</note><text locale="">..</text></message></catalog>
 static Dictionary _xml_to_data(const Dictionary &p_root, const String &p_extra_name) {
 	Dictionary data;
 	Dictionary rules;
@@ -719,7 +791,12 @@ static Dictionary _xml_to_data(const Dictionary &p_root, const String &p_extra_n
 				continue;
 			}
 			const Dictionary text = text_variant;
-			if (String(text.get(XML::KEY_NAME, String())) != "text") {
+			const String text_element = text.get(XML::KEY_NAME, String());
+			if (text_element == "note") {
+				entry["_" + String(Dictionary(text.get(XML::KEY_ATTRIBUTES, Dictionary())).get("name", String()))] = text.get(XML::KEY_TEXT, String());
+				continue;
+			}
+			if (text_element != "text") {
 				continue;
 			}
 			const String locale = Dictionary(text.get(XML::KEY_ATTRIBUTES, Dictionary())).get("locale", String());
@@ -778,7 +855,13 @@ static Dictionary _data_to_xml(const Dictionary &p_data, const String &p_extra_n
 		Array texts;
 		for (const KeyValue<Variant, Variant> &field : entry) {
 			const String locale = field.key;
+			if (locale == "_key" || locale == "_context" || locale == "_" + p_extra_name) {
+				continue;
+			}
 			if (locale.begins_with("_")) {
+				Dictionary note_attributes;
+				note_attributes["name"] = locale.substr(1);
+				texts.push_back(_make_xml_element("note", note_attributes, field.value));
 				continue;
 			}
 			Dictionary text_attributes;
@@ -834,6 +917,14 @@ Error LocalizationCatalog::_load_rows(const Array &p_rows) {
 	for (const KeyValue<int, String> &E : header.locale_columns) {
 		column_of[E.key] = _get_or_add_column(E.value);
 	}
+	// `_` columns, which the importer ignores: notes. Indices, as note_columns may grow.
+	HashMap<int, uint32_t> note_column_of;
+	for (int i = 1; i < header_row.size(); i++) {
+		const NoteColumn *note_column = header_row[i].begins_with("_") ? _get_note_column(header_row[i]) : nullptr;
+		if (note_column) {
+			note_column_of[i] = uint32_t(note_column - note_columns.ptr());
+		}
+	}
 
 	int plural_row = -1; // Row of the open plural block.
 	HashMap<int, PackedStringArray> plural_texts; // CSV column -> forms.
@@ -873,6 +964,11 @@ Error LocalizationCatalog::_load_rows(const Array &p_rows) {
 		if (plural_row < 0) {
 			row = add_key(key, context);
 			_set_row_extra(row, extra);
+			for (const KeyValue<int, uint32_t> &E : note_column_of) {
+				if (E.key < line.size()) {
+					_set_note(row, &note_columns[E.value], line[E.key]);
+				}
+			}
 			if (plural_column != -1 && !extra.is_empty()) {
 				plural_row = row;
 			}
@@ -924,6 +1020,10 @@ Array LocalizationCatalog::_get_rows() const {
 	for (const LocaleColumn *column : columns) {
 		header.push_back(column->locale);
 	}
+	const int first_note = (int)header.size();
+	for (const NoteColumn &note_column : note_columns) {
+		header.push_back("_" + String(note_column.name));
+	}
 	rows.push_back(header);
 
 	// Values are read with c_unescape() (like the importer), so backslashes are escaped.
@@ -951,6 +1051,12 @@ Array LocalizationCatalog::_get_rows() const {
 			const Vector<String> *forms = columns[i]->plural_forms.getptr(row);
 			form_count = forms ? MAX(form_count, (int)forms->size()) : form_count;
 			line.set(first_locale + i, escape(columns[i]->cells.get(row)));
+		}
+		for (uint32_t i = 0; i < note_columns.size(); i++) {
+			const String *note = note_columns[i].notes.getptr(row);
+			if (note) {
+				line.set(first_note + i, *note);
+			}
 		}
 		if (extra_column != -1) {
 			const String extra = _get_row_extra(row);
@@ -1201,6 +1307,9 @@ void LocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_translated_count", "locale"), &LocalizationCatalog::get_translated_count);
 	ClassDB::bind_method(D_METHOD("get_missing_rows", "locale"), &LocalizationCatalog::get_missing_rows);
 	ClassDB::bind_method(D_METHOD("clear"), &LocalizationCatalog::clear);
+	ClassDB::bind_method(D_METHOD("set_note", "key", "note", "context", "column"), &LocalizationCatalog::set_note, DEFVAL(StringName()), DEFVAL(StringName("notes")));
+	ClassDB::bind_method(D_METHOD("get_note", "key", "context", "column"), &LocalizationCatalog::get_note, DEFVAL(StringName()), DEFVAL(StringName("notes")));
+	ClassDB::bind_method(D_METHOD("get_note_columns"), &LocalizationCatalog::get_note_columns);
 
 	ClassDB::bind_method(D_METHOD("load_from_text", "text", "format"), &LocalizationCatalog::load_from_text);
 	ClassDB::bind_method(D_METHOD("to_text", "format"), &LocalizationCatalog::to_text);
@@ -1495,7 +1604,10 @@ Ref<Resource> ResourceFormatLoaderLocalizationCatalog::load(const String &p_path
 	}
 	Ref<LocalizationCatalog> catalog = Object::cast_to<LocalizationCatalog>(ClassDB::instantiate(type));
 	ERR_FAIL_COND_V(catalog.is_null(), Ref<Resource>());
+	// Translator notes are for the editor and tools; load_from_file() called directly keeps them.
+	catalog->skip_notes = !Engine::get_singleton()->is_editor_hint();
 	const Error err = catalog->load_from_file(p_path);
+	catalog->skip_notes = false;
 	if (r_error) {
 		*r_error = err;
 	}

@@ -284,6 +284,8 @@ void LocalizationServer::_rebuild(bool p_keys, const LocalVector<uint8_t> *p_dir
 		}
 		// A key follows the channel of the highest-priority catalog that has it.
 		table->row_channels.resize(row_count);
+		LocalVector<LocalVector<uint32_t>> layer_channels; // Layer -> the channels of its rows.
+		layer_channels.resize(table->layers.size());
 		for (uint32_t row = 0; row < row_count; row++) {
 			StringName channel = SNAME("interface"); // Rows of removed catalogs.
 			for (uint32_t layer = table->layers.size(); layer-- > 0;) {
@@ -301,6 +303,22 @@ void LocalizationServer::_rebuild(bool p_keys, const LocalVector<uint8_t> *p_dir
 			}
 			table->row_channels[row] = (uint32_t)channel_index;
 			table->channel_rows[channel_index].push_back(row);
+			// Every layer with the row serves the channel through the chain walk, not only the winning one.
+			for (uint32_t layer = 0; layer < table->layers.size(); layer++) {
+				if (table->get_catalog_row(layer, row) >= 0 && !layer_channels[layer].has((uint32_t)channel_index)) {
+					layer_channels[layer].push_back((uint32_t)channel_index);
+				}
+			}
+		}
+		table->channel_locales.resize(table->channels.size());
+		for (uint32_t layer = 0; layer < table->layers.size(); layer++) {
+			for (const uint32_t channel_index : layer_channels[layer]) {
+				for (const String &locale : table->layers[layer]->get_locales()) {
+					if (!table->channel_locales[channel_index].has(locale)) {
+						table->channel_locales[channel_index].push_back(locale);
+					}
+				}
+			}
 		}
 		keys = table;
 	}
@@ -528,10 +546,16 @@ PackedStringArray LocalizationServer::get_available_locales() const {
 	return _get_data()->keys->locales;
 }
 
-PackedStringArray LocalizationServer::get_all_available_locales() {
+PackedStringArray LocalizationServer::get_available_locales_for(const StringName &p_channel) const {
+	const KeyTable *table = _get_data()->keys;
+	const int64_t channel_index = table->channels.find(p_channel);
+	return channel_index < 0 ? PackedStringArray() : table->channel_locales[channel_index];
+}
+
+PackedStringArray LocalizationServer::get_all_available_locales(const StringName &p_channel) {
 	PackedStringArray locales;
 	for (const LocalizationServer *server : live_servers) {
-		for (const String &locale : server->get_available_locales()) {
+		for (const String &locale : p_channel.is_empty() ? server->get_available_locales() : server->get_available_locales_for(p_channel)) {
 			const String standardized = _standardize_locale(locale);
 			if (!locales.has(standardized)) {
 				locales.push_back(standardized);
@@ -556,6 +580,7 @@ void LocalizationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_catalog_manifest", "manifest", "priority"), &LocalizationServer::add_catalog_manifest, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("load_project_catalogs"), &LocalizationServer::load_project_catalogs);
 	ClassDB::bind_method(D_METHOD("get_available_locales"), &LocalizationServer::get_available_locales);
+	ClassDB::bind_method(D_METHOD("get_available_locales_for", "channel"), &LocalizationServer::get_available_locales_for);
 	ClassDB::bind_method(D_METHOD("get_key_count"), &LocalizationServer::get_key_count);
 
 	ADD_SIGNAL(MethodInfo("locale_loaded", PropertyInfo(Variant::STRING, "locale")));

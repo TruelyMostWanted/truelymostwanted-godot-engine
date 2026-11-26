@@ -78,10 +78,18 @@ public:
 	};
 
 private:
+	// Translator notes (#357): the `_` columns of the text formats other than `_key`, `_context` and the extra one.
+	struct NoteColumn {
+		StringName name; // Without the `_`.
+		HashMap<uint32_t, String> notes; // Sparse: row -> note.
+	};
+
 	Cells ids; // "key" or "context\x04key" per row.
 	LocalVector<uint32_t> index; // Open addressing: row + 1 per slot, 0 = empty.
 	LocalVector<LocaleColumn *> columns;
 	HashMap<uint32_t, String> row_extras; // Sparse: plural key (text) or expected type (resource) per row.
+	LocalVector<NoteColumn> note_columns; // Never in `.lcat`.
+	bool skip_notes = false; // Set by the loader outside the editor: runtime lookups don't need notes.
 	String source_path; // Binary file the unloaded columns are read from.
 	StringName channel;
 	mutable Mutex load_mutex;
@@ -100,6 +108,11 @@ private:
 	Array _get_rows() const;
 	Error _read_binary(const Ref<FileAccess> &p_file, const String &p_path);
 	Error _write_binary(const Ref<FileAccess> &p_file);
+	// The note column of `p_field` (`_name`), added if missing; null for the reserved fields or when notes are skipped.
+	NoteColumn *_get_note_column(const String &p_field);
+	void _set_note(uint32_t p_row, NoteColumn *p_column, const String &p_note);
+
+	friend class ResourceFormatLoaderLocalizationCatalog;
 
 protected:
 	static void _bind_methods();
@@ -169,6 +182,10 @@ public:
 	int get_translated_count(const String &p_locale) const;
 	PackedInt32Array get_missing_rows(const String &p_locale) const;
 	void clear();
+
+	void set_note(const StringName &p_key, const String &p_note, const StringName &p_context = StringName(), const StringName &p_column = StringName("notes"));
+	String get_note(const StringName &p_key, const StringName &p_context = StringName(), const StringName &p_column = StringName("notes")) const;
+	PackedStringArray get_note_columns() const;
 
 	Error load_from_text(const String &p_text, ResourceTextSerializer::Format p_format);
 	String to_text(ResourceTextSerializer::Format p_format) const;

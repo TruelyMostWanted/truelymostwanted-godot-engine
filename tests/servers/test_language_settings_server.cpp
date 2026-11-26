@@ -73,6 +73,9 @@ struct TestSetup {
 	~TestSetup() {
 		translation_server->remove_translation(french);
 		translation_server->remove_translation(japanese);
+		for (const char *channel : { "interface", "audio", "subtitles" }) {
+			translation_server->clear_locale_for(channel);
+		}
 		translation_server->set_locale(original_locale);
 		translation_server->set_pseudolocalization_enabled(original_pseudolocalization);
 		ProjectSettings::get_singleton()->set_setting("internationalization/locale/test", "");
@@ -229,6 +232,136 @@ TEST_CASE("[LanguageSettingsServer] The test locale wins at startup, a runtime c
 	CHECK_FALSE(server->has_session_override("locale"));
 	CHECK(translation_server->get_locale() == "fr");
 	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Locale channels are applied, saved and applied again on startup") {
+	TestSetup setup;
+	TranslationServer *translation_server = setup.translation_server;
+	const String path = temp_file("channels.ini");
+	{
+		LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+		server->set_file_path(path);
+		CHECK(server->get_setting_names().has("audio_locale"));
+		// Empty: same as the language.
+		CHECK(server->get_locale_for("audio").is_empty());
+		CHECK(server->get_default_value("subtitles_locale") == Variant(String()));
+
+		server->set_locale("fr");
+		server->set_locale_for("interface", "ja");
+		server->set_locale_for("audio", "ja-JP");
+		CHECK(server->get_locale_for(StringName()) == "fr");
+		CHECK(server->get_locale_for("audio") == "ja_JP");
+		CHECK(translation_server->get_locale() == "fr");
+		CHECK(translation_server->get_locale_for("interface") == "ja");
+		CHECK(translation_server->get_locale_for("audio") == "ja_JP");
+		CHECK(translation_server->get_locale_for("subtitles") == "fr");
+		CHECK(server->save() == OK);
+
+		server->set_locale_for("interface", "");
+		CHECK(translation_server->get_locale_for("interface") == "fr");
+		// Custom channels are not stored.
+		ERR_PRINT_OFF;
+		server->set_locale_for("custom", "ja");
+		ERR_PRINT_ON;
+		CHECK(translation_server->get_locale_for("custom") == "fr");
+		memdelete(server);
+	}
+
+	// "Restart": the engine follows the OS locale on every channel.
+	translation_server->clear_locale_for("audio");
+	translation_server->set_locale(project_locale());
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_file_path(path);
+	server->startup();
+	CHECK(translation_server->get_locale() == "fr");
+	CHECK(translation_server->get_locale_for("interface") == "ja");
+	CHECK(translation_server->get_locale_for("audio") == "ja_JP");
+	CHECK(translation_server->get_locale_for("subtitles") == "fr");
+	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Files without channels load, the test locale makes the channels follow it") {
+	TestSetup setup;
+	TranslationServer *translation_server = setup.translation_server;
+	const String old_path = temp_file("before_channels.json");
+	{
+		Ref<FileAccess> file = FileAccess::open(old_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("{ \"locale\": \"fr\" }");
+	}
+	LanguageSettingsServer *old_server = memnew(LanguageSettingsServer);
+	old_server->set_file_path(old_path);
+	old_server->startup();
+	CHECK(old_server->get_locale() == "fr");
+	CHECK(old_server->get_locale_for("interface").is_empty());
+	CHECK(old_server->get_locale_for("subtitles").is_empty());
+	CHECK(translation_server->get_locale_for("audio") == "fr");
+	memdelete(old_server);
+
+	const String path = temp_file("channels_test_locale.ini");
+	{
+		LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+		server->set_file_path(path);
+		server->set_locale("fr");
+		server->set_locale_for("audio", "fr");
+		CHECK(server->save() == OK);
+		memdelete(server);
+	}
+	ProjectSettings::get_singleton()->set_setting("internationalization/locale/test", "ja");
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_file_path(path);
+	server->startup();
+	CHECK(translation_server->get_locale() == "ja");
+	CHECK(translation_server->get_locale_for("audio") == "ja");
+	CHECK(server->has_session_override("audio_locale"));
+	CHECK(server->get_locale_for("audio") == "fr");
+
+	server->set_locale_for("audio", "fr");
+	CHECK_FALSE(server->has_session_override("audio_locale"));
+	CHECK(translation_server->get_locale_for("audio") == "fr");
+	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Channel locales are checked against the catalogs of the channel") {
+	TestSetup setup;
+	TranslationServer *translation_server = setup.translation_server;
+	TextLocalizationServer *text_server = TextLocalizationServer::get_singleton();
+	REQUIRE(text_server != nullptr);
+	Ref<TextLocalizationCatalog> interface_texts;
+	interface_texts.instantiate();
+	interface_texts->set_text("HELLO", "en", "Hello");
+	interface_texts->set_text("HELLO", "de", "Hallo");
+	Ref<TextLocalizationCatalog> subtitles;
+	subtitles.instantiate();
+	subtitles->set_channel("subtitles");
+	subtitles->set_text("LINE_1", "en", "Hi");
+	subtitles->set_text("LINE_1", "es", "Hola");
+	text_server->add_catalog(interface_texts);
+	text_server->add_catalog(subtitles);
+
+	CHECK(text_server->get_available_locales_for("subtitles") == PackedStringArray({ "en", "es" }));
+	CHECK(text_server->get_available_locales_for("audio").is_empty());
+	CHECK(LanguageSettingsServer::get_available_locales_for("subtitles") == PackedStringArray({ "en", "es" }));
+	const PackedStringArray interface_locales = LanguageSettingsServer::get_available_locales_for("interface");
+	CHECK(interface_locales.has("de"));
+	CHECK(interface_locales.has("fr")); // Godot translations belong to the interface.
+	CHECK_FALSE(interface_locales.has("es"));
+	// No catalog declares the channel: every locale.
+	CHECK(LanguageSettingsServer::get_available_locales_for("audio") == LanguageSettingsServer::get_available_locales());
+	CHECK(LanguageSettingsServer::get_available_locales().has("es"));
+
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_locale("en");
+	server->set_locale_for("subtitles", "es");
+	CHECK(translation_server->get_locale_for("subtitles") == "es");
+	// No subtitles in German: the channel follows the language, the stored value is kept.
+	server->set_locale_for("subtitles", "de");
+	CHECK(translation_server->get_locale_for("subtitles") == "en");
+	CHECK(server->get_locale_for("subtitles") == "de");
+	memdelete(server);
+
+	text_server->clear_catalogs();
+	MessageQueue::get_singleton()->flush();
 }
 
 TEST_CASE("[LanguageSettingsServer] Pseudolocalization reaches TranslationServer") {

@@ -38,6 +38,10 @@ class LanguageSettings : public Resource {
 	GDCLASS(LanguageSettings, Resource);
 
 	String locale; // Empty: follow the OS (or the test locale of the project).
+	// Locale channels (#357), empty: same as `locale`.
+	String interface_locale;
+	String audio_locale;
+	String subtitles_locale;
 	bool pseudolocalization_enabled = false;
 	int layout_direction = 0; // Window::LAYOUT_DIRECTION_INHERITED.
 	int root_auto_translate_mode = 1; // Node::AUTO_TRANSLATE_MODE_ALWAYS.
@@ -48,6 +52,12 @@ protected:
 public:
 	void set_locale(const String &p_locale);
 	String get_locale() const;
+	void set_interface_locale(const String &p_locale);
+	String get_interface_locale() const;
+	void set_audio_locale(const String &p_locale);
+	String get_audio_locale() const;
+	void set_subtitles_locale(const String &p_locale);
+	String get_subtitles_locale() const;
 	void set_pseudolocalization_enabled(bool p_enabled);
 	bool is_pseudolocalization_enabled() const;
 	void set_layout_direction(int p_direction);
