@@ -8,7 +8,7 @@
 		The data is stored compactly: every locale is one column of UTF-8 text with one 4-byte offset per row, so a message costs its text plus 4 bytes (instead of an interned [StringName] per message like in [Translation]).
 		[b]Files:[/b] [method load_from_file] and [method save_to_file] choose the format by the file extension. The binary [code].lcat[/code] format stores one block per locale: a catalog loaded from it (also with [method @GDScript.load]) reads only the keys and the locale table; the text of a locale is read when it is first used, or with [method load_locale]. This keeps unused locales out of memory and works from the PCK and [code]user://[/code] on every platform, including the Web.
 		[b]Text formats[/b] ([method load_from_text], [method to_text], [enum ResourceTextSerializer.Format]):
-		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are translator notes (the importer ignores them), a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not.
+		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are translator notes (the importer ignores them), a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not. Without [SerializerOptions], the delimiter ([code],[/code], [code];[/code] or tab) is the one found most often in the header row.
 		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs); other fields starting with [code]_[/code] are translator notes. The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code] and [code skip-lint]channel[/code]. In INI, every key is a [code][section][/code].
 		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules, [code]&lt;note name="notes"&gt;[/code] elements in a message for translator notes.
 		[b]Translator notes:[/b] columns or fields such as [code]_notes[/code] or [code]_max_length[/code] hold notes per key for translators and tools (see [method get_note]). They are kept by every text format and in [code].tres[/code], but never written to [code].lcat[/code], and a catalog loaded through [ResourceLoader] outside the editor (as the localization servers do) skips them, so they cost no memory in a game. [method load_from_file] and [method load_from_text] always keep them.
@@ -33,6 +33,7 @@
 		GD.Print(lazy.GetText("HELLO", "de")); // Loads "de" only.
 		[/csharp]
 		[/codeblocks]
+		[b]Editor:[/b] a catalog opened in the inspector is edited in the CSV Table dock (one row per key, one column per locale and note column, plural forms as child rows, undo/redo); the inspector lists the missing keys per locale. In the FileSystem dock, "Use as Text Localization Catalog" / "Use as Resource Localization Catalog" adds data files to [member ProjectSettings.internationalization/localization/catalog_manifests] and opens them; Project &gt; Tools &gt; "Convert Project Translations to Catalogs..." moves the translations and translation remaps of the Localization tab to catalogs. On export, text catalogs of the manifests are converted to [code].lcat[/code] (see [member ProjectSettings.internationalization/localization/export/convert_text_to_binary]).
 		[b]Note:[/b] [code].csv[/code] files in a project are imported by the CSV translation importer. To read them at runtime with [method load_from_file], set their import mode to "Keep File (exported as is)", or convert them to [code].lcat[/code].
 		[b]Note:[/b] Reading the same catalog from several threads is safe (loading a locale is guarded by a lock); changing it while other threads read it is not.
 	</description>
@@ -67,6 +68,22 @@
 			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the row number of [param key] with [param context], or [code]-1[/code] if the catalog has no such row.
+			</description>
+		</method>
+		<method name="get_entry" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the row of [param key] with [param context] as a [Dictionary] in the shape of one entry of the JSON format: [code]_key[/code] and [code]_context[/code] (only for a key with a context), [code]_plural[/code] or [code]_type[/code], one [code]_&lt;name&gt;[/code] field per translator note, and per locale the text, or an [Array] of plural forms. Empty texts and notes are left out. Returns an empty [Dictionary] if the key is missing. Loads all locales.
+				[codeblocks]
+				[gdscript]
+				print(catalog.get_entry("APPLE")) # { "_plural": "APPLES", "en": ["%d apple", "%d apples"], "_notes": "Inventory" }
+				[/gdscript]
+				[csharp]
+				GD.Print(catalog.GetEntry("APPLE")); // { "_plural": "APPLES", "en": ["%d apple", "%d apples"], "_notes": "Inventory" }
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_file_extensions" qualifiers="static">
@@ -151,8 +168,9 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="text" type="String" />
 			<param index="1" name="format" type="int" enum="ResourceTextSerializer.Format" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Replaces the content of this catalog with [param text] in the text format [param format]. See the class description for the layout of each format.
+				Replaces the content of this catalog with [param text] in the text format [param format]. See the class description for the layout of each format. [param options] sets the CSV delimiter ([member SerializerOptions.csv_delimiter]); without options, CSV text uses the delimiter found in its header row. Its header setting is ignored: a catalog CSV always has a header row.
 			</description>
 		</method>
 		<method name="load_locale">
@@ -184,6 +202,27 @@
 				Writes the catalog to [param path] in the format of its extension (see [method load_from_file]). Loads all locales first.
 			</description>
 		</method>
+		<method name="set_entry">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="entry" type="Dictionary" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Replaces the plural key or expected type, the translator notes and the texts of [param key] with [param context] by those of [param entry] (the shape of [method get_entry]). The key is added if missing, locales and note columns of [param entry] are added too; fields the entry does not have are cleared. [code]_key[/code] and [code]_context[/code] of [param entry] are ignored. The editor uses it for undo and redo: the entry from [method get_entry] before a change restores the key.
+				[codeblocks]
+				[gdscript]
+				var before = catalog.get_entry("HELLO")
+				catalog.set_entry("HELLO", { "en": "Hi", "de": "Hallo", "_notes": "Greeting" })
+				catalog.set_entry("HELLO", before) # Back to the old texts.
+				[/gdscript]
+				[csharp]
+				var before = catalog.GetEntry("HELLO");
+				catalog.SetEntry("HELLO", new Godot.Collections.Dictionary { { "en", "Hi" }, { "de", "Hallo" }, { "_notes", "Greeting" } });
+				catalog.SetEntry("HELLO", before); // Back to the old texts.
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="set_note">
 			<return type="void" />
 			<param index="0" name="key" type="StringName" />
@@ -209,8 +248,9 @@
 		<method name="to_text" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="format" type="int" enum="ResourceTextSerializer.Format" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Returns the catalog as text in [param format], or an empty [String] on error (for example a disabled module). Loads all locales.
+				Returns the catalog as text in [param format], or an empty [String] on error (for example a disabled module). Loads all locales. [param options] sets for example the CSV delimiter or the indentation of JSON and XML (JSON without options is indented with tabs).
 			</description>
 		</method>
 		<method name="unload_locale">
@@ -218,6 +258,31 @@
 			<param index="0" name="locale" type="String" />
 			<description>
 				Frees the texts of [param locale]; they are read again from the [code].lcat[/code] file when needed. Fails if the locale was changed since loading, or the catalog was not loaded from a [code].lcat[/code] file.
+			</description>
+		</method>
+		<method name="validate" qualifiers="const">
+			<return type="DataValidation" />
+			<param index="0" name="options" type="DataValidationOptions" default="null" />
+			<description>
+				Checks the catalog and returns the issues:
+				- [constant DataValidation.ISSUE_KIND_EMPTY_REQUIRED]: a key without text in a locale. Row = the key's row, column = the locale's index in [member locales], field = the locale.
+				- [constant DataValidation.ISSUE_KIND_DUPLICATE_KEY]: a key defined more than once in the text it was last loaded from (CSV rows, or entries whose [code]_key[/code] and [code]_context[/code] repeat another entry). The definitions were merged.
+				- [constant DataValidation.ISSUE_KIND_INVALID_LOCALE]: a locale column that is not a standard locale code of a known language. Column = its index, field = the locale.
+				The path of an issue is the entry name ([code]key[/code] or [code]key@context[/code]). For a catalog loaded from a text file through [ResourceLoader] (its [member Resource.resource_path] has a text extension), the issues get the line of their key in that file. [param options] limits the number of issues ([member DataValidationOptions.max_issues], [member DataValidationOptions.stop_on_first]); [method get_translated_count] counts the missing texts without a limit.
+				[codeblocks]
+				[gdscript]
+				var result = catalog.validate()
+				for i in result.get_issue_count():
+					print("%d: %s" % [result.get_issue_line(i), result.get_issue_message(i)])
+				[/gdscript]
+				[csharp]
+				DataValidation result = catalog.Validate();
+				for (int i = 0; i &lt; result.GetIssueCount(); i++)
+				{
+					GD.Print($"{result.GetIssueLine(i)}: {result.GetIssueMessage(i)}");
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 	</methods>
@@ -230,6 +295,9 @@
 		</member>
 		<member name="locales" type="PackedStringArray" setter="" getter="get_locales" default="PackedStringArray()">
 			The locales of the catalog, in column order, loaded or not.
+		</member>
+		<member name="note_columns" type="PackedStringArray" setter="" getter="get_note_columns" default="PackedStringArray()">
+			The names of the translator note columns, see [method get_note_columns].
 		</member>
 	</members>
 	<signals>
