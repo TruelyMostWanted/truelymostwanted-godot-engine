@@ -178,7 +178,8 @@ TEST_CASE("[SceneTree][LocalizedText] Bound controls refresh on locale, value an
 	CHECK(label->get_text() == "Hello Bob!");
 	CHECK(button->get_text() == "Hello Bob!");
 	CHECK(rich->get_text() == "Hello Bob!");
-	const Array expected = { Array{ "Hello Bob!" } };
+	Array expected;
+	expected.push_back(Array({ "Hello Bob!" })); // A nested initializer list would be flattened.
 	SIGNAL_CHECK("text_changed", expected);
 	SIGNAL_UNWATCH(greeting.ptr(), SNAME("text_changed"));
 
