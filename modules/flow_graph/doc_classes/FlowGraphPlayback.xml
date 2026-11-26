@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphPlayback" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Walks a [FlowGraph] like a state machine.
+	</brief_description>
+	<description>
+		A [FlowGraphPlayback] runs a [FlowGraph]: it knows the current node, moves along flow connections, reads data inputs on demand, enters subgraphs, keeps variables in a [FlowBlackboard], and tells the game what happens through signals. Its state can be saved into a [FlowGraphState] and restored later (savegames). [FlowGraphPlayer] plays it in the scene tree; you can also use a playback on its own.
+		[b]Steps.[/b] [method start] enters the start node. Each entered node runs its [method FlowNode._enter]; a node that continues leaves through the flow output from [method FlowNode._choose_exit], and the playback enters the connected node in the same call. This repeats until a node waits ([constant ENTER_RESULT_WAIT]), the graph ends ([FlowEndNode] or a flow output without a connection), or the playback is stopped. Everything runs synchronously on the calling thread.
+		[b]Waiting.[/b] A waiting node holds the playback ([method is_waiting]). Continue with [method advance], [method advance_to_exit] or [method choose]. Nodes that wait for time implement [method FlowNode._process_waiting], driven by [method process]. To wait for a signal, connect the signal to [method advance] (one-shot) in [method FlowNode._enter].
+		[b]Data.[/b] Data nodes are not entered. When a node reads [method get_input_value], the playback evaluates the connected output ([method FlowNode._evaluate_output]) and, recursively, its inputs. An unconnected input reads the default value of its [FlowPort]; an unconnected input of a [FlowExpressionNode] reads the variable of the same name, if there is one.
+		[b]Subgraphs.[/b] A [FlowSubgraphNode] pushes its graph and starts it; when that graph ends, the playback returns to the subgraph node and continues through the output named like the end name (see [member FlowSubgraphNode.exit_names]) or [code]out[/code]. Node ids in signals and methods belong to the graph on top of the stack ([method get_current_graph]).
+		[b]Control from signal handlers.[/b] Signal handlers and nodes may call [method stop], [method start], [method advance] or [method travel]; the step that emitted the signal then returns without touching the state.
+		[b]Guards.[/b] [member max_steps_per_advance], [member max_data_depth] and [member max_subgraph_depth] stop endless loops and runaway recursion (the Web build has a small stack): the playback prints an error, stops and returns [constant ERR_CYCLIC_LINK].
+		[codeblocks]
+		[gdscript]
+		var playback := FlowGraphPlayback.new()
+		playback.node_waiting.connect(func(id, node): print("Waiting at ", node.get_title()))
+		playback.finished.connect(func(end_id): print("Done"))
+		playback.start(preload("res://quests/intro.tres"))
+		# Later, for example when the player presses a button:
+		if playback.is_waiting():
+		    playback.advance()
+		[/gdscript]
+		[csharp]
+		var playback = new FlowGraphPlayback();
+		playback.NodeWaiting += (id, node) =&gt; GD.Print("Waiting at ", node.GetTitle());
+		playback.Finished += endId =&gt; GD.Print("Done");
+		playback.Start(GD.Load&lt;FlowGraph&gt;("res://quests/intro.tres"));
+		// Later, for example when the player presses a button:
+		if (playback.IsWaiting())
+		{
+		    playback.Advance();
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="advance">
+			<return type="int" enum="Error" />
+			<description>
+				Continues from the waiting node through the exit its [method FlowNode._choose_exit] returns. Returns [constant ERR_UNAVAILABLE] if no node is waiting.
+			</description>
+		</method>
+		<method name="advance_to_exit">
+			<return type="int" enum="Error" />
+			<param index="0" name="port" type="StringName" />
+			<description>
+				Continues from the waiting node through its flow output [param port]. Returns [constant ERR_UNAVAILABLE] if no node is waiting and [constant ERR_INVALID_PARAMETER] if the node has no such flow output.
+			</description>
+		</method>
+		<method name="choose">
+			<return type="int" enum="Error" />
+			<param index="0" name="exit_index" type="int" />
+			<description>
+				Continues from the waiting node through the exit at [param exit_index] of [method get_available_exits]. Returns [constant ERR_UNAVAILABLE] for a disabled exit.
+			</description>
+		</method>
+		<method name="emit_event">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="arguments" type="Array" default="[]" />
+			<description>
+				Emits [signal event_emitted]. Used by [FlowEmitEventNode] and by custom node types.
+			</description>
+		</method>
+		<method name="get_available_exits">
+			<return type="FlowExit[]" />
+			<description>
+				Returns the ways to leave the current node, from [method FlowNode._get_available_exits]: by default one [FlowExit] per flow output. [member FlowExit.node_id] is filled with the connected node. Use it to build choice menus, then call [method choose].
+			</description>
+		</method>
+		<method name="get_current_graph" qualifiers="const">
+			<return type="FlowGraph" />
+			<description>
+				Returns the graph on top of the stack: the graph of a running subgraph, else the graph passed to [method start].
+			</description>
+		</method>
+		<method name="get_current_node" qualifiers="const">
+			<return type="FlowNode" />
+			<description>
+				Returns the current node of [method get_current_graph], or [code]null[/code] when the playback does not play.
+			</description>
+		</method>
+		<method name="get_current_node_id" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the id of the current node in [method get_current_graph], or [code]-1[/code] when the playback does not play.
+			</description>
+		</method>
+		<method name="get_graph" qualifiers="const">
+			<return type="FlowGraph" />
+			<description>
+				Returns the graph passed to [method start] (or restored by [method set_state]). It stays set after the playback finished.
+			</description>
+		</method>
+		<method name="get_graph_stack_depth" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of graph levels: [code]1[/code] in the main graph, one more per running subgraph, [code]0[/code] when the playback does not play.
+			</description>
+		</method>
+		<method name="get_history" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<description>
+				Returns the ids of the entered nodes since [method start], oldest first, on all graph levels. Only the last 256 entries are kept.
+			</description>
+		</method>
+		<method name="get_input_value">
+			<return type="Variant" />
+			<param index="0" name="port" type="StringName" />
+			<description>
+				Returns the value of the data input [param port] of the node that is being entered, processed or evaluated. Call it from the runtime virtual methods of [FlowNode]. A connected input evaluates its source node; an unconnected input reads the port's default value.
+			</description>
+		</method>
+		<method name="get_node_input_value">
+			<return type="Variant" />
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="port" type="StringName" />
+			<description>
+				Returns the value of the data input [param port] of the node [param node_id] in [method get_current_graph], at any time. For tools and debugging.
+			</description>
+		</method>
+		<method name="get_node_memory" qualifiers="const">
+			<return type="Variant" />
+			<description>
+				Returns the runtime value that the node that is being entered, processed or evaluated stored with [method set_node_memory], or [code]null[/code].
+			</description>
+		</method>
+		<method name="get_state" qualifiers="const">
+			<return type="FlowGraphState" />
+			<description>
+				Returns the current state: graph, node on every graph level, node memory, history, variables and the waiting flag. Save it with [ResourceSaver] and restore it with [method set_state].
+			</description>
+		</method>
+		<method name="get_travel_path" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="to_id" type="int" />
+			<description>
+				Returns the shortest flow path from the current node to [param to_id] in [method get_current_graph], both included, or an empty array.
+			</description>
+		</method>
+		<method name="get_variable" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the value of a variable of the [member blackboard], or [code]null[/code].
+			</description>
+		</method>
+		<method name="has_variable" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the [member blackboard] has the variable.
+			</description>
+		</method>
+		<method name="is_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] between [method start] and the end of the graph or [method stop].
+			</description>
+		</method>
+		<method name="is_waiting" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the current node waits ([constant ENTER_RESULT_WAIT]).
+			</description>
+		</method>
+		<method name="process">
+			<return type="void" />
+			<param index="0" name="delta" type="float" />
+			<description>
+				Calls [method FlowNode._process_waiting] of the waiting node and continues when it returns [code]true[/code]. Does nothing when no node waits through [method FlowNode._process_waiting]. [FlowGraphPlayer] calls it for you.
+			</description>
+		</method>
+		<method name="set_node_memory">
+			<return type="void" />
+			<param index="0" name="value" type="Variant" />
+			<description>
+				Stores a runtime value for the node that is being entered, processed or evaluated, for example the elapsed time of a wait. Node memory belongs to the graph level and is part of [method get_state]; resources are shared between graphs, so keep runtime data here and not in node properties.
+			</description>
+		</method>
+		<method name="set_state">
+			<return type="int" enum="Error" />
+			<param index="0" name="state" type="FlowGraphState" />
+			<description>
+				Restores a state from [method get_state]. The graph is loaded from [member FlowGraphState.graph_path] unless the playback already has it; a graph without a path (built in code) is restored onto the current graph, so call [method start] first. A waiting state emits [signal node_waiting] again; a state saved between two nodes enters the current node again.
+			</description>
+		</method>
+		<method name="set_variable">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Sets a variable of the [member blackboard].
+			</description>
+		</method>
+		<method name="start">
+			<return type="int" enum="Error" />
+			<param index="0" name="graph" type="FlowGraph" />
+			<param index="1" name="from_id" type="int" default="-1" />
+			<description>
+				Starts [param graph] at [param from_id], or at [member FlowGraph.start_node_id] for [constant START_NODE_DEFAULT], and runs until a node waits or the graph ends. Declared variables that the [member blackboard] does not have yet are added with their default values; existing values are kept. The first start of a graph validates it and prints its issues as warnings. Returns [constant ERR_INVALID_DATA] if the start node does not exist.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops the playback and emits [signal stopped].
+			</description>
+		</method>
+		<method name="travel">
+			<return type="int" enum="Error" />
+			<param index="0" name="to_id" type="int" />
+			<param index="1" name="mode" type="int" enum="FlowGraphPlayback.TravelMode" default="0" />
+			<description>
+				Moves to the node [param to_id] of [method get_current_graph]. [constant TRAVEL_MODE_WALK] follows [method get_travel_path]: every node on the way is entered and exited (their effects run, waits are skipped, subgraphs are not entered); returns [constant ERR_CANT_RESOLVE] without a path. [constant TRAVEL_MODE_TELEPORT] leaves the current node and enters [param to_id] directly.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="blackboard" type="FlowBlackboard" setter="set_blackboard" getter="get_blackboard">
+			The variables of the playback. A new empty blackboard by default; share one between playbacks for common state (quests, dialogs). Setting [code]null[/code] creates a new empty one. [signal variable_changed] repeats its changes.
+		</member>
+		<member name="max_data_depth" type="int" setter="set_max_data_depth" getter="get_max_data_depth" default="256">
+			The deepest chain of data pulls (a node reading an input that reads an input ...). Deeper chains, usually data cycles, stop the playback with an error.
+		</member>
+		<member name="max_steps_per_advance" type="int" setter="set_max_steps_per_advance" getter="get_max_steps_per_advance" default="1024">
+			The most nodes entered in one call ([method start], [method advance], [method travel] ...). More, usually a flow loop without a waiting node, stops the playback with an error.
+		</member>
+		<member name="max_subgraph_depth" type="int" setter="set_max_subgraph_depth" getter="get_max_subgraph_depth" default="64">
+			The most nested graph levels. More, usually a graph that contains itself, stops the playback with an error.
+		</member>
+	</members>
+	<signals>
+		<signal name="event_emitted">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="arguments" type="Array" />
+			<description>
+				Emitted by a [FlowEmitEventNode] or by [method emit_event].
+			</description>
+		</signal>
+		<signal name="finished">
+			<param index="0" name="end_node_id" type="int" />
+			<description>
+				Emitted when the main graph ends, with the id of the end node (or of the node whose flow output had no connection).
+			</description>
+		</signal>
+		<signal name="node_entered">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Emitted when a node becomes the current node, before it runs.
+			</description>
+		</signal>
+		<signal name="node_exited">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Emitted when the playback leaves a node.
+			</description>
+		</signal>
+		<signal name="node_waiting">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Emitted when the current node waits, and by [method set_state] when it restores a waiting node. Show dialog lines or choices here.
+			</description>
+		</signal>
+		<signal name="started">
+			<description>
+				Emitted by [method start] before the first node is entered.
+			</description>
+		</signal>
+		<signal name="stopped">
+			<description>
+				Emitted by [method stop], also when a guard stopped the playback.
+			</description>
+		</signal>
+		<signal name="variable_changed">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Emitted when a variable of the [member blackboard] changes, also when another playback changed a shared blackboard.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="START_NODE_DEFAULT" value="-1">
+			Starts at [member FlowGraph.start_node_id].
+		</constant>
+		<constant name="ENTER_RESULT_CONTINUE" value="0" enum="EnterResult">
+			The node is done; the playback leaves it through [method FlowNode._choose_exit].
+		</constant>
+		<constant name="ENTER_RESULT_WAIT" value="1" enum="EnterResult">
+			The node waits until [method advance], [method advance_to_exit], [method choose] or its [method FlowNode._process_waiting] continues.
+		</constant>
+		<constant name="ENTER_RESULT_END" value="2" enum="EnterResult">
+			The node ends its graph, like a [FlowEndNode].
+		</constant>
+		<constant name="ENTER_RESULT_MAX" value="3" enum="EnterResult">
+			Represents the size of the [enum EnterResult] enum.
+		</constant>
+		<constant name="TRAVEL_MODE_WALK" value="0" enum="TravelMode">
+			Walk along the shortest flow path and run the nodes on the way.
+		</constant>
+		<constant name="TRAVEL_MODE_TELEPORT" value="1" enum="TravelMode">
+			Jump to the target node directly.
+		</constant>
+		<constant name="TRAVEL_MODE_MAX" value="2" enum="TravelMode">
+			Represents the size of the [enum TravelMode] enum.
+		</constant>
+	</constants>
+</class>

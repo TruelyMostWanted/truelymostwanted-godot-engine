@@ -30,7 +30,6 @@
 
 #include "flow_nodes.h"
 
-#include "core/math/expression.h"
 #include "core/object/class_db.h"
 
 static TypedArray<FlowPort> _flow_in() {
@@ -88,6 +87,10 @@ TypedArray<FlowPort> FlowBranchNode::_create_output_ports() const {
 	return ports;
 }
 
+StringName FlowBranchNode::_default_choose_exit(FlowGraphPlayback *p_playback) const {
+	return p_playback->get_input_value(SNAME("condition")).booleanize() ? SNAME("true") : SNAME("false");
+}
+
 // FlowExpressionNode.
 
 TypedArray<FlowPort> FlowExpressionNode::_create_input_ports() const {
@@ -122,13 +125,33 @@ PackedStringArray FlowExpressionNode::_get_default_configuration_warnings() cons
 	return warnings;
 }
 
+Variant FlowExpressionNode::_default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	if (parsed.is_null()) {
+		parsed.instantiate();
+		if (parsed->parse(expression, input_names) != OK) {
+			const String error = parsed->get_error_text();
+			parsed.unref();
+			ERR_FAIL_V_MSG(Variant(), vformat("FlowExpressionNode: can't parse \"%s\": %s", expression, error));
+		}
+	}
+	Array inputs;
+	for (const String &input_name : input_names) {
+		inputs.push_back(p_playback->get_input_value(input_name));
+	}
+	// No base instance: the expression sees its inputs and global functions only.
+	const Variant result = parsed->execute(inputs, nullptr, true);
+	return parsed->has_execute_failed() ? Variant() : result;
+}
+
 void FlowExpressionNode::set_expression(const String &p_expression) {
 	expression = p_expression;
+	parsed.unref();
 	emit_changed();
 }
 
 void FlowExpressionNode::set_input_names(const PackedStringArray &p_names) {
 	input_names = p_names;
+	parsed.unref();
 	notify_ports_changed();
 }
 
@@ -185,6 +208,10 @@ TypedArray<FlowPort> FlowGetVariableNode::_create_output_ports() const {
 	return ports;
 }
 
+Variant FlowGetVariableNode::_default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	return p_playback->get_variable(get_variable_name());
+}
+
 // FlowSetVariableNode.
 
 TypedArray<FlowPort> FlowSetVariableNode::_create_input_ports() const {
@@ -195,6 +222,11 @@ TypedArray<FlowPort> FlowSetVariableNode::_create_input_ports() const {
 
 TypedArray<FlowPort> FlowSetVariableNode::_create_output_ports() const {
 	return _flow_out();
+}
+
+FlowGraphPlayback::EnterResult FlowSetVariableNode::_default_enter(FlowGraphPlayback *p_playback) const {
+	p_playback->set_variable(get_variable_name(), p_playback->get_input_value(SNAME("value")));
+	return FlowGraphPlayback::ENTER_RESULT_CONTINUE;
 }
 
 // FlowEmitEventNode.
@@ -217,6 +249,11 @@ PackedStringArray FlowEmitEventNode::_get_default_configuration_warnings() const
 		warnings.push_back(RTR("No event name is set."));
 	}
 	return warnings;
+}
+
+FlowGraphPlayback::EnterResult FlowEmitEventNode::_default_enter(FlowGraphPlayback *p_playback) const {
+	p_playback->emit_event(event_name, arguments);
+	return FlowGraphPlayback::ENTER_RESULT_CONTINUE;
 }
 
 void FlowEmitEventNode::set_event_name(const StringName &p_name) {
@@ -246,7 +283,11 @@ TypedArray<FlowPort> FlowSubgraphNode::_create_input_ports() const {
 }
 
 TypedArray<FlowPort> FlowSubgraphNode::_create_output_ports() const {
-	return _flow_out();
+	TypedArray<FlowPort> ports = _flow_out();
+	for (const String &exit_name : exit_names) {
+		ports.push_back(FlowPort::create_flow(exit_name));
+	}
+	return ports;
 }
 
 PackedStringArray FlowSubgraphNode::_get_default_inline_properties() const {
@@ -266,11 +307,19 @@ void FlowSubgraphNode::set_graph(const Ref<FlowGraph> &p_graph) {
 	emit_changed();
 }
 
+void FlowSubgraphNode::set_exit_names(const PackedStringArray &p_names) {
+	exit_names = p_names;
+	notify_ports_changed();
+}
+
 void FlowSubgraphNode::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_graph", "graph"), &FlowSubgraphNode::set_graph);
 	ClassDB::bind_method(D_METHOD("get_graph"), &FlowSubgraphNode::get_graph);
+	ClassDB::bind_method(D_METHOD("set_exit_names", "names"), &FlowSubgraphNode::set_exit_names);
+	ClassDB::bind_method(D_METHOD("get_exit_names"), &FlowSubgraphNode::get_exit_names);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "graph", PROPERTY_HINT_RESOURCE_TYPE, "FlowGraph"), "set_graph", "get_graph");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "exit_names"), "set_exit_names", "get_exit_names");
 }
 
 // FlowWaitNode.
@@ -285,6 +334,17 @@ TypedArray<FlowPort> FlowWaitNode::_create_output_ports() const {
 
 PackedStringArray FlowWaitNode::_get_default_inline_properties() const {
 	return PackedStringArray({ "seconds" });
+}
+
+FlowGraphPlayback::EnterResult FlowWaitNode::_default_enter(FlowGraphPlayback *p_playback) const {
+	p_playback->set_node_memory(0.0); // Elapsed seconds.
+	return FlowGraphPlayback::ENTER_RESULT_WAIT;
+}
+
+bool FlowWaitNode::_default_process_waiting(FlowGraphPlayback *p_playback, double p_delta) const {
+	const double elapsed = double(p_playback->get_node_memory()) + p_delta;
+	p_playback->set_node_memory(elapsed);
+	return elapsed >= seconds;
 }
 
 void FlowWaitNode::set_seconds(double p_seconds) {

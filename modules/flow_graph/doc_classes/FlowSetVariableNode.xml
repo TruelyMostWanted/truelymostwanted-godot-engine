@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		The set variable node has the flow input [code]in[/code], the data input [code]value[/code] (any type) and the flow output [code]out[/code]. When the execution reaches it, the value of [code]value[/code] is stored in the variable [member FlowVariableNode.variable_name] of the blackboard and the execution continues at [code]out[/code].
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		At runtime the node reads [code]value[/code] when it is entered, writes it to the variable [member FlowVariableNode.variable_name] of the blackboard of the [FlowGraphPlayback] (which emits [signal FlowGraphPlayback.variable_changed]) and continues at [code]out[/code].
 		[codeblocks]
 		[gdscript]
 		var set_gold := FlowSetVariableNode.new()

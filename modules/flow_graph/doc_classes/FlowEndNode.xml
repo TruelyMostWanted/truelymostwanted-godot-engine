@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		The end node has one flow input port, [code]in[/code], and no outputs. When the execution reaches it, the graph is finished. The optional [member end_name] tells the caller which end was reached, which is useful when a graph has several ends, for example a dialogue with different outcomes. When a graph runs as a [FlowSubgraphNode], its end nodes are where it returns to the calling graph.
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		At runtime the node ends the graph: [signal FlowGraphPlayback.finished] is emitted with the id of this node and the playback stops playing. Inside a [FlowSubgraphNode] it only ends the inner graph; the outer graph continues at the output of the subgraph node that matches [member end_name] (see [member FlowSubgraphNode.exit_names]), or at [code]out[/code].
 		[codeblocks]
 		[gdscript]
 		var end_node := FlowEndNode.new()

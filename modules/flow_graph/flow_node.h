@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "flow_graph_playback.h"
 #include "flow_port.h"
 
 #include "core/templates/local_vector.h"
@@ -67,6 +68,13 @@ protected:
 	virtual PackedStringArray _get_default_inline_properties() const { return PackedStringArray(); }
 	virtual PackedStringArray _get_default_configuration_warnings() const { return PackedStringArray(); }
 
+	// Runtime defaults of built-in node types; a script override of the matching virtual takes precedence.
+	virtual FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const { return FlowGraphPlayback::ENTER_RESULT_CONTINUE; }
+	virtual StringName _default_choose_exit(FlowGraphPlayback *p_playback) const;
+	virtual Variant _default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const;
+	virtual bool _default_process_waiting(FlowGraphPlayback *p_playback, double p_delta) const { return false; }
+	virtual bool _has_default_process_waiting() const { return false; }
+
 	GDVIRTUAL0RC(TypedArray<FlowPort>, _get_input_ports)
 	GDVIRTUAL0RC(TypedArray<FlowPort>, _get_output_ports)
 	GDVIRTUAL0RC(String, _get_title)
@@ -74,6 +82,13 @@ protected:
 	GDVIRTUAL0RC(TypedArray<PackedStringArray>, _get_translatable_strings)
 	GDVIRTUAL0RC(PackedStringArray, _get_configuration_warnings)
 	GDVIRTUAL0RC(PackedStringArray, _get_inline_properties)
+
+	GDVIRTUAL1RC(FlowGraphPlayback::EnterResult, _enter, Ref<FlowGraphPlayback>)
+	GDVIRTUAL1C(_exit, Ref<FlowGraphPlayback>)
+	GDVIRTUAL1RC(StringName, _choose_exit, Ref<FlowGraphPlayback>)
+	GDVIRTUAL1RC(TypedArray<FlowExit>, _get_available_exits, Ref<FlowGraphPlayback>)
+	GDVIRTUAL2RC(Variant, _evaluate_output, Ref<FlowGraphPlayback>, StringName)
+	GDVIRTUAL2RC(bool, _process_waiting, Ref<FlowGraphPlayback>, double)
 
 public:
 	void set_title_override(const String &p_title);
@@ -99,4 +114,13 @@ public:
 	PackedStringArray get_inline_properties() const;
 
 	bool is_in_graph() const;
+
+	// Runtime, called by FlowGraphPlayback.
+	FlowGraphPlayback::EnterResult enter(FlowGraphPlayback *p_playback) const;
+	void exit(FlowGraphPlayback *p_playback) const;
+	StringName choose_exit(FlowGraphPlayback *p_playback) const;
+	TypedArray<FlowExit> get_available_exits(FlowGraphPlayback *p_playback) const;
+	Variant evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const;
+	bool process_waiting(FlowGraphPlayback *p_playback, double p_delta) const;
+	bool uses_process_waiting() const;
 };
