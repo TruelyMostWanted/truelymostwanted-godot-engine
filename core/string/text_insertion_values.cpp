@@ -32,7 +32,7 @@
 
 #include "core/object/class_db.h"
 
-void TextInsertionValues::set_values(const Dictionary &p_values) {
+void TextInsertionValues::set_values(const TypedDictionary<StringName, Variant> &p_values) {
 	values.clear();
 	for (const KeyValue<Variant, Variant> &E : p_values) {
 		values.insert(E.key.operator StringName(), E.value);
@@ -40,9 +40,8 @@ void TextInsertionValues::set_values(const Dictionary &p_values) {
 	emit_changed();
 }
 
-Dictionary TextInsertionValues::get_values() const {
-	Dictionary result;
-	result.set_typed(Variant::STRING_NAME, StringName(), Variant(), Variant::NIL, StringName(), Variant());
+TypedDictionary<StringName, Variant> TextInsertionValues::get_values() const {
+	TypedDictionary<StringName, Variant> result;
 	for (const KeyValue<StringName, Variant> &E : values) {
 		result[E.key] = E.value;
 	}

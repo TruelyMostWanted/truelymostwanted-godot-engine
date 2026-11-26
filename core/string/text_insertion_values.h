@@ -32,6 +32,7 @@
 
 #include "core/io/resource.h"
 #include "core/templates/hash_map.h"
+#include "core/variant/typed_dictionary.h"
 
 // A set of named values for TextInsertionServer placeholders, edited in the inspector and saved as a resource.
 class TextInsertionValues : public Resource {
@@ -44,8 +45,8 @@ protected:
 	static void _bind_methods();
 
 public:
-	void set_values(const Dictionary &p_values);
-	Dictionary get_values() const;
+	void set_values(const TypedDictionary<StringName, Variant> &p_values);
+	TypedDictionary<StringName, Variant> get_values() const;
 
 	void set_priority(int p_priority);
 	int get_priority() const { return priority; }
