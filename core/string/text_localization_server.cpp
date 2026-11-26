@@ -36,26 +36,28 @@
 #include "core/string/translation_domain.h"
 #include "core/string/translation_server.h"
 
-// The tr() adapter: one Translation in the main domain that answers from the resolved column of the active chain.
-// Its locale is the active locale, so TranslationDomain matches it with one string compare.
+// A tr() adapter: one Translation per channel domain that answers from the resolved column for the keys of its
+// channel. Its locale is the channel's locale, so TranslationDomain matches it with one string compare.
 class TextLocalizationTranslation : public Translation {
 	GDSOFTCLASS(TextLocalizationTranslation, Translation);
 
 public:
+	StringName channel;
+
 	virtual StringName get_message(const StringName &p_src_text, const StringName &p_context = "") const override {
 		const TextLocalizationServer *server = TextLocalizationServer::get_singleton();
-		return server ? server->get_message(p_src_text, p_context) : StringName();
+		return server ? server->get_message(p_src_text, p_context, channel) : StringName();
 	}
 
 	virtual StringName get_plural_message(const StringName &p_src_text, const StringName &p_plural_text, int p_n, const StringName &p_context = "") const override {
 		const TextLocalizationServer *server = TextLocalizationServer::get_singleton();
-		return server ? server->get_plural_message(p_src_text, p_n, p_context) : StringName();
+		return server ? server->get_plural_message(p_src_text, p_n, p_context, channel) : StringName();
 	}
 
 	virtual void get_message_list(List<StringName> *r_messages) const override {
 		const TextLocalizationServer *server = TextLocalizationServer::get_singleton();
 		if (server) {
-			server->get_message_list(r_messages);
+			server->get_message_list(r_messages, channel);
 		}
 	}
 
@@ -124,18 +126,42 @@ void TextLocalizationServer::_data_published(const Data *p_data, const Data *p_p
 	if (!translation_server) {
 		return;
 	}
-	// The main domain translates in the `interface` locale: the adapter's locale matches it with one string compare.
-	adapter->set_locale(translation_server->get_locale_for(SNAME("interface")));
-	// The adapter is only in the main domain while there are catalogs: no cost for projects without them.
-	const Ref<TranslationDomain> domain = translation_server->get_main_domain();
-	const bool needed = !p_data->keys->layers.is_empty();
-	if (needed != domain->has_translation(adapter)) {
-		if (needed) {
-			domain->add_translation(adapter);
-		} else {
-			domain->remove_translation(adapter);
+	// One adapter per channel domain (`interface` = the main domain; `audio` has none), only while the channel has
+	// keys: no cost for projects without catalogs.
+	for (const StringName &channel : p_data->keys->channels) {
+		if (channel != SNAME("audio") && !adapters.has(channel)) {
+			Ref<TextLocalizationTranslation> adapter;
+			adapter.instantiate();
+			adapter->channel = channel;
+			adapters.insert(channel, adapter);
 		}
 	}
+	for (const KeyValue<StringName, Ref<Translation>> &E : adapters) {
+		E.value->set_locale(translation_server->get_locale_for(E.key));
+		const Ref<TranslationDomain> domain = translation_server->get_or_add_domain(E.key == SNAME("interface") ? StringName() : E.key);
+		const bool needed = p_data->keys->channels.has(E.key);
+		if (needed != domain->has_translation(E.value)) {
+			if (needed) {
+				domain->add_translation(E.value);
+			} else {
+				domain->remove_translation(E.value);
+			}
+		}
+	}
+}
+
+bool TextLocalizationServer::is_adapter(const Ref<Translation> &p_translation) const {
+	for (const KeyValue<StringName, Ref<Translation>> &E : adapters) {
+		if (E.value == p_translation) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int TextLocalizationServer::_find_channel_row(const TextData *p_data, const StringName &p_key, const StringName &p_context, const StringName &p_channel) {
+	const int row = p_data->keys->find(p_key, p_context);
+	return row >= 0 && p_data->keys->channels[p_data->keys->row_channels[row]] == p_channel ? row : -1;
 }
 
 String TextLocalizationServer::_get_text(const TextData *p_data, uint32_t p_row, int p_count) const {
@@ -272,9 +298,9 @@ PackedStringArray TextLocalizationServer::get_missing_keys(const String &p_local
 	return missing;
 }
 
-StringName TextLocalizationServer::get_message(const StringName &p_key, const StringName &p_context) const {
+StringName TextLocalizationServer::get_message(const StringName &p_key, const StringName &p_context, const StringName &p_channel) const {
 	const TextData *text_data = _get_text_data();
-	const int row = text_data->keys->find(p_key, p_context);
+	const int row = _find_channel_row(text_data, p_key, p_context, p_channel);
 	if (row < 0 || text_data->texts[row].is_empty()) {
 		return StringName();
 	}
@@ -286,9 +312,9 @@ StringName TextLocalizationServer::get_message(const StringName &p_key, const St
 	return name;
 }
 
-StringName TextLocalizationServer::get_plural_message(const StringName &p_key, int p_count, const StringName &p_context) const {
+StringName TextLocalizationServer::get_plural_message(const StringName &p_key, int p_count, const StringName &p_context, const StringName &p_channel) const {
 	const TextData *text_data = _get_text_data();
-	const int row = text_data->keys->find(p_key, p_context);
+	const int row = _find_channel_row(text_data, p_key, p_context, p_channel);
 	if (row < 0) {
 		return StringName();
 	}
@@ -296,9 +322,13 @@ StringName TextLocalizationServer::get_plural_message(const StringName &p_key, i
 	return text.is_empty() ? StringName() : StringName(text);
 }
 
-void TextLocalizationServer::get_message_list(List<StringName> *r_messages) const {
+void TextLocalizationServer::get_message_list(List<StringName> *r_messages, const StringName &p_channel) const {
 	const TextData *text_data = _get_text_data();
-	for (uint32_t row = 0; row < text_data->texts.size(); row++) {
+	const int64_t channel = text_data->keys->channels.find(p_channel);
+	if (channel < 0) {
+		return;
+	}
+	for (const uint32_t row : text_data->keys->channel_rows[channel]) {
 		if (!text_data->texts[row].is_empty()) {
 			r_messages->push_back(text_data->keys->keys[row].key);
 		}
@@ -319,7 +349,6 @@ void TextLocalizationServer::_bind_methods() {
 
 TextLocalizationServer::TextLocalizationServer() {
 	singleton = this;
-	adapter = Ref<Translation>(memnew(TextLocalizationTranslation));
 	_rebuild(true);
 }
 

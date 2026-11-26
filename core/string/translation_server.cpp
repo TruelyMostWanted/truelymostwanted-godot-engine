@@ -507,17 +507,19 @@ void TranslationServer::_set_channel_locale(const StringName &p_channel, const S
 	} else {
 		channel_locales[p_channel] = p_locale;
 	}
-	const bool is_interface = p_channel == SNAME("interface");
-	if (is_interface) {
-		// The main domain answers tr() and the controls; their shaping language follows its override too.
-		main_domain->set_locale_override(p_locale);
+	// A channel is a translation domain: `interface` is the main domain, `audio` has none (resources only), other
+	// channels are the domains of their name. Nodes pick one with their translation domain; their shaping language
+	// follows its override too.
+	const bool has_domain = p_channel != SNAME("audio");
+	if (has_domain) {
+		get_or_add_domain(p_channel == SNAME("interface") ? StringName() : p_channel)->set_locale_override(p_locale);
 	}
 	const String current_locale = get_locale_for(p_channel);
 	if (current_locale == previous_locale) {
 		return;
 	}
 	emit_signal(SNAME("locale_changed"), p_channel, current_locale, previous_locale);
-	if (is_interface && OS::get_singleton()->get_main_loop()) {
+	if (has_domain && OS::get_singleton()->get_main_loop()) {
 		OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_TRANSLATION_CHANGED);
 	}
 }

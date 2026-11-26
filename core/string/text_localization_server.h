@@ -39,8 +39,9 @@ class Translation;
 
 // Texts with context and plural forms from TextLocalizationCatalogs (#343). On a locale change one resolved column
 // (a String per row) is built for the locale chain over all layers, so translate() is one hash lookup and one array
-// read, translate_id() one array read. An adapter Translation in the main TranslationDomain answers tr(), atr()
-// and auto translation from the same column.
+// read, translate_id() one array read. One adapter Translation per channel domain (`interface` = the main
+// TranslationDomain, `subtitles` = the domain "subtitles", ...) answers tr(), atr() and auto translation from the
+// same column, for the keys of its channel.
 class TextLocalizationServer : public LocalizationServer {
 	GDCLASS(TextLocalizationServer, LocalizationServer);
 
@@ -64,9 +65,10 @@ class TextLocalizationServer : public LocalizationServer {
 		mutable HashSet<StringName> reported_missing;
 	};
 
-	Ref<Translation> adapter;
+	HashMap<StringName, Ref<Translation>> adapters; // Channel -> the tr() adapter in the channel's domain.
 
 	_FORCE_INLINE_ const TextData *_get_text_data() const { return static_cast<const TextData *>(_get_data()); }
+	static int _find_channel_row(const TextData *p_data, const StringName &p_key, const StringName &p_context, const StringName &p_channel);
 	String _get_text(const TextData *p_data, uint32_t p_row, int p_count) const;
 	String _finish(const TextData *p_data, int p_row, const StringName &p_key, int p_count, const Dictionary &p_args) const;
 
@@ -91,11 +93,11 @@ public:
 	bool has_translation(const StringName &p_key, const StringName &p_context = StringName()) const;
 	PackedStringArray get_missing_keys(const String &p_locale = String()) const;
 
-	// For the tr() adapter: StringName() when the active chain has no text.
-	StringName get_message(const StringName &p_key, const StringName &p_context) const;
-	StringName get_plural_message(const StringName &p_key, int p_count, const StringName &p_context) const;
-	void get_message_list(List<StringName> *r_messages) const;
-	bool is_adapter(const Ref<Translation> &p_translation) const { return p_translation == adapter; }
+	// For the tr() adapters, one per channel domain: StringName() when the key is not in `p_channel` or has no text.
+	StringName get_message(const StringName &p_key, const StringName &p_context, const StringName &p_channel) const;
+	StringName get_plural_message(const StringName &p_key, int p_count, const StringName &p_context, const StringName &p_channel) const;
+	void get_message_list(List<StringName> *r_messages, const StringName &p_channel) const;
+	bool is_adapter(const Ref<Translation> &p_translation) const;
 
 	TextLocalizationServer();
 	~TextLocalizationServer();
