@@ -13,8 +13,8 @@
 			TextInsertionServer.value_changed.connect(_on_value_changed)
 			_refresh()
 
-		func _on_value_changed(name):
-			if template.has_name(name):
+		func _on_value_changed(value_name):
+			if template.has_name(value_name):
 				_refresh()
 
 		func _refresh():
