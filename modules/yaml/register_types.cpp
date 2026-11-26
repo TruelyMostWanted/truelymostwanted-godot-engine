@@ -39,6 +39,18 @@
 #include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
 
+#ifdef TOOLS_ENABLED
+#include "editor/editor_node.h"
+#include "editor/script/script_editor_plugin.h"
+#include "editor/yaml_syntax_highlighter.h"
+
+static void _register_yaml_syntax_highlighter() {
+	Ref<EditorYAMLSyntaxHighlighter> highlighter;
+	highlighter.instantiate();
+	ScriptEditor::get_singleton()->register_syntax_highlighter(highlighter);
+}
+#endif // TOOLS_ENABLED
+
 static Ref<ResourceFormatLoaderResourceYAML> resource_loader_yaml;
 static Ref<ResourceFormatSaverResourceYAML> resource_saver_yaml;
 static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_yaml;
@@ -47,6 +59,12 @@ static Ref<ResourceFormatLoaderResourceYAML> resource_loader_yml;
 static Ref<ResourceFormatSaverResourceYAML> resource_saver_yml;
 
 void initialize_yaml_module(ModuleInitializationLevel p_level) {
+#ifdef TOOLS_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorNode::add_init_callback(&_register_yaml_syntax_highlighter);
+		return;
+	}
+#endif // TOOLS_ENABLED
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}

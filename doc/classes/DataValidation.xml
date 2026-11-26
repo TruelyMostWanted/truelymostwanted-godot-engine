@@ -121,7 +121,7 @@
 			<return type="void" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Sets the line of every issue that has a path and no line by searching the keys of its path in [param text], in order; an index [code]n[/code] picks the [code](n + 1)[/code]-th following occurrence of the next key. Use it for [JSON] data validated with [method DataSchema.validate]. Best effort: exact for files with one key per line, approximate for keys on one line.
+				Sets the line of every issue that has a path and no line by searching the keys of its path in [param text], in order; an index [code]n[/code] picks the [code](n + 1)[/code]-th following occurrence of the next key. Use it for [JSON] data validated with [method DataSchema.validate]. Best effort: exact for files with one key per line, approximate for keys on one line. Searches are shared between issues, so the cost stays close to one pass over [param text] even for many issues.
 			</description>
 		</method>
 	</methods>

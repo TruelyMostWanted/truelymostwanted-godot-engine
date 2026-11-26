@@ -31,6 +31,7 @@
 #include "data_validation.h"
 
 #include "core/object/class_db.h"
+#include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 
 void DataValidationOptions::set_max_issues(int p_max_issues) {
@@ -108,6 +109,10 @@ static int _data_validation_find_key(const String &p_text, const String &p_key, 
 }
 
 void DataValidation::resolve_lines(const String &p_text) {
+	// Searches and line starts are shared between issues, so many issues cost about one pass over the text:
+	// the n-th occurrence of a key continues from the last search of the same key at the same position.
+	HashMap<String, Vector2i> searches; // "<from>/<key>" -> (occurrence index, position) of the last search.
+	LocalVector<int> line_starts;
 	for (Issue &issue : issues) {
 		if (issue.line != POSITION_NONE || issue.path.is_empty()) {
 			continue;
@@ -122,10 +127,20 @@ void DataValidation::resolve_lines(const String &p_text) {
 				continue;
 			}
 			const String key = segment.replace("~1", "/").replace("~0", "~");
-			int at = _data_validation_find_key(p_text, key, position);
-			for (; at >= 0 && skip > 0; skip--) {
+			const String search_key = itos(position) + "/" + key;
+			const Vector2i *last = searches.getptr(search_key);
+			int index = 0;
+			int at;
+			if (last && last->x <= skip) {
+				index = last->x;
+				at = last->y;
+			} else {
+				at = _data_validation_find_key(p_text, key, position);
+			}
+			for (; at >= 0 && index < skip; index++) {
 				at = _data_validation_find_key(p_text, key, at + key.length());
 			}
+			searches[search_key] = Vector2i(index, at);
 			skip = 0;
 			if (at < 0) {
 				break;
@@ -136,14 +151,27 @@ void DataValidation::resolve_lines(const String &p_text) {
 		if (found < 0) {
 			continue;
 		}
-		int line = 1;
-		const char32_t *text = p_text.ptr();
-		for (int i = 0; i < found; i++) {
-			if (text[i] == '\n') {
-				line++;
+		if (line_starts.is_empty()) {
+			line_starts.push_back(0);
+			const char32_t *text = p_text.ptr();
+			for (int i = 0; i < p_text.length(); i++) {
+				if (text[i] == '\n') {
+					line_starts.push_back(i + 1);
+				}
 			}
 		}
-		issue.line = line;
+		// Number of lines that start at or before the match.
+		int low = 0;
+		int high = line_starts.size();
+		while (low < high) {
+			const int middle = (low + high) / 2;
+			if (line_starts[middle] <= found) {
+				low = middle + 1;
+			} else {
+				high = middle;
+			}
+		}
+		issue.line = low;
 	}
 }
 
