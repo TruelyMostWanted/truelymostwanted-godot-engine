@@ -1758,8 +1758,8 @@
 		<member name="VideoTextureStreamingSettingsServer" type="VideoTextureStreamingSettingsServer" setter="" getter="">
 			The [VideoTextureStreamingSettingsServer] singleton.
 		</member>
-		<member name="VideoWindowSettingsServer" type="VideoWindowSettingsServer" setter="" getter="">
-			The [VideoWindowSettingsServer] singleton.
+		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
+			The [WindowSettingsServer] singleton.
 		</member>
 		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
 			The [ViewportServer] singleton.

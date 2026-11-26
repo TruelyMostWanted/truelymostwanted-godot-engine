@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		A [VideoPreset] bundles the settings that [method VideoPresetSettingsServer.apply_preset] sets in the settings domains [code]"video_quality"[/code] ([VideoQualitySettingsServer]), [code]"video_texture"[/code] ([VideoTextureSettingsServer]), [code]"video_shadow"[/code] ([VideoShadowSettingsServer]) and [code]"video_effect"[/code] ([VideoEffectSettingsServer]). Each domain has a typed resource of the class the domain stores ([VideoQualitySettings], [VideoTextureSettings], [VideoShadowSettings], [VideoEffectSettings]), so the Inspector shows its enums and ranges. A domain resource sets [i]all[/i] values of its domain; a [code]null[/code] resource leaves the domain as it is, so a preset can cover only some domains.
-		The four built-in presets are created with [method VideoPresetSettingsServer.create_builtin_preset]. To replace or add presets, save a [VideoPreset] as a [code].tres[/code] file and add it to [member ProjectSettings.settings/video_preset/presets], or call [method VideoPresetSettingsServer.add_preset] at runtime. The window settings ([VideoWindowSettingsServer]) are not part of a preset.
+		The four built-in presets are created with [method VideoPresetSettingsServer.create_builtin_preset]. To replace or add presets, save a [VideoPreset] as a [code].tres[/code] file and add it to [member ProjectSettings.settings/video_preset/presets], or call [method VideoPresetSettingsServer.add_preset] at runtime. The window settings ([WindowSettingsServer]) are not part of a preset.
 		[codeblocks]
 		[gdscript]
 		var preset = VideoPresetSettingsServer.create_builtin_preset("High")

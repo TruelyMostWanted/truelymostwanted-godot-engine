@@ -41,7 +41,7 @@ class Window;
 // Settings domain `accessibility` (#27): UI scale, font size, color scheme, focus outline and spoken focus
 // (engine-applied), reduced motion and transparency, colorblind mode and subtitles (game-side).
 // Applied in APPLY_PHASE_SCENE, before the main scene is loaded:
-// - `ui_scale` multiplies the content scale factor of the root window (VideoWindowSettingsServer, #20, keeps
+// - `ui_scale` multiplies the content scale factor of the root window (WindowSettingsServer, #20, keeps
 //   its own factor and multiplies with get_root_ui_scale() when it pushes).
 // - `font_size_factor`, `color_scheme` and `focus_outline_width` go into an overlay theme on the root window:
 //   a copy of the root window's previous theme plus the changed items. The project theme stays untouched.
@@ -131,7 +131,7 @@ protected:
 
 public:
 	static AccessibilitySettingsServer *get_singleton();
-	// The UI scale pushed to the root window, or 1 without the domain. VideoWindowSettingsServer multiplies with it.
+	// The UI scale pushed to the root window, or 1 without the domain. WindowSettingsServer multiplies with it.
 	static float get_root_ui_scale();
 
 	virtual StringName get_domain() const override;

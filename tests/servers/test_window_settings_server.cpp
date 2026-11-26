@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  test_video_window_settings_server.cpp                                 */
+/*  test_window_settings_server.cpp                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,7 +30,7 @@
 
 #include "tests/test_macros.h"
 
-TEST_FORCE_LINK(test_video_window_settings_server)
+TEST_FORCE_LINK(test_window_settings_server)
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -39,12 +39,12 @@ TEST_FORCE_LINK(test_video_window_settings_server)
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_window_settings.h"
-#include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/window_settings.h"
+#include "servers/settings/window_settings_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
-namespace TestVideoWindowSettingsServer {
+namespace TestWindowSettingsServer {
 
 // Autosave off; the test display server has no screen, so the window values are kept by the domain.
 struct TestSetup {
@@ -57,7 +57,7 @@ struct TestSetup {
 };
 
 static String temp_file(const String &p_name) {
-	const String path = TestUtils::get_temp_path("video_window_settings_server").path_join(p_name);
+	const String path = TestUtils::get_temp_path("window_settings_server").path_join(p_name);
 	DirAccess::make_dir_recursive_absolute(path.get_base_dir());
 	if (FileAccess::exists(path)) {
 		DirAccess::remove_absolute(path);
@@ -65,15 +65,15 @@ static String temp_file(const String &p_name) {
 	return path;
 }
 
-TEST_CASE("[VideoWindowSettingsServer] The domain is an engine singleton registered with the manager") {
+TEST_CASE("[WindowSettingsServer] The domain is an engine singleton registered with the manager") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = VideoWindowSettingsServer::get_singleton();
+	WindowSettingsServer *server = WindowSettingsServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("VideoWindowSettingsServer"));
-	CHECK(SettingsServerManager::get_singleton()->get_server("video_window") == server);
-	CHECK(server->get_domain() == StringName("video_window"));
+	CHECK(Engine::get_singleton()->has_singleton("WindowSettingsServer"));
+	CHECK(SettingsServerManager::get_singleton()->get_server("window") == server);
+	CHECK(server->get_domain() == StringName("window"));
 	CHECK(server->get_apply_phase() == SettingsServer::APPLY_PHASE_PRE_DISPLAY);
-	CHECK(server->get_file_path() == "user://settings/video_window.ini");
+	CHECK(server->get_file_path() == "user://settings/window.ini");
 
 	const PackedStringArray names = server->get_setting_names();
 	for (const char *name : { "window_mode", "window_size", "screen", "window_centered", "window_position", "borderless", "always_on_top", "unresizable", "transparent", "vsync_mode", "content_scale_mode", "content_scale_aspect", "content_scale_stretch", "content_scale_factor", "hdr_output_requested", "hdr_reference_luminance", "hdr_max_luminance", "window_states" }) {
@@ -89,12 +89,12 @@ TEST_CASE("[VideoWindowSettingsServer] The domain is an engine singleton registe
 	CHECK_FALSE(server->get_setting_flags("window_mode").has_flag(SettingsServer::SETTING_FLAG_RESTART_REQUIRED));
 
 	// No window options on the test command line.
-	CHECK(VideoWindowSettingsServer::get_command_line_options().is_empty());
+	CHECK(WindowSettingsServer::get_command_line_options().is_empty());
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Defaults come from the project settings") {
+TEST_CASE("[WindowSettingsServer] Defaults come from the project settings") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(temp_file("defaults.ini"));
 	const int width = GLOBAL_GET("display/window/size/viewport_width");
 	const int height = GLOBAL_GET("display/window/size/viewport_height");
@@ -112,9 +112,9 @@ TEST_CASE("[VideoWindowSettingsServer] Defaults come from the project settings")
 	memdelete(server);
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Values are validated") {
+TEST_CASE("[WindowSettingsServer] Values are validated") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(temp_file("validate.ini"));
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 
@@ -133,9 +133,9 @@ TEST_CASE("[VideoWindowSettingsServer] Values are validated") {
 	memdelete(server);
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Mode and size wait for the confirmation, V-Sync is applied at once") {
+TEST_CASE("[WindowSettingsServer] Mode and size wait for the confirmation, V-Sync is applied at once") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(temp_file("confirm.ini"));
 
 	server->set_vsync_mode(DisplayServerEnums::VSYNC_DISABLED);
@@ -160,11 +160,11 @@ TEST_CASE("[VideoWindowSettingsServer] Mode and size wait for the confirmation, 
 	memdelete(server);
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and given to the main window on startup") {
+TEST_CASE("[WindowSettingsServer] Fullscreen and 1920x1080 are saved and given to the main window on startup") {
 	TestSetup setup;
-	const String path = temp_file("video_window.ini");
+	const String path = temp_file("window.ini");
 	{
-		VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+		WindowSettingsServer *server = memnew(WindowSettingsServer);
 		server->set_file_path(path);
 		server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 		server->set_window_mode(DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
@@ -181,7 +181,7 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 	}
 
 	// "Restart": phase 1, before the display server exists.
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(path);
 	server->startup();
 	CHECK(server->get_window_mode() == DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
@@ -189,7 +189,7 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 	CHECK(server->get_screen() == 1);
 
 	// What Main::setup2() passes to DisplayServer::create().
-	VideoWindowSettingsServer::BootWindow boot_window;
+	WindowSettingsServer::BootWindow boot_window;
 	boot_window.mode = DisplayServerEnums::WINDOW_MODE_WINDOWED;
 	boot_window.vsync_mode = DisplayServerEnums::VSYNC_ENABLED;
 	boot_window.flags = DisplayServerEnums::WINDOW_FLAG_ALWAYS_ON_TOP_BIT;
@@ -203,7 +203,7 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 	CHECK((boot_window.flags & DisplayServerEnums::WINDOW_FLAG_ALWAYS_ON_TOP_BIT) != 0);
 
 	// The values are handed over once.
-	VideoWindowSettingsServer::BootWindow second;
+	WindowSettingsServer::BootWindow second;
 	second.size = Size2i(10, 10);
 	server->get_boot_window(second);
 	CHECK(second.size == Size2i(10, 10));
@@ -215,9 +215,9 @@ TEST_CASE("[VideoWindowSettingsServer] Fullscreen and 1920x1080 are saved and gi
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoWindowSettingsServer] Window states are saved by key and restored") {
+TEST_CASE("[SceneTree][WindowSettingsServer] Window states are saved by key and restored") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(temp_file("states.ini"));
 
 	Window *inventory = memnew(Window);
@@ -262,13 +262,13 @@ TEST_CASE("[SceneTree][VideoWindowSettingsServer] Window states are saved by key
 	memdelete(server);
 }
 
-TEST_CASE("[SceneTree][VideoWindowSettingsServer] Content scale reaches the root window, windows get their state when they enter the tree") {
+TEST_CASE("[SceneTree][WindowSettingsServer] Content scale reaches the root window, windows get their state when they enter the tree") {
 	TestSetup setup;
 	Window *root = SceneTree::get_singleton()->get_root().ptr();
 	const Window::ContentScaleMode original_mode = root->get_content_scale_mode();
 	const real_t original_factor = root->get_content_scale_factor();
 
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_file_path(temp_file("scene.ini"));
 	server->set_content_scale_mode(Window::CONTENT_SCALE_MODE_CANVAS_ITEMS);
 	server->set_content_scale_factor(1.5);
@@ -299,9 +299,9 @@ TEST_CASE("[SceneTree][VideoWindowSettingsServer] Content scale reaches the root
 	root->set_content_scale_factor(original_factor);
 }
 
-TEST_CASE("[VideoWindowSettingsServer] Typed signals fire once per applied change") {
+TEST_CASE("[WindowSettingsServer] Typed signals fire once per applied change") {
 	TestSetup setup;
-	VideoWindowSettingsServer *server = memnew(VideoWindowSettingsServer);
+	WindowSettingsServer *server = memnew(WindowSettingsServer);
 	server->set_apply_mode(SettingsServer::APPLY_MODE_MANUAL);
 	SIGNAL_WATCH(server, "vsync_mode_changed");
 
@@ -333,4 +333,4 @@ TEST_CASE("[VideoWindowSettingsServer] Typed signals fire once per applied chang
 	memdelete(server);
 }
 
-} // namespace TestVideoWindowSettingsServer
+} // namespace TestWindowSettingsServer

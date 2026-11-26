@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="VideoWindowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="WindowSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Settings resource for windows and display: mode, size, screen, V-Sync, content scale and HDR.
 	</brief_description>
 	<description>
-		The data of the settings domain [code]"video_window"[/code], which [VideoWindowSettingsServer] stores, loads and applies: mode, size, screen, position, window flags and V-Sync mode of the main window, the content scale of the root window, HDR output and the stored states of further windows.
+		The data of the settings domain [code]"window"[/code], which [WindowSettingsServer] stores, loads and applies: mode, size, screen, position, window flags and V-Sync mode of the main window, the content scale of the root window, HDR output and the stored states of further windows.
 		Each property is one stored value; its default is the project setting it replaces. The enums are those of the engine ([enum DisplayServer.WindowMode], [enum DisplayServer.VSyncMode], [enum Window.ContentScaleMode], [enum Window.ContentScaleAspect], [enum Window.ContentScaleStretch]).
-		A [VideoWindowSettings] resource saved in [code]res://[/code] and named in the project setting [code]settings/defaults/video_window[/code] replaces the defaults, so a game can ship its own (for example fullscreen on the first start). Edit it in the Inspector like any resource.
+		A [WindowSettings] resource saved in [code]res://[/code] and named in the project setting [code]settings/defaults/window[/code] replaces the defaults, so a game can ship its own (for example fullscreen on the first start). Edit it in the Inspector like any resource.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -63,7 +63,7 @@
 			Size of the main window in windowed mode, in pixels. The default is [member ProjectSettings.display/window/size/viewport_width] and [member ProjectSettings.display/window/size/viewport_height] (or the window size overrides). The size is kept while the window is maximized or fullscreen and used again when it is windowed. It is limited to the usable area of the screen. Changes go through the confirmation (see [method SettingsServer.apply_with_confirmation]). The command line argument [code]--resolution[/code] overrides it for the session.
 		</member>
 		<member name="window_states" type="Dictionary" setter="set_window_states" getter="get_window_states" default="{}">
-			The stored states of further windows, keyed by node path (or by a key of the game). Each value is a [Dictionary] with [code]mode[/code] ([enum Window.Mode]), [code]size[/code] and [code]position[/code] ([Vector2i]) and, for windows that are not embedded, [code skip-lint]screen[/code] (the position is then relative to that screen). Use [method VideoWindowSettingsServer.save_window_state] and [method VideoWindowSettingsServer.restore_window_state] instead of changing it directly.
+			The stored states of further windows, keyed by node path (or by a key of the game). Each value is a [Dictionary] with [code]mode[/code] ([enum Window.Mode]), [code]size[/code] and [code]position[/code] ([Vector2i]) and, for windows that are not embedded, [code skip-lint]screen[/code] (the position is then relative to that screen). Use [method WindowSettingsServer.save_window_state] and [method WindowSettingsServer.restore_window_state] instead of changing it directly.
 		</member>
 	</members>
 </class>

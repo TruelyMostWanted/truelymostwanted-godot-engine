@@ -112,8 +112,8 @@
 #include "servers/settings/video_texture_settings_server.h"
 #include "servers/settings/video_texture_streaming_settings.h"
 #include "servers/settings/video_texture_streaming_settings_server.h"
-#include "servers/settings/video_window_settings.h"
-#include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/window_settings.h"
+#include "servers/settings/window_settings_server.h"
 #include "servers/settings/xr_settings.h"
 #include "servers/settings/xr_settings_server.h"
 #include "servers/subtitle/subtitle.h"
@@ -204,7 +204,7 @@ static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
 static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
 static InputMapSettingsServer *input_map_settings_server = nullptr;
-static VideoWindowSettingsServer *video_window_settings_server = nullptr;
+static WindowSettingsServer *window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
 static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
 static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
@@ -295,11 +295,11 @@ void register_server_types() {
 	input_map_settings_server = memnew(InputMapSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
 	settings_server_manager->register_server(input_map_settings_server);
-	GDREGISTER_CLASS(VideoWindowSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoWindowSettingsServer);
-	video_window_settings_server = memnew(VideoWindowSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoWindowSettingsServer", VideoWindowSettingsServer::get_singleton(), "VideoWindowSettingsServer"));
-	settings_server_manager->register_server(video_window_settings_server);
+	GDREGISTER_CLASS(WindowSettings);
+	GDREGISTER_ABSTRACT_CLASS(WindowSettingsServer);
+	window_settings_server = memnew(WindowSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("WindowSettingsServer", WindowSettingsServer::get_singleton(), "WindowSettingsServer"));
+	settings_server_manager->register_server(window_settings_server);
 	GDREGISTER_CLASS(EngineSettings);
 	GDREGISTER_ABSTRACT_CLASS(EngineSettingsServer);
 	engine_settings_server = memnew(EngineSettingsServer);
@@ -638,8 +638,8 @@ void unregister_server_types() {
 	video_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
 	engine_settings_server = nullptr;
-	memdelete(video_window_settings_server);
-	video_window_settings_server = nullptr;
+	memdelete(window_settings_server);
+	window_settings_server = nullptr;
 	memdelete(input_map_settings_server);
 	input_map_settings_server = nullptr;
 	memdelete(input_settings_server);

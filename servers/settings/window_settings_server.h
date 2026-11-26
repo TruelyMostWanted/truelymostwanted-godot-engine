@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_window_settings_server.h                                        */
+/*  window_settings_server.h                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -36,14 +36,14 @@
 #include "servers/display/display_server.h"
 #include "servers/settings/settings_server.h"
 
-// Settings domain `video_window` (#20): mode, size, screen, position, flags and V-Sync of the main window,
-// its content scale and HDR output (VideoWindowSettings), plus the stored states of further windows.
+// Settings domain `window` (#20): mode, size, screen, position, flags and V-Sync of the main window,
+// its content scale and HDR output (WindowSettings), plus the stored states of further windows.
 // Applied in APPLY_PHASE_PRE_DISPLAY: Main::setup2() creates the main window with the stored mode, size,
 // V-Sync mode and flags (get_boot_window()) and places it on the stored screen before it is shown
 // (on_display_server_created()). Content scale and HDR wait for the root window (APPLY_PHASE_SCENE).
 // Precedence: command line (session overrides) > player's file > project settings.
-class VideoWindowSettingsServer : public SettingsServer {
-	GDCLASS(VideoWindowSettingsServer, SettingsServer);
+class WindowSettingsServer : public SettingsServer {
+	GDCLASS(WindowSettingsServer, SettingsServer);
 
 public:
 	// The main window values DisplayServer::create() takes. Main::setup2() fills them from the project
@@ -63,7 +63,7 @@ private:
 		TARGET_NONE, // Stored only (window states).
 	};
 
-	static VideoWindowSettingsServer *singleton;
+	static WindowSettingsServer *singleton;
 
 	// The last value pushed per setting (the effective one, with session overrides).
 	HashMap<StringName, Variant> pushed_values;
@@ -105,9 +105,11 @@ protected:
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
+	// `video_window`: the domain name before #243.
+	virtual String _get_legacy_file_name() const override;
 
 public:
-	static VideoWindowSettingsServer *get_singleton();
+	static WindowSettingsServer *get_singleton();
 
 	// The window options passed on the command line (Main::get_command_line_window_options()).
 	static Dictionary get_command_line_options();
@@ -169,6 +171,6 @@ public:
 	bool has_window_state(const String &p_key) const;
 	void clear_window_state(const String &p_key);
 
-	VideoWindowSettingsServer();
-	~VideoWindowSettingsServer();
+	WindowSettingsServer();
+	~WindowSettingsServer();
 };
