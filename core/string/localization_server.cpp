@@ -67,7 +67,8 @@ static Ref<FilesManifest> _get_catalog_files(const Ref<FilesManifest> &p_manifes
 	files->set_type_hint(StringName());
 	if (files->get_extensions().is_empty()) {
 		PackedStringArray extensions = LocalizationCatalog::get_file_extensions();
-		extensions.append_array({ "tres", "res" });
+		extensions.push_back("tres");
+		extensions.push_back("res");
 		files->set_extensions(extensions);
 	}
 	return files;

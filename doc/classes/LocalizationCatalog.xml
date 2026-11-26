@@ -185,7 +185,7 @@
 	</methods>
 	<members>
 		<member name="channel" type="StringName" setter="set_channel" getter="get_channel" default="&amp;&quot;&quot;">
-			The locale channel the keys of this catalog follow (see [method TranslationServer.set_locale_for]): [code]&amp;"interface"[/code], [code]&amp;"audio"[/code], [code]&amp;"subtitles"[/code] or a custom one. [TextLocalizationCatalog]s use [code]&amp;"interface"[/code] by default; for [ResourceLocalizationCatalog]s an empty channel means the channel of each key's type. Stored in [code].tres[/code], [code].lcat[/code] and the dictionary formats (not in CSV).
+			The locale channel the keys of this catalog follow (see [method TranslationServer.set_locale_for]): [code]&amp;"interface"[/code], [code]&amp;"audio"[/code], [code]&amp;"subtitles"[/code] or a custom one. [TextLocalizationCatalog]s use [code]&amp;"interface"[/code] by default; for [ResourceLocalizationCatalog]s an empty channel means the channel of each key's type. Stored in [code].tres[/code], [code].lcat[/code], JSON, YAML, TOML and INI (not in CSV and XML).
 		</member>
 		<member name="key_count" type="int" setter="" getter="get_key_count" default="0">
 			The number of rows (keys with their context).

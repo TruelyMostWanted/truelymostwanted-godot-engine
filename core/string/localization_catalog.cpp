@@ -1304,7 +1304,7 @@ int TextLocalizationCatalog::get_plural_form(const String &p_locale, int p_n) co
 }
 
 TextLocalizationCatalog::TextLocalizationCatalog() {
-	channel = SNAME("interface");
+	set_channel(SNAME("interface"));
 }
 
 void TextLocalizationCatalog::add_translation(const Ref<Translation> &p_translation) {
