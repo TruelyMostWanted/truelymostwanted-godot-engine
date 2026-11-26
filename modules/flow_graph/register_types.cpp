@@ -30,6 +30,7 @@
 
 #include "register_types.h"
 
+#include "dialogue/dialogue_nodes.h"
 #include "flow_graph.h"
 #include "flow_graph_data.h"
 #include "flow_graph_debugger.h"
@@ -76,6 +77,9 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(FlowGraphState);
 	GDREGISTER_CLASS(FlowGraphPlayback);
 	GDREGISTER_CLASS(FlowGraphPlayer);
+	GDREGISTER_CLASS(DialogueOption);
+	GDREGISTER_CLASS(DialogueLineNode);
+	GDREGISTER_CLASS(DialogueChoiceNode);
 #ifdef DEBUG_ENABLED
 	FlowGraphDebugger::initialize();
 #endif

@@ -8,6 +8,9 @@ def configure(env):
 
 def get_doc_classes():
     return [
+        "DialogueChoiceNode",
+        "DialogueLineNode",
+        "DialogueOption",
         "FlowBlackboard",
         "FlowBranchNode",
         "FlowConnection",

@@ -162,7 +162,7 @@ private:
 	// Run loop. _step(), _follow() and _end_frame() return the next node id to enter, or -1 when the run stops there.
 	Error _run(uint64_t p_serial, int p_next_id);
 	int _step(int p_id);
-	bool _exit_current();
+	bool _exit_current(const StringName &p_port = StringName());
 	int _follow(const StringName &p_port);
 	int _end_frame(const StringName &p_end_name);
 
