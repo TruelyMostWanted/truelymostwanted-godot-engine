@@ -797,7 +797,7 @@ Ref<DataValidation> LocalizationCatalog::validate(const Ref<DataValidationOption
 		const int at = duplicate.rfind_char('@');
 		const int row = at < 0 ? find_key(duplicate) : find_key(duplicate.left(at), duplicate.substr(at + 1));
 		const int row_or_none = row < 0 ? DataValidation::POSITION_NONE : row;
-		result->add_issue(DataValidation::ISSUE_KIND_DUPLICATE_KEY, vformat("\"%s\" is defined more than once; the definitions are merged.", duplicate), StringName(), duplicate, row_or_none);
+		result->add_issue(DataValidation::ISSUE_KIND_DUPLICATE_KEY, vformat("\"%s\" is defined more than once; the definitions are merged.", duplicate), StringName(), DataValidation::join_path(String(), duplicate), row_or_none);
 	}
 	const Vector<String> languages = TranslationServer::get_singleton()->get_all_languages();
 	for (uint32_t i = 0; i < columns.size() && !result->is_full(); i++) {
@@ -815,7 +815,7 @@ Ref<DataValidation> LocalizationCatalog::validate(const Ref<DataValidationOption
 		for (uint32_t row = 0; row < ids.size() && !result->is_full(); row++) {
 			if (column->cells.get_length(row) == 0) {
 				const String name = entry_name(row);
-				result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("\"%s\" has no \"%s\" translation.", name, column->locale), column->locale, name, row, i);
+				result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("\"%s\" has no \"%s\" translation.", name, column->locale), column->locale, DataValidation::join_path(String(), name), row, i);
 			}
 		}
 	}
