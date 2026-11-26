@@ -24,7 +24,8 @@
 		GD.Print(LocalizationServer.GetLocaleChain("de_DE")); // ["de_DE", "de", "en"]
 
 		var modTexts = GD.Load&lt;TextLocalizationCatalog&gt;("user://mods/knights/translations/texts.lcat");
-		TextLocalizationServer.AddCatalog(modTexts, 100);
+		// Methods of this base class are reached through the singleton instance in C#.
+		TextLocalizationServer.Singleton.AddCatalog(modTexts, 100);
 		[/csharp]
 		[/codeblocks]
 	</description>
