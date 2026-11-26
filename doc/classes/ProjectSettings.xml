@@ -3821,6 +3821,21 @@
 		<member name="settings/general/only_changed_values" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
 		</member>
+		<member name="settings/graphics_preset/file_name" type="String" setter="" getter="" default="&quot;graphics_preset&quot;">
+			The name of the settings file of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/graphics_preset/format] with [member settings/graphics_preset/override_format]). It may contain a relative subfolder, for example [code]profiles/graphics_preset[/code] for [code]user://settings/profiles/graphics_preset.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/graphics_preset/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/graphics_preset/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/graphics_preset/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]) stores its file in [member settings/graphics_preset/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/graphics_preset/presets" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The graphics presets of the project: [code].tres[/code] or [code].res[/code] files with a [GraphicsPreset]. A preset with the name of a built-in preset ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code], [code]"Ultra"[/code]) replaces it, other names are added after the built-in presets. Files that are no [GraphicsPreset] or have no name are ignored with an error. See [GraphicsPresetSettingsServer].
+		</member>
+		<member name="settings/graphics_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [GraphicsPresetSettingsServer] starts with the four built-in presets ([method GraphicsPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/graphics_preset/presets] exist.
+		</member>
 		<member name="settings/input/file_name" type="String" setter="" getter="" default="&quot;input&quot;">
 			The name of the settings file of the [code]"input"[/code] domain ([InputSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/input/format] with [member settings/input/override_format]). It may contain a relative subfolder, for example [code]profiles/input[/code] for [code]user://settings/profiles/input.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
 		</member>
@@ -3910,21 +3925,6 @@
 		</member>
 		<member name="settings/tts_personas/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]) stores its file in [member settings/tts_personas/format] instead of [member settings/general/default_format].
-		</member>
-		<member name="settings/video_preset/file_name" type="String" setter="" getter="" default="&quot;video_preset&quot;">
-			The name of the settings file of the [code]"video_preset"[/code] domain ([VideoPresetSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/video_preset/format] with [member settings/video_preset/override_format]). It may contain a relative subfolder, for example [code]profiles/video_preset[/code] for [code]user://settings/profiles/video_preset.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
-		</member>
-		<member name="settings/video_preset/format" type="int" setter="" getter="" default="1">
-			The text format of the [code]"video_preset"[/code] domain ([VideoPresetSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/video_preset/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
-		</member>
-		<member name="settings/video_preset/override_format" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], the [code]"video_preset"[/code] domain ([VideoPresetSettingsServer]) stores its file in [member settings/video_preset/format] instead of [member settings/general/default_format].
-		</member>
-		<member name="settings/video_preset/presets" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
-			The graphics presets of the project: [code].tres[/code] or [code].res[/code] files with a [VideoPreset]. A preset with the name of a built-in preset ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code], [code]"Ultra"[/code]) replaces it, other names are added after the built-in presets. Files that are no [VideoPreset] or have no name are ignored with an error. See [VideoPresetSettingsServer].
-		</member>
-		<member name="settings/video_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
-			If [code]true[/code], [VideoPresetSettingsServer] starts with the four built-in presets ([method VideoPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/video_preset/presets] exist.
 		</member>
 		<member name="settings/window/file_name" type="String" setter="" getter="" default="&quot;window&quot;">
 			The name of the settings file of the [code]"window"[/code] domain ([WindowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/window/format] with [member settings/window/override_format]). It may contain a relative subfolder, for example [code]profiles/window[/code] for [code]user://settings/profiles/window.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.

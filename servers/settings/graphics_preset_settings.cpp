@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_preset_settings.cpp                                             */
+/*  graphics_preset_settings.cpp                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,22 +28,22 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_preset_settings.h"
+#include "graphics_preset_settings.h"
 
 #include "core/object/class_db.h"
 
-void VideoPresetSettings::set_preset(const String &p_preset) {
+void GraphicsPresetSettings::set_preset(const String &p_preset) {
 	preset = p_preset;
 	emit_changed();
 }
 
-String VideoPresetSettings::get_preset() const {
+String GraphicsPresetSettings::get_preset() const {
 	return preset;
 }
 
-void VideoPresetSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_preset", "preset"), &VideoPresetSettings::set_preset);
-	ClassDB::bind_method(D_METHOD("get_preset"), &VideoPresetSettings::get_preset);
+void GraphicsPresetSettings::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_preset", "preset"), &GraphicsPresetSettings::set_preset);
+	ClassDB::bind_method(D_METHOD("get_preset"), &GraphicsPresetSettings::get_preset);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "preset"), "set_preset", "get_preset");
 }

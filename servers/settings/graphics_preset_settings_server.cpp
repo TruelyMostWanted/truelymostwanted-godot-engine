@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_preset_settings_server.cpp                                      */
+/*  graphics_preset_settings_server.cpp                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,7 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "video_preset_settings_server.h"
+#include "graphics_preset_settings_server.h"
 
 #include "core/config/project_settings.h"
 #include "core/io/resource_loader.h"
@@ -37,27 +37,27 @@
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "servers/rendering/rendering_server.h"
+#include "servers/settings/graphics_preset_settings.h"
 #include "servers/settings/settings_server_manager.h"
-#include "servers/settings/video_preset_settings.h"
 
-static constexpr const char *SETTING_VIDEO_PRESET_PRESETS = "settings/video_preset/presets";
-static constexpr const char *SETTING_VIDEO_PRESET_USE_BUILTIN = "settings/video_preset/use_builtin_presets";
-static constexpr const char *VIDEO_PRESET_CUSTOM = "Custom";
+static constexpr const char *SETTING_GRAPHICS_PRESET_PRESETS = "settings/graphics_preset/presets";
+static constexpr const char *SETTING_GRAPHICS_PRESET_USE_BUILTIN = "settings/graphics_preset/use_builtin_presets";
+static constexpr const char *GRAPHICS_PRESET_CUSTOM = "Custom";
 
 // The built-in presets, from the lowest to the highest.
-static const char *video_preset_builtin_names[] = { "Low", "Medium", "High", "Ultra" };
-static constexpr int VIDEO_PRESET_BUILTIN_COUNT = 4;
+static const char *graphics_preset_builtin_names[] = { "Low", "Medium", "High", "Ultra" };
+static constexpr int GRAPHICS_PRESET_BUILTIN_COUNT = 4;
 
 // One value of the built-in presets: its value in Low, Medium, High and Ultra.
-struct VideoPresetBuiltinValue {
+struct GraphicsPresetBuiltinValue {
 	const char *domain;
 	const char *name;
 	Variant::Type type;
-	double values[VIDEO_PRESET_BUILTIN_COUNT];
+	double values[GRAPHICS_PRESET_BUILTIN_COUNT];
 };
 
 // Enum values are the values of the engine enums (see the hints of the domain resources).
-static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
+static const GraphicsPresetBuiltinValue graphics_preset_builtin_values[] = {
 	// Resolution scale (bilinear), mesh LOD threshold in pixels.
 	{ "render_quality", "scaling_3d_scale", Variant::FLOAT, { 0.75, 1.0, 1.0, 1.0 } },
 	{ "render_quality", "mesh_lod_threshold", Variant::FLOAT, { 4.0, 2.0, 1.0, 0.5 } },
@@ -96,7 +96,7 @@ static const VideoPresetBuiltinValue video_preset_builtin_values[] = {
 	{ "render_effect", "allow_volumetric_fog", Variant::BOOL, { 0, 1, 1, 1 } },
 };
 
-static Variant video_preset_builtin_value(const VideoPresetBuiltinValue &p_value, int p_level) {
+static Variant graphics_preset_builtin_value(const GraphicsPresetBuiltinValue &p_value, int p_level) {
 	const double number = p_value.values[p_level];
 	switch (p_value.type) {
 		case Variant::BOOL:
@@ -108,14 +108,14 @@ static Variant video_preset_builtin_value(const VideoPresetBuiltinValue &p_value
 	}
 }
 
-static bool video_preset_is_number(const Variant &p_value) {
+static bool graphics_preset_is_number(const Variant &p_value) {
 	return p_value.get_type() == Variant::INT || p_value.get_type() == Variant::FLOAT;
 }
 
 // Like SettingsServer::values_equal(), but numbers of different types are compared by value and floats
 // approximately (domain resources store `float`, presets `double`).
-static bool video_preset_values_equal(const Variant &p_a, const Variant &p_b) {
-	if (video_preset_is_number(p_a) && video_preset_is_number(p_b)) {
+static bool graphics_preset_values_equal(const Variant &p_a, const Variant &p_b) {
+	if (graphics_preset_is_number(p_a) && graphics_preset_is_number(p_b)) {
 		if (p_a.get_type() == Variant::INT && p_b.get_type() == Variant::INT) {
 			return int64_t(p_a) == int64_t(p_b);
 		}
@@ -127,7 +127,7 @@ static bool video_preset_values_equal(const Variant &p_a, const Variant &p_b) {
 // A new settings resource of `p_domain` for a built-in preset: a copy of the domain's defaults (the project
 // settings), so the values a built-in preset does not define keep the project's choice; the class defaults
 // if the domain is not registered.
-static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
+static Ref<Resource> graphics_preset_builtin_base(const String &p_domain) {
 	Ref<Resource> base;
 	if (p_domain == "render_quality") {
 		base = Ref<Resource>(memnew(RenderQualitySettings));
@@ -153,63 +153,63 @@ static Ref<Resource> video_preset_builtin_base(const String &p_domain) {
 
 // Compares the stored values of a preset's domain resource with the values of the domain server. Values the
 // domain doesn't have or support are not applied, so they don't count either.
-static bool video_preset_domain_matches(const SettingsServer *p_server, const Ref<Resource> &p_settings) {
+static bool graphics_preset_domain_matches(const SettingsServer *p_server, const Ref<Resource> &p_settings) {
 	LocalVector<PropertyInfo> infos;
 	SettingsServer::get_value_infos(p_settings.ptr(), infos);
 	for (const PropertyInfo &info : infos) {
 		if (!p_server->has_setting(info.name) || !p_server->is_value_supported(info.name)) {
 			continue;
 		}
-		if (!video_preset_values_equal(p_server->get_value(info.name), p_settings->get(info.name))) {
+		if (!graphics_preset_values_equal(p_server->get_value(info.name), p_settings->get(info.name))) {
 			return false;
 		}
 	}
 	return true;
 }
 
-VideoPresetSettingsServer *VideoPresetSettingsServer::singleton = nullptr;
+GraphicsPresetSettingsServer *GraphicsPresetSettingsServer::singleton = nullptr;
 
-VideoPresetSettingsServer *VideoPresetSettingsServer::get_singleton() {
+GraphicsPresetSettingsServer *GraphicsPresetSettingsServer::get_singleton() {
 	return singleton;
 }
 
-void VideoPresetSettingsServer::register_settings() {
-	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_VIDEO_PRESET_PRESETS, PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:%s", Variant::STRING, PROPERTY_HINT_FILE, "*.tres,*.res")), PackedStringArray());
-	GLOBAL_DEF(SETTING_VIDEO_PRESET_USE_BUILTIN, true);
+void GraphicsPresetSettingsServer::register_settings() {
+	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_GRAPHICS_PRESET_PRESETS, PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:%s", Variant::STRING, PROPERTY_HINT_FILE, "*.tres,*.res")), PackedStringArray());
+	GLOBAL_DEF(SETTING_GRAPHICS_PRESET_USE_BUILTIN, true);
 }
 
-String VideoPresetSettingsServer::get_custom_preset_name() {
-	return VIDEO_PRESET_CUSTOM;
+String GraphicsPresetSettingsServer::get_custom_preset_name() {
+	return GRAPHICS_PRESET_CUSTOM;
 }
 
-PackedStringArray VideoPresetSettingsServer::get_builtin_preset_names() {
+PackedStringArray GraphicsPresetSettingsServer::get_builtin_preset_names() {
 	PackedStringArray names;
-	for (const char *builtin_name : video_preset_builtin_names) {
+	for (const char *builtin_name : graphics_preset_builtin_names) {
 		names.push_back(builtin_name);
 	}
 	return names;
 }
 
-Ref<VideoPreset> VideoPresetSettingsServer::create_builtin_preset(const String &p_name) {
+Ref<GraphicsPreset> GraphicsPresetSettingsServer::create_builtin_preset(const String &p_name) {
 	int level = -1;
-	for (int i = 0; i < VIDEO_PRESET_BUILTIN_COUNT; i++) {
-		if (p_name == video_preset_builtin_names[i]) {
+	for (int i = 0; i < GRAPHICS_PRESET_BUILTIN_COUNT; i++) {
+		if (p_name == graphics_preset_builtin_names[i]) {
 			level = i;
 			break;
 		}
 	}
-	ERR_FAIL_COND_V_MSG(level < 0, Ref<VideoPreset>(), vformat("VideoPresetSettingsServer: \"%s\" is not a built-in preset (%s).", p_name, String(", ").join(get_builtin_preset_names())));
+	ERR_FAIL_COND_V_MSG(level < 0, Ref<GraphicsPreset>(), vformat("GraphicsPresetSettingsServer: \"%s\" is not a built-in preset (%s).", p_name, String(", ").join(get_builtin_preset_names())));
 
-	Ref<VideoPreset> preset;
+	Ref<GraphicsPreset> preset;
 	preset.instantiate();
 	preset->set_preset_name(p_name);
-	for (const String &domain : VideoPreset::get_domains()) {
-		preset->set_domain_settings(domain, video_preset_builtin_base(domain));
+	for (const String &domain : GraphicsPreset::get_domains()) {
+		preset->set_domain_settings(domain, graphics_preset_builtin_base(domain));
 	}
-	for (const VideoPresetBuiltinValue &value : video_preset_builtin_values) {
+	for (const GraphicsPresetBuiltinValue &value : graphics_preset_builtin_values) {
 		const Ref<Resource> domain_settings = preset->get_domain_settings(value.domain);
 		ERR_CONTINUE(domain_settings.is_null());
-		domain_settings->set(value.name, video_preset_builtin_value(value, level));
+		domain_settings->set(value.name, graphics_preset_builtin_value(value, level));
 	}
 	return preset;
 }
@@ -217,30 +217,34 @@ Ref<VideoPreset> VideoPresetSettingsServer::create_builtin_preset(const String &
 /////////////////////////////////////////////////////////////////////////////
 // Domain.
 
-StringName VideoPresetSettingsServer::get_domain() const {
-	return SNAME("video_preset");
+StringName GraphicsPresetSettingsServer::get_domain() const {
+	return SNAME("graphics_preset");
 }
 
-SettingsServer::ApplyPhase VideoPresetSettingsServer::get_apply_phase() const {
+String GraphicsPresetSettingsServer::_get_legacy_file_name() const {
+	return "video_preset";
+}
+
+SettingsServer::ApplyPhase GraphicsPresetSettingsServer::get_apply_phase() const {
 	// Together with the video domains; the name has no engine target.
 	return APPLY_PHASE_SCENE;
 }
 
-Ref<Resource> VideoPresetSettingsServer::_create_default_settings() const {
-	Ref<VideoPresetSettings> default_settings;
+Ref<Resource> GraphicsPresetSettingsServer::_create_default_settings() const {
+	Ref<GraphicsPresetSettings> default_settings;
 	default_settings.instantiate();
 	return default_settings;
 }
 
-void VideoPresetSettingsServer::_apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) {
+void GraphicsPresetSettingsServer::_apply_settings(const Ref<Resource> &p_settings, const PackedStringArray &p_names) {
 	// The name of the preset has no engine target: the values are applied by apply_preset() on the video domains.
 }
 
-void VideoPresetSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
+void GraphicsPresetSettingsServer::_read_settings_from_engine(const Ref<Resource> &p_settings) {
 	// Nothing to read: the engine has no preset.
 }
 
-Variant VideoPresetSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
+Variant GraphicsPresetSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	const Variant value = SettingsServer::_validate_setting(p_name, p_value);
 	if (p_name == SNAME("preset") && value.get_type() == Variant::STRING) {
 		return String(value).strip_edges();
@@ -251,7 +255,7 @@ Variant VideoPresetSettingsServer::_validate_setting(const StringName &p_name, c
 /////////////////////////////////////////////////////////////////////////////
 // Domain servers.
 
-SettingsServer *VideoPresetSettingsServer::_get_domain_server(const StringName &p_domain) const {
+SettingsServer *GraphicsPresetSettingsServer::_get_domain_server(const StringName &p_domain) const {
 	const ObjectID *override_id = domain_overrides.getptr(p_domain);
 	if (override_id != nullptr) {
 		return ObjectDB::get_instance<SettingsServer>(*override_id);
@@ -260,23 +264,23 @@ SettingsServer *VideoPresetSettingsServer::_get_domain_server(const StringName &
 	return manager != nullptr ? manager->get_server(p_domain) : nullptr;
 }
 
-void VideoPresetSettingsServer::_connect_domain(SettingsServer *p_server) {
+void GraphicsPresetSettingsServer::_connect_domain(SettingsServer *p_server) {
 	if (p_server == nullptr || p_server == this) {
 		return;
 	}
-	const Callable callback = callable_mp(this, &VideoPresetSettingsServer::_on_domain_value_changed);
+	const Callable callback = callable_mp(this, &GraphicsPresetSettingsServer::_on_domain_value_changed);
 	if (!p_server->is_connected(SNAME("value_changed"), callback)) {
 		p_server->connect(SNAME("value_changed"), callback);
 	}
 }
 
-void VideoPresetSettingsServer::_connect_domains() {
-	for (const String &domain : VideoPreset::get_domains()) {
+void GraphicsPresetSettingsServer::_connect_domains() {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		_connect_domain(_get_domain_server(domain));
 	}
 }
 
-void VideoPresetSettingsServer::set_domain_server(const StringName &p_domain, SettingsServer *p_server) {
+void GraphicsPresetSettingsServer::set_domain_server(const StringName &p_domain, SettingsServer *p_server) {
 	if (p_server == nullptr) {
 		domain_overrides.erase(p_domain);
 	} else {
@@ -285,8 +289,8 @@ void VideoPresetSettingsServer::set_domain_server(const StringName &p_domain, Se
 	_connect_domain(_get_domain_server(p_domain));
 }
 
-void VideoPresetSettingsServer::_on_server_registered(const StringName &p_domain) {
-	if (VideoPreset::get_domains().has(p_domain)) {
+void GraphicsPresetSettingsServer::_on_server_registered(const StringName &p_domain) {
+	if (GraphicsPreset::get_domains().has(p_domain)) {
 		_connect_domain(_get_domain_server(p_domain));
 	}
 }
@@ -294,13 +298,13 @@ void VideoPresetSettingsServer::_on_server_registered(const StringName &p_domain
 /////////////////////////////////////////////////////////////////////////////
 // Presets.
 
-void VideoPresetSettingsServer::_ensure_presets() const {
+void GraphicsPresetSettingsServer::_ensure_presets() const {
 	if (!presets_loaded) {
-		const_cast<VideoPresetSettingsServer *>(this)->_load_presets();
+		const_cast<GraphicsPresetSettingsServer *>(this)->_load_presets();
 	}
 }
 
-void VideoPresetSettingsServer::_load_presets() {
+void GraphicsPresetSettingsServer::_load_presets() {
 	presets_loaded = true;
 	presets.clear();
 
@@ -308,16 +312,16 @@ void VideoPresetSettingsServer::_load_presets() {
 	bool use_builtin = true;
 	PackedStringArray paths;
 	if (project_settings != nullptr) {
-		if (project_settings->has_setting(SETTING_VIDEO_PRESET_USE_BUILTIN)) {
-			use_builtin = project_settings->get_setting(SETTING_VIDEO_PRESET_USE_BUILTIN);
+		if (project_settings->has_setting(SETTING_GRAPHICS_PRESET_USE_BUILTIN)) {
+			use_builtin = project_settings->get_setting(SETTING_GRAPHICS_PRESET_USE_BUILTIN);
 		}
-		if (project_settings->has_setting(SETTING_VIDEO_PRESET_PRESETS)) {
-			paths = project_settings->get_setting(SETTING_VIDEO_PRESET_PRESETS);
+		if (project_settings->has_setting(SETTING_GRAPHICS_PRESET_PRESETS)) {
+			paths = project_settings->get_setting(SETTING_GRAPHICS_PRESET_PRESETS);
 		}
 	}
 
 	if (use_builtin) {
-		for (const char *builtin_name : video_preset_builtin_names) {
+		for (const char *builtin_name : graphics_preset_builtin_names) {
 			presets.push_back(create_builtin_preset(builtin_name));
 		}
 	}
@@ -326,14 +330,14 @@ void VideoPresetSettingsServer::_load_presets() {
 		if (path.is_empty()) {
 			continue;
 		}
-		const Ref<VideoPreset> preset = ResourceLoader::load(path);
+		const Ref<GraphicsPreset> preset = ResourceLoader::load(path);
 		if (preset.is_null()) {
-			ERR_PRINT(vformat("VideoPresetSettingsServer: \"%s\" (project setting \"%s\") is not a VideoPreset resource; it is ignored.", path, SETTING_VIDEO_PRESET_PRESETS));
+			ERR_PRINT(vformat("GraphicsPresetSettingsServer: \"%s\" (project setting \"%s\") is not a GraphicsPreset resource; it is ignored.", path, SETTING_GRAPHICS_PRESET_PRESETS));
 			continue;
 		}
 		const String preset_name = preset->get_preset_name();
-		if (preset_name.is_empty() || preset_name == VIDEO_PRESET_CUSTOM) {
-			ERR_PRINT(vformat("VideoPresetSettingsServer: the preset \"%s\" needs a name other than \"\" and \"%s\"; it is ignored.", path, VIDEO_PRESET_CUSTOM));
+		if (preset_name.is_empty() || preset_name == GRAPHICS_PRESET_CUSTOM) {
+			ERR_PRINT(vformat("GraphicsPresetSettingsServer: the preset \"%s\" needs a name other than \"\" and \"%s\"; it is ignored.", path, GRAPHICS_PRESET_CUSTOM));
 			continue;
 		}
 		const int index = _find_preset(preset_name);
@@ -345,7 +349,7 @@ void VideoPresetSettingsServer::_load_presets() {
 	}
 }
 
-int VideoPresetSettingsServer::_find_preset(const String &p_name) const {
+int GraphicsPresetSettingsServer::_find_preset(const String &p_name) const {
 	for (uint32_t i = 0; i < presets.size(); i++) {
 		if (presets[i]->get_preset_name() == p_name) {
 			return int(i);
@@ -354,39 +358,39 @@ int VideoPresetSettingsServer::_find_preset(const String &p_name) const {
 	return -1;
 }
 
-TypedArray<VideoPreset> VideoPresetSettingsServer::get_presets() const {
+TypedArray<GraphicsPreset> GraphicsPresetSettingsServer::get_presets() const {
 	_ensure_presets();
-	TypedArray<VideoPreset> result;
-	for (const Ref<VideoPreset> &preset : presets) {
+	TypedArray<GraphicsPreset> result;
+	for (const Ref<GraphicsPreset> &preset : presets) {
 		result.push_back(preset);
 	}
 	return result;
 }
 
-PackedStringArray VideoPresetSettingsServer::get_preset_names() const {
+PackedStringArray GraphicsPresetSettingsServer::get_preset_names() const {
 	_ensure_presets();
 	PackedStringArray names;
-	for (const Ref<VideoPreset> &preset : presets) {
+	for (const Ref<GraphicsPreset> &preset : presets) {
 		names.push_back(preset->get_preset_name());
 	}
 	return names;
 }
 
-Ref<VideoPreset> VideoPresetSettingsServer::get_preset(const String &p_name) const {
+Ref<GraphicsPreset> GraphicsPresetSettingsServer::get_preset(const String &p_name) const {
 	_ensure_presets();
 	const int index = _find_preset(p_name);
-	return index >= 0 ? presets[index] : Ref<VideoPreset>();
+	return index >= 0 ? presets[index] : Ref<GraphicsPreset>();
 }
 
-bool VideoPresetSettingsServer::has_preset(const String &p_name) const {
+bool GraphicsPresetSettingsServer::has_preset(const String &p_name) const {
 	_ensure_presets();
 	return _find_preset(p_name) >= 0;
 }
 
-void VideoPresetSettingsServer::add_preset(const Ref<VideoPreset> &p_preset) {
+void GraphicsPresetSettingsServer::add_preset(const Ref<GraphicsPreset> &p_preset) {
 	ERR_FAIL_COND(p_preset.is_null());
 	const String preset_name = p_preset->get_preset_name();
-	ERR_FAIL_COND_MSG(preset_name.is_empty() || preset_name == VIDEO_PRESET_CUSTOM, vformat("VideoPresetSettingsServer: a preset needs a name other than \"\" and \"%s\".", VIDEO_PRESET_CUSTOM));
+	ERR_FAIL_COND_MSG(preset_name.is_empty() || preset_name == GRAPHICS_PRESET_CUSTOM, vformat("GraphicsPresetSettingsServer: a preset needs a name other than \"\" and \"%s\".", GRAPHICS_PRESET_CUSTOM));
 	_ensure_presets();
 	const int index = _find_preset(preset_name);
 	if (index >= 0) {
@@ -397,15 +401,15 @@ void VideoPresetSettingsServer::add_preset(const Ref<VideoPreset> &p_preset) {
 	_update_current();
 }
 
-void VideoPresetSettingsServer::remove_preset(const String &p_name) {
+void GraphicsPresetSettingsServer::remove_preset(const String &p_name) {
 	_ensure_presets();
 	const int index = _find_preset(p_name);
-	ERR_FAIL_COND_MSG(index < 0, vformat("VideoPresetSettingsServer: there is no preset \"%s\".", p_name));
+	ERR_FAIL_COND_MSG(index < 0, vformat("GraphicsPresetSettingsServer: there is no preset \"%s\".", p_name));
 	presets.remove_at(index);
 	_update_current();
 }
 
-void VideoPresetSettingsServer::reload_presets() {
+void GraphicsPresetSettingsServer::reload_presets() {
 	_load_presets();
 	_update_current();
 }
@@ -413,8 +417,8 @@ void VideoPresetSettingsServer::reload_presets() {
 /////////////////////////////////////////////////////////////////////////////
 // Current preset.
 
-bool VideoPresetSettingsServer::_matches(const Ref<VideoPreset> &p_preset) const {
-	for (const String &domain : VideoPreset::get_domains()) {
+bool GraphicsPresetSettingsServer::_matches(const Ref<GraphicsPreset> &p_preset) const {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		// A domain the preset doesn't touch (null resource) doesn't count.
 		const Ref<Resource> domain_settings = p_preset->get_domain_settings(domain);
 		if (domain_settings.is_null()) {
@@ -424,14 +428,14 @@ bool VideoPresetSettingsServer::_matches(const Ref<VideoPreset> &p_preset) const
 		if (server == nullptr) {
 			continue;
 		}
-		if (!video_preset_domain_matches(server, domain_settings)) {
+		if (!graphics_preset_domain_matches(server, domain_settings)) {
 			return false;
 		}
 	}
 	return true;
 }
 
-String VideoPresetSettingsServer::_detect(const String &p_preferred) const {
+String GraphicsPresetSettingsServer::_detect(const String &p_preferred) const {
 	_ensure_presets();
 	if (!p_preferred.is_empty()) {
 		const int index = _find_preset(p_preferred);
@@ -439,42 +443,42 @@ String VideoPresetSettingsServer::_detect(const String &p_preferred) const {
 			return p_preferred;
 		}
 	}
-	for (const Ref<VideoPreset> &preset : presets) {
+	for (const Ref<GraphicsPreset> &preset : presets) {
 		if (_matches(preset)) {
 			return preset->get_preset_name();
 		}
 	}
-	return VIDEO_PRESET_CUSTOM;
+	return GRAPHICS_PRESET_CUSTOM;
 }
 
-String VideoPresetSettingsServer::detect_preset() const {
+String GraphicsPresetSettingsServer::detect_preset() const {
 	return _detect(String());
 }
 
-bool VideoPresetSettingsServer::matches_preset(const String &p_name) const {
-	const Ref<VideoPreset> preset = get_preset(p_name);
+bool GraphicsPresetSettingsServer::matches_preset(const String &p_name) const {
+	const Ref<GraphicsPreset> preset = get_preset(p_name);
 	return preset.is_valid() && _matches(preset);
 }
 
-String VideoPresetSettingsServer::get_current_preset() const {
+String GraphicsPresetSettingsServer::get_current_preset() const {
 	const String stored = get_value(SNAME("preset"));
-	if (stored == VIDEO_PRESET_CUSTOM || (!stored.is_empty() && has_preset(stored))) {
+	if (stored == GRAPHICS_PRESET_CUSTOM || (!stored.is_empty() && has_preset(stored))) {
 		return stored;
 	}
 	// No preset picked yet, or the stored one no longer exists: the values decide.
 	return _detect(String());
 }
 
-bool VideoPresetSettingsServer::is_custom() const {
-	return get_current_preset() == VIDEO_PRESET_CUSTOM;
+bool GraphicsPresetSettingsServer::is_custom() const {
+	return get_current_preset() == GRAPHICS_PRESET_CUSTOM;
 }
 
-void VideoPresetSettingsServer::_set_stored_preset(const String &p_name) {
+void GraphicsPresetSettingsServer::_set_stored_preset(const String &p_name) {
 	set_value(SNAME("preset"), p_name);
 	_update_current();
 }
 
-void VideoPresetSettingsServer::_update_current() {
+void GraphicsPresetSettingsServer::_update_current() {
 	const String current = get_current_preset();
 	if (last_current_known && current == last_current) {
 		return;
@@ -484,15 +488,15 @@ void VideoPresetSettingsServer::_update_current() {
 	emit_signal(SNAME("preset_changed"), current);
 }
 
-Error VideoPresetSettingsServer::apply_preset(const String &p_name) {
-	ERR_FAIL_COND_V_MSG(p_name == VIDEO_PRESET_CUSTOM, ERR_INVALID_PARAMETER, vformat("VideoPresetSettingsServer: \"%s\" is not a preset; it is the state after a single change.", VIDEO_PRESET_CUSTOM));
-	const Ref<VideoPreset> preset = get_preset(p_name);
-	ERR_FAIL_COND_V_MSG(preset.is_null(), ERR_DOES_NOT_EXIST, vformat("VideoPresetSettingsServer: there is no preset \"%s\" (%s).", p_name, String(", ").join(get_preset_names())));
+Error GraphicsPresetSettingsServer::apply_preset(const String &p_name) {
+	ERR_FAIL_COND_V_MSG(p_name == GRAPHICS_PRESET_CUSTOM, ERR_INVALID_PARAMETER, vformat("GraphicsPresetSettingsServer: \"%s\" is not a preset; it is the state after a single change.", GRAPHICS_PRESET_CUSTOM));
+	const Ref<GraphicsPreset> preset = get_preset(p_name);
+	ERR_FAIL_COND_V_MSG(preset.is_null(), ERR_DOES_NOT_EXIST, vformat("GraphicsPresetSettingsServer: there is no preset \"%s\" (%s).", p_name, String(", ").join(get_preset_names())));
 
 	Error result = OK;
 	PackedStringArray missing_domains;
 	applying_preset = true;
-	for (const String &domain : VideoPreset::get_domains()) {
+	for (const String &domain : GraphicsPreset::get_domains()) {
 		// A null resource: the preset doesn't touch the domain.
 		const Ref<Resource> domain_settings = preset->get_domain_settings(domain);
 		if (domain_settings.is_null()) {
@@ -526,12 +530,12 @@ Error VideoPresetSettingsServer::apply_preset(const String &p_name) {
 	_set_stored_preset(p_name);
 
 	if (!missing_domains.is_empty()) {
-		WARN_PRINT(vformat("VideoPresetSettingsServer: the settings domains %s are not registered; the values of preset \"%s\" for them are skipped.", String(", ").join(missing_domains), p_name));
+		WARN_PRINT(vformat("GraphicsPresetSettingsServer: the settings domains %s are not registered; the values of preset \"%s\" for them are skipped.", String(", ").join(missing_domains), p_name));
 	}
 	return result;
 }
 
-String VideoPresetSettingsServer::suggest_preset() const {
+String GraphicsPresetSettingsServer::suggest_preset() const {
 	// 0 = Low, 1 = Medium, 2 = High. Ultra is never suggested: that needs a benchmark (out of scope).
 	int level = 1;
 	const String method = OS::get_singleton() != nullptr ? OS::get_singleton()->get_current_rendering_method() : String();
@@ -558,8 +562,8 @@ String VideoPresetSettingsServer::suggest_preset() const {
 #endif // RD_ENABLED
 	}
 	for (int i = level; i >= 0; i--) {
-		if (has_preset(video_preset_builtin_names[i])) {
-			return video_preset_builtin_names[i];
+		if (has_preset(graphics_preset_builtin_names[i])) {
+			return graphics_preset_builtin_names[i];
 		}
 	}
 	return String();
@@ -568,7 +572,7 @@ String VideoPresetSettingsServer::suggest_preset() const {
 /////////////////////////////////////////////////////////////////////////////
 // Signals.
 
-void VideoPresetSettingsServer::_on_domain_value_changed(const StringName &p_name, const Variant &p_value) {
+void GraphicsPresetSettingsServer::_on_domain_value_changed(const StringName &p_name, const Variant &p_value) {
 	if (applying_preset) {
 		return;
 	}
@@ -579,7 +583,7 @@ void VideoPresetSettingsServer::_on_domain_value_changed(const StringName &p_nam
 		return;
 	}
 	// A single change: still the chosen preset, another preset, or "Custom".
-	const String detected = _detect(stored == VIDEO_PRESET_CUSTOM ? String() : stored);
+	const String detected = _detect(stored == GRAPHICS_PRESET_CUSTOM ? String() : stored);
 	if (detected != stored) {
 		_set_stored_preset(detected);
 	} else {
@@ -587,56 +591,56 @@ void VideoPresetSettingsServer::_on_domain_value_changed(const StringName &p_nam
 	}
 }
 
-void VideoPresetSettingsServer::_on_own_value_changed(const StringName &p_name, const Variant &p_value) {
+void GraphicsPresetSettingsServer::_on_own_value_changed(const StringName &p_name, const Variant &p_value) {
 	_update_current();
 }
 
-void VideoPresetSettingsServer::_on_own_changed() {
+void GraphicsPresetSettingsServer::_on_own_changed() {
 	_update_current();
 }
 
-void VideoPresetSettingsServer::_bind_methods() {
-	ClassDB::bind_static_method("VideoPresetSettingsServer", D_METHOD("get_custom_preset_name"), &VideoPresetSettingsServer::get_custom_preset_name);
-	ClassDB::bind_static_method("VideoPresetSettingsServer", D_METHOD("get_builtin_preset_names"), &VideoPresetSettingsServer::get_builtin_preset_names);
-	ClassDB::bind_static_method("VideoPresetSettingsServer", D_METHOD("create_builtin_preset", "name"), &VideoPresetSettingsServer::create_builtin_preset);
+void GraphicsPresetSettingsServer::_bind_methods() {
+	ClassDB::bind_static_method("GraphicsPresetSettingsServer", D_METHOD("get_custom_preset_name"), &GraphicsPresetSettingsServer::get_custom_preset_name);
+	ClassDB::bind_static_method("GraphicsPresetSettingsServer", D_METHOD("get_builtin_preset_names"), &GraphicsPresetSettingsServer::get_builtin_preset_names);
+	ClassDB::bind_static_method("GraphicsPresetSettingsServer", D_METHOD("create_builtin_preset", "name"), &GraphicsPresetSettingsServer::create_builtin_preset);
 
-	ClassDB::bind_method(D_METHOD("get_presets"), &VideoPresetSettingsServer::get_presets);
-	ClassDB::bind_method(D_METHOD("get_preset_names"), &VideoPresetSettingsServer::get_preset_names);
-	ClassDB::bind_method(D_METHOD("get_preset", "name"), &VideoPresetSettingsServer::get_preset);
-	ClassDB::bind_method(D_METHOD("has_preset", "name"), &VideoPresetSettingsServer::has_preset);
-	ClassDB::bind_method(D_METHOD("add_preset", "preset"), &VideoPresetSettingsServer::add_preset);
-	ClassDB::bind_method(D_METHOD("remove_preset", "name"), &VideoPresetSettingsServer::remove_preset);
-	ClassDB::bind_method(D_METHOD("reload_presets"), &VideoPresetSettingsServer::reload_presets);
+	ClassDB::bind_method(D_METHOD("get_presets"), &GraphicsPresetSettingsServer::get_presets);
+	ClassDB::bind_method(D_METHOD("get_preset_names"), &GraphicsPresetSettingsServer::get_preset_names);
+	ClassDB::bind_method(D_METHOD("get_preset", "name"), &GraphicsPresetSettingsServer::get_preset);
+	ClassDB::bind_method(D_METHOD("has_preset", "name"), &GraphicsPresetSettingsServer::has_preset);
+	ClassDB::bind_method(D_METHOD("add_preset", "preset"), &GraphicsPresetSettingsServer::add_preset);
+	ClassDB::bind_method(D_METHOD("remove_preset", "name"), &GraphicsPresetSettingsServer::remove_preset);
+	ClassDB::bind_method(D_METHOD("reload_presets"), &GraphicsPresetSettingsServer::reload_presets);
 
-	ClassDB::bind_method(D_METHOD("apply_preset", "name"), &VideoPresetSettingsServer::apply_preset);
-	ClassDB::bind_method(D_METHOD("get_current_preset"), &VideoPresetSettingsServer::get_current_preset);
-	ClassDB::bind_method(D_METHOD("is_custom"), &VideoPresetSettingsServer::is_custom);
-	ClassDB::bind_method(D_METHOD("detect_preset"), &VideoPresetSettingsServer::detect_preset);
-	ClassDB::bind_method(D_METHOD("matches_preset", "name"), &VideoPresetSettingsServer::matches_preset);
-	ClassDB::bind_method(D_METHOD("suggest_preset"), &VideoPresetSettingsServer::suggest_preset);
+	ClassDB::bind_method(D_METHOD("apply_preset", "name"), &GraphicsPresetSettingsServer::apply_preset);
+	ClassDB::bind_method(D_METHOD("get_current_preset"), &GraphicsPresetSettingsServer::get_current_preset);
+	ClassDB::bind_method(D_METHOD("is_custom"), &GraphicsPresetSettingsServer::is_custom);
+	ClassDB::bind_method(D_METHOD("detect_preset"), &GraphicsPresetSettingsServer::detect_preset);
+	ClassDB::bind_method(D_METHOD("matches_preset", "name"), &GraphicsPresetSettingsServer::matches_preset);
+	ClassDB::bind_method(D_METHOD("suggest_preset"), &GraphicsPresetSettingsServer::suggest_preset);
 
 	ADD_SIGNAL(MethodInfo("preset_changed", PropertyInfo(Variant::STRING, "name")));
 }
 
-VideoPresetSettingsServer::VideoPresetSettingsServer() {
+GraphicsPresetSettingsServer::GraphicsPresetSettingsServer() {
 	if (singleton == nullptr) {
 		singleton = this;
 	}
 	register_settings();
 
-	const Callable own_value_changed = callable_mp(this, &VideoPresetSettingsServer::_on_own_value_changed);
+	const Callable own_value_changed = callable_mp(this, &GraphicsPresetSettingsServer::_on_own_value_changed);
 	connect(SNAME("value_changed"), own_value_changed);
-	connect(SNAME("loaded"), callable_mp(this, &VideoPresetSettingsServer::_on_own_changed));
-	connect(SNAME("reset"), callable_mp(this, &VideoPresetSettingsServer::_on_own_changed));
+	connect(SNAME("loaded"), callable_mp(this, &GraphicsPresetSettingsServer::_on_own_changed));
+	connect(SNAME("reset"), callable_mp(this, &GraphicsPresetSettingsServer::_on_own_changed));
 
 	SettingsServerManager *manager = SettingsServerManager::get_singleton();
 	if (manager != nullptr) {
-		manager->connect(SNAME("server_registered"), callable_mp(this, &VideoPresetSettingsServer::_on_server_registered));
+		manager->connect(SNAME("server_registered"), callable_mp(this, &GraphicsPresetSettingsServer::_on_server_registered));
 	}
 	_connect_domains();
 }
 
-VideoPresetSettingsServer::~VideoPresetSettingsServer() {
+GraphicsPresetSettingsServer::~GraphicsPresetSettingsServer() {
 	if (singleton == this) {
 		singleton = nullptr;
 	}

@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_preset.h                                                        */
+/*  graphics_preset.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -39,10 +39,10 @@
 // A graphics preset (#25): a name and one settings resource per video settings domain (`render_quality`,
 // `texture`, `shadow`, `render_effect`), the same classes the domains store. A domain resource sets
 // all values of its domain; a null resource leaves the domain as it is.
-// VideoPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
-// replace presets with `.tres` files (project setting `settings/video_preset/presets`).
-class VideoPreset : public Resource {
-	GDCLASS(VideoPreset, Resource);
+// GraphicsPresetSettingsServer applies presets; the four built-in presets are created in code, projects add or
+// replace presets with `.tres` files (project setting `settings/graphics_preset/presets`).
+class GraphicsPreset : public Resource {
+	GDCLASS(GraphicsPreset, Resource);
 
 	String preset_name;
 	Ref<RenderQualitySettings> render_quality;

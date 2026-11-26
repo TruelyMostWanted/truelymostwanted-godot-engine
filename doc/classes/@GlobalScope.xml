@@ -1605,6 +1605,9 @@
 		<member name="Geometry3D" type="Geometry3D" setter="" getter="">
 			The [Geometry3D] singleton.
 		</member>
+		<member name="GraphicsPresetSettingsServer" type="GraphicsPresetSettingsServer" setter="" getter="">
+			The [GraphicsPresetSettingsServer] singleton.
+		</member>
 		<member name="IP" type="IP" setter="" getter="">
 			The [IP] singleton.
 		</member>
@@ -1754,9 +1757,6 @@
 		</member>
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
-		</member>
-		<member name="VideoPresetSettingsServer" type="VideoPresetSettingsServer" setter="" getter="">
-			The [VideoPresetSettingsServer] singleton.
 		</member>
 		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
 			The [ViewportServer] singleton.

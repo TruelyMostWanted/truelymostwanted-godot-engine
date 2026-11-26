@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  video_preset_settings.h                                               */
+/*  graphics_preset_settings.h                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -32,11 +32,11 @@
 
 #include "core/io/resource.h"
 
-// Data of the `video_preset` settings domain (#25): the name of the graphics preset the player picked
+// Data of the `graphics_preset` settings domain (#25): the name of the graphics preset the player picked
 // ("Custom" after a change of a single value, empty if none was picked yet). The values of the preset are stored
-// by the video domains themselves. VideoPresetSettingsServer keeps it up to date.
-class VideoPresetSettings : public Resource {
-	GDCLASS(VideoPresetSettings, Resource);
+// by the video domains themselves. GraphicsPresetSettingsServer keeps it up to date.
+class GraphicsPresetSettings : public Resource {
+	GDCLASS(GraphicsPresetSettings, Resource);
 
 	String preset;
 

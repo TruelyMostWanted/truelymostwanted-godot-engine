@@ -88,6 +88,9 @@
 #include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
+#include "servers/settings/graphics_preset.h"
+#include "servers/settings/graphics_preset_settings.h"
+#include "servers/settings/graphics_preset_settings_server.h"
 #include "servers/settings/input_action_rebinder.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/input_settings.h"
@@ -109,9 +112,6 @@
 #include "servers/settings/texture_streaming_settings_server.h"
 #include "servers/settings/tts_persona_settings.h"
 #include "servers/settings/tts_persona_settings_server.h"
-#include "servers/settings/video_preset.h"
-#include "servers/settings/video_preset_settings.h"
-#include "servers/settings/video_preset_settings_server.h"
 #include "servers/settings/window_settings.h"
 #include "servers/settings/window_settings_server.h"
 #include "servers/settings/xr_settings.h"
@@ -210,7 +210,7 @@ static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
 static ShadowSettingsServer *shadow_settings_server = nullptr;
 static TextureSettingsServer *texture_settings_server = nullptr;
 static RenderEffectSettingsServer *render_effect_settings_server = nullptr;
-static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
+static GraphicsPresetSettingsServer *graphics_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
 static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
@@ -326,12 +326,12 @@ void register_server_types() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderEffectSettingsServer", RenderEffectSettingsServer::get_singleton(), "RenderEffectSettingsServer"));
 	settings_server_manager->register_server(render_effect_settings_server);
 	// After the four video domains it applies presets to (#25).
-	GDREGISTER_CLASS(VideoPreset);
-	GDREGISTER_CLASS(VideoPresetSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoPresetSettingsServer);
-	video_preset_settings_server = memnew(VideoPresetSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoPresetSettingsServer", VideoPresetSettingsServer::get_singleton(), "VideoPresetSettingsServer"));
-	settings_server_manager->register_server(video_preset_settings_server);
+	GDREGISTER_CLASS(GraphicsPreset);
+	GDREGISTER_CLASS(GraphicsPresetSettings);
+	GDREGISTER_ABSTRACT_CLASS(GraphicsPresetSettingsServer);
+	graphics_preset_settings_server = memnew(GraphicsPresetSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("GraphicsPresetSettingsServer", GraphicsPresetSettingsServer::get_singleton(), "GraphicsPresetSettingsServer"));
+	settings_server_manager->register_server(graphics_preset_settings_server);
 	GDREGISTER_CLASS(AccessibilitySettings);
 	GDREGISTER_CLASS(AccessibilityColorScheme);
 	GDREGISTER_ABSTRACT_CLASS(AccessibilitySettingsServer);
@@ -622,8 +622,8 @@ void unregister_server_types() {
 	memdelete(texture_streaming_settings_server);
 	texture_streaming_settings_server = nullptr;
 #endif
-	memdelete(video_preset_settings_server);
-	video_preset_settings_server = nullptr;
+	memdelete(graphics_preset_settings_server);
+	graphics_preset_settings_server = nullptr;
 	memdelete(render_effect_settings_server);
 	render_effect_settings_server = nullptr;
 	memdelete(tts_persona_settings_server);
