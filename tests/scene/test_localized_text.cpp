@@ -277,9 +277,7 @@ TEST_CASE("[SceneTree][LocalizedText] Cost of the node_added hook for nodes with
 	const uint64_t hook_usec = OS::get_singleton()->get_ticks_usec() - start;
 	CHECK_FALSE(nodes[0]->has_meta("localized_text"));
 	MESSAGE(vformat("LocalizedText node_added hook, %d nodes without bindings: emit node_added %d ns per node, add_child %d ns per node.",
-			count, (int)(hook_usec * 1000 / count), (int)(add_usec * 1000 / count))
-					.utf8()
-					.get_data());
+			count, (int)(hook_usec * 1000 / count), (int)(add_usec * 1000 / count));
 	for (Node *node : nodes) {
 		memdelete(node);
 	}
@@ -369,9 +367,7 @@ TEST_CASE("[SceneTree][LocalizedText] Timing with 1 000 bound labels") {
 	const uint64_t frame_usec = OS::get_singleton()->get_ticks_usec() - start;
 
 	MESSAGE(vformat("LocalizedText, %d bound labels (without shaping): bind all %d us, locale switch %d us, value change for 1 label %d us, for %d labels %d us, EVERY_FRAME (unchanged) %d us per frame.",
-			count, (int)bind_usec, (int)locale_usec, (int)one_usec, count - 1, (int)all_usec, (int)frame_usec)
-					.utf8()
-					.get_data());
+			count, (int)bind_usec, (int)locale_usec, (int)one_usec, count - 1, (int)all_usec, (int)frame_usec);
 
 	for (Label *label : labels) {
 		memdelete(label);
