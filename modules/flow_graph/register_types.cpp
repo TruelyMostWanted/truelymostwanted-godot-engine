@@ -33,6 +33,7 @@
 #include "dialogue/dialogue_nodes.h"
 #include "flow_graph.h"
 #include "flow_graph_data.h"
+#include "flow_graph_debugger.h"
 #include "flow_graph_playback.h"
 #include "flow_graph_player.h"
 #include "flow_node.h"
@@ -41,7 +42,16 @@
 
 #include "core/object/class_db.h"
 
+#ifdef TOOLS_ENABLED
+#include "editor/flow_graph_editor_plugin.h"
+#endif
+
 void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
+#ifdef TOOLS_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::add_by_type<FlowGraphEditorPlugin>();
+	}
+#endif
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
@@ -70,7 +80,15 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(DialogueOption);
 	GDREGISTER_CLASS(DialogueLineNode);
 	GDREGISTER_CLASS(DialogueChoiceNode);
+#ifdef DEBUG_ENABLED
+	FlowGraphDebugger::initialize();
+#endif
 }
 
 void uninitialize_flow_graph_module(ModuleInitializationLevel p_level) {
+#ifdef DEBUG_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
+		FlowGraphDebugger::finalize();
+	}
+#endif
 }
