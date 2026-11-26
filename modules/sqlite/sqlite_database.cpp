@@ -272,7 +272,12 @@ Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 
 void SQLiteDatabase::close() {
 	if (db) {
-		// close_v2 keeps the connection alive until all statements are finalized.
+		// Finalize the prepared statements first: a live statement keeps the
+		// connection, and with it the file, open (on Windows it can't be deleted).
+		for (SQLiteStatement *statement : statements) {
+			statement->finalize();
+		}
+		statements.clear();
 		sqlite3_close_v2(db);
 		db = nullptr;
 	}

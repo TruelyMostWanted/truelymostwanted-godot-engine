@@ -34,6 +34,7 @@
 
 #include "core/io/resource.h"
 #include "core/io/resource_loader.h"
+#include "core/templates/hash_set.h"
 #include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
 
@@ -58,6 +59,7 @@ private:
 	OpenMode open_mode = OPEN_MODE_CREATE;
 	Error last_error = OK;
 	String last_error_message;
+	HashSet<SQLiteStatement *> statements; // Live prepared statements; close() finalizes them.
 
 	Error _run(const String &p_sql, const Variant &p_params, TypedArray<Dictionary> *r_rows);
 	bool _check_table(const String &p_table);
@@ -79,6 +81,9 @@ public:
 	Error set_result(int p_result);
 	Error set_error(Error p_error, const String &p_message);
 	sqlite3 *get_handle() const { return db; }
+	// Called by SQLiteStatement when it is created and when it is freed.
+	void register_statement(SQLiteStatement *p_statement) { statements.insert(p_statement); }
+	void unregister_statement(SQLiteStatement *p_statement) { statements.erase(p_statement); }
 
 	Error open(const String &p_path = String(), OpenMode p_mode = OPEN_MODE_CREATE);
 	void close();

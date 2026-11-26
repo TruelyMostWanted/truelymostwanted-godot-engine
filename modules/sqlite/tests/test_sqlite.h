@@ -286,6 +286,18 @@ TEST_CASE("[SQLite] Prepared statements") {
 	CHECK(insert->bind_int(1, 1) == ERR_UNCONFIGURED);
 	ERR_PRINT_ON;
 
+	// close() finalizes the live statements, so the file is closed and can be
+	// deleted (on Windows an open file can't be).
+	CHECK(DirAccess::remove_absolute(db_path) == OK);
+	CHECK_FALSE(FileAccess::exists(db_path));
+
+	// Reopening does not revive old statements.
+	REQUIRE(db->open(db_path) == OK);
+	ERR_PRINT_OFF;
+	CHECK(last->step() == SQLiteStatement::STEP_RESULT_ERROR);
+	ERR_PRINT_ON;
+	db->close();
+
 	insert.unref();
 	select.unref();
 	last.unref();
