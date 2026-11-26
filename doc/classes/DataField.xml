@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DataField" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One field of a [DataSchema]: a key, column or attribute of a data file.
+	</brief_description>
+	<description>
+		A [DataField] describes one value of a data file the way Godot describes typed values everywhere: a [member type], a [member hint] and a [member hint_string], like an exported property. On top of that it holds the rules of a data file: [member required], [member unique], [member allow_empty], a [member default_value], a regular expression [member pattern] and nested schemas for [Dictionary] and [Array] values.
+		The [member hint_string] is parsed and the [member pattern] compiled once when they are set, so validating many values costs no string splitting.
+		[codeblocks]
+		[gdscript]
+		var hp = DataField.new()
+		hp.name = &amp;"hp"
+		hp.type = TYPE_INT
+		hp.required = true
+		hp.set_range(0, 100)
+
+		var rarity = DataField.new()
+		rarity.name = &amp;"rarity"
+		rarity.set_enum_values(["common", "rare", "epic"])
+		[/gdscript]
+		[csharp]
+		var hp = new DataField();
+		hp.Name = "hp";
+		hp.Type = Variant.Type.Int;
+		hp.Required = true;
+		hp.SetRange(0, 100);
+
+		var rarity = new DataField();
+		rarity.Name = "rarity";
+		rarity.SetEnumValues(["common", "rare", "epic"]);
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The property [member name] is set with [code]set_field_name()[/code]; [code skip-lint]set_name()[/code] is the setter of [member Resource.resource_name].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="set_enum_values">
+			<return type="void" />
+			<param index="0" name="values" type="PackedStringArray" />
+			<description>
+				Sets [member hint] to [constant PROPERTY_HINT_ENUM] and [member hint_string] to [param values] joined with commas. A [String] field then accepts only these names; an [int] field accepts their values (0, 1, 2, ..., or the values given as [code]"Name:5"[/code]).
+			</description>
+		</method>
+		<method name="set_range">
+			<return type="void" />
+			<param index="0" name="min" type="float" />
+			<param index="1" name="max" type="float" />
+			<param index="2" name="step" type="float" default="1.0" />
+			<description>
+				Sets [member hint] to [constant PROPERTY_HINT_RANGE] and [member hint_string] to [code]"min,max,step"[/code]. Numbers outside [param min] and [param max] are reported as [constant DataValidation.ISSUE_KIND_OUT_OF_RANGE]. Add [code]or_greater[/code] or [code]or_less[/code] to [member hint_string] to open a side of the range.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="allow_empty" type="bool" setter="set_allow_empty" getter="is_allow_empty" default="true">
+			If [code]true[/code], an empty value ([code]null[/code] or an empty string, such as an empty CSV cell) is accepted and not checked further. If [code]false[/code], it is reported as [constant DataValidation.ISSUE_KIND_EMPTY_REQUIRED].
+		</member>
+		<member name="default_value" type="Variant" setter="set_default_value" getter="get_default_value" default="null">
+			The value of an empty or unconvertible cell in the typed access of [CSV] ([method CSV.get_typed_row], [method CSV.get_typed_column]) and in [method DataSchema.convert_value], and the value written by [method CSV.append_typed_row] for a missing key.
+		</member>
+		<member name="description" type="String" setter="set_description" getter="get_description" default="&quot;&quot;">
+			A description of the field for people editing the data, for example as a tooltip in an editor.
+		</member>
+		<member name="element_schema" type="DataSchema" setter="set_element_schema" getter="get_element_schema">
+			For an [Array] field: the schema every element ([Dictionary]) is validated against. [member DataField.unique] fields of this schema are unique within the array.
+		</member>
+		<member name="element_type" type="int" setter="set_element_type" getter="get_element_type" enum="Variant.Type" default="0">
+			For an [Array] field without [member element_schema]: the type every element must have ([constant TYPE_NIL] = any).
+		</member>
+		<member name="hint" type="int" setter="set_hint" getter="get_hint" enum="PropertyHint" default="0">
+			How [member hint_string] is read, as for an exported property. Validation uses [constant PROPERTY_HINT_RANGE] ([code]"min,max[,step][,or_greater][,or_less]"[/code]) and [constant PROPERTY_HINT_ENUM] ([code]"A,B:5,C"[/code]); editors can use any hint to build an editor for the value.
+		</member>
+		<member name="hint_string" type="String" setter="set_hint_string" getter="get_hint_string" default="&quot;&quot;">
+			The details of [member hint], as for an exported property. See [method set_range] and [method set_enum_values].
+		</member>
+		<member name="name" type="StringName" setter="set_field_name" getter="get_field_name" default="&amp;&quot;&quot;">
+			The key, column name or attribute name of the field.
+		</member>
+		<member name="pattern" type="String" setter="set_pattern" getter="get_pattern" default="&quot;&quot;">
+			A regular expression (see [RegEx]) the whole value must match, as text, for example [code]"[A-Z]{2}[0-9]+"[/code]. Values that do not match are reported as [constant DataValidation.ISSUE_KIND_PATTERN_MISMATCH]. Empty means no check.
+		</member>
+		<member name="required" type="bool" setter="set_required" getter="is_required" default="false">
+			If [code]true[/code], a missing key or CSV column is reported as [constant DataValidation.ISSUE_KIND_MISSING_FIELD].
+		</member>
+		<member name="schema" type="DataSchema" setter="set_schema" getter="get_schema">
+			For a [Dictionary] field: the schema its keys are validated against.
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="4">
+			The type of the value ([constant TYPE_NIL] = any). Text values (CSV cells, XML attributes, plain INI values) are accepted if they convert: [int] and [float] as numbers, [bool] as [code]true[/code], [code]false[/code], [code]1[/code] or [code]0[/code], other types in the syntax of [method @GlobalScope.str_to_var] ([code]Vector2(1, 2)[/code]). An [int] field also accepts a [float] without fraction, as JSON numbers are floats. Only data types can be set: not [Object], [RID], [Callable] or [Signal].
+		</member>
+		<member name="unique" type="bool" setter="set_unique" getter="is_unique" default="false">
+			If [code]true[/code], the value must differ in every row of a table or every entry of a list of records. Repeated values are reported as [constant DataValidation.ISSUE_KIND_DUPLICATE_KEY].
+		</member>
+	</members>
+</class>
