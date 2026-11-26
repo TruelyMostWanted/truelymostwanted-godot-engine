@@ -17,11 +17,12 @@
 		[/gdscript]
 		[csharp]
 		var exits = playback.GetAvailableExits();
-		for (int i = 0; i &lt; exits.Count; i++)
+		int index = 0;
+		foreach (FlowExit exit in exits)
 		{
-		    int index = i;
-		    var button = new Button { Text = exits[i].Label, Disabled = !exits[i].Enabled };
-		    button.Pressed += () =&gt; playback.Choose(index);
+		    int choice = index++;
+		    var button = new Button { Text = exit.Label, Disabled = !exit.Enabled };
+		    button.Pressed += () =&gt; playback.Choose(choice);
 		    menu.AddChild(button);
 		}
 		[/csharp]
