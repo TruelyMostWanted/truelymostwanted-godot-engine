@@ -163,6 +163,7 @@
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/audio/audio_stream_generator.h"
 #include "scene/resources/dpi_texture.h"
+#include "scene/resources/localized_text.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/particle_process_material.h"
 #include "scene/resources/placeholder_textures.h"
@@ -1085,6 +1086,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(Theme);
 	GDREGISTER_CLASS(InputIconSet);
 	GDREGISTER_CLASS(ProgressBarStyle);
+	GDREGISTER_CLASS(LocalizedText);
 
 	GDREGISTER_CLASS(BitMap);
 	GDREGISTER_CLASS(Gradient);
@@ -1446,6 +1448,7 @@ void unregister_scene_types() {
 		memdelete(progress_bar_server);
 		progress_bar_server = nullptr;
 	}
+	LocalizedText::finish();
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
