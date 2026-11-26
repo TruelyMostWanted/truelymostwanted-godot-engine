@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/resource.h"
 #include "core/object/worker_thread_pool.h"
 #include "core/string/localization_server.h"
 #include "core/templates/safe_refcount.h"
@@ -37,7 +38,7 @@
 
 // Localized resource paths from ResourceLocalizationCatalogs (#344); keys are the original paths. On a locale or
 // catalog change the paths of the active locale are resolved into one snapshot that ResourceLoader asks on every
-// load() (lock-free). Cached resources whose path changed are reloaded in the background and updated in place.
+// load() (lock-free). Cached resources whose path changed are loaded again in the background and updated in place.
 // Replaces `internationalization/locale/translation_remaps`, which is imported as the first project layer.
 class ResourceLocalizationServer : public LocalizationServer {
 	GDCLASS(ResourceLocalizationServer, LocalizationServer);
@@ -56,6 +57,7 @@ class ResourceLocalizationServer : public LocalizationServer {
 
 	struct Relocalization {
 		PackedStringArray paths;
+		LocalVector<Ref<Resource>> resources; // Loaded on the workers, copied into the cached ones on the main thread.
 		WorkerThreadPool::GroupID group = -1;
 		SafeNumeric<uint32_t> remaining;
 	};

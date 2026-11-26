@@ -42,6 +42,7 @@ TEST_FORCE_LINK(test_resource_localization_server)
 #include "core/string/localization_catalog.h"
 #include "core/string/resource_localization_server.h"
 #include "core/string/translation_server.h"
+#include "scene/resources/image_texture.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -234,6 +235,45 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	wait_for_relocalization(server);
 	SIGNAL_CHECK_FALSE("resources_relocalized");
 	SIGNAL_UNWATCH(server, SNAME("resources_relocalized"));
+}
+
+// Relocalizing textures needs the main thread (ImageTexture::copy_from() reads the image back from the
+// RenderingServer). A load() of a relocalized path on the main thread meanwhile must not wait for the workers.
+TEST_CASE("[SceneTree][ResourceLocalizationServer] load() on the main thread during a relocalization") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	LocalizationServer::set_locale("en");
+	const String folder = make_folder("resource_localization_textures");
+	Ref<ResourceLocalizationCatalog> catalog;
+	catalog.instantiate();
+	PackedStringArray originals;
+	for (int index = 0; index < 32; index++) {
+		for (const String &locale : PackedStringArray({ "en", "de" })) {
+			Ref<Image> image = Image::create_empty(64, 64, false, Image::FORMAT_RGBA8);
+			image->fill(locale == "en" ? Color(1, 0, 0) : Color(0, 0, 1));
+			REQUIRE(ResourceSaver::save(ImageTexture::create_from_image(image), folder.path_join(vformat("%s_%d.res", locale, index))) == OK);
+		}
+		originals.push_back(folder.path_join(vformat("en_%d.res", index)));
+		catalog->set_localized_path(originals[index], "de", folder.path_join(vformat("de_%d.res", index)));
+	}
+	server->add_catalog(catalog);
+	MessageQueue::get_singleton()->flush();
+	LocalVector<Ref<ImageTexture>> cached;
+	for (const String &path : originals) {
+		cached.push_back(Ref<ImageTexture>(ResourceLoader::load(path)));
+		REQUIRE(cached[cached.size() - 1].is_valid());
+	}
+
+	LocalizationServer::set_locale("de");
+	CHECK(server->is_relocalizing());
+	for (int index = 0; index < originals.size(); index++) {
+		CHECK(ResourceLoader::load(originals[index]).ptr() == cached[index].ptr()); // Hung here before (#344).
+	}
+	wait_for_relocalization(server);
+	REQUIRE_FALSE(server->is_relocalizing());
+	for (const Ref<ImageTexture> &texture : cached) {
+		CHECK(texture->get_image()->get_pixel(0, 0) == Color(0, 0, 1));
+	}
 }
 
 // Prints the cost of one path_remap() with 1000 remapped paths: Godot's table vs the server (both check that the

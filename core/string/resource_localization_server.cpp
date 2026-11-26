@@ -143,11 +143,18 @@ void ResourceLocalizationServer::_data_published(const Data *p_data) {
 	}
 }
 
-// Like ResourceLoader's threaded CACHE_MODE_REPLACE: the new data goes into the cached instance on the loading
-// thread, `changed` signals of the load are deferred to the main thread.
+// Loads the localized file without the cache, under its own path: a load() of the original path on the main thread
+// meanwhile gets the cached instance instead of waiting for this thread. The new data is copied into the cached
+// instance on the main thread (_relocalization_done()), because copy_from() may need it (ImageTexture reads its image
+// back from the RenderingServer, which waits for the main thread).
 void ResourceLocalizationServer::_relocalize_resource(void *p_userdata, uint32_t p_index) {
 	Relocalization *job = static_cast<Relocalization *>(p_userdata);
-	ResourceLoader::load(job->paths[p_index], "", ResourceFormatLoader::CACHE_MODE_REPLACE);
+	const String &key = job->paths[p_index];
+	String path;
+	if (!_localize_path(key, path)) {
+		path = key;
+	}
+	job->resources[p_index] = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 	if (job->remaining.decrement() == 0) {
 		MessageQueue::get_main_singleton()->push_callable(callable_mp(singleton, &ResourceLocalizationServer::_relocalization_done));
 	}
@@ -155,7 +162,7 @@ void ResourceLocalizationServer::_relocalize_resource(void *p_userdata, uint32_t
 
 void ResourceLocalizationServer::_relocalize(const PackedStringArray &p_paths) {
 	if (relocalization) {
-		// One run at a time: two loads of a path in flight would share one result, possibly of the older locale.
+		// One run at a time: the newer locale must not be overwritten by the older run.
 		for (const String &path : p_paths) {
 			if (!pending_paths.has(path)) {
 				pending_paths.push_back(path);
@@ -165,6 +172,7 @@ void ResourceLocalizationServer::_relocalize(const PackedStringArray &p_paths) {
 	}
 	relocalization = memnew(Relocalization);
 	relocalization->paths = p_paths;
+	relocalization->resources.resize((uint32_t)p_paths.size());
 	relocalization->remaining.set((uint32_t)p_paths.size());
 	// Without worker threads (Web), the loads run here.
 	relocalization->group = WorkerThreadPool::get_singleton()->add_native_group_task(&ResourceLocalizationServer::_relocalize_resource, relocalization, (int)p_paths.size(), -1, false, "Relocalize resources");
@@ -174,6 +182,13 @@ void ResourceLocalizationServer::_relocalization_done() {
 	ERR_FAIL_NULL(relocalization);
 	WorkerThreadPool::get_singleton()->wait_for_group_task_completion(relocalization->group);
 	const PackedStringArray paths = relocalization->paths;
+	for (uint32_t index = 0; index < relocalization->resources.size(); index++) {
+		const Ref<Resource> &loaded = relocalization->resources[index];
+		const Ref<Resource> cached = ResourceCache::get_ref(paths[index]);
+		if (loaded.is_valid() && cached.is_valid() && cached != loaded) {
+			cached->copy_from(loaded);
+		}
+	}
 	memdelete(relocalization);
 	relocalization = nullptr;
 	if (!pending_paths.is_empty()) {
