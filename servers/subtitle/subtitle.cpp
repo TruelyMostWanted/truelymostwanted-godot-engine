@@ -31,6 +31,7 @@
 #include "subtitle.h"
 
 #include "core/io/file_access.h"
+#include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "servers/subtitle/subtitle_format_srt.h"
 #include "servers/subtitle/subtitle_formats.h"
