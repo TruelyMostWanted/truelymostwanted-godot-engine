@@ -124,6 +124,7 @@ private:
 	bool save_queued = false;
 	bool unsaved = false;
 	bool format_warned = false;
+	bool legacy_file_loaded = false; // load() read the file of the old domain name: startup() writes the new file.
 	String format_warned_path; // The last path whose extension gave no usable format (warned once).
 	mutable String file_name_warned; // The last invalid `settings/<domain>/file_name` (warned once).
 
@@ -178,6 +179,9 @@ protected:
 	// The type name of the storage form that a file with this text is read as (a CSV header of an older layout can
 	// name another type). By default the type of _settings_to_storage_for_format() of the defaults.
 	virtual String _get_storage_type_for_text(const String &p_text, ResourceTextSerializer::Format p_format) const;
+	// The file name (without extension) the domain used before it was renamed (#243). If the settings file does not
+	// exist yet, load() reads this file from the same folder once; startup() then writes the new file. Empty: none.
+	virtual String _get_legacy_file_name() const { return String(); }
 
 	GDVIRTUAL0RC(StringName, _get_domain)
 	GDVIRTUAL0RC(int, _get_format_version)

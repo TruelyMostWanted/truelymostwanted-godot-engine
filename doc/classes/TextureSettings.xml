@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextureSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [TextureSettingsServer]: texture filtering and Canvas2D.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"texture"[/code]. [TextureSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/texture.ini[/code]. Change the values through the methods of [TextureSettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		The setters store values as they are; [TextureSettingsServer] clamps values out of range and replaces invalid enum values with the default, with a warning, when they are set or loaded. Values the current renderer ignores are stored too, so that the same file works with every renderer.
+		It can also be used as the project defaults of the domain: save a [TextureSettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/texture[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="anisotropic_filtering_level" type="int" setter="set_anisotropic_filtering_level" getter="get_anisotropic_filtering_level" enum="Viewport.AnisotropicFiltering" default="2">
+			The anisotropic filtering level of 3D textures that use mipmaps with anisotropic filtering, pushed to [member Viewport.anisotropic_filtering_level]. Higher levels keep textures at grazing angles sharp (floors, roads) and cost GPU memory bandwidth. Works in every renderer; the Compatibility renderer needs the [code]GL_EXT_texture_filter_anisotropic[/code] extension (available on most desktop GPUs and in most browsers).
+		</member>
+		<member name="canvas_item_default_texture_filter" type="int" setter="set_canvas_item_default_texture_filter" getter="get_canvas_item_default_texture_filter" enum="Viewport.DefaultCanvasItemTextureFilter" default="1">
+			The texture filter of canvas items (2D nodes and [Control]s) whose [member CanvasItem.texture_filter] is [constant CanvasItem.TEXTURE_FILTER_PARENT_NODE] up to the viewport, pushed to [member Viewport.canvas_item_default_texture_filter]. [constant Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST] keeps pixel art crisp. Works in every renderer.
+		</member>
+		<member name="canvas_item_default_texture_repeat" type="int" setter="set_canvas_item_default_texture_repeat" getter="get_canvas_item_default_texture_repeat" enum="Viewport.DefaultCanvasItemTextureRepeat" default="0">
+			The texture repeat mode of canvas items whose [member CanvasItem.texture_repeat] is [constant CanvasItem.TEXTURE_REPEAT_PARENT_NODE] up to the viewport, pushed to [member Viewport.canvas_item_default_texture_repeat]. Works in every renderer.
+		</member>
+		<member name="canvas_shadow_atlas_size" type="int" setter="set_canvas_shadow_atlas_size" getter="get_canvas_shadow_atlas_size" default="2048">
+			The size in pixels of the texture that holds the shadows of [Light2D]s, pushed to [method RenderingServer.canvas_set_shadow_texture_size]. The renderer rounds it to the nearest power of two (and to the GPU's maximum texture size). Larger values give sharper 2D shadows and use more VRAM. Global, not per viewport. Valid range: [code]128[/code] to [code]16384[/code]. Works in every renderer.
+		</member>
+		<member name="decal_filter" type="int" setter="set_decal_filter" getter="get_decal_filter" enum="RenderingServer.DecalFilter" default="3">
+			The texture filter of [Decal] textures, pushed to [method RenderingServer.decals_set_filter]. Global, not per viewport. Forward+ and Mobile only: the Compatibility renderer has no decals (stored, not pushed).
+		</member>
+		<member name="light_projector_filter" type="int" setter="set_light_projector_filter" getter="get_light_projector_filter" enum="RenderingServer.LightProjectorFilter" default="3">
+			The texture filter of light projectors (the [member Light3D.light_projector] textures), pushed to [method RenderingServer.light_projectors_set_filter]. Global, not per viewport. Forward+ and Mobile only: the Compatibility renderer ignores it (stored, not pushed).
+		</member>
+		<member name="sdf_oversize" type="int" setter="set_sdf_oversize" getter="get_sdf_oversize" enum="Viewport.SDFOversize" default="1">
+			How far the 2D signed distance field reaches beyond the viewport, pushed to [member Viewport.sdf_oversize]. Larger values keep SDF effects (GPUParticles2D collision, [code]texture_sdf()[/code] in shaders) correct at the screen edges and cost more GPU time. Works in every renderer.
+		</member>
+		<member name="sdf_scale" type="int" setter="set_sdf_scale" getter="get_sdf_scale" enum="Viewport.SDFScale" default="1">
+			The resolution of the 2D signed distance field relative to the viewport, pushed to [member Viewport.sdf_scale]. [constant Viewport.SDF_SCALE_100_PERCENT] is the most precise and the slowest. Works in every renderer.
+		</member>
+		<member name="snap_2d_transforms_to_pixel" type="bool" setter="set_snap_2d_transforms_to_pixel" getter="is_snap_2d_transforms_to_pixel_enabled" default="false">
+			If [code]true[/code], 2D nodes are drawn at whole pixel positions, pushed to [member Viewport.snap_2d_transforms_to_pixel]. Avoids blurry or jittering pixel art; movement can look less smooth. Works in every renderer.
+		</member>
+		<member name="snap_2d_vertices_to_pixel" type="bool" setter="set_snap_2d_vertices_to_pixel" getter="is_snap_2d_vertices_to_pixel_enabled" default="false">
+			If [code]true[/code], the vertices of 2D polygons and lines are snapped to whole pixels, pushed to [member Viewport.snap_2d_vertices_to_pixel]. Works in every renderer.
+		</member>
+		<member name="texture_mipmap_bias" type="float" setter="set_texture_mipmap_bias" getter="get_texture_mipmap_bias" default="0.0">
+			The mipmap LOD bias of 3D textures, pushed to [member Viewport.texture_mipmap_bias]. Negative values make textures sharper (and more prone to shimmering), positive values blurrier. Valid range: [code]-2.0[/code] to [code]2.0[/code]. Works in every renderer.
+		</member>
+	</members>
+</class>

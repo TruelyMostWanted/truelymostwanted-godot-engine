@@ -88,6 +88,9 @@
 #include "servers/settings/camera_3d_settings_server.h"
 #include "servers/settings/engine_settings.h"
 #include "servers/settings/engine_settings_server.h"
+#include "servers/settings/graphics_preset.h"
+#include "servers/settings/graphics_preset_settings.h"
+#include "servers/settings/graphics_preset_settings_server.h"
 #include "servers/settings/input_action_rebinder.h"
 #include "servers/settings/input_map_settings_server.h"
 #include "servers/settings/input_settings.h"
@@ -95,25 +98,22 @@
 #include "servers/settings/language_settings.h"
 #include "servers/settings/language_settings_server.h"
 #include "servers/settings/list_settings_server.h"
+#include "servers/settings/render_effect_settings.h"
+#include "servers/settings/render_effect_settings_server.h"
+#include "servers/settings/render_quality_settings.h"
+#include "servers/settings/render_quality_settings_server.h"
 #include "servers/settings/settings_server.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/shadow_settings.h"
+#include "servers/settings/shadow_settings_server.h"
+#include "servers/settings/texture_settings.h"
+#include "servers/settings/texture_settings_server.h"
+#include "servers/settings/texture_streaming_settings.h"
+#include "servers/settings/texture_streaming_settings_server.h"
 #include "servers/settings/tts_persona_settings.h"
 #include "servers/settings/tts_persona_settings_server.h"
-#include "servers/settings/video_effect_settings.h"
-#include "servers/settings/video_effect_settings_server.h"
-#include "servers/settings/video_preset.h"
-#include "servers/settings/video_preset_settings.h"
-#include "servers/settings/video_preset_settings_server.h"
-#include "servers/settings/video_quality_settings.h"
-#include "servers/settings/video_quality_settings_server.h"
-#include "servers/settings/video_shadow_settings.h"
-#include "servers/settings/video_shadow_settings_server.h"
-#include "servers/settings/video_texture_settings.h"
-#include "servers/settings/video_texture_settings_server.h"
-#include "servers/settings/video_texture_streaming_settings.h"
-#include "servers/settings/video_texture_streaming_settings_server.h"
-#include "servers/settings/video_window_settings.h"
-#include "servers/settings/video_window_settings_server.h"
+#include "servers/settings/window_settings.h"
+#include "servers/settings/window_settings_server.h"
 #include "servers/settings/xr_settings.h"
 #include "servers/settings/xr_settings_server.h"
 #include "servers/subtitle/subtitle.h"
@@ -204,17 +204,17 @@ static AudioBusSettingsServer *audio_bus_settings_server = nullptr;
 static LanguageSettingsServer *language_settings_server = nullptr;
 static InputSettingsServer *input_settings_server = nullptr;
 static InputMapSettingsServer *input_map_settings_server = nullptr;
-static VideoWindowSettingsServer *video_window_settings_server = nullptr;
+static WindowSettingsServer *window_settings_server = nullptr;
 static EngineSettingsServer *engine_settings_server = nullptr;
-static VideoQualitySettingsServer *video_quality_settings_server = nullptr;
-static VideoShadowSettingsServer *video_shadow_settings_server = nullptr;
-static VideoTextureSettingsServer *video_texture_settings_server = nullptr;
-static VideoEffectSettingsServer *video_effect_settings_server = nullptr;
-static VideoPresetSettingsServer *video_preset_settings_server = nullptr;
+static RenderQualitySettingsServer *render_quality_settings_server = nullptr;
+static ShadowSettingsServer *shadow_settings_server = nullptr;
+static TextureSettingsServer *texture_settings_server = nullptr;
+static RenderEffectSettingsServer *render_effect_settings_server = nullptr;
+static GraphicsPresetSettingsServer *graphics_preset_settings_server = nullptr;
 static AccessibilitySettingsServer *accessibility_settings_server = nullptr;
 static TTSPersonaSettingsServer *tts_persona_settings_server = nullptr;
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
-static VideoTextureStreamingSettingsServer *video_texture_streaming_settings_server = nullptr;
+static TextureStreamingSettingsServer *texture_streaming_settings_server = nullptr;
 #endif
 #ifndef _3D_DISABLED
 static Camera3DSettingsServer *camera_3d_settings_server = nullptr;
@@ -295,43 +295,43 @@ void register_server_types() {
 	input_map_settings_server = memnew(InputMapSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMapSettingsServer", InputMapSettingsServer::get_singleton(), "InputMapSettingsServer"));
 	settings_server_manager->register_server(input_map_settings_server);
-	GDREGISTER_CLASS(VideoWindowSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoWindowSettingsServer);
-	video_window_settings_server = memnew(VideoWindowSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoWindowSettingsServer", VideoWindowSettingsServer::get_singleton(), "VideoWindowSettingsServer"));
-	settings_server_manager->register_server(video_window_settings_server);
+	GDREGISTER_CLASS(WindowSettings);
+	GDREGISTER_ABSTRACT_CLASS(WindowSettingsServer);
+	window_settings_server = memnew(WindowSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("WindowSettingsServer", WindowSettingsServer::get_singleton(), "WindowSettingsServer"));
+	settings_server_manager->register_server(window_settings_server);
 	GDREGISTER_CLASS(EngineSettings);
 	GDREGISTER_ABSTRACT_CLASS(EngineSettingsServer);
 	engine_settings_server = memnew(EngineSettingsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineSettingsServer", EngineSettingsServer::get_singleton(), "EngineSettingsServer"));
 	settings_server_manager->register_server(engine_settings_server);
-	GDREGISTER_CLASS(VideoQualitySettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoQualitySettingsServer);
-	video_quality_settings_server = memnew(VideoQualitySettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoQualitySettingsServer", VideoQualitySettingsServer::get_singleton(), "VideoQualitySettingsServer"));
-	settings_server_manager->register_server(video_quality_settings_server);
-	GDREGISTER_CLASS(VideoShadowSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoShadowSettingsServer);
-	video_shadow_settings_server = memnew(VideoShadowSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoShadowSettingsServer", VideoShadowSettingsServer::get_singleton(), "VideoShadowSettingsServer"));
-	settings_server_manager->register_server(video_shadow_settings_server);
-	GDREGISTER_CLASS(VideoTextureSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoTextureSettingsServer);
-	video_texture_settings_server = memnew(VideoTextureSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureSettingsServer", VideoTextureSettingsServer::get_singleton(), "VideoTextureSettingsServer"));
-	settings_server_manager->register_server(video_texture_settings_server);
-	GDREGISTER_CLASS(VideoEffectSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoEffectSettingsServer);
-	video_effect_settings_server = memnew(VideoEffectSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoEffectSettingsServer", VideoEffectSettingsServer::get_singleton(), "VideoEffectSettingsServer"));
-	settings_server_manager->register_server(video_effect_settings_server);
+	GDREGISTER_CLASS(RenderQualitySettings);
+	GDREGISTER_ABSTRACT_CLASS(RenderQualitySettingsServer);
+	render_quality_settings_server = memnew(RenderQualitySettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderQualitySettingsServer", RenderQualitySettingsServer::get_singleton(), "RenderQualitySettingsServer"));
+	settings_server_manager->register_server(render_quality_settings_server);
+	GDREGISTER_CLASS(ShadowSettings);
+	GDREGISTER_ABSTRACT_CLASS(ShadowSettingsServer);
+	shadow_settings_server = memnew(ShadowSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ShadowSettingsServer", ShadowSettingsServer::get_singleton(), "ShadowSettingsServer"));
+	settings_server_manager->register_server(shadow_settings_server);
+	GDREGISTER_CLASS(TextureSettings);
+	GDREGISTER_ABSTRACT_CLASS(TextureSettingsServer);
+	texture_settings_server = memnew(TextureSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextureSettingsServer", TextureSettingsServer::get_singleton(), "TextureSettingsServer"));
+	settings_server_manager->register_server(texture_settings_server);
+	GDREGISTER_CLASS(RenderEffectSettings);
+	GDREGISTER_ABSTRACT_CLASS(RenderEffectSettingsServer);
+	render_effect_settings_server = memnew(RenderEffectSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("RenderEffectSettingsServer", RenderEffectSettingsServer::get_singleton(), "RenderEffectSettingsServer"));
+	settings_server_manager->register_server(render_effect_settings_server);
 	// After the four video domains it applies presets to (#25).
-	GDREGISTER_CLASS(VideoPreset);
-	GDREGISTER_CLASS(VideoPresetSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoPresetSettingsServer);
-	video_preset_settings_server = memnew(VideoPresetSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoPresetSettingsServer", VideoPresetSettingsServer::get_singleton(), "VideoPresetSettingsServer"));
-	settings_server_manager->register_server(video_preset_settings_server);
+	GDREGISTER_CLASS(GraphicsPreset);
+	GDREGISTER_CLASS(GraphicsPresetSettings);
+	GDREGISTER_ABSTRACT_CLASS(GraphicsPresetSettingsServer);
+	graphics_preset_settings_server = memnew(GraphicsPresetSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("GraphicsPresetSettingsServer", GraphicsPresetSettingsServer::get_singleton(), "GraphicsPresetSettingsServer"));
+	settings_server_manager->register_server(graphics_preset_settings_server);
 	GDREGISTER_CLASS(AccessibilitySettings);
 	GDREGISTER_CLASS(AccessibilityColorScheme);
 	GDREGISTER_ABSTRACT_CLASS(AccessibilitySettingsServer);
@@ -346,11 +346,11 @@ void register_server_types() {
 	settings_server_manager->register_server(tts_persona_settings_server);
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
 	// Only with the texture_streaming module (#22); otherwise the domain is missing.
-	GDREGISTER_CLASS(VideoTextureStreamingSettings);
-	GDREGISTER_ABSTRACT_CLASS(VideoTextureStreamingSettingsServer);
-	video_texture_streaming_settings_server = memnew(VideoTextureStreamingSettingsServer);
-	Engine::get_singleton()->add_singleton(Engine::Singleton("VideoTextureStreamingSettingsServer", VideoTextureStreamingSettingsServer::get_singleton(), "VideoTextureStreamingSettingsServer"));
-	settings_server_manager->register_server(video_texture_streaming_settings_server);
+	GDREGISTER_CLASS(TextureStreamingSettings);
+	GDREGISTER_ABSTRACT_CLASS(TextureStreamingSettingsServer);
+	texture_streaming_settings_server = memnew(TextureStreamingSettingsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextureStreamingSettingsServer", TextureStreamingSettingsServer::get_singleton(), "TextureStreamingSettingsServer"));
+	settings_server_manager->register_server(texture_streaming_settings_server);
 #endif
 #ifndef _3D_DISABLED
 	// Not with disable_3d (#28): Camera3D is missing.
@@ -619,27 +619,27 @@ void unregister_server_types() {
 	camera_3d_settings_server = nullptr;
 #endif
 #ifdef MODULE_TEXTURE_STREAMING_ENABLED
-	memdelete(video_texture_streaming_settings_server);
-	video_texture_streaming_settings_server = nullptr;
+	memdelete(texture_streaming_settings_server);
+	texture_streaming_settings_server = nullptr;
 #endif
-	memdelete(video_preset_settings_server);
-	video_preset_settings_server = nullptr;
-	memdelete(video_effect_settings_server);
-	video_effect_settings_server = nullptr;
+	memdelete(graphics_preset_settings_server);
+	graphics_preset_settings_server = nullptr;
+	memdelete(render_effect_settings_server);
+	render_effect_settings_server = nullptr;
 	memdelete(tts_persona_settings_server);
 	tts_persona_settings_server = nullptr;
 	memdelete(accessibility_settings_server);
 	accessibility_settings_server = nullptr;
-	memdelete(video_texture_settings_server);
-	video_texture_settings_server = nullptr;
-	memdelete(video_shadow_settings_server);
-	video_shadow_settings_server = nullptr;
-	memdelete(video_quality_settings_server);
-	video_quality_settings_server = nullptr;
+	memdelete(texture_settings_server);
+	texture_settings_server = nullptr;
+	memdelete(shadow_settings_server);
+	shadow_settings_server = nullptr;
+	memdelete(render_quality_settings_server);
+	render_quality_settings_server = nullptr;
 	memdelete(engine_settings_server);
 	engine_settings_server = nullptr;
-	memdelete(video_window_settings_server);
-	video_window_settings_server = nullptr;
+	memdelete(window_settings_server);
+	window_settings_server = nullptr;
 	memdelete(input_map_settings_server);
 	input_map_settings_server = nullptr;
 	memdelete(input_settings_server);

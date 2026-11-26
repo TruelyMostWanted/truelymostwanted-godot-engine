@@ -1143,22 +1143,34 @@ Error SettingsServer::load() {
 	// The pending values before the load: settings_changed() names the values the load changed.
 	const Ref<Resource> previous = settings;
 
+	// The file that is read: the settings file, or once the file of the old domain name (#243).
+	String read_path = path;
+	bool legacy = false;
+	legacy_file_loaded = false;
 	if (!FileAccess::exists(path)) {
-		// The normal first start: the defaults stay. Not a failure.
-		print_verbose(vformat("Settings domain \"%s\": no file at \"%s\" yet; the defaults are used.", domain, path));
-		settings = copy_settings(defaults);
-		_emit_settings_changed(_get_changed_names(previous, settings));
-		emit_signal(SNAME("loaded"));
-		return ERR_FILE_NOT_FOUND;
+		const String legacy_name = _get_legacy_file_name();
+		const String legacy_path = legacy_name.is_empty() ? String() : path.get_base_dir().path_join(legacy_name + "." + path.get_extension());
+		if (!legacy_path.is_empty() && legacy_path != path && FileAccess::exists(legacy_path)) {
+			print_verbose(vformat("Settings domain \"%s\": no file at \"%s\" yet; the file of the old domain name \"%s\" is read.", domain, path, legacy_path));
+			read_path = legacy_path;
+			legacy = true;
+		} else {
+			// The normal first start: the defaults stay. Not a failure.
+			print_verbose(vformat("Settings domain \"%s\": no file at \"%s\" yet; the defaults are used.", domain, path));
+			settings = copy_settings(defaults);
+			_emit_settings_changed(_get_changed_names(previous, settings));
+			emit_signal(SNAME("loaded"));
+			return ERR_FILE_NOT_FOUND;
+		}
 	}
 
 	Error err = OK;
-	const String text = FileAccess::get_file_as_string(path, &err);
+	const String text = FileAccess::get_file_as_string(read_path, &err);
 	String error;
 	Ref<Resource> loaded;
 	PackedStringArray present;
 	// The extension decides; an unknown extension is read in the format of the domain.
-	const ResourceTextSerializer::Format format = _get_format_for_path(path);
+	const ResourceTextSerializer::Format format = _get_format_for_path(read_path);
 	const String type_name = _get_storage_type_for_text(text, format);
 
 	if (err != OK) {
@@ -1209,6 +1221,10 @@ Error SettingsServer::load() {
 				version = int(tree[version_key]);
 				tree.erase(version_key);
 			}
+			if (legacy) {
+				// The old file names the class of the settings before the rename: read it as the current class.
+				tree.erase("$type");
+			}
 			String decode_type = type_name;
 			if (version < current_version) {
 				const String old_type = tree.get("$type", String());
@@ -1220,7 +1236,7 @@ Error SettingsServer::load() {
 					decode_type = new_type;
 				}
 			} else if (version > current_version) {
-				WARN_PRINT(vformat("Settings domain \"%s\": \"%s\" was written with version %d; this game reads version %d.", domain, path, version, current_version));
+				WARN_PRINT(vformat("Settings domain \"%s\": \"%s\" was written with version %d; this game reads version %d.", domain, read_path, version, current_version));
 			}
 			for (const KeyValue<Variant, Variant> &kv : tree) {
 				const String key = kv.key;
@@ -1242,10 +1258,10 @@ Error SettingsServer::load() {
 
 	if (err != OK || loaded.is_null()) {
 		// The file is kept as it is until the next save().
-		WARN_PRINT(vformat("Settings domain \"%s\": can't load \"%s\" (%s); the defaults are used and the file is not overwritten until the next save.", domain, path, error));
+		WARN_PRINT(vformat("Settings domain \"%s\": can't load \"%s\" (%s); the defaults are used and the file is not overwritten until the next save.", domain, read_path, error));
 		const Error result_error = err != OK ? err : ERR_FILE_CORRUPT;
 		settings = copy_settings(defaults);
-		emit_signal(SNAME("load_failed"), int(result_error), path);
+		emit_signal(SNAME("load_failed"), int(result_error), read_path);
 		_emit_settings_changed(_get_changed_names(previous, settings));
 		emit_signal(SNAME("loaded"));
 		return result_error;
@@ -1265,6 +1281,7 @@ Error SettingsServer::load() {
 		}
 	}
 	_validate_loaded_settings(settings);
+	legacy_file_loaded = legacy;
 	_emit_settings_changed(_get_changed_names(previous, settings));
 	emit_signal(SNAME("loaded"));
 	return OK;
@@ -1390,6 +1407,11 @@ void SettingsServer::startup() {
 	// The engine runs with these values now: nothing waits for a restart.
 	restart_baseline = copy_settings(applied);
 	restart_required_names.clear();
+	if (legacy_file_loaded) {
+		// The values came from the file of the old domain name: written once under the new name (the old file stays).
+		legacy_file_loaded = false;
+		save();
+	}
 	in_startup = false;
 }
 
