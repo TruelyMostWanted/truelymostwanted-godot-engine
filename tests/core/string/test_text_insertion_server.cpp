@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_text_insertion_server)
 
+#include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "core/string/text_insertion_server.h"
 #include "core/string/translation_server.h"
@@ -207,14 +208,16 @@ TEST_CASE("[TextInsertionServer] Signals") {
 	server->set_value("gold", 5);
 	server->notify_changed("gold");
 	server->remove_value("gold");
-	SIGNAL_CHECK("value_changed", { { StringName("gold") }, { StringName("gold") }, { StringName("gold") } });
+	const Array expected_value_changed = { Array{ StringName("gold") }, Array{ StringName("gold") }, Array{ StringName("gold") } };
+	SIGNAL_CHECK("value_changed", expected_value_changed);
 
 	Ref<TextInsertionValues> resource;
 	resource.instantiate();
 	server->add_values(resource);
 	resource->set_value("gold", 6);
 	server->remove_values(resource);
-	SIGNAL_CHECK("values_changed", { {}, {}, {} });
+	const Array expected_values_changed = { Array(), Array(), Array() };
+	SIGNAL_CHECK("values_changed", expected_values_changed);
 
 	SIGNAL_UNWATCH(server, SNAME("value_changed"));
 	SIGNAL_UNWATCH(server, SNAME("values_changed"));
