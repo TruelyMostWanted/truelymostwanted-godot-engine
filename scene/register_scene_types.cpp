@@ -113,6 +113,7 @@
 #include "scene/main/screenshot_server.h"
 #include "scene/main/shader_globals_override.h"
 #include "scene/main/status_indicator.h"
+#include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
 #include "scene/main/viewport.h"
 #include "scene/main/viewport_server.h"
@@ -519,6 +520,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(HTTPRequestTarget);
 	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
+	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
