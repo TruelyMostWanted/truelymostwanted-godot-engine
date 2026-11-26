@@ -145,16 +145,16 @@
 			A value does not match [member DataField.pattern].
 		</constant>
 		<constant name="ISSUE_KIND_EMPTY_REQUIRED" value="6" enum="IssueKind">
-			A value is empty, but [member DataField.allow_empty] is [code]false[/code].
+			A value is empty, but [member DataField.allow_empty] is [code]false[/code]. [method CSV.validate_translation] reports missing translations with this kind.
 		</constant>
 		<constant name="ISSUE_KIND_DUPLICATE_KEY" value="7" enum="IssueKind">
-			A value of a [member DataField.unique] field repeats.
+			A value of a [member DataField.unique] field repeats. [method CSV.validate_translation] reports repeated keys and repeated [code]?context[/code]/[code]?plural[/code] columns with this kind.
 		</constant>
 		<constant name="ISSUE_KIND_PARSE_ERROR" value="8" enum="IssueKind">
 			The text could not be parsed (see [method TextDataFormat.get_error_message]).
 		</constant>
 		<constant name="ISSUE_KIND_INVALID_LOCALE" value="9" enum="IssueKind">
-			A locale is not valid (used by translation checks).
+			A header cell of a translation table is no locale or has an unknown language code, or the table has no column with a known language code (see [method CSV.validate_translation]).
 		</constant>
 		<constant name="ISSUE_KIND_MAX" value="10" enum="IssueKind">
 			Represents the size of the [enum IssueKind] enum.

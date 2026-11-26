@@ -199,6 +199,37 @@ The static [method parse_string] returns an [Array] of [Dictionary] keyed by col
 				Writes the rows in [param data] as CSV text. Rows are either all [Dictionary]s or all arrays ([Array] or [PackedStringArray]). For dictionaries, the columns are the keys in order of first appearance (sorted with [member SerializerOptions.sort_keys]), a header row is written unless [member SerializerOptions.csv_headers] is off, and a missing key is an empty cell. Values are converted with [method @GlobalScope.str], [code]null[/code] is an empty cell. Returns an empty [String] and prints an error if a row has another type.
 			</description>
 		</method>
+		<method name="validate_translation" qualifiers="const">
+			<return type="DataValidation" />
+			<param index="0" name="options" type="DataValidationOptions" default="null" />
+			<description>
+				Validates the CSV as a translation table, with the rules of the CSV translation importer: column 0 holds the keys, columns named [code]?context[/code] and [code]?plural[/code] hold the message context and plural form, columns starting with [code]_[/code] are ignored, all other columns are locales. Rows whose key is [code]?pluralrule[/code] and rows without a key (further plural forms) are not checked. The importer uses the same header checks.
+				The result contains:
+				- [constant DataValidation.ISSUE_KIND_INVALID_LOCALE] for a header cell that is no locale (the importer ignores the column), for a locale whose language code is unknown (the importer imports it anyway), and once without a position when no column starts with a known language code (the file is no translation table; rows are not checked then).
+				- [constant DataValidation.ISSUE_KIND_DUPLICATE_KEY] for a second [code]?context[/code] or [code]?plural[/code] column, and for a key used twice in the same context (the later row replaces the earlier one on import).
+				- [constant DataValidation.ISSUE_KIND_EMPTY_REQUIRED] for each missing translation: an empty locale cell in a row with a key. The field of the issue is the name of the locale column.
+				- [constant DataValidation.ISSUE_KIND_MISSING_FIELD] if the CSV has no [member header].
+				Rows and columns are 0-based ([code]row[/code] counts data rows, without the header); header issues have no row. With [member DataValidationOptions.keep_positions] and text kept by [method TextDataFormat.parse], issues also get their line.
+				[codeblocks]
+				[gdscript]
+				var csv = CSV.new()
+				csv.parse(FileAccess.get_file_as_string("res://translations/ui.csv"))
+				var result = csv.validate_translation()
+				for i in result.get_issue_count():
+				    print(result.get_issue_message(i))
+				[/gdscript]
+				[csharp]
+				var csv = new Csv();
+				csv.Parse(FileAccess.GetFileAsString("res://translations/ui.csv"));
+				DataValidation result = csv.ValidateTranslation();
+				for (int i = 0; i &lt; result.GetIssueCount(); i++)
+				{
+				    GD.Print(result.GetIssueMessage(i));
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="header" type="PackedStringArray" setter="set_header" getter="get_header" default="PackedStringArray()">

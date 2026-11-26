@@ -32,6 +32,7 @@
 
 #include "core/io/serializer_options.h"
 #include "core/io/text_data_format.h"
+#include "core/templates/hash_map.h"
 #include "core/variant/array.h"
 
 // A CSV file (RFC 4180) as a Resource: `data` is an Array of rows (PackedStringArray), `header` the column
@@ -58,6 +59,22 @@ protected:
 	virtual void _resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const override;
 
 public:
+	// Column roles of a translation CSV header, see check_translation_header().
+	struct TranslationHeader {
+		HashMap<int, String> locale_columns; // Column -> standardized locale, in column order.
+		int context_column = -1;
+		int plural_column = -1;
+		Vector<int> invalid_columns; // Not a locale (e.g. an empty cell): ignored.
+		Vector<int> unknown_columns; // A locale whose language code is unknown: still a locale column.
+		bool has_known_language = false;
+	};
+
+	// Checks a header row the way ResourceImporterCSVTranslation reads it: column 0 holds the keys,
+	// "?context" and "?plural" columns are special, "_" columns are ignored, all others are locales.
+	static void check_translation_header(const Vector<String> &p_header, TranslationHeader &r_header, DataValidation *r_validation);
+	// Validates `header` and the rows as a translation table (locales, duplicate keys, missing translations).
+	Ref<DataValidation> validate_translation(const Ref<DataValidationOptions> &p_options = Ref<DataValidationOptions>()) const;
+
 	// On error, r_line is the 1-based line of the problem.
 	static Error parse_text(const String &p_text, const Ref<SerializerOptions> &p_options, Array &r_data, String &r_error, int &r_line);
 	// Rows are arrays (PackedStringArray or Array) or dictionaries (columns in order of first appearance).
