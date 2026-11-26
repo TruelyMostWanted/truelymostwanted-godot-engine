@@ -39,12 +39,14 @@
 // Reads and writes the YAML 1.2 subset that maps to Variant (https://yaml.org/spec/1.2.2/), and any Resource
 // as YAML on top of the property mapping of ResourceTextSerializer (format FORMAT_YAML).
 // Not supported (rejected with an error): anchors and aliases, merge keys, tags other than !!str, !!int,
-// !!float, !!bool and !!null, complex keys and more than one document.
-// As a Resource (TextDataFormat), `data` is the tree of one document. Values are addressed by paths of keys
-// and array indices separated by "/" ("enemies/0/name"); in a key, "~" is written as "~0" and "/" as "~1"
-// (JSON Pointer, RFC 6901).
+// !!float, !!bool and !!null and complex keys.
+// As a Resource (TextDataFormat), `data` is the tree of the first document; further documents ("---") are
+// kept beside it (get_document()). Values are addressed by paths of keys and array indices separated by "/"
+// ("enemies/0/name"); in a key, "~" is written as "~0" and "/" as "~1" (JSON Pointer, RFC 6901).
 class YAML : public TextDataFormat {
 	GDCLASS(YAML, TextDataFormat);
+
+	Array extra_documents; // Documents after the first one (`data`).
 
 	// Finds the container that holds the last part of the path. With p_create, missing dictionaries are created.
 	bool _resolve_parent(const Vector<String> &p_parts, bool p_create, Variant &r_parent) const;
@@ -56,11 +58,13 @@ protected:
 	virtual Error _parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) override;
 	virtual Error _encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const override;
 	virtual void _get_extensions(List<String> *r_extensions) const override;
+	virtual void _cleared() override { extra_documents.clear(); }
 
 public:
-	// Parses a YAML document into a tree of Dictionary, Array, String, int, float, bool and null, in file order.
-	// Mapping keys are always strings. On error, r_line and r_column (1-based) point at the problem.
-	static Error parse_text(const String &p_text, Variant &r_data, String &r_error, int &r_line, int &r_column);
+	// Parses YAML into a tree of Dictionary, Array, String, int, float, bool and null, in file order; r_data is
+	// the first document, r_documents (if given) gets all documents. Mapping keys are always strings. On error,
+	// r_line and r_column (1-based) point at the problem.
+	static Error parse_text(const String &p_text, Variant &r_data, String &r_error, int &r_line, int &r_column, Array *r_documents = nullptr);
 	// Writes a tree as YAML: block style with `indent` spaces, or flow style on one line if `indent` is empty.
 	static Error write_text(const Variant &p_data, const ResourceTextSerializer::Options &p_options, String &r_text, String &r_error);
 
@@ -80,6 +84,11 @@ public:
 	void set_value(const String &p_path, const Variant &p_value);
 	bool has_value(const String &p_path) const;
 	void erase_value(const String &p_path);
+
+	int get_document_count() const { return 1 + extra_documents.size(); }
+	Variant get_document(int p_index) const;
+	void add_document(const Variant &p_data);
+	void remove_document(int p_index);
 
 	static Variant parse_string(const String &p_text);
 	static String stringify(const Variant &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());

@@ -51,12 +51,13 @@
 		    volume: 0.5
 		    offset: [0.0, 1.5]
 		[/codeblock]
-		[b]Reading:[/b] block mappings and sequences (also [code]- key: value[/code] entries and sequences at the indentation of their key), flow mappings and sequences ([code]{a: 1}[/code], [code][1, 2][/code]) over one or more lines, plain, single-quoted and double-quoted scalars with all YAML escapes and line folding, literal ([code]|[/code]) and folded ([code]&gt;[/code]) block scalars with chomping ([code]-[/code], [code]+[/code]) and indentation indicators, comments, the [code]%YAML[/code] directive, one [code]---[/code] document start and the [code]...[/code] document end. Plain scalars are typed by the YAML 1.2 core schema: [code]null[/code], [code]~[/code] and empty values are [code]null[/code]; [code]true[/code] and [code]false[/code] are [bool]s (YAML 1.2 does not treat [code]yes[/code] or [code]on[/code] as booleans); integers in decimal, octal ([code]0o17[/code]) and hexadecimal ([code]0x1F[/code]) are [int]s; numbers with a point or exponent, [code].inf[/code], [code]-.inf[/code] and [code].nan[/code] are [float]s; everything else is a [String]. Quoted and block scalars are always strings, and so are mapping keys. The tags [code]!!str[/code], [code]!!int[/code], [code]!!float[/code], [code]!!bool[/code] and [code]!!null[/code] set the type of a scalar.
-		[b]Not supported:[/b] anchors ([code]&amp;a[/code]) and aliases ([code]*a[/code]), merge keys ([code]&lt;&lt;[/code]), other tags and the [code]%TAG[/code] directive, complex keys ([code]?[/code]), collections as keys, more than one document, tabs in indentation, plain scalars over several lines inside flow collections, integers outside 64 bits and nesting deeper than 256 levels. They stop the parsing with an error that has the line and column. Comments are not kept when a document is written again.
+		[b]Reading:[/b] block mappings and sequences (also [code]- key: value[/code] entries and sequences at the indentation of their key), flow mappings and sequences ([code]{a: 1}[/code], [code][1, 2][/code]) over one or more lines, plain, single-quoted and double-quoted scalars with all YAML escapes and line folding, literal ([code]|[/code]) and folded ([code]&gt;[/code]) block scalars with chomping ([code]-[/code], [code]+[/code]) and indentation indicators, comments, the [code]%YAML[/code] directive at the start, and several documents, each started by [code]---[/code] and optionally ended by [code]...[/code]. Plain scalars are typed by the YAML 1.2 core schema: [code]null[/code], [code]~[/code] and empty values are [code]null[/code]; [code]true[/code] and [code]false[/code] are [bool]s (YAML 1.2 does not treat [code]yes[/code] or [code]on[/code] as booleans); integers in decimal, octal ([code]0o17[/code]) and hexadecimal ([code]0x1F[/code]) are [int]s; numbers with a point or exponent, [code].inf[/code], [code]-.inf[/code] and [code].nan[/code] are [float]s; everything else is a [String]. Quoted and block scalars are always strings, and so are mapping keys. The tags [code]!!str[/code], [code]!!int[/code], [code]!!float[/code], [code]!!bool[/code] and [code]!!null[/code] set the type of a scalar.
+		[b]Not supported:[/b] anchors ([code]&amp;a[/code]) and aliases ([code]*a[/code]), merge keys ([code]&lt;&lt;[/code]), other tags and the [code]%TAG[/code] directive, complex keys ([code]?[/code]), collections as keys, content on the line of [code]---[/code], tabs in indentation, plain scalars over several lines inside flow collections, integers outside 64 bits and nesting deeper than 256 levels. They stop the parsing with an error that has the line and column. Comments are not kept when a document is written again.
 		[b]Writing:[/b] keys keep their order (or are sorted with [member SerializerOptions.sort_keys]). Mappings and sequences are written in block style, indented by the number of spaces in [member SerializerOptions.indent] (a tab counts as four spaces); an empty [member SerializerOptions.indent] writes the whole document in flow style on one line. Arrays of only numbers, booleans and [code]null[/code] (for example vectors and colors of a resource) stay on one line: [code][1.5, 2.0][/code]. Strings are written without quotes where they read back as the same string, otherwise in double quotes; strings with line breaks become literal block scalars ([code]|[/code]).
 		[b]Resource and files:[/b] [YAML] is a [Resource] (see [TextDataFormat]). [code]load("res://x.yaml")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
 		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_value] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings. The extensions [code].yaml[/code] and [code].yml[/code] are recognized.
 		[b]Paths:[/b] a path is made of mapping keys and sequence indices separated by [code]/[/code] ([code]"enemies/0/name"[/code]); the empty path is the whole document. Inside a key, [code]~[/code] is written [code]~0[/code] and [code]/[/code] is written [code]~1[/code], as in JSON Pointer ([url=https://www.rfc-editor.org/rfc/rfc6901]RFC 6901[/url]). [method set_value] with an index equal to the size of the sequence appends.
+		[b]Several documents:[/b] a file can hold several documents separated by [code]---[/code] lines. [member TextDataFormat.data] is the first document, so files with one document and all path methods work on it; [method get_document_count], [method get_document], [method add_document] and [method remove_document] reach all documents. Writing puts [code]---[/code] before every document after the first. [method parse_string], [method stringify], [method serialize] and [method deserialize] use the first document only. [method Resource.duplicate] copies only the first document.
 		[codeblocks]
 		[gdscript]
 		var yaml = YAML.new()
@@ -79,6 +80,13 @@
 		<link title="YAML 1.2.2 specification">https://yaml.org/spec/1.2.2/</link>
 	</tutorials>
 	<methods>
+		<method name="add_document">
+			<return type="void" />
+			<param index="0" name="data" type="Variant" />
+			<description>
+				Appends [param data] as a new document after the last one. Drops the kept parsed text.
+			</description>
+		</method>
 		<method name="deserialize" qualifiers="static">
 			<return type="Resource" />
 			<param index="0" name="text" type="String" />
@@ -100,7 +108,20 @@
 			<return type="void" />
 			<param index="0" name="path" type="String" />
 			<description>
-				Erases the mapping key or removes the sequence element at [param path]. Prints an error if it does not exist. An empty [param path] clears the document. Drops the kept parsed text.
+				Erases the mapping key or removes the sequence element at [param path]. Prints an error if it does not exist. An empty [param path] clears all documents (see [method TextDataFormat.clear]). Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="get_document" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the document at [param index]; [code]0[/code] is [member TextDataFormat.data]. Dictionaries and arrays are returned by reference, so changing them changes the document (call [method add_document] or [method remove_document], or set [member TextDataFormat.data], to drop the kept parsed text). Prints an error and returns [code]null[/code] if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_document_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of documents. It is at least [code]1[/code]: an empty file is one [code]null[/code] document.
 			</description>
 		</method>
 		<method name="get_value" qualifiers="const">
@@ -122,7 +143,14 @@
 			<return type="Variant" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Reads the YAML document [param text] and returns it as a tree of [Dictionary], [Array], [String], [int], [float], [bool] and [code]null[/code]. Returns [code]null[/code] and prints an error with line and column if the text is not valid YAML. Use [method TextDataFormat.parse] to tell an empty document from an error.
+				Reads the YAML document [param text] and returns it as a tree of [Dictionary], [Array], [String], [int], [float], [bool] and [code]null[/code]. Returns [code]null[/code] and prints an error with line and column if the text is not valid YAML. Use [method TextDataFormat.parse] to tell an empty document from an error. If [param text] has several documents, returns the first one.
+			</description>
+		</method>
+		<method name="remove_document">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the document at [param index]. Removing document [code]0[/code] makes the next document [member TextDataFormat.data]; removing the only document clears it. Prints an error if [param index] is out of range. Drops the kept parsed text.
 			</description>
 		</method>
 		<method name="serialize" qualifiers="static">
