@@ -156,8 +156,8 @@ TEST_CASE("[Editor][DataFileEditor] Schema lookup by file_patterns of the schema
 	settings->set_setting("filesystem/data/schema_files", PackedStringArray{ root.path_join("missing.tres"), schema_path });
 
 	Ref<DataSchema> found = EditorDataSchemaLookup::find_schema("res://data/items_weapons.csv");
-	CHECK(found.is_valid());
-	CHECK(found.is_valid() && found->get_file_patterns() == schema->get_file_patterns());
+	REQUIRE(found.is_valid());
+	CHECK(found->get_file_patterns() == schema->get_file_patterns());
 	CHECK(EditorDataSchemaLookup::find_schema("res://data/enemies.csv").is_null());
 	CHECK(EditorDataSchemaLookup::find_schema("").is_null());
 
