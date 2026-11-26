@@ -158,6 +158,9 @@ public:
 
 	// Called on every TranslationServer::set_locale() through the locale hook.
 	void update_locale();
+	// ResourceLoader::clear_translation_remaps() (EditorNode) drops the locale hooks: registers them again and
+	// catches up with the active locale.
+	static void restore_locale_hooks();
 
 	LocalizationServer();
 	virtual ~LocalizationServer();

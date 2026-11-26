@@ -256,6 +256,13 @@ void LocalizationServer::update_locale() {
 	emit_signal(SNAME("locale_changed"), locale, previous_locale);
 }
 
+void LocalizationServer::restore_locale_hooks() {
+	for (LocalizationServer *server : live_servers) {
+		server->locale_hook->set_as_translation_remapped(true);
+		server->update_locale();
+	}
+}
+
 void LocalizationServer::add_catalog(const Ref<LocalizationCatalog> &p_catalog, int p_priority) {
 	ERR_FAIL_COND(p_catalog.is_null());
 	ERR_FAIL_COND_MSG(!p_catalog->is_class(_get_catalog_class()), vformat("%s only takes catalogs of the class %s.", get_class(), _get_catalog_class()));
