@@ -195,7 +195,7 @@ TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
 			ERR_PRINT_OFF;
 			const String server_path = ResourceLoader::path_remap(path);
 			ERR_PRINT_ON;
-			CHECK_MESSAGE(server_path == godot_path, vformat("%s %s", locale, path);
+			CHECK_MESSAGE(server_path == godot_path, vformat("%s %s", locale, path));
 		}
 	}
 	// `ja` points to a missing file: both fall back to the original path.
