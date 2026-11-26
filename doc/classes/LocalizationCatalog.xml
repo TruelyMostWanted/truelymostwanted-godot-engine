@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LocalizationCatalog" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Base class of catalogs that store localized strings per key and locale.
+	</brief_description>
+	<description>
+		A [LocalizationCatalog] is a table: one row per key (a key and an optional context) and one column per locale. [TextLocalizationCatalog] stores texts, [ResourceLocalizationCatalog] stores localized resource paths. Rows are addressed by key and context, or by their row number (see [method find_key]).
+		The data is stored compactly: every locale is one column of UTF-8 text with one 4-byte offset per row, so a message costs its text plus 4 bytes (instead of an interned [StringName] per message like in [Translation]).
+		[b]Files:[/b] [method load_from_file] and [method save_to_file] choose the format by the file extension. The binary [code].lcat[/code] format stores one block per locale: a catalog loaded from it (also with [method @GDScript.load]) reads only the keys and the locale table; the text of a locale is read when it is first used, or with [method load_locale]. This keeps unused locales out of memory and works from the PCK and [code]user://[/code] on every platform, including the Web.
+		[b]Text formats[/b] ([method load_from_text], [method to_text], [enum ResourceTextSerializer.Format]):
+		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are ignored, a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not.
+		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs). The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order) and [code]plural_rules[/code]. In INI, every key is a [code][section][/code].
+		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules.
+		Saved as [code].tres[/code] or [code].res[/code], a catalog stores all locales in one block (no loading per locale).
+		[codeblocks]
+		[gdscript]
+		var catalog = TextLocalizationCatalog.new()
+		catalog.load_from_file("res://translations/ui.csv")
+		catalog.save_to_file("user://ui.lcat")
+
+		var lazy = load("user://ui.lcat") as TextLocalizationCatalog
+		print(lazy.is_locale_loaded("de")) # false
+		print(lazy.get_text("HELLO", "de")) # Loads "de" only.
+		[/gdscript]
+		[csharp]
+		var catalog = new TextLocalizationCatalog();
+		catalog.LoadFromFile("res://translations/ui.csv");
+		catalog.SaveToFile("user://ui.lcat");
+
+		var lazy = GD.Load&lt;TextLocalizationCatalog&gt;("user://ui.lcat");
+		GD.Print(lazy.IsLocaleLoaded("de")); // false
+		GD.Print(lazy.GetText("HELLO", "de")); // Loads "de" only.
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] [code].csv[/code] files in a project are imported by the CSV translation importer. To read them at runtime with [method load_from_file], set their import mode to "Keep File (exported as is)", or convert them to [code].lcat[/code].
+		[b]Note:[/b] Reading the same catalog from several threads is safe (loading a locale is guarded by a lock); changing it while other threads read it is not.
+	</description>
+	<tutorials>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/341-feature-localization-catalog</link>
+	</tutorials>
+	<methods>
+		<method name="add_key">
+			<return type="int" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Adds a row for [param key] and [param context] and returns its row number. If the row exists, returns its row number without a change.
+			</description>
+		</method>
+		<method name="add_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Adds an empty column for [param locale] (after the existing ones). Nothing happens if the locale exists. Setting a text of a new locale adds its column too.
+			</description>
+		</method>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes all keys and locales.
+			</description>
+		</method>
+		<method name="find_key" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the row number of [param key] with [param context], or [code]-1[/code] if the catalog has no such row.
+			</description>
+		</method>
+		<method name="get_key" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="row" type="int" />
+			<description>
+				Returns the key of the row [param row] (between [code]0[/code] and [member key_count] - 1).
+			</description>
+		</method>
+		<method name="get_key_context" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="row" type="int" />
+			<description>
+				Returns the context of the row [param row], or an empty [StringName] if the row has no context.
+			</description>
+		</method>
+		<method name="get_missing_rows" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns the row numbers that have no text in [param locale] (all rows if the catalog has no such locale). Loads the locale.
+			</description>
+		</method>
+		<method name="get_translated_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns the number of rows that have a text in [param locale]. Known without loading the locale (it is stored in the locale table of a [code].lcat[/code] file).
+			</description>
+		</method>
+		<method name="has_key" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns [code]true[/code] if the catalog has a row for [param key] with [param context].
+			</description>
+		</method>
+		<method name="has_locale" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns [code]true[/code] if the catalog has a column for [param locale], loaded or not.
+			</description>
+		</method>
+		<method name="is_locale_loaded" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns [code]true[/code] if the texts of [param locale] are in memory. Only a catalog loaded from a [code].lcat[/code] file has locales that are not loaded.
+			</description>
+		</method>
+		<method name="load_from_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Replaces the content of this catalog with the file at [param path]. The extension selects the format: [code]lcat[/code] (binary, locales are loaded on first use), [code]csv[/code], [code]json[/code], [code]yaml[/code]/[code]yml[/code], [code]toml[/code], [code]ini[/code] or [code]xml[/code]. Returns [constant ERR_UNAVAILABLE] if the format's module is disabled, [constant ERR_INVALID_DATA] if a [code].lcat[/code] file holds another kind of catalog.
+			</description>
+		</method>
+		<method name="load_from_text">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="format" type="int" enum="ResourceTextSerializer.Format" />
+			<description>
+				Replaces the content of this catalog with [param text] in the text format [param format]. See the class description for the layout of each format.
+			</description>
+		</method>
+		<method name="load_locale">
+			<return type="int" enum="Error" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Reads the texts of [param locale] from the [code].lcat[/code] file the catalog was loaded from, if they are not in memory yet, and emits [signal locale_loaded]. Getters such as [method TextLocalizationCatalog.get_text] do this automatically.
+			</description>
+		</method>
+		<method name="remove_key">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Removes the row of [param key] with [param context] from all locales. The rows after it move up by one.
+			</description>
+		</method>
+		<method name="remove_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Removes the column of [param locale].
+			</description>
+		</method>
+		<method name="save_to_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Writes the catalog to [param path] in the format of its extension (see [method load_from_file]). Loads all locales first.
+			</description>
+		</method>
+		<method name="to_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="format" type="int" enum="ResourceTextSerializer.Format" />
+			<description>
+				Returns the catalog as text in [param format], or an empty [String] on error (for example a disabled module). Loads all locales.
+			</description>
+		</method>
+		<method name="unload_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Frees the texts of [param locale]; they are read again from the [code].lcat[/code] file when needed. Fails if the locale was changed since loading, or the catalog was not loaded from a [code].lcat[/code] file.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="key_count" type="int" setter="" getter="get_key_count" default="0">
+			The number of rows (keys with their context).
+		</member>
+		<member name="locales" type="PackedStringArray" setter="" getter="get_locales" default="PackedStringArray()">
+			The locales of the catalog, in column order, loaded or not.
+		</member>
+	</members>
+	<signals>
+		<signal name="locale_loaded">
+			<param index="0" name="locale" type="String" />
+			<description>
+				Emitted on the main thread after the texts of [param locale] were read from the [code].lcat[/code] file.
+			</description>
+		</signal>
+	</signals>
+</class>

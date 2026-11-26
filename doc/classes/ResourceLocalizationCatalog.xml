@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ResourceLocalizationCatalog" inherits="LocalizationCatalog" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A catalog of localized resource paths.
+	</brief_description>
+	<description>
+		A [ResourceLocalizationCatalog] maps the path of a resource (the key) to its localized path per locale, for example [code]res://voice/intro.ogg[/code] to [code]res://voice/de/intro.ogg[/code] in [code]"de"[/code]. Each key can name the resource type it expects. See [LocalizationCatalog] for the file formats; in CSV the expected type is the [code]?type[/code] column, in the other formats the [code]_type[/code] field.
+		It holds the same data as the project setting [code]internationalization/locale/translation_remaps[/code]; [method add_translation_remaps] and [method to_translation_remaps] convert between both.
+		[codeblocks]
+		[gdscript]
+		var catalog = ResourceLocalizationCatalog.new()
+		catalog.set_localized_path("res://voice/intro.ogg", "de", "res://voice/de/intro.ogg")
+		catalog.set_expected_type("res://voice/intro.ogg", &amp;"AudioStream")
+		print(catalog.to_translation_remaps()) # { "res://voice/intro.ogg": ["res://voice/de/intro.ogg:de"] }
+		[/gdscript]
+		[csharp]
+		var catalog = new ResourceLocalizationCatalog();
+		catalog.SetLocalizedPath("res://voice/intro.ogg", "de", "res://voice/de/intro.ogg");
+		catalog.SetExpectedType("res://voice/intro.ogg", "AudioStream");
+		GD.Print(catalog.ToTranslationRemaps());
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/341-feature-localization-catalog</link>
+	</tutorials>
+	<methods>
+		<method name="add_translation_remaps">
+			<return type="void" />
+			<param index="0" name="remaps" type="Dictionary" />
+			<description>
+				Adds the entries of [param remaps], a [Dictionary] in the form of the project setting [code]internationalization/locale/translation_remaps[/code]: each key is a resource path, each value a [PackedStringArray] of [code]"localized_path:locale"[/code]. The expected type of each key is the resource type of its file, when the file exists.
+			</description>
+		</method>
+		<method name="get_expected_type" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="key" type="StringName" />
+			<description>
+				Returns the resource type expected for [param key], or an empty [StringName].
+			</description>
+		</method>
+		<method name="get_localized_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<description>
+				Returns the path of [param key] in [param locale], or an empty [String] if the resource is not localized for that locale.
+			</description>
+		</method>
+		<method name="set_expected_type">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="type" type="StringName" />
+			<description>
+				Sets the resource type expected for [param key] (a class name such as [code]"Texture2D"[/code]). Adds the key if needed.
+			</description>
+		</method>
+		<method name="set_localized_path">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="path" type="String" />
+			<description>
+				Sets the path of [param key] in [param locale]. Adds the key and the locale if needed. An empty [param path] removes the localization for that locale.
+			</description>
+		</method>
+		<method name="to_translation_remaps">
+			<return type="Dictionary" />
+			<description>
+				Returns the catalog as a [Dictionary] in the form of the project setting [code]internationalization/locale/translation_remaps[/code]. Keys without a localized path are left out. Loads all locales.
+			</description>
+		</method>
+	</methods>
+</class>
