@@ -48,6 +48,7 @@
 #include "core/os/time.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/version.h"
 #include "editor/animation/animation_player_editor_plugin.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
@@ -400,7 +401,7 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME + " (" TRUELY_VERSION_FULL_NAME ")");
 	if (project_title) {
 		project_title->set_text(title);
 	}

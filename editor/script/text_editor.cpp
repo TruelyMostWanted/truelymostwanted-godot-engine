@@ -31,6 +31,7 @@
 #include "text_editor.h"
 
 #include "core/io/json.h"
+#include "core/io/text_data_format.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
 
@@ -50,6 +51,21 @@ void TextEditor::_validate_script() {
 			te->set_line_background_color(code_editor->get_error_pos().x, EDITOR_GET("text_editor/theme/highlighting/mark_color"));
 		}
 	}
+
+	// Live parse errors for plain data files (INI, CSV, XML, TOML, YAML), like JSON above.
+	Ref<TextDataFormat> data_file = edited_res;
+	if (data_file.is_valid()) {
+		CodeEdit *te = code_editor->get_text_editor();
+
+		te->set_line_background_color(code_editor->get_error_pos().x, Color(0, 0, 0, 0));
+		code_editor->set_error("");
+
+		if (data_file->parse(te->get_text(), true) != OK) {
+			code_editor->set_error(data_file->get_error_message().replace("[", "[lb]"));
+			code_editor->set_error_pos(MAX(data_file->get_error_line() - 1, 0), MAX(data_file->get_error_column() - 1, 0));
+			te->set_line_background_color(code_editor->get_error_pos().x, EDITOR_GET("text_editor/theme/highlighting/mark_color"));
+		}
+	}
 }
 
 void TextEditor::apply_code() {
@@ -62,11 +78,16 @@ void TextEditor::apply_code() {
 	if (json_file.is_valid()) {
 		json_file->parse(code_editor->get_text_editor()->get_text(), true);
 	}
+
+	Ref<TextDataFormat> data_file = edited_res;
+	if (data_file.is_valid()) {
+		data_file->parse(code_editor->get_text_editor()->get_text(), true);
+	}
 	code_editor->get_text_editor()->get_syntax_highlighter()->update_cache();
 }
 
 ScriptEditorBase *TextEditor::create_editor(const Ref<Resource> &p_resource) {
-	if (Object::cast_to<TextFile>(*p_resource) || Object::cast_to<JSON>(*p_resource)) {
+	if (Object::cast_to<TextFile>(*p_resource) || Object::cast_to<JSON>(*p_resource) || Object::cast_to<TextDataFormat>(*p_resource)) {
 		return memnew(TextEditor);
 	}
 	return nullptr;

@@ -64,7 +64,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="variables" type="Dictionary[StringName, Variant]" setter="set_variables" getter="get_variables" default="{}">
+		<member name="variables" type="Dictionary" setter="set_variables" getter="get_variables" default="{}">
 			All values, keyed by variable name. Assigning a dictionary replaces all values and does not emit [signal variable_changed]. Prefer [method set_variable] to change single values.
 		</member>
 	</members>

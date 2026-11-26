@@ -71,6 +71,8 @@ protected:
 public:
 	// Takes ownership of p_stmt. Called by SQLiteDatabase::prepare().
 	void setup(const Ref<SQLiteDatabase> &p_database, sqlite3_stmt *p_stmt);
+	// Releases the SQLite statement. Called by SQLiteDatabase::close().
+	void finalize();
 
 	String get_sql() const;
 	int get_bind_parameter_count() const;
