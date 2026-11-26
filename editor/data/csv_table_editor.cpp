@@ -484,6 +484,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 }
 
 CSVTableEditor::CSVTableEditor() {
+	singleton = this;
 	set_name(TTRC("CSV Table"));
 	set_icon_name("TextFile");
 	set_dock_shortcut(ED_SHORTCUT_AND_COMMAND("bottom_panels/toggle_csv_table_bottom_panel", TTRC("Toggle CSV Table Dock")));
@@ -556,6 +557,12 @@ CSVTableEditor::CSVTableEditor() {
 	validate_timer->set_wait_time(0.5);
 	validate_timer->connect("timeout", callable_mp(this, &CSVTableEditor::_validate));
 	add_child(validate_timer);
+}
+
+CSVTableEditor::~CSVTableEditor() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
 }
 
 void CSVTableEditorPlugin::edit(Object *p_object) {

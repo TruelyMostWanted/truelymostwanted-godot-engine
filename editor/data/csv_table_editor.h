@@ -51,6 +51,7 @@ class CSVTableEditor : public EditorDock {
 	GDCLASS(CSVTableEditor, EditorDock);
 
 	static constexpr int PAGE_SIZE = 500;
+	static inline CSVTableEditor *singleton = nullptr;
 
 	Ref<CSV> csv;
 	Ref<TextFile> text_file; // Translation CSVs: the TextFile of the script editor, kept in sync with `csv`.
@@ -93,9 +94,12 @@ class CSVTableEditor : public EditorDock {
 	void _tree_gui_input(const Ref<InputEvent> &p_event);
 
 public:
+	static CSVTableEditor *get_singleton() { return singleton; }
+
 	void edit(const Ref<Resource> &p_resource);
 
 	CSVTableEditor();
+	~CSVTableEditor();
 };
 
 class CSVTableEditorPlugin : public EditorPlugin {
