@@ -181,6 +181,21 @@ TEST_CASE("[DataFileTreeAdapter] Search finds keys and scalar values") {
 	CHECK(paths[0] == PackedInt32Array({ 0, 1 }));
 }
 
+TEST_CASE("[DataFileTreeAdapter] Child paths stay the same after a new parse") {
+	const String enemies = Adapter::make_child_path(String(), "enemies", 0, false);
+	CHECK(enemies == "/enemies");
+	CHECK(Adapter::make_child_path(enemies, "1", 1, false) == "/enemies/1");
+	// Keys are used, not the index: a key inserted before keeps the path of the others.
+	CHECK(Adapter::make_child_path(String(), "boss", 5, false) == Adapter::make_child_path(String(), "boss", 6, false));
+	// "/" and "\" in keys cannot be confused with the separator.
+	CHECK(Adapter::make_child_path(String(), "a/b", 0, false) == "/a\\/b");
+	CHECK(Adapter::make_child_path(String(), "a\\", 0, false) == "/a\\\\");
+	CHECK(Adapter::make_child_path("/a", "b", 0, false) != Adapter::make_child_path(String(), "a/b", 0, false));
+	// XML: the child index, because sibling elements share their tag.
+	CHECK(Adapter::make_child_path("/0", "spawn", 2, true) == "/0/2");
+	CHECK(Adapter::make_child_path("/0", "spawn", 3, true) != Adapter::make_child_path("/0", "spawn", 2, true));
+}
+
 TEST_CASE("[DataFileTreeAdapter] CSV preview column widths") {
 	Array rows;
 	rows.push_back(PackedStringArray({ "knight", "warrior", "100" }));

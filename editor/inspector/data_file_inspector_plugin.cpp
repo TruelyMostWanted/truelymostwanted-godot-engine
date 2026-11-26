@@ -47,6 +47,7 @@
 #include "scene/gui/item_list.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
+#include "scene/gui/scroll_bar.h"
 #include "scene/gui/tree.h"
 #include "scene/main/timer.h"
 #include "scene/resources/font.h"
@@ -184,6 +185,11 @@ Vector<PackedInt32Array> DataFileTreeAdapter::find(const Variant &p_root, bool p
 	return paths;
 }
 
+String DataFileTreeAdapter::make_child_path(const String &p_parent_path, const String &p_key, int p_index, bool p_xml) {
+	const String segment = p_xml ? itos(p_index) : p_key.replace("\\", "\\\\").replace("/", "\\/");
+	return p_parent_path + "/" + segment;
+}
+
 PackedInt32Array DataFileTreeAdapter::get_column_chars(const PackedStringArray &p_header, const Array &p_rows, int p_max_rows, int p_max_columns, int p_max_chars) {
 	const int row_count = MIN(p_rows.size(), p_max_rows);
 	int column_count = p_header.size();
@@ -243,6 +249,43 @@ void DataFileInspectorView::_fill(TreeItem *p_parent, int p_from) {
 		more->set_text(COLUMN_KEY, vformat(TTR("%d more..."), rest));
 		more->set_tooltip_text(COLUMN_KEY, vformat(TTR("Select to show the next %d."), MIN(rest, CHILD_PAGE)));
 		more->set_metadata(1, -1 - next);
+	}
+}
+
+String DataFileInspectorView::_get_item_path(TreeItem *p_item) const {
+	// Tree items: the key in column 0 and the child index in metadata 1. CSV rows: the row number in column 0.
+	TreeItem *parent = p_item->get_parent();
+	if (parent == nullptr) {
+		return String();
+	}
+	return DataFileTreeAdapter::make_child_path(_get_item_path(parent), p_item->get_text(0), p_item->get_metadata(1), xml);
+}
+
+void DataFileInspectorView::_collect_expanded(TreeItem *p_item, HashSet<String> &r_paths) const {
+	for (TreeItem *child = p_item->get_first_child(); child; child = child->get_next()) {
+		TreeItem *first = child->get_first_child();
+		if (!child->is_collapsed() && first && int(first->get_metadata(1)) != PLACEHOLDER_INDEX) {
+			r_paths.insert(_get_item_path(child));
+			_collect_expanded(child, r_paths);
+		}
+	}
+}
+
+void DataFileInspectorView::_restore(TreeItem *p_item, const HashSet<String> &p_expanded, const String &p_selected) {
+	for (TreeItem *child = p_item->get_first_child(); child; child = child->get_next()) {
+		if (int(child->get_metadata(1)) < PLACEHOLDER_INDEX) {
+			continue; // A "more" item.
+		}
+		const String path = _get_item_path(child);
+		if (path == p_selected) {
+			child->select(0);
+		}
+		if (child->is_collapsed() && p_expanded.has(path)) {
+			child->set_collapsed(false); // Fills the children, see _item_collapsed().
+		}
+		if (!child->is_collapsed()) {
+			_restore(child, p_expanded, p_selected);
+		}
 	}
 }
 
@@ -356,17 +399,26 @@ void DataFileInspectorView::_update_tree() {
 }
 
 void DataFileInspectorView::_queue_update() {
-	if (!update_queued) {
-		update_queued = true;
-		callable_mp(this, &DataFileInspectorView::_update).call_deferred();
-	}
+	// Once after a burst of changes (the text editor parses the file again while typing).
+	update_timer->start();
 }
 
 void DataFileInspectorView::_update() {
-	update_queued = false;
 	const Ref<TextDataFormat> format = resource;
 	const Ref<JSON> json = resource;
 	ERR_FAIL_COND(format.is_null() && json.is_null());
+
+	// Keep what the user opened, selected and scrolled to across the rebuild.
+	HashSet<String> expanded;
+	String selected = "-"; // Not a path.
+	const real_t scroll = tree->get_scroll().y;
+	if (tree->get_root()) {
+		_collect_expanded(tree->get_root(), expanded);
+		if (tree->get_selected()) {
+			selected = _get_item_path(tree->get_selected());
+		}
+	}
+
 	const Variant data = format.is_valid() ? format->get_data() : json->get_data();
 	const bool csv = Object::cast_to<CSV>(*resource) != nullptr;
 	xml = Object::cast_to<XML>(*resource) != nullptr;
@@ -408,6 +460,12 @@ void DataFileInspectorView::_update() {
 		_update_csv();
 	} else {
 		_update_tree();
+	}
+	TreeItem *root = tree->get_root();
+	if (root && root->get_first_child()) {
+		_restore(root, expanded, selected);
+		tree->scroll_to_item(root->get_first_child()); // Updates the scroll bar range to the new items.
+		tree->get_vscroll_bar()->set_value(scroll);
 	}
 	_validate(false);
 }
@@ -587,6 +645,12 @@ DataFileInspectorView::DataFileInspectorView(const Ref<Resource> &p_resource) {
 	search_timer->set_wait_time(0.3);
 	search_timer->connect("timeout", callable_mp(this, &DataFileInspectorView::_update_tree));
 	add_child(search_timer);
+
+	update_timer = memnew(Timer);
+	update_timer->set_one_shot(true);
+	update_timer->set_wait_time(UPDATE_DELAY);
+	update_timer->connect("timeout", callable_mp(this, &DataFileInspectorView::_update));
+	add_child(update_timer);
 	search->connect(SceneStringName(text_changed), callable_mp(search_timer, &Timer::start).bind(-1).unbind(1));
 
 	tree = memnew(Tree);

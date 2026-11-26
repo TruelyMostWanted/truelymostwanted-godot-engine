@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
@@ -66,6 +67,9 @@ public:
 	// Paths (child indices from p_root) of the entries whose key or scalar value contains p_query (case-insensitive),
 	// depth-first in document order, at most p_max.
 	static Vector<PackedInt32Array> find(const Variant &p_root, bool p_xml, const String &p_query, int p_max);
+	// Path of a child that stays the same when the data is parsed again: "/"-separated keys ("/" and "\" in keys
+	// escaped with "\"). XML uses the child index, because sibling elements often share their tag.
+	static String make_child_path(const String &p_parent_path, const String &p_key, int p_index, bool p_xml);
 	// Characters of the longest cell per column (at most p_max_columns columns) in the header and the first
 	// p_max_rows rows, capped at p_max_chars.
 	static PackedInt32Array get_column_chars(const PackedStringArray &p_header, const Array &p_rows, int p_max_rows, int p_max_columns, int p_max_chars);
@@ -84,11 +88,11 @@ class DataFileInspectorView : public VBoxContainer {
 	static constexpr int MAX_MATCHES = 100;
 	static constexpr int MAX_ISSUES = 100;
 	static constexpr int AUTO_VALIDATE_SIZE = 256 * 1024;
+	static constexpr double UPDATE_DELAY = 0.3;
 
 	Ref<Resource> resource;
 	bool xml = false;
 	Variant root_value;
-	bool update_queued = false;
 
 	Label *summary_label = nullptr;
 	Label *status_label = nullptr;
@@ -96,6 +100,7 @@ class DataFileInspectorView : public VBoxContainer {
 	Button *table_button = nullptr;
 	LineEdit *search = nullptr;
 	Timer *search_timer = nullptr;
+	Timer *update_timer = nullptr;
 	Tree *tree = nullptr;
 	Label *more_label = nullptr;
 	ItemList *issue_list = nullptr;
@@ -104,6 +109,9 @@ class DataFileInspectorView : public VBoxContainer {
 	String _get_parsed_text() const;
 	TreeItem *_create_item(TreeItem *p_parent, const DataFileTreeAdapter::Entry &p_entry, int p_index, bool p_lazy);
 	void _fill(TreeItem *p_parent, int p_from);
+	String _get_item_path(TreeItem *p_item) const;
+	void _collect_expanded(TreeItem *p_item, HashSet<String> &r_paths) const;
+	void _restore(TreeItem *p_item, const HashSet<String> &p_expanded, const String &p_selected);
 	void _update_csv();
 	void _update_tree();
 	void _queue_update();
