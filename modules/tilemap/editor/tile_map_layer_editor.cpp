@@ -32,6 +32,7 @@
 
 #include "../tile_map.h"
 #include "../tile_map_layer.h"
+#include "tile_map_path_graph_editor.h"
 #include "tiles_editor_plugin.h"
 
 #include "core/input/input.h"
@@ -4158,6 +4159,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 
 void TileMapLayerEditor::_tile_map_layer_changed() {
 	tile_map_layer_changed_needs_update = true;
+	path_graph_editor->queue_rebuild();
 }
 
 void TileMapLayerEditor::_tab_changed(int p_tab_id) {
@@ -4319,6 +4321,10 @@ bool TileMapLayerEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event
 		return true;
 	}
 
+	if (path_graph_editor->forward_canvas_gui_input(_get_edited_layer(), p_event)) {
+		return true;
+	}
+
 	return tabs_plugins[tabs_bar->get_current_tab()]->forward_canvas_gui_input(p_event);
 }
 
@@ -4349,6 +4355,8 @@ void TileMapLayerEditor::_draw_overlay() {
 	Transform2D xform = CanvasItemEditor::get_singleton()->get_canvas_transform() * edited_layer->get_global_transform_with_canvas();
 	Transform2D xform_inv = xform.affine_inverse();
 	Vector2i tile_shape_size = tile_set->get_tile_size();
+
+	path_graph_editor->draw(custom_overlay, _get_edited_layer(), xform);
 
 	// Fade the overlay out when size too small.
 	Vector2 hint_distance = xform.get_scale() * tile_shape_size;
@@ -4759,6 +4767,9 @@ TileMapLayerEditor::TileMapLayerEditor() {
 	toggle_grid_button->set_tooltip_text(TTRC("Toggle grid visibility."));
 	toggle_grid_button->connect(SceneStringName(toggled), callable_mp(this, &TileMapLayerEditor::_on_grid_toggled));
 	tile_map_toolbar->add_child(toggle_grid_button);
+
+	path_graph_editor = memnew(TileMapPathGraphEditor);
+	tile_map_toolbar->add_child(path_graph_editor);
 
 	// Advanced settings menu button.
 	advanced_menu_button = memnew(MenuButton);

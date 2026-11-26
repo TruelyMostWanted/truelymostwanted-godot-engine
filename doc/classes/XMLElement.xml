@@ -114,10 +114,10 @@
 		</method>
 	</methods>
 	<members>
-		<member name="name" type="String" setter="set_name" getter="get_name">
+		<member name="name" type="String" setter="set_name" getter="get_name" default="&quot;&quot;">
 			The tag name of the element.
 		</member>
-		<member name="text" type="String" setter="set_text" getter="get_text">
+		<member name="text" type="String" setter="set_text" getter="get_text" default="&quot;&quot;">
 			The text of the direct text children of the element, joined together. Setting it replaces all text nodes of the element and keeps its child elements.
 		</member>
 	</members>

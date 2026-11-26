@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowVariable" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		The declaration of a variable of a [FlowGraph]: name, type and default value.
+	</brief_description>
+	<description>
+		A [FlowVariable] declares a variable that the nodes of a [FlowGraph] may read and write, for example with [FlowGetVariableNode] and [FlowSetVariableNode]. It only holds the declaration. The values of a running graph live in a [FlowBlackboard], which starts from the default values of these declarations when the playback creates it.
+		Declare variables in [member FlowGraph.variables]. [method FlowGraph.validate] reports a variable node whose [member FlowVariableNode.variable_name] is not declared ([constant FlowGraphValidation.ISSUE_KIND_UNDECLARED_VARIABLE]).
+		[codeblocks]
+		[gdscript]
+		var variable := FlowVariable.new()
+		variable.name = &amp;"gold"
+		variable.type = TYPE_INT
+		variable.default_value = 50
+		graph.variables = [variable]
+		[/gdscript]
+		[csharp]
+		var variable = new FlowVariable { Name = "gold", Type = Variant.Type.Int, DefaultValue = 50 };
+		graph.Variables = [variable];
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="default_value" type="Variant" setter="set_default_value" getter="get_default_value" default="null">
+			The initial value of the variable.
+		</member>
+		<member name="description" type="String" setter="set_description" getter="get_description" default="&quot;&quot;">
+			A free text that tells designers what the variable is for.
+		</member>
+		<member name="name" type="StringName" setter="set_variable_name" getter="get_variable_name" default="&amp;&quot;&quot;">
+			The name of the variable, used by [member FlowVariableNode.variable_name] and as the key in [member FlowBlackboard.variables].
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="0">
+			The [enum Variant.Type] of the variable. [constant @GlobalScope.TYPE_NIL] means any type.
+		</member>
+	</members>
+</class>

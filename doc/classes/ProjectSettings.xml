@@ -1299,8 +1299,9 @@
 		<member name="filesystem/resources/text_formats/indent" type="String" setter="" getter="" default="&quot;  &quot;">
 			The indentation of [code].json[/code] and [code].xml[/code] resource files. An empty string writes each file on one line. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.indent].
 		</member>
-		<member name="filesystem/resources/text_formats/ini_plain_values" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [code].ini[/code] resource files are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. See [ResourceTextSerializer].
+		<member name="filesystem/resources/text_formats/ini_value_style" type="int" setter="" getter="" default="1">
+			How values are written into [code].ini[/code] files (see [enum SerializerOptions.IniValueStyle]). [b]Plain[/b] writes them without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. [b]Godot Variant[/b] uses the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. Used when the options of [ResourceTextSerializer] or [INI] are [code]null[/code]; see [member SerializerOptions.ini_value_style].
+			[b]Note:[/b] This setting replaces the bool [code]filesystem/resources/text_formats/ini_plain_values[/code]. If a [code]project.godot[/code] still has the bool and this setting is the default, the bool is used.
 		</member>
 		<member name="filesystem/resources/text_formats/sort_keys" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], keys are written in alphabetical order into [code].json[/code], [code].ini[/code], [code].xml[/code] and [code].toml[/code] resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.sort_keys].
