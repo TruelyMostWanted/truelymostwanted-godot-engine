@@ -33,6 +33,7 @@
 #include "core/io/data_schema.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
+#include "core/string/translation_server.h"
 #include "core/templates/hash_set.h"
 #include "core/variant/variant_utility.h"
 
@@ -302,6 +303,43 @@ void CSV::set_cell(int p_row, int p_column, const String &p_value) {
 	_mark_data_changed();
 }
 
+Array CSV::get_cells(int p_row, int p_column, int p_row_count, int p_column_count) const {
+	ERR_FAIL_COND_V(p_row < 0 || p_column < 0 || p_row_count < 0 || p_column_count < 0, Array());
+	const Array rows = _get_rows();
+	Array result;
+	for (int row = p_row; row < MIN(p_row + p_row_count, rows.size()); row++) {
+		const PackedStringArray cells = rows[row];
+		PackedStringArray block_row;
+		block_row.resize(p_column_count);
+		for (int column = 0; column < p_column_count; column++) {
+			block_row.set(column, p_column + column < cells.size() ? cells[p_column + column] : String());
+		}
+		result.push_back(block_row);
+	}
+	return result;
+}
+
+void CSV::set_cells(int p_row, int p_column, const Array &p_cells) {
+	Array rows = _get_rows();
+	ERR_FAIL_INDEX(p_row, rows.size() + 1);
+	ERR_FAIL_COND(p_column < 0);
+	for (int i = 0; i < p_cells.size(); i++) {
+		const PackedStringArray values = p_cells[i];
+		if (p_row + i == rows.size()) {
+			rows.push_back(PackedStringArray());
+		}
+		PackedStringArray cells = rows[p_row + i];
+		if (cells.size() < p_column + values.size()) {
+			cells.resize(p_column + values.size());
+		}
+		for (int column = 0; column < values.size(); column++) {
+			cells.set(p_column + column, values[column]);
+		}
+		rows[p_row + i] = cells;
+	}
+	_mark_data_changed();
+}
+
 int CSV::find_column(const String &p_name) const {
 	return (int)header.find(p_name);
 }
@@ -525,6 +563,96 @@ CSV::CSV() {
 	_get_data_ref() = Array();
 }
 
+void CSV::check_translation_header(const Vector<String> &p_header, TranslationHeader &r_header, DataValidation *r_validation) {
+	ERR_FAIL_NULL(r_validation);
+	TranslationServer *ts = TranslationServer::get_singleton();
+	HashSet<String> known_languages;
+	for (const String &language : ts->get_all_languages()) {
+		known_languages.insert(language);
+	}
+
+	for (int i = 1; i < p_header.size(); i++) {
+		const String &column = p_header[i];
+		if (column.begins_with("_")) {
+			continue;
+		}
+		const String lower = column.to_lower();
+		if (lower == "?context" || lower == "?plural") {
+			int &special_column = lower == "?context" ? r_header.context_column : r_header.plural_column;
+			if (special_column != -1) {
+				r_validation->add_issue(DataValidation::ISSUE_KIND_DUPLICATE_KEY, vformat("Multiple '%s' columns found. Only one is allowed. Subsequent ones are ignored.", lower), lower, String(), DataValidation::POSITION_NONE, i);
+			} else {
+				special_column = i;
+			}
+			continue;
+		}
+
+		const String locale = ts->standardize_locale(column);
+		if (locale.is_empty()) {
+			r_header.invalid_columns.push_back(i);
+			r_validation->add_issue(DataValidation::ISSUE_KIND_INVALID_LOCALE, vformat("Invalid locale format '%s', should be 'language_Script_COUNTRY_VARIANT@extra'. The column is ignored.", column), column, String(), DataValidation::POSITION_NONE, i);
+			continue;
+		}
+		if (known_languages.has(locale.get_slicec('_', 0))) {
+			r_header.has_known_language = true;
+		} else {
+			r_header.unknown_columns.push_back(i);
+			r_validation->add_issue(DataValidation::ISSUE_KIND_INVALID_LOCALE, vformat("Unknown language code '%s'. The column is used as a locale anyway; prefix its name with '_' to ignore it.", column), column, String(), DataValidation::POSITION_NONE, i);
+		}
+		r_header.locale_columns[i] = locale;
+	}
+
+	if (!r_header.has_known_language) {
+		r_validation->add_issue(DataValidation::ISSUE_KIND_INVALID_LOCALE, "No column of the header starts with a known language code: this is not a translation table.");
+	}
+}
+
+Ref<DataValidation> CSV::validate_translation(const Ref<DataValidationOptions> &p_options) const {
+	Ref<DataValidation> result;
+	result.instantiate();
+	result->apply_options(p_options);
+	if (header.is_empty()) {
+		result->add_issue(DataValidation::ISSUE_KIND_MISSING_FIELD, "A translation CSV needs a header row: the keys, then one column per locale.");
+		return result;
+	}
+
+	TranslationHeader columns;
+	check_translation_header(header, columns, result.ptr());
+	if (columns.has_known_language) {
+		const Array rows = _get_rows();
+		HashSet<String> keys;
+		for (int row = 0; row < rows.size() && !result->is_full(); row++) {
+			const PackedStringArray cells = rows[row];
+			const auto cell = [&cells](int p_column) {
+				return p_column >= 0 && p_column < cells.size() ? cells[p_column] : String();
+			};
+			// Rows without a key are empty or further plural forms (a locale may have fewer forms).
+			const String key = cell(0);
+			if (key.is_empty() || key.to_lower() == "?pluralrule") {
+				continue;
+			}
+			// The importer adds messages by key and context: a second row replaces the first.
+			const String context = cell(columns.context_column);
+			const String id = context.is_empty() ? key : context + String::chr(4) + key;
+			if (keys.has(id)) {
+				result->add_issue(DataValidation::ISSUE_KIND_DUPLICATE_KEY, vformat("Key '%s' is used twice%s.", key, context.is_empty() ? String() : vformat(" in context '%s'", context)), header[0], String(), row, 0);
+			} else {
+				keys.insert(id);
+			}
+			for (const KeyValue<int, String> &E : columns.locale_columns) {
+				if (cell(E.key).is_empty()) {
+					result->add_issue(DataValidation::ISSUE_KIND_EMPTY_REQUIRED, vformat("Missing translation of '%s' for locale '%s'.", key, E.value), header[E.key], String(), row, E.key);
+				}
+			}
+		}
+	}
+
+	if (p_options.is_valid() && p_options->is_keep_positions() && !get_parsed_text().is_empty()) {
+		_resolve_issue_lines(result, get_parsed_text());
+	}
+	return result;
+}
+
 void CSV::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_header", "header"), &CSV::set_header);
 	ClassDB::bind_method(D_METHOD("get_header"), &CSV::get_header);
@@ -538,12 +666,15 @@ void CSV::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_row", "row", "values"), &CSV::set_row);
 	ClassDB::bind_method(D_METHOD("get_cell", "row", "column"), &CSV::get_cell);
 	ClassDB::bind_method(D_METHOD("set_cell", "row", "column", "value"), &CSV::set_cell);
+	ClassDB::bind_method(D_METHOD("get_cells", "row", "column", "row_count", "column_count"), &CSV::get_cells);
+	ClassDB::bind_method(D_METHOD("set_cells", "row", "column", "cells"), &CSV::set_cells);
 	ClassDB::bind_method(D_METHOD("find_column", "name"), &CSV::find_column);
 	ClassDB::bind_method(D_METHOD("get_column", "column"), &CSV::get_column);
 	ClassDB::bind_method(D_METHOD("find_rows", "column", "value"), &CSV::find_rows);
 	ClassDB::bind_method(D_METHOD("get_typed_row", "row", "schema"), &CSV::get_typed_row);
 	ClassDB::bind_method(D_METHOD("append_typed_row", "values", "schema"), &CSV::append_typed_row);
 	ClassDB::bind_method(D_METHOD("get_typed_column", "column", "schema"), &CSV::get_typed_column);
+	ClassDB::bind_method(D_METHOD("validate_translation", "options"), &CSV::validate_translation, DEFVAL(Ref<DataValidationOptions>()));
 
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "header"), "set_header", "get_header");
 
