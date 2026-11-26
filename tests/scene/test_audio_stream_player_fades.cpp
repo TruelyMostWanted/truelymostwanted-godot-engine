@@ -43,15 +43,6 @@ TEST_FORCE_LINK(test_audio_stream_player_fades)
 
 namespace TestAudioStreamPlayerFades {
 
-// [SceneTree] cases get no AudioServer from the test runner; the runner deletes it after the tree.
-static void ensure_audio_server() {
-	if (AudioServer::get_singleton() == nullptr) {
-		AudioDriverManager::initialize(AudioDriverManager::get_driver_count() - 1); // The dummy driver.
-		AudioServer *audio_server = memnew(AudioServer);
-		audio_server->init();
-	}
-}
-
 static Ref<AudioStreamWAV> make_wav(double p_seconds) {
 	// Silent 16-bit mono WAV; the tests check state and gains, not sound.
 	Ref<AudioStreamWAV> wav;
@@ -67,7 +58,6 @@ static Ref<AudioStreamWAV> make_wav(double p_seconds) {
 }
 
 static AudioStreamPlayer *make_player(const Ref<AudioStream> &p_stream) {
-	ensure_audio_server();
 	AudioStreamPlayer *player = memnew(AudioStreamPlayer);
 	player->set_stream(p_stream);
 	SceneTree::get_singleton()->get_root()->add_child(player);
@@ -108,7 +98,7 @@ TEST_CASE("[AudioFade] Curves, start and advance") {
 	CHECK(fade.get_value() == doctest::Approx(0.5));
 }
 
-TEST_CASE("[SceneTree][AudioStreamPlayer] fade_in starts silent and rises, fade_out stops") {
+TEST_CASE("[SceneTree][Audio][AudioStreamPlayer] fade_in starts silent and rises, fade_out stops") {
 	AudioStreamPlayer *player = make_player(make_wav(10.0));
 	SIGNAL_WATCH(player, "fade_finished");
 
@@ -151,7 +141,7 @@ TEST_CASE("[SceneTree][AudioStreamPlayer] fade_in starts silent and rises, fade_
 	memdelete(player);
 }
 
-TEST_CASE("[SceneTree][AudioStreamPlayer] crossfade_to swaps the stream and fades both") {
+TEST_CASE("[SceneTree][Audio][AudioStreamPlayer] crossfade_to swaps the stream and fades both") {
 	Ref<AudioStreamWAV> first = make_wav(10.0);
 	Ref<AudioStreamWAV> second = make_wav(10.0);
 	AudioStreamPlayer *player = make_player(first);
@@ -186,7 +176,7 @@ TEST_CASE("[SceneTree][AudioStreamPlayer] crossfade_to swaps the stream and fade
 	memdelete(player);
 }
 
-TEST_CASE("[SceneTree][AudioStreamPlayer] Track info of a single stream and the position signal") {
+TEST_CASE("[SceneTree][Audio][AudioStreamPlayer] Track info of a single stream and the position signal") {
 	Ref<AudioStreamWAV> wav = make_wav(10.0);
 	AudioStreamPlayer *player = make_player(wav);
 	CHECK(player->get_current_track_index() == -1);
