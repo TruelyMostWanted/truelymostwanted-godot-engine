@@ -36,6 +36,7 @@
 
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 #include "servers/audio/audio_server.h"
 
 #include <thirdparty/dr_libs/dr_bridge.h>
@@ -231,6 +232,11 @@ void AudioStreamMP3::set_data(const Vector<uint8_t> &p_data) {
 	channels = mp3d->channels;
 	sample_rate = mp3d->sampleRate;
 	length = float(pcm_frames) / (mp3d->sampleRate);
+	int64_t audio_size = p_data.size() - AudioStreamTags::get_id3v2_size(p_data.ptr(), p_data.size());
+	if (p_data.size() >= 128 && memcmp(p_data.ptr() + p_data.size() - 128, "TAG", 3) == 0) {
+		audio_size -= 128; // ID3v1.
+	}
+	bitrate = length > 0 ? int(audio_size * 8 / length) : 0;
 
 	// Initialize seek table.
 	drmp3_uint32 seek_count = mp3_frames / 20;
@@ -266,7 +272,19 @@ double AudioStreamMP3::get_loop_offset() const {
 }
 
 double AudioStreamMP3::get_length() const {
-	return length;
+	return data.is_empty() ? AudioStream::get_length() : length;
+}
+
+int AudioStreamMP3::get_sample_rate() const {
+	return data.is_empty() ? AudioStream::get_sample_rate() : int(sample_rate);
+}
+
+int AudioStreamMP3::get_channel_count() const {
+	return data.is_empty() ? AudioStream::get_channel_count() : channels;
+}
+
+int AudioStreamMP3::get_bitrate() const {
+	return data.is_empty() ? AudioStream::get_bitrate() : bitrate;
 }
 
 bool AudioStreamMP3::is_monophonic() const {
@@ -324,6 +342,7 @@ Ref<AudioStreamMP3> AudioStreamMP3::load_from_buffer(const Vector<uint8_t> &p_st
 	mp3_stream.instantiate();
 	mp3_stream->set_data(p_stream_data);
 	ERR_FAIL_COND_V_MSG(mp3_stream->get_data().is_empty(), Ref<AudioStreamMP3>(), "MP3 decoding failed. Check that your data is a valid MP3 audio stream.");
+	AudioStreamTags::read_file_tags(mp3_stream.ptr(), p_stream_data);
 	return mp3_stream;
 }
 

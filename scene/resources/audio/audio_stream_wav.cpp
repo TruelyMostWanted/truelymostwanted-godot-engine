@@ -33,6 +33,7 @@
 #include "core/io/file_access_memory.h"
 #include "core/io/marshalls.h"
 #include "core/object/class_db.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 #include "servers/audio/audio_server.h"
 
 const float TRIM_DB_LIMIT = -50;
@@ -487,7 +488,34 @@ Dictionary AudioStreamWAV::get_tags() const {
 	return tags;
 }
 
+int AudioStreamWAV::get_sample_rate() const {
+	return data.is_empty() ? AudioStream::get_sample_rate() : int(mix_rate);
+}
+
+int AudioStreamWAV::get_channel_count() const {
+	return data.is_empty() ? AudioStream::get_channel_count() : (stereo ? 2 : 1);
+}
+
+int AudioStreamWAV::get_bitrate() const {
+	const double length = get_length();
+	return (data.is_empty() || length <= 0) ? AudioStream::get_bitrate() : int(data.size() * 8 / length);
+}
+
+String AudioStreamWAV::get_codec() const {
+	switch (format) {
+		case FORMAT_IMA_ADPCM:
+			return "IMA ADPCM";
+		case FORMAT_QOA:
+			return "QOA";
+		default:
+			return "PCM";
+	}
+}
+
 double AudioStreamWAV::get_length() const {
+	if (data.is_empty()) {
+		return AudioStream::get_length();
+	}
 	uint64_t len = data.size();
 	switch (format) {
 		case AudioStreamWAV::FORMAT_8_BITS:
@@ -1219,6 +1247,7 @@ Ref<AudioStreamWAV> AudioStreamWAV::load_from_buffer(const Vector<uint8_t> &p_st
 		}
 		sample->set_tags(tag_dictionary);
 	}
+	AudioStreamTags::read_file_tags(sample.ptr(), p_stream_data);
 
 	return sample;
 }

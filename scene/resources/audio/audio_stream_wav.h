@@ -153,6 +153,10 @@ public:
 	virtual Dictionary get_tags() const override;
 
 	virtual double get_length() const override; //if supported, otherwise return 0
+	virtual int get_sample_rate() const override;
+	virtual int get_channel_count() const override;
+	virtual int get_bitrate() const override;
+	virtual String get_codec() const override;
 
 	virtual bool is_monophonic() const override;
 
