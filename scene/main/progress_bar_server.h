@@ -68,7 +68,8 @@ class ProgressBarServer : public Object {
 	HashMap<ObjectID, uint32_t> styles;
 	HashSet<RID> position_only_bars;
 	LocalVector<ObjectID> scratch; // Reused every frame, no allocation.
-	bool processing = false;
+	bool upright_connected = false; // Connected to RenderingServer.frame_pre_draw.
+	ObjectID detached_tree; // The SceneTree whose process_frame is connected.
 
 	void _redraw(const RID &p_bar, const Bar &p_data);
 	void _apply_style(const RID &p_bar, Bar &r_data);
@@ -76,6 +77,8 @@ class ProgressBarServer : public Object {
 	void _remove_style_user(const Ref<ProgressBarStyle> &p_style);
 	void _free_bar(RID p_bar); // By value: callers pass references into containers it changes.
 	void _update_processing();
+	void _free_detached();
+	void _update_upright();
 	void _on_parent_exited(uint64_t p_parent);
 	void _on_style_changed(uint64_t p_style);
 
@@ -99,7 +102,7 @@ public:
 	void bars_set_ratios(const TypedArray<RID> &p_bars, const PackedFloat32Array &p_ratios);
 	int get_bar_count() const;
 
-	// Once per frame (RenderingServer.frame_pre_draw) while needed; public for the unit tests.
+	// What runs once per frame while needed (SceneTree.process_frame, RenderingServer.frame_pre_draw); for the unit tests.
 	void process();
 
 	ProgressBarServer();

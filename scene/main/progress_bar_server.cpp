@@ -33,6 +33,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "scene/main/canvas_item.h"
+#include "scene/main/scene_tree.h"
 #include "scene/resources/theme.h"
 #include "scene/scene_string_names.h"
 #include "scene/theme/theme_db.h"
@@ -162,17 +163,29 @@ void ProgressBarServer::_free_bar(RID p_bar) {
 }
 
 void ProgressBarServer::_update_processing() {
+	// Position-only bars: before each draw, after process and physics moved the units.
 	RenderingServer *rs = RenderingServer::get_singleton();
-	const bool needed = !position_only_bars.is_empty() || !detached_parents.is_empty();
-	if (needed == processing || rs == nullptr) {
-		return;
+	const bool upright_needed = !position_only_bars.is_empty();
+	if (rs != nullptr && upright_needed != upright_connected) {
+		upright_connected = upright_needed;
+		if (upright_needed) {
+			rs->connect(SNAME("frame_pre_draw"), callable_mp(this, &ProgressBarServer::_update_upright));
+		} else {
+			rs->disconnect(SNAME("frame_pre_draw"), callable_mp(this, &ProgressBarServer::_update_upright));
+		}
 	}
-	processing = needed;
-	if (needed) {
-		rs->connect(SNAME("frame_pre_draw"), callable_mp(this, &ProgressBarServer::process));
-	} else {
-		rs->disconnect(SNAME("frame_pre_draw"), callable_mp(this, &ProgressBarServer::process));
+	// Detached parents: every frame, also when nothing is drawn (headless, minimized, low processor mode).
+	SceneTree *tree = SceneTree::get_singleton();
+	SceneTree *connected = ObjectDB::get_instance<SceneTree>(detached_tree);
+	const bool detached_needed = !detached_parents.is_empty() && tree != nullptr;
+	if (connected != nullptr && (!detached_needed || connected != tree)) {
+		connected->disconnect(SNAME("process_frame"), callable_mp(this, &ProgressBarServer::_free_detached));
+		connected = nullptr;
 	}
+	if (detached_needed && connected == nullptr) {
+		tree->connect(SNAME("process_frame"), callable_mp(this, &ProgressBarServer::_free_detached));
+	}
+	detached_tree = detached_needed ? tree->get_instance_id() : ObjectID();
 }
 
 void ProgressBarServer::_on_parent_exited(uint64_t p_parent) {
@@ -190,28 +203,29 @@ void ProgressBarServer::_on_style_changed(uint64_t p_style) {
 	_update_processing();
 }
 
-void ProgressBarServer::process() {
+void ProgressBarServer::_free_detached() {
 	// Parents that left the tree: free the bars of deleted ones, forget the ones that came back.
-	if (!detached_parents.is_empty()) {
-		scratch.clear();
-		for (const ObjectID &id : detached_parents) {
-			Node *parent = ObjectDB::get_instance<Node>(id);
-			if (parent == nullptr || parent->is_inside_tree()) {
-				scratch.push_back(id);
-			}
-		}
-		for (const ObjectID &id : scratch) {
-			detached_parents.erase(id);
-			if (ObjectDB::get_instance(id) != nullptr) {
-				continue;
-			}
-			// Each _free_bar() removes the bar from the list; the last one removes the parent.
-			while (parents.has(id)) {
-				_free_bar(parents[id][0]);
-			}
+	scratch.clear();
+	for (const ObjectID &id : detached_parents) {
+		Node *parent = ObjectDB::get_instance<Node>(id);
+		if (parent == nullptr || parent->is_inside_tree()) {
+			scratch.push_back(id);
 		}
 	}
+	for (const ObjectID &id : scratch) {
+		detached_parents.erase(id);
+		if (ObjectDB::get_instance(id) != nullptr) {
+			continue;
+		}
+		// Each _free_bar() removes the bar from the list; the last one removes the parent.
+		while (parents.has(id)) {
+			_free_bar(parents[id][0]);
+		}
+	}
+	_update_processing();
+}
 
+void ProgressBarServer::_update_upright() {
 	RenderingServer *rs = RenderingServer::get_singleton();
 	for (const RID &rid : position_only_bars) {
 		Bar &bar = bars[rid];
@@ -225,7 +239,11 @@ void ProgressBarServer::process() {
 			rs->canvas_item_set_transform(rid, transform);
 		}
 	}
-	_update_processing();
+}
+
+void ProgressBarServer::process() {
+	_free_detached();
+	_update_upright();
 }
 
 RID ProgressBarServer::bar_create(CanvasItem *p_parent, const Ref<ProgressBarStyle> &p_style) {
