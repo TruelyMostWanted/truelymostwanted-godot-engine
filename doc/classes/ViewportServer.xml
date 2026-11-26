@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ViewportServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A registry of every [Viewport] and [Window] in the scene tree.
+	</brief_description>
+	<description>
+		Knows every [Viewport] (including [SubViewport]s and [Window]s) that is inside the [SceneTree], so settings and tools don't have to search the tree for them. It also finds the node behind a viewport [RID] or a window ID.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+		    for window in ViewportServer.get_windows():
+		        print(window.title, " has window ID ", window.get_window_id())
+		    ViewportServer.viewport_added.connect(_on_viewport_added)
+
+		func _on_viewport_added(viewport):
+		    viewport.msaa_3d = Viewport.MSAA_4X
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    foreach (Window window in ViewportServer.GetWindows())
+		    {
+		        GD.Print(window.Title, " has window ID ", window.GetWindowId());
+		    }
+		    ViewportServer.ViewportAdded += OnViewportAdded;
+		}
+
+		private void OnViewportAdded(Viewport viewport)
+		{
+		    viewport.Msaa3D = Viewport.Msaa.Msaa4X;
+		}
+		[/csharp]
+		[/codeblocks]
+		The registry follows [signal SceneTree.node_added] and [signal SceneTree.node_removed]. It starts at the first frame, or earlier at the first call of one of its methods, and then lists every viewport that is already in the tree. [signal viewport_added] is only emitted for viewports that enter the tree after that, so call [method get_viewports] for the ones that are there already.
+		[b]Note:[/b] Viewports that are not inside the tree are not listed. In the editor, the registry also lists the editor's own viewports.
+		[b]Note:[/b] Use this server from the main thread only, like the scene tree.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_viewport_by_rid">
+			<return type="Viewport" />
+			<param index="0" name="rid" type="RID" />
+			<description>
+				Returns the registered viewport whose [method Viewport.get_viewport_rid] is [param rid], or [code]null[/code] if no viewport in the tree has this [RID].
+			</description>
+		</method>
+		<method name="get_viewport_count">
+			<return type="int" />
+			<description>
+				Returns the number of viewports in the tree, windows included.
+			</description>
+		</method>
+		<method name="get_viewports">
+			<return type="Viewport[]" />
+			<description>
+				Returns every viewport in the tree, windows included, in the order they entered the tree. The root window comes first.
+			</description>
+		</method>
+		<method name="get_window_by_id">
+			<return type="Window" />
+			<param index="0" name="window_id" type="int" />
+			<description>
+				Returns the window whose [method Window.get_window_id] is [param window_id], or [code]null[/code] if no window in the tree has this ID. [code]0[/code] ([constant DisplayServer.MAIN_WINDOW_ID]) is the root window. Embedded windows have no window ID of their own and are never returned.
+			</description>
+		</method>
+		<method name="get_windows">
+			<return type="Window[]" />
+			<description>
+				Returns every [Window] in the tree, in the order they entered the tree. The root window comes first.
+			</description>
+		</method>
+		<method name="has_viewport">
+			<return type="bool" />
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Returns [code]true[/code] if [param viewport] is registered, that is, inside the tree.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="viewport_added">
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Emitted when [param viewport] (a [SubViewport], a [Window] or another [Viewport]) has entered the tree and was registered.
+			</description>
+		</signal>
+		<signal name="viewport_removed">
+			<param index="0" name="viewport" type="Viewport" />
+			<description>
+				Emitted when [param viewport] is about to leave the tree and was unregistered. It is still valid during the signal.
+			</description>
+		</signal>
+	</signals>
+</class>
