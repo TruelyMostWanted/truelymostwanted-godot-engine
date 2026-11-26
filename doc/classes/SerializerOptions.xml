@@ -52,8 +52,8 @@
 		<member name="indent" type="String" setter="set_indent" getter="get_indent" default="&quot;  &quot;">
 			JSON and XML: the indentation of one level. An empty string writes JSON on one line and XML without line breaks. INI, CSV and TOML ignore it.
 		</member>
-		<member name="ini_plain_values" type="bool" setter="set_ini_plain_values" getter="is_ini_plain_values" default="false">
-			INI: if [code]true[/code], values are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so players and other tools can edit them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read.
+		<member name="ini_value_style" type="int" setter="set_ini_value_style" getter="get_ini_value_style" enum="SerializerOptions.IniValueStyle" default="1">
+			INI: the syntax of written values. [constant INI_VALUE_STYLE_GODOT_VARIANT] uses the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]); [constant INI_VALUE_STYLE_PLAIN] writes values without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so players and other tools can edit them. Both styles are read.
 		</member>
 		<member name="sort_keys" type="bool" setter="set_sort_keys" getter="is_sort_keys" default="false">
 			JSON, INI, XML and TOML: if [code]true[/code], the keys of every object, section and element are written in alphabetical order (also the keys of [Dictionary] properties), which keeps diffs in version control small. If [code]false[/code], properties are written in property order. CSV columns always keep the property order.
@@ -62,4 +62,15 @@
 			XML: if [code]true[/code], the text starts with [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Both are read.
 		</member>
 	</members>
+	<constants>
+		<constant name="INI_VALUE_STYLE_PLAIN" value="0" enum="IniValueStyle">
+			INI values are plain text without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code], [code]color=#ff0000ff[/code]), readable by other tools.
+		</constant>
+		<constant name="INI_VALUE_STYLE_GODOT_VARIANT" value="1" enum="IniValueStyle">
+			INI values use Godot's Variant syntax like [ConfigFile]: strings are quoted, other types use their constructor ([code]Vector2(1, 2)[/code]).
+		</constant>
+		<constant name="INI_VALUE_STYLE_MAX" value="2" enum="IniValueStyle">
+			Represents the size of the [enum IniValueStyle] enum.
+		</constant>
+	</constants>
 </class>

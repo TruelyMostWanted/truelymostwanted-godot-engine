@@ -211,7 +211,7 @@ TEST_CASE("[XML] Errors with line numbers") {
 	CHECK(xml->parse("<a/>\n<b/>") == ERR_PARSE_ERROR);
 	CHECK(xml->get_error_line() == 2);
 	CHECK(xml->parse("") == ERR_PARSE_ERROR);
-	CHECK(xml->get_data().is_empty());
+	CHECK(Dictionary(xml->get_data()).is_empty());
 
 	// Trailing whitespace after the root is not a second root.
 	CHECK(xml->parse("<a/>\n\n") == OK);
@@ -263,7 +263,7 @@ TEST_CASE("[INI] Stringify and parse again, typed and plain") {
 	CHECK(INI::parse_string(typed) == data);
 
 	Ref<SerializerOptions> plain = make_options();
-	plain->set_ini_plain_values(true);
+	plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	const String plain_text = INI::stringify(data, plain);
 	CHECK(plain_text.contains("mute=false"));
 	const Dictionary plain_data = INI::parse_string(plain_text);
@@ -294,13 +294,18 @@ TEST_CASE("[CSV] Parse with and without headers") {
 	headers->set_csv_headers(true);
 	Ref<CSV> csv;
 	csv.instantiate();
-	REQUIRE(csv->parse(text, headers) == OK);
-	const Array records = csv->get_data();
+	csv->set_options(headers);
+	REQUIRE(csv->parse(text) == OK);
+	CHECK(csv->get_header() == PackedStringArray({ "name", "note" }));
+	REQUIRE(csv->get_row_count() == 3);
+	CHECK(csv->get_cell(0, 1) == "a, b");
+	CHECK(csv->get_cell(1, 1) == "line\nbreak \"quoted\"");
+	CHECK(csv->get_row_as_dictionary(2)["name"] == "Cleo");
+	CHECK(csv->get_row_as_dictionary(2)["note"] == ""); // Missing cells are empty.
+
+	const Array records = CSV::parse_string(text, headers);
 	REQUIRE(records.size() == 3);
 	CHECK(Dictionary(records[0])["note"] == "a, b");
-	CHECK(Dictionary(records[1])["note"] == "line\nbreak \"quoted\"");
-	CHECK(Dictionary(records[2])["name"] == "Cleo");
-	CHECK(Dictionary(records[2])["note"] == ""); // Missing cells are empty.
 
 	Ref<SerializerOptions> rows_only = make_options();
 	rows_only->set_csv_headers(false);
@@ -349,9 +354,10 @@ TEST_CASE("[CSV] Errors with line numbers") {
 	headers->set_csv_headers(true);
 	Ref<CSV> csv;
 	csv.instantiate();
-	CHECK(csv->parse("a,b\n1,2\n3,\"open\n", headers) == ERR_PARSE_ERROR);
+	csv->set_options(headers);
+	CHECK(csv->parse("a,b\n1,2\n3,\"open\n") == ERR_PARSE_ERROR);
 	CHECK(csv->get_error_line() == 3);
-	CHECK(csv->parse("a,b\n1,2,3\n", headers) == ERR_PARSE_ERROR);
+	CHECK(csv->parse("a,b\n1,2,3\n") == ERR_PARSE_ERROR);
 	CHECK(csv->get_error_line() == 2);
 
 	Array mixed;
