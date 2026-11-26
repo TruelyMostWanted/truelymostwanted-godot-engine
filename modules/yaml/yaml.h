@@ -33,23 +33,29 @@
 #include "core/io/resource.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/io/serializer_options.h"
-#include "core/object/ref_counted.h"
+#include "core/io/text_data_format.h"
 #include "core/variant/variant.h"
 
 // Reads and writes the YAML 1.2 subset that maps to Variant (https://yaml.org/spec/1.2.2/), and any Resource
 // as YAML on top of the property mapping of ResourceTextSerializer (format FORMAT_YAML).
 // Not supported (rejected with an error): anchors and aliases, merge keys, tags other than !!str, !!int,
 // !!float, !!bool and !!null, complex keys and more than one document.
-class YAML : public RefCounted {
-	GDCLASS(YAML, RefCounted);
+// As a Resource (TextDataFormat), `data` is the tree of one document. Values are addressed by paths of keys
+// and array indices separated by "/" ("enemies/0/name"); in a key, "~" is written as "~0" and "/" as "~1"
+// (JSON Pointer, RFC 6901).
+class YAML : public TextDataFormat {
+	GDCLASS(YAML, TextDataFormat);
 
-	Variant data;
-	String error_message;
-	int error_line = 0;
-	int error_column = 0;
+	// Finds the container that holds the last part of the path. With p_create, missing dictionaries are created.
+	bool _resolve_parent(const Vector<String> &p_parts, bool p_create, Variant &r_parent) const;
+	static bool _get_child(const Variant &p_node, const String &p_part, Variant &r_child);
 
 protected:
 	static void _bind_methods();
+
+	virtual Error _parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) override;
+	virtual Error _encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const override;
+	virtual void _get_extensions(List<String> *r_extensions) const override;
 
 public:
 	// Parses a YAML document into a tree of Dictionary, Array, String, int, float, bool and null, in file order.
@@ -66,12 +72,14 @@ public:
 	// The parse function registered for ResourceTextSerializer::FORMAT_YAML.
 	static Error parse_format(const String &p_text, const String &p_type_hint, const ResourceTextSerializer::Options &p_options, Ref<Resource> &r_resource, String &r_error);
 
-	// Bound API.
-	Error parse(const String &p_text);
-	Variant get_data() const { return data; }
-	String get_error_message() const { return error_message; }
-	int get_error_line() const { return error_line; }
-	int get_error_column() const { return error_column; }
+	// Splits a path ("a/b~1c/0" -> ["a", "b/c", "0"]); an empty path is the whole document.
+	static Vector<String> split_path(const String &p_path);
+	static String escape_key(const String &p_key);
+
+	Variant get_value(const String &p_path, const Variant &p_default = Variant()) const;
+	void set_value(const String &p_path, const Variant &p_value);
+	bool has_value(const String &p_path) const;
+	void erase_value(const String &p_path);
 
 	static Variant parse_string(const String &p_text);
 	static String stringify(const Variant &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
