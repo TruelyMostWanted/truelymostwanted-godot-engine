@@ -52,5 +52,47 @@
 		<member name="force/mono" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], forces the imported audio to be mono if the source file is stereo. This decreases the file size by 50% by merging the two channels into one.
 		</member>
+		<member name="info/album" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.album] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/album_artist" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.album_artist] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/artist" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.artist] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/comment" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.comment] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/composer" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.composer] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/copyright" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.copyright] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/disc_count" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.disc_count] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/disc_number" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.disc_number] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/genre" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.genre] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/read_file_tags" type="bool" setter="" getter="" default="true">
+			If [code]false[/code], no track information is read from the audio file or saved in the imported resource, and the other [code]info/[/code] options are ignored. Overrides [member ProjectSettings.audio/info/read_file_tags] for this file.
+		</member>
+		<member name="info/title" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.title] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/track_count" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.track_count] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/track_number" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.track_number] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/year" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.year] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
 	</members>
 </class>

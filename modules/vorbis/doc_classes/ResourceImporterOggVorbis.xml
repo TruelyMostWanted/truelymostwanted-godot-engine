@@ -40,6 +40,48 @@
 			The tempo of the audio track, measured in beats per minute. This should match the BPM measure that was used to compose the track. This is only relevant for music that wishes to make use of interactive music functionality, not sound effects.
 			A more convenient editor for [member bpm] is provided in the [b]Advanced Import Settings[/b] dialog, as it lets you preview your changes without having to reimport the audio.
 		</member>
+		<member name="info/album" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.album] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/album_artist" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.album_artist] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/artist" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.artist] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/comment" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.comment] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/composer" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.composer] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/copyright" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.copyright] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/disc_count" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.disc_count] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/disc_number" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.disc_number] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/genre" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.genre] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/read_file_tags" type="bool" setter="" getter="" default="true">
+			If [code]false[/code], no track information is read from the audio file or saved in the imported resource, and the other [code]info/[/code] options are ignored. Overrides [member ProjectSettings.audio/info/read_file_tags] for this file.
+		</member>
+		<member name="info/title" type="String" setter="" getter="" default="&quot;&quot;">
+			Overrides [member AudioStream.title] of the imported stream. If empty, the value read from the file is kept.
+		</member>
+		<member name="info/track_count" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.track_count] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/track_number" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.track_number] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
+		<member name="info/year" type="int" setter="" getter="" default="0">
+			Overrides [member AudioStream.year] of the imported stream. If [code]0[/code], the value read from the file is kept.
+		</member>
 		<member name="loop" type="bool" setter="" getter="" default="false">
 			If enabled, the audio will begin playing either from the beginning or from [member loop_offset], after playback ends by either reaching the end of the audio or reaching the end of the last beat according to the amount specified in [member beat_count].
 			[b]Note:[/b] In [AudioStreamPlayer], the [signal AudioStreamPlayer.finished] signal won't be emitted for looping audio when it reaches the end of the audio file, as the audio will keep playing indefinitely.
