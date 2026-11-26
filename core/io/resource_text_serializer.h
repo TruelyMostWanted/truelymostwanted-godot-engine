@@ -37,6 +37,8 @@
 #include "core/templates/pair.h"
 #include "core/variant/dictionary.h"
 
+class TextDataFormat;
+
 // Maps any Resource to a tree of plain values (Dictionary, Array, String, numbers, booleans) and back,
 // based on the properties with PROPERTY_USAGE_STORAGE. The text formats JSON, INI and CSV are built on
 // this tree. Other formats (for example a TOML module) reuse encode_resource() and decode_resource().
@@ -159,6 +161,9 @@ public:
 	static String get_format_file_extension(Format p_format);
 	// FORMAT_MAX if the extension belongs to no format. Case-insensitive, a leading dot is ignored, "yml" is YAML.
 	static Format get_format_for_extension(const String &p_extension);
+	// A new TextDataFormat of `p_format` (INI, CSV, XML, TOML, YAML) with `p_options`; null for JSON (the JSON
+	// class is no TextDataFormat) and, with an error, for formats whose module is not in this build.
+	static Ref<TextDataFormat> create_data_format(Format p_format, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 
 	// Bound API.
 	Dictionary resource_to_dictionary(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>()) const;

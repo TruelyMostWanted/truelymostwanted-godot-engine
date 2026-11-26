@@ -231,6 +231,13 @@ struct GodotTestCaseListener : public doctest::IReporter {
 #endif // NAVIGATION_2D_DISABLED
 			ERR_PRINT_ON;
 
+			if (name.contains("[Audio]")) {
+				// [SceneTree][Audio]: audio nodes in a tree need the AudioServer too (dummy driver, freed in test_case_end).
+				AudioDriverManager::initialize(AudioDriverManager::get_driver_count() - 1);
+				AudioServer *audio_server = memnew(AudioServer);
+				audio_server->init();
+			}
+
 			memnew(InputMap);
 			InputMap::get_singleton()->load_default();
 
