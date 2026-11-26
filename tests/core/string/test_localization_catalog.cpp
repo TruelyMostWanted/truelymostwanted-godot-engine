@@ -223,6 +223,32 @@ TEST_CASE("[LocalizationCatalog] Resource catalog and translation_remaps") {
 	}
 }
 
+TEST_CASE("[LocalizationCatalog] Resource catalog resolves the expected type on demand") {
+	const String path = TestUtils::get_temp_path("localization_catalog_type").path_join("item.tres");
+	REQUIRE(DirAccess::make_dir_recursive_absolute(path.get_base_dir()) == OK);
+	if (FileAccess::exists(path)) {
+		DirAccess::remove_absolute(path);
+	}
+	Dictionary remaps;
+	remaps[path] = PackedStringArray({ "res://item_de.tres:de" });
+	Ref<ResourceLocalizationCatalog> catalog;
+	catalog.instantiate();
+	catalog->add_translation_remaps(remaps);
+	// No file yet: adding the remaps stored no type.
+	CHECK(catalog->get_expected_type(path) == StringName());
+	{
+		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("[gd_resource type=\"Gradient\" format=3]\n\n[resource]\n");
+	}
+	CHECK(catalog->get_expected_type(path) == "Gradient");
+	// A stored type wins.
+	catalog->set_expected_type(path, "Resource");
+	CHECK(catalog->get_expected_type(path) == "Resource");
+	CHECK(catalog->get_expected_type("res://unknown.tres") == StringName());
+	DirAccess::remove_absolute(path);
+}
+
 TEST_CASE("[LocalizationCatalog] List with priorities and wildcards") {
 	const String folder = TestUtils::get_temp_path("localization_catalog_list");
 	REQUIRE(DirAccess::make_dir_recursive_absolute(folder) == OK);

@@ -1337,17 +1337,19 @@ void ResourceLocalizationCatalog::set_expected_type(const StringName &p_key, con
 }
 
 StringName ResourceLocalizationCatalog::get_expected_type(const StringName &p_key) const {
-	return _get_row_extra(find_key(p_key));
+	const int row = find_key(p_key);
+	if (row < 0) {
+		return StringName();
+	}
+	// Without a stored type the key's file decides, resolved on demand: adding remaps opens no files.
+	const String type = _get_row_extra(row);
+	return type.is_empty() ? StringName(ResourceLoader::get_resource_type(p_key)) : StringName(type);
 }
 
 void ResourceLocalizationCatalog::add_translation_remaps(const Dictionary &p_remaps) {
 	for (const KeyValue<Variant, Variant> &kv : p_remaps) {
 		const String path = kv.key;
 		const int row = add_key(path);
-		const String type = ResourceLoader::get_resource_type(path);
-		if (!type.is_empty()) {
-			_set_row_extra(row, type);
-		}
 		const PackedStringArray remaps = kv.value;
 		for (const String &remap : remaps) {
 			// "res://texture_de.png:de": the locale follows the last colon.
