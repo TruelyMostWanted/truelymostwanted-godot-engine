@@ -71,4 +71,7 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="channel" type="StringName" setter="set_channel" getter="get_channel" overrides="LocalizationCatalog" default="&amp;&quot;&quot;" />
+	</members>
 </class>
