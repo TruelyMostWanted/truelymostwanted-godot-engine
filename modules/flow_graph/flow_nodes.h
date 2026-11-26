@@ -32,6 +32,8 @@
 
 #include "flow_graph.h"
 
+#include "core/math/expression.h"
+
 // Built-in node types. Their runtime behavior is implemented by FlowGraphPlayback.
 // Port names: flow input "in", flow output "out".
 
@@ -56,6 +58,7 @@ protected:
 	TypedArray<FlowPort> _create_input_ports() const override;
 	String _get_default_category() const override { return "Flow"; }
 	PackedStringArray _get_default_inline_properties() const override;
+	FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const override { return FlowGraphPlayback::ENTER_RESULT_END; }
 
 public:
 	void set_end_name(const StringName &p_name);
@@ -71,6 +74,7 @@ protected:
 	TypedArray<FlowPort> _create_input_ports() const override;
 	TypedArray<FlowPort> _create_output_ports() const override;
 	String _get_default_category() const override { return "Flow"; }
+	StringName _default_choose_exit(FlowGraphPlayback *p_playback) const override;
 };
 
 // Evaluates a Godot Expression. Every name in input_names is a data input; the data output "result" holds the value.
@@ -80,6 +84,7 @@ class FlowExpressionNode : public FlowNode {
 	String expression;
 	PackedStringArray input_names;
 	Variant::Type result_type = Variant::NIL;
+	mutable Ref<Expression> parsed; // Parsed once, dropped when expression or input_names change.
 
 protected:
 	static void _bind_methods();
@@ -88,6 +93,7 @@ protected:
 	String _get_default_category() const override { return "Data"; }
 	PackedStringArray _get_default_inline_properties() const override;
 	PackedStringArray _get_default_configuration_warnings() const override;
+	Variant _default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const override;
 
 public:
 	void set_expression(const String &p_expression);
@@ -122,6 +128,7 @@ class FlowGetVariableNode : public FlowVariableNode {
 protected:
 	static void _bind_methods() {}
 	TypedArray<FlowPort> _create_output_ports() const override;
+	Variant _default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const override;
 };
 
 // Writes the data input "value" into a variable of the blackboard.
@@ -132,6 +139,7 @@ protected:
 	static void _bind_methods() {}
 	TypedArray<FlowPort> _create_input_ports() const override;
 	TypedArray<FlowPort> _create_output_ports() const override;
+	FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const override;
 };
 
 // Emits an event with arguments through the playback (signal event_emitted).
@@ -148,6 +156,7 @@ protected:
 	String _get_default_category() const override { return "Events"; }
 	PackedStringArray _get_default_inline_properties() const override;
 	PackedStringArray _get_default_configuration_warnings() const override;
+	FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const override;
 
 public:
 	void set_event_name(const StringName &p_name);
@@ -156,11 +165,13 @@ public:
 	Array get_arguments() const { return arguments; }
 };
 
-// Runs another FlowGraph from its start node and continues when it ends.
+// Runs another FlowGraph from its start node and continues when it ends: through the output named like the
+// end_name of the inner end node if that name is in exit_names, else through "out".
 class FlowSubgraphNode : public FlowNode {
 	GDCLASS(FlowSubgraphNode, FlowNode);
 
 	Ref<FlowGraph> graph;
+	PackedStringArray exit_names;
 
 protected:
 	static void _bind_methods();
@@ -173,6 +184,8 @@ protected:
 public:
 	void set_graph(const Ref<FlowGraph> &p_graph);
 	Ref<FlowGraph> get_graph() const { return graph; }
+	void set_exit_names(const PackedStringArray &p_names);
+	PackedStringArray get_exit_names() const { return exit_names; }
 };
 
 // Waits a number of seconds before it continues.
@@ -187,6 +200,9 @@ protected:
 	TypedArray<FlowPort> _create_output_ports() const override;
 	String _get_default_category() const override { return "Flow"; }
 	PackedStringArray _get_default_inline_properties() const override;
+	FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const override;
+	bool _default_process_waiting(FlowGraphPlayback *p_playback, double p_delta) const override;
+	bool _has_default_process_waiting() const override { return true; }
 
 public:
 	void set_seconds(double p_seconds);

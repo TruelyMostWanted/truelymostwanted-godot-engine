@@ -1347,6 +1347,9 @@
 		<member name="filesystem/streaming_assets/target_folder" type="String" setter="" getter="" default="&quot;{exe_name}_Data/StreamingAssets&quot;">
 			The folder that holds the streaming assets in [code]Raw[/code] mode, relative to the folder of the executable (Windows, Linux) or to the bundle resources (macOS, iOS). Placeholders are expanded with [method StreamingAssetsServer.expand_template]: [code]{exe_name}[/code] is the base name of the exported executable, for example [code]MyGame[/code] for [code]MyGame.exe[/code]. Must be a relative folder without [code].[/code] or [code]..[/code].
 		</member>
+		<member name="flow_graph/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [FlowGraph] files in text formats ([code]mmd[/code] and the JSON, YAML and TOML formats of [ResourceTextSerializer]) are converted to binary [code]res[/code] files on export, so exported projects load them without parsing text. [code]tres[/code] files follow [member editor/export/convert_text_resources_to_binary].
+		</member>
 		<member name="gui/common/auto_focus_strategy" type="int" setter="" getter="" default="0">
 			Determines what strategy to use when inferring the top/left/right/bottom [Control] to focus if no neighbor is defined.
 			- [b]Legacy[/b] is the old focus strategy up until Godot 4.8. It shouldn't be used for new projects, as the new default (Balloon) yields more intuitive results.
