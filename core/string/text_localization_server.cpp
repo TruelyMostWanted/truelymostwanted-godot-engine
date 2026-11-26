@@ -31,7 +31,6 @@
 #include "text_localization_server.h"
 
 #include "core/object/class_db.h"
-#include "core/string/plural_rules.h"
 #include "core/string/text_insertion_server.h"
 #include "core/string/translation.h"
 #include "core/string/translation_domain.h"
@@ -69,54 +68,54 @@ public:
 
 TextLocalizationServer *TextLocalizationServer::singleton = nullptr;
 
-TextLocalizationServer::TextData::~TextData() {
-	for (PluralRules *rule : rules) {
-		if (rule) {
-			memdelete(rule);
-		}
-	}
-}
-
 LocalizationServer::Data *TextLocalizationServer::_create_data() const {
 	return memnew(TextData);
 }
 
-void TextLocalizationServer::_resolve(Data *p_data) const {
+void TextLocalizationServer::_resolve(Data *p_data, const Data *p_previous, const LocalVector<uint8_t> *p_dirty) const {
 	TextData *text_data = static_cast<TextData *>(p_data);
 	const KeyTable *table = text_data->keys;
-	const uint32_t row_count = table->keys.size();
-	text_data->texts.resize(row_count);
-	text_data->names.resize(row_count);
-	// The chain first (a `de_DE` text beats a `de` text), then the layers from the highest priority.
-	for (uint32_t chain_index = 0; chain_index < (uint32_t)text_data->chain.size(); chain_index++) {
-		const String &locale = text_data->chain[chain_index];
-		String rule;
-		for (uint32_t layer = table->layers.size(); layer-- > 0;) {
-			const LocalizationCatalog *catalog = table->layers[layer].ptr();
-			const int column_index = catalog->find_locale(locale);
-			const LocalizationCatalog::LocaleColumn *column = column_index < 0 ? nullptr : catalog->get_locale_column(column_index);
+	if (p_previous) {
+		const TextData *previous = static_cast<const TextData *>(p_previous);
+		text_data->texts = previous->texts;
+		text_data->plurals = previous->plurals;
+	} else {
+		text_data->texts.resize(table->keys.size());
+	}
+	text_data->names.resize(table->keys.size());
+	for (uint32_t channel = 0; channel < table->channels.size(); channel++) {
+		if (p_dirty && !(*p_dirty)[channel]) {
+			continue;
+		}
+		const LocalVector<uint32_t> &rows = table->channel_rows[channel];
+		if (p_previous) {
+			for (const uint32_t row : rows) {
+				text_data->texts[row] = String();
+				text_data->plurals.erase(row);
+			}
+		}
+		// The chain first (a `de_DE` text beats a `de` text), then the layers from the highest priority.
+		for (const Source &source : text_data->channels[channel].sources) {
+			const LocalizationCatalog::LocaleColumn *column = table->layers[source.layer]->get_locale_column(source.column);
 			if (!column) {
 				continue;
 			}
-			if (rule.is_empty()) {
-				rule = column->plural_rule;
-			}
-			for (uint32_t row = 0; row < row_count; row++) {
-				const int32_t catalog_row = table->get_catalog_row(layer, row);
+			const PluralRules *rule = nullptr;
+			for (const uint32_t row : rows) {
+				const int32_t catalog_row = table->get_catalog_row(source.layer, row);
 				if (catalog_row < 0 || !text_data->texts[row].is_empty() || column->cells.get_length(catalog_row) == 0) {
 					continue;
 				}
 				text_data->texts[row] = column->cells.get(catalog_row);
 				const Vector<String> *forms = column->plural_forms.getptr(catalog_row);
 				if (forms) {
-					text_data->plurals.insert(row, PluralEntry{ *forms, chain_index });
+					if (!rule) {
+						rule = LocalizationCatalog::get_plural_rules(column->plural_rule, column->locale);
+					}
+					text_data->plurals.insert(row, PluralEntry{ *forms, rule });
 				}
 			}
 		}
-		if (rule.is_empty() && TranslationServer::get_singleton()) {
-			rule = TranslationServer::get_singleton()->get_plural_rules(locale);
-		}
-		text_data->rules.push_back(PluralRules::parse(rule.is_empty() ? String("nplurals=2; plural=(n != 1);") : rule));
 	}
 }
 
@@ -125,9 +124,8 @@ void TextLocalizationServer::_data_published(const Data *p_data, const Data *p_p
 	if (!translation_server) {
 		return;
 	}
-	if (!p_data->locale.is_empty()) {
-		adapter->set_locale(p_data->locale);
-	}
+	// The main domain translates in the `interface` locale: the adapter's locale matches it with one string compare.
+	adapter->set_locale(translation_server->get_locale_for(SNAME("interface")));
 	// The adapter is only in the main domain while there are catalogs: no cost for projects without them.
 	const Ref<TranslationDomain> domain = translation_server->get_main_domain();
 	const bool needed = !p_data->keys->layers.is_empty();
@@ -144,35 +142,11 @@ String TextLocalizationServer::_get_text(const TextData *p_data, uint32_t p_row,
 	if (p_count >= 0) {
 		const PluralEntry *plural = p_data->plurals.getptr(p_row);
 		if (plural) {
-			const PluralRules *rules = p_data->rules[plural->rule];
-			const int form = rules ? rules->evaluate(p_count) : (p_count == 1 ? 0 : 1);
+			const int form = LocalizationCatalog::evaluate_plural_rules(plural->rule, p_count);
 			return plural->forms[CLAMP(form, 0, (int)plural->forms.size() - 1)];
 		}
 	}
 	return p_data->texts[p_row];
-}
-
-String TextLocalizationServer::_get_raw_text(const KeyTable *p_keys, const PackedStringArray &p_chain, uint32_t p_row, int p_count) const {
-	for (const String &locale : p_chain) {
-		for (uint32_t layer = p_keys->layers.size(); layer-- > 0;) {
-			const int32_t catalog_row = p_keys->get_catalog_row(layer, p_row);
-			if (catalog_row < 0) {
-				continue;
-			}
-			const TextLocalizationCatalog *catalog = static_cast<const TextLocalizationCatalog *>(p_keys->layers[layer].ptr());
-			const int column_index = catalog->find_locale(locale);
-			const LocalizationCatalog::LocaleColumn *column = column_index < 0 ? nullptr : catalog->get_locale_column(column_index);
-			if (!column || column->cells.get_length(catalog_row) == 0) {
-				continue;
-			}
-			const Vector<String> *forms = p_count >= 0 ? column->plural_forms.getptr(catalog_row) : nullptr;
-			if (forms) {
-				return (*forms)[CLAMP(catalog->get_plural_form(locale, p_count), 0, (int)forms->size() - 1)];
-			}
-			return column->cells.get(catalog_row);
-		}
-	}
-	return String();
 }
 
 String TextLocalizationServer::_finish(const TextData *p_data, int p_row, const StringName &p_key, int p_count, const Dictionary &p_args) const {
@@ -188,7 +162,8 @@ String TextLocalizationServer::_finish(const TextData *p_data, int p_row, const 
 			}
 		}
 		if (first) {
-			const_cast<TextLocalizationServer *>(this)->_emit_on_main_thread(SNAME("key_missing"), p_key, p_data->locale);
+			const String locale = p_row < 0 ? TranslationServer::get_singleton()->get_locale_for(SNAME("interface")) : p_data->channels[p_data->keys->row_channels[p_row]].locale;
+			const_cast<TextLocalizationServer *>(this)->_emit_on_main_thread(SNAME("key_missing"), p_key, locale);
 		}
 #endif
 		// Keys are often source texts: their placeholders are filled too.
@@ -224,13 +199,20 @@ String TextLocalizationServer::translate(const StringName &p_key, const StringNa
 
 String TextLocalizationServer::translate_for_locale(const String &p_locale, const StringName &p_key, const StringName &p_context, int p_count, const Dictionary &p_args) const {
 	const TextData *text_data = _get_text_data();
+	const int row = text_data->keys->find(p_key, p_context);
 	const PackedStringArray chain = get_locale_chain(p_locale);
-	if (!chain.is_empty() && chain[0] == text_data->locale) {
+	if (row >= 0 && !chain.is_empty() && chain[0] == text_data->channels[text_data->keys->row_channels[row]].locale) {
 		return translate(p_key, p_context, p_count, p_args);
 	}
-	const int row = text_data->keys->find(p_key, p_context);
-	const String text = row < 0 ? String() : _get_raw_text(text_data->keys, chain, row, p_count);
-	const String result = text.is_empty() ? String(p_key) : text;
+	String text;
+	Vector<String> forms;
+	String locale;
+	const int layer = row < 0 ? -1 : _read_row(text_data->keys, chain, row, text, p_count >= 0 ? &forms : nullptr, &locale);
+	if (layer >= 0 && !forms.is_empty()) {
+		const TextLocalizationCatalog *catalog = static_cast<const TextLocalizationCatalog *>(text_data->keys->layers[layer].ptr());
+		text = forms[CLAMP(catalog->get_plural_form(locale, p_count), 0, (int)forms.size() - 1)];
+	}
+	const String result = layer < 0 ? String(p_key) : text;
 	return p_args.is_empty() ? result : TextInsertionServer::get_singleton()->insert(result, p_args);
 }
 
@@ -265,25 +247,6 @@ PackedStringArray TextLocalizationServer::get_translation_keys(const String &p_t
 	return result;
 }
 
-StringName TextLocalizationServer::get_translation_key(const String &p_text) const {
-	const PackedStringArray found = get_translation_keys(p_text);
-	return found.is_empty() ? StringName() : StringName(found[0]);
-}
-
-StringName TextLocalizationServer::get_translation_key_for_locale(const String &p_locale, const String &p_text) const {
-	const TextData *text_data = _get_text_data();
-	const PackedStringArray chain = get_locale_chain(p_locale);
-	if (!chain.is_empty() && chain[0] == text_data->locale) {
-		return get_translation_key(p_text);
-	}
-	for (uint32_t row = 0; row < text_data->keys->keys.size(); row++) {
-		if (_get_raw_text(text_data->keys, chain, row, -1) == p_text) {
-			return text_data->keys->keys[row].key;
-		}
-	}
-	return StringName();
-}
-
 bool TextLocalizationServer::has_translation(const StringName &p_key, const StringName &p_context) const {
 	const TextData *text_data = _get_text_data();
 	const int row = text_data->keys->find(p_key, p_context);
@@ -292,18 +255,18 @@ bool TextLocalizationServer::has_translation(const StringName &p_key, const Stri
 
 PackedStringArray TextLocalizationServer::get_missing_keys(const String &p_locale) const {
 	const TextData *text_data = _get_text_data();
-	const PackedStringArray full_chain = get_locale_chain(p_locale.is_empty() ? text_data->locale : p_locale);
-	// Only the locale and its parents: a key that shows the fallback locale is missing.
-	PackedStringArray chain;
-	for (const String &locale : full_chain) {
-		if (locale == full_chain[0] || full_chain[0].begins_with(locale + "_")) {
-			chain.push_back(locale);
-		}
+	const KeyTable *table = text_data->keys;
+	// Only the locale and its parents: a key that shows another locale is missing. Without a locale, the locale of
+	// each key's channel.
+	LocalVector<PackedStringArray> chains;
+	for (const Channel &channel : text_data->channels) {
+		chains.push_back(build_locale_chain(p_locale.is_empty() ? channel.locale : p_locale, PackedStringArray(), false));
 	}
 	PackedStringArray missing;
-	for (uint32_t row = 0; row < text_data->keys->keys.size(); row++) {
-		if (_get_raw_text(text_data->keys, chain, row, -1).is_empty()) {
-			missing.push_back(text_data->keys->keys[row].key);
+	String text;
+	for (uint32_t row = 0; row < table->keys.size(); row++) {
+		if (_read_row(table, chains[table->row_channels[row]], row, text) < 0) {
+			missing.push_back(table->keys[row].key);
 		}
 	}
 	return missing;
@@ -347,8 +310,6 @@ void TextLocalizationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("translate_for_locale", "locale", "key", "context", "count", "args"), &TextLocalizationServer::translate_for_locale, DEFVAL(StringName()), DEFVAL(-1), DEFVAL(Dictionary()));
 	ClassDB::bind_method(D_METHOD("get_key_id", "key", "context"), &TextLocalizationServer::get_key_id, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("translate_id", "id", "count", "args"), &TextLocalizationServer::translate_id, DEFVAL(-1), DEFVAL(Dictionary()));
-	ClassDB::bind_method(D_METHOD("get_translation_key", "text"), &TextLocalizationServer::get_translation_key);
-	ClassDB::bind_method(D_METHOD("get_translation_key_for_locale", "locale", "text"), &TextLocalizationServer::get_translation_key_for_locale);
 	ClassDB::bind_method(D_METHOD("get_translation_keys", "text"), &TextLocalizationServer::get_translation_keys);
 	ClassDB::bind_method(D_METHOD("has_translation", "key", "context"), &TextLocalizationServer::has_translation, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("get_missing_keys", "locale"), &TextLocalizationServer::get_missing_keys, DEFVAL(String()));

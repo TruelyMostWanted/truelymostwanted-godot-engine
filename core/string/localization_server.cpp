@@ -31,26 +31,15 @@
 #include "localization_server.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/files_manifest.h"
+#include "core/io/files_manifest_server.h"
+#include "core/io/pck_package_server.h"
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
 #include "core/string/translation_server.h"
-
-// Flagged as translation-remapped: TranslationServer::set_locale() calls reload_from_file() on it before the scene
-// tree is notified, so a locale change from anywhere (scripts, editor, command line) reaches the server first.
-class LocalizationLocaleHook : public Resource {
-	GDSOFTCLASS(LocalizationLocaleHook, Resource);
-
-public:
-	LocalizationServer *server = nullptr;
-
-	virtual void reload_from_file() override {
-		if (server) {
-			server->update_locale();
-		}
-	}
-};
+#include "core/templates/hash_set.h"
 
 // All live servers (created and freed on the main thread), for get_all_available_locales().
 static LocalVector<LocalizationServer *> live_servers;
@@ -71,32 +60,52 @@ static void _append_with_parents(const String &p_locale, PackedStringArray &r_ch
 	}
 }
 
+// A copy of a catalog manifest for listing its files. Its type hint names the catalog kind and is not used as a
+// filter (text formats have no resource type before they are loaded); without extensions, the catalog formats.
+static Ref<FilesManifest> _get_catalog_files(const Ref<FilesManifest> &p_manifest) {
+	Ref<FilesManifest> files = p_manifest->duplicate();
+	files->set_type_hint(StringName());
+	if (files->get_extensions().is_empty()) {
+		PackedStringArray extensions = LocalizationCatalog::get_file_extensions();
+		extensions.append_array({ "tres", "res" });
+		files->set_extensions(extensions);
+	}
+	return files;
+}
+
 void LocalizationServer::register_settings() {
-	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_CATALOGS, PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:%s", Variant::STRING, PROPERTY_HINT_FILE, "*.lcat,*.tres,*.res,*.json,*.csv,*.xml,*.ini,*.toml,*.yaml")), PackedStringArray());
-	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_EXTERNAL_CATALOGS), PackedStringArray());
-	GLOBAL_DEF(SETTING_EXTERNAL_CATALOGS_PRIORITY, 100);
+	GLOBAL_DEF(PropertyInfo(Variant::ARRAY, SETTING_CATALOG_MANIFESTS, PROPERTY_HINT_ARRAY_TYPE, "FilesManifest"), Array());
 }
 
-void LocalizationServer::set_locale(const String &p_locale) {
-	ERR_FAIL_NULL(TranslationServer::get_singleton());
-	TranslationServer::get_singleton()->set_locale(p_locale);
-}
-
-String LocalizationServer::get_locale() {
-	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	return translation_server ? translation_server->get_locale() : String();
-}
-
-String LocalizationServer::get_fallback_locale() {
-	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	return translation_server ? translation_server->get_fallback_locale() : String();
-}
-
-PackedStringArray LocalizationServer::get_locale_chain(const String &p_locale) {
+PackedStringArray LocalizationServer::build_locale_chain(const String &p_locale, const PackedStringArray &p_available, bool p_fallback) {
 	PackedStringArray chain;
-	_append_with_parents(_standardize_locale(p_locale), chain);
-	_append_with_parents(_standardize_locale(get_fallback_locale()), chain);
+	const String locale = _standardize_locale(p_locale);
+	_append_with_parents(locale, chain);
+	const TranslationServer *translation_server = TranslationServer::get_singleton();
+	if (!translation_server) {
+		return chain;
+	}
+	// The closest other locale, like Godot's resource remaps: `de_DE` takes `de_AT` if there is no `de`.
+	String closest;
+	int closest_score = 0;
+	for (const String &available : p_available) {
+		const int score = chain.has(available) ? 0 : translation_server->compare_locales(locale, available);
+		if (score > closest_score) {
+			closest_score = score;
+			closest = available;
+		}
+	}
+	if (!closest.is_empty()) {
+		chain.push_back(closest);
+	}
+	if (p_fallback) {
+		_append_with_parents(_standardize_locale(translation_server->get_fallback_locale()), chain);
+	}
 	return chain;
+}
+
+PackedStringArray LocalizationServer::get_locale_chain(const String &p_locale) const {
+	return build_locale_chain(p_locale, _get_data()->keys->locales);
 }
 
 void LocalizationServer::_add_layer(const Ref<LocalizationCatalog> &p_catalog, int p_priority) {
@@ -119,18 +128,41 @@ bool LocalizationServer::_remove_layer(const Ref<LocalizationCatalog> &p_catalog
 	return false;
 }
 
+bool LocalizationServer::_takes_manifest(const Ref<FilesManifest> &p_manifest) const {
+	// The type hint names the catalog kind; without one, a manifest lists text catalogs.
+	const StringName kind = p_manifest->get_type_hint().is_empty() ? StringName("TextLocalizationCatalog") : p_manifest->get_type_hint();
+	return kind == _get_catalog_class();
+}
+
 Ref<LocalizationCatalog> LocalizationServer::_load_catalog(const String &p_path) const {
 	const String extension = p_path.get_extension().to_lower();
-	if (extension == LocalizationCatalog::BINARY_EXTENSION || extension == "tres" || extension == "res") {
+	if (extension == LocalizationCatalog::BINARY_EXTENSION || !LocalizationCatalog::get_file_extensions().has(extension)) {
+		// `.lcat`, `.tres`, `.res` name their kind: skip catalogs of the other server and other resources unloaded.
 		if (!ClassDB::is_parent_class(ResourceLoader::get_resource_type(p_path), _get_catalog_class())) {
-			return Ref<LocalizationCatalog>(); // A catalog of another server.
+			return Ref<LocalizationCatalog>();
 		}
-		return ResourceLoader::load(p_path);
 	}
-	// Text formats (JSON, CSV, XML, INI, TOML, YAML) don't name their kind: they are read as this server's class.
-	Ref<LocalizationCatalog> catalog = Object::cast_to<LocalizationCatalog>(ClassDB::instantiate(_get_catalog_class()));
-	ERR_FAIL_COND_V(catalog.is_null(), Ref<LocalizationCatalog>());
-	return catalog->load_from_file(p_path) == OK ? catalog : Ref<LocalizationCatalog>();
+	// Text formats are read as the class of the type hint, through ResourceLoader: cached under their path, so a
+	// catalog loaded twice is the same layer. A `.csv` imported as Translation is not a catalog: it is cached as
+	// a Translation under the same path, fails the cast below and is skipped (import it as "Keep File").
+	const Ref<LocalizationCatalog> catalog = ResourceLoader::load(p_path, _get_catalog_class());
+	return catalog.is_valid() && catalog->is_class(_get_catalog_class()) ? catalog : Ref<LocalizationCatalog>();
+}
+
+int LocalizationServer::_add_catalog_paths(const PackedStringArray &p_paths, int p_priority, bool p_project) {
+	int added = 0;
+	for (const String &path : p_paths) {
+		const Ref<LocalizationCatalog> catalog = _load_catalog(path);
+		if (catalog.is_valid()) {
+			_remove_layer(catalog);
+			_add_layer(catalog, p_priority);
+			if (p_project) {
+				project_catalogs.push_back(catalog);
+			}
+			added++;
+		}
+	}
+	return added;
 }
 
 void LocalizationServer::_on_catalog_changed() {
@@ -158,12 +190,55 @@ void LocalizationServer::_free_retired() {
 	free_queued = false;
 }
 
-void LocalizationServer::_rebuild(bool p_keys) {
-	Data *new_data = _create_data();
-	new_data->locale = get_locale();
-	new_data->chain = new_data->locale.is_empty() ? PackedStringArray() : get_locale_chain(new_data->locale);
+void LocalizationServer::_connect_translation_server() {
+	// TranslationServer is created after the localization servers: connected on the first rebuild that sees it.
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	const Callable on_locale_changed = callable_mp(this, &LocalizationServer::_on_locale_changed);
+	if (translation_server && !translation_server->is_connected(SNAME("locale_changed"), on_locale_changed)) {
+		translation_server->connect(SNAME("locale_changed"), on_locale_changed);
+		translation_server->connect(SNAME("fallback_locale_changed"), callable_mp(this, &LocalizationServer::_on_fallback_locale_changed));
+	}
+}
 
+void LocalizationServer::_on_locale_changed(const StringName &p_channel, const String &p_locale, const String &p_previous_locale) {
+	_update_locales(false);
+}
+
+void LocalizationServer::_on_fallback_locale_changed(const String &p_locale) {
+	_update_locales(true);
+}
+
+void LocalizationServer::_update_locales(bool p_all) {
+	if (!Thread::is_main_thread()) {
+		callable_mp(this, &LocalizationServer::_update_locales).call_deferred(p_all);
+		return;
+	}
+	const Data *current = _get_data();
+	const TranslationServer *translation_server = TranslationServer::get_singleton();
+	if (!current || !translation_server || p_all) {
+		_rebuild(false);
+		return;
+	}
+	// Only the channels whose locale changed: a general change reaches every channel without its own locale.
+	LocalVector<uint8_t> dirty;
+	dirty.resize_initialized(keys->channels.size());
+	bool changed = false;
+	for (uint32_t channel = 0; channel < keys->channels.size(); channel++) {
+		if (translation_server->get_locale_for(keys->channels[channel]) != current->channels[channel].locale) {
+			dirty[channel] = 1;
+			changed = true;
+		}
+	}
+	if (changed) {
+		_rebuild(false, &dirty);
+	}
+}
+
+void LocalizationServer::_rebuild(bool p_keys, const LocalVector<uint8_t> *p_dirty) {
+	_connect_translation_server();
+	const Data *previous_data = _get_data();
 	if (p_keys || !keys) {
+		p_dirty = nullptr;
 		KeyTable *table = memnew(KeyTable);
 		if (keys) {
 			table->index = keys->index;
@@ -174,6 +249,11 @@ void LocalizationServer::_rebuild(bool p_keys) {
 		LocalVector<uint32_t> found;
 		for (const Layer &layer : layers) {
 			table->layers.push_back(layer.catalog);
+			for (const String &locale : layer.catalog->get_locales()) {
+				if (!table->locales.has(locale)) {
+					table->locales.push_back(locale);
+				}
+			}
 			const LocalizationCatalog::Cells &ids = layer.catalog->get_id_cells();
 			for (uint32_t catalog_row = 0; catalog_row < ids.size(); catalog_row++) {
 				const String id = ids.get(catalog_row);
@@ -201,10 +281,54 @@ void LocalizationServer::_rebuild(bool p_keys) {
 				table->catalog_rows[layer * row_count + found[position++]] = catalog_row;
 			}
 		}
+		// A key follows the channel of the highest-priority catalog that has it.
+		table->row_channels.resize(row_count);
+		for (uint32_t row = 0; row < row_count; row++) {
+			StringName channel = SNAME("interface"); // Rows of removed catalogs.
+			for (uint32_t layer = table->layers.size(); layer-- > 0;) {
+				const int32_t catalog_row = table->get_catalog_row(layer, row);
+				if (catalog_row >= 0) {
+					channel = table->layers[layer]->get_row_channel(catalog_row);
+					break;
+				}
+			}
+			int64_t channel_index = table->channels.find(channel);
+			if (channel_index < 0) {
+				channel_index = table->channels.size();
+				table->channels.push_back(channel);
+				table->channel_rows.resize(table->channels.size());
+			}
+			table->row_channels[row] = (uint32_t)channel_index;
+			table->channel_rows[channel_index].push_back(row);
+		}
 		keys = table;
 	}
+
+	Data *new_data = _create_data();
 	new_data->keys = keys;
-	_resolve(new_data);
+	new_data->channels.resize(keys->channels.size());
+	const TranslationServer *translation_server = TranslationServer::get_singleton();
+	for (uint32_t channel_index = 0; channel_index < keys->channels.size(); channel_index++) {
+		Channel &channel = new_data->channels[channel_index];
+		if (p_dirty && !(*p_dirty)[channel_index]) {
+			const Channel &previous = previous_data->channels[channel_index];
+			channel.locale = previous.locale;
+			channel.chain = previous.chain;
+			channel.sources = previous.sources;
+			continue;
+		}
+		channel.locale = translation_server ? translation_server->get_locale_for(keys->channels[channel_index]) : String();
+		channel.chain = channel.locale.is_empty() ? PackedStringArray() : build_locale_chain(channel.locale, keys->locales);
+		for (const String &locale : channel.chain) {
+			for (uint32_t layer = keys->layers.size(); layer-- > 0;) {
+				const int column = keys->layers[layer]->find_locale(locale);
+				if (column >= 0) {
+					channel.sources.push_back(Source{ layer, column });
+				}
+			}
+		}
+	}
+	_resolve(new_data, p_dirty ? previous_data : nullptr, p_dirty);
 
 	Data *old_data = data.exchange(new_data, std::memory_order_acq_rel);
 	if (old_data) {
@@ -217,50 +341,50 @@ void LocalizationServer::_rebuild(bool p_keys) {
 	}
 	_data_published(new_data, old_data);
 
-	// On-demand locales: unload file-backed columns outside of the chain, report the newly loaded locales.
+	// On-demand locales: unload file-backed columns no chain reads, report the newly loaded locales.
+	HashSet<uint64_t> used;
+	for (const Channel &channel : new_data->channels) {
+		for (const Source &source : channel.sources) {
+			used.insert(((uint64_t)source.layer << 32) | (uint32_t)source.column);
+		}
+	}
 	PackedStringArray present;
-	for (const Ref<LocalizationCatalog> &catalog : keys->layers) {
-		for (const String &locale : catalog->get_locales()) {
-			if (new_data->chain.has(locale)) {
-				if (!present.has(locale)) {
-					present.push_back(locale);
+	for (uint32_t layer = 0; layer < keys->layers.size(); layer++) {
+		const Ref<LocalizationCatalog> &catalog = keys->layers[layer];
+		const PackedStringArray locales = catalog->get_locales();
+		for (int column = 0; column < locales.size(); column++) {
+			if (used.has(((uint64_t)layer << 32) | (uint32_t)column)) {
+				if (!present.has(locales[column])) {
+					present.push_back(locales[column]);
 				}
-			} else if (catalog->is_locale_loaded(locale)) {
-				const LocalizationCatalog::LocaleColumn *column = catalog->get_locale_column(catalog->find_locale(locale));
-				if (column && column->block_offset != 0) {
-					catalog->unload_locale(locale);
-				}
+			} else if (catalog->is_locale_loaded(locales[column]) && catalog->get_locale_column(column)->block_offset != 0) {
+				catalog->unload_locale(locales[column]);
 			}
 		}
 	}
-	const PackedStringArray previous = chain_locales;
+	const PackedStringArray previous_locales = chain_locales;
 	chain_locales = present;
 	for (const String &locale : present) {
-		if (!previous.has(locale)) {
+		if (!previous_locales.has(locale)) {
 			_emit_on_main_thread(SNAME("locale_loaded"), locale);
 		}
 	}
 }
 
-void LocalizationServer::update_locale() {
-	if (!Thread::is_main_thread()) {
-		callable_mp(this, &LocalizationServer::update_locale).call_deferred();
-		return;
+int LocalizationServer::_read_row(const KeyTable *p_keys, const PackedStringArray &p_chain, uint32_t p_row, String &r_text, Vector<String> *r_forms, String *r_locale) const {
+	for (const String &locale : p_chain) {
+		for (uint32_t layer = p_keys->layers.size(); layer-- > 0;) {
+			const int32_t catalog_row = p_keys->get_catalog_row(layer, p_row);
+			const LocalizationCatalog *catalog = p_keys->layers[layer].ptr();
+			if (catalog_row >= 0 && catalog->read_cell(catalog->find_locale(locale), catalog_row, r_text, r_forms)) {
+				if (r_locale) {
+					*r_locale = locale;
+				}
+				return (int)layer;
+			}
+		}
 	}
-	const String previous_locale = _get_data() ? _get_data()->locale : String();
-	const String locale = get_locale();
-	if (locale == previous_locale) {
-		return;
-	}
-	_rebuild(false);
-	emit_signal(SNAME("locale_changed"), locale, previous_locale);
-}
-
-void LocalizationServer::restore_locale_hooks() {
-	for (LocalizationServer *server : live_servers) {
-		server->locale_hook->set_as_translation_remapped(true);
-		server->update_locale();
-	}
+	return -1;
 }
 
 void LocalizationServer::add_catalog(const Ref<LocalizationCatalog> &p_catalog, int p_priority) {
@@ -310,23 +434,15 @@ void LocalizationServer::clear_catalogs() {
 	while (!layers.is_empty()) {
 		_remove_layer(layers[layers.size() - 1].catalog);
 	}
+	project_catalogs.clear();
 	_catalogs_changed();
 }
 
-int LocalizationServer::add_catalog_list(const Ref<LocalizationCatalogList> &p_list) {
-	ERR_FAIL_COND_V(p_list.is_null(), 0);
-	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), 0, "Catalog lists can only be added on the main thread.");
-	int added = 0;
-	for (int entry = 0; entry < p_list->get_entry_count(); entry++) {
-		for (const String &path : p_list->get_entry_catalog_paths(entry)) {
-			const Ref<LocalizationCatalog> catalog = _load_catalog(path);
-			if (catalog.is_valid()) {
-				_remove_layer(catalog);
-				_add_layer(catalog, p_list->get_entry_priority(entry));
-				added++;
-			}
-		}
-	}
+int LocalizationServer::add_catalog_manifest(const Ref<FilesManifest> &p_manifest, int p_priority) {
+	ERR_FAIL_COND_V(p_manifest.is_null(), 0);
+	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), 0, "Catalog manifests can only be added on the main thread.");
+	ERR_FAIL_COND_V_MSG(!_takes_manifest(p_manifest), 0, vformat("The manifest's type_hint \"%s\" is not %s.", p_manifest->get_type_hint(), _get_catalog_class()));
+	const int added = _add_catalog_paths(_get_catalog_files(p_manifest)->get_paths(), p_priority, false);
 	if (added > 0) {
 		_catalogs_changed();
 	}
@@ -334,40 +450,81 @@ int LocalizationServer::add_catalog_list(const Ref<LocalizationCatalogList> &p_l
 }
 
 int LocalizationServer::load_project_catalogs() {
+	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), 0, "Project catalogs can only be loaded on the main thread.");
+	for (const Ref<LocalizationCatalog> &catalog : project_catalogs) {
+		_remove_layer(catalog);
+	}
+	project_catalogs.clear();
+	int added = 0;
 	const Ref<LocalizationCatalog> project_catalog = _get_project_catalog();
 	if (project_catalog.is_valid()) {
 		_remove_layer(project_catalog);
 		_add_layer(project_catalog, 0);
+		project_catalogs.push_back(project_catalog);
+		added++;
 	}
-	Ref<LocalizationCatalogList> list;
-	list.instantiate();
-	for (const String &path : PackedStringArray(GLOBAL_GET(_get_catalogs_setting()))) {
-		list->add_entry(path, 0);
+
+	// The manifests in list order: a later manifest wins over an earlier one. Registered in FilesManifestServer,
+	// so its file signals (watching) and mounted or unmounted packs reload the catalogs.
+	FilesManifestServer *manifest_server = FilesManifestServer::get_singleton();
+	const Array manifests = GLOBAL_GET(SETTING_CATALOG_MANIFESTS);
+	manifest_names.clear();
+	for (int i = 0; i < manifests.size(); i++) {
+		const Ref<FilesManifest> manifest = manifests[i];
+		if (manifest.is_null() || !_takes_manifest(manifest)) {
+			continue;
+		}
+		const Ref<FilesManifest> files = _get_catalog_files(manifest);
+		const String name = vformat("localization_catalogs_%d", i);
+		manifest_names.push_back(name);
+		PackedStringArray paths;
+		if (manifest_server) {
+			if (manifest_server->has_manifest(name)) {
+				manifest_server->refresh(name);
+			} else {
+				manifest_server->register_manifest(name, files);
+			}
+			paths = manifest_server->get_file_paths(name);
+		} else {
+			paths = files->get_paths();
+		}
+		added += _add_catalog_paths(paths, 0, true);
 	}
-	const int external_priority = GLOBAL_GET(SETTING_EXTERNAL_CATALOGS_PRIORITY);
-	for (const String &path : PackedStringArray(GLOBAL_GET(_get_external_catalogs_setting()))) {
-		list->add_entry(path, external_priority);
+
+	if (manifest_server && !manifest_server->is_connected(SNAME("file_added"), callable_mp(this, &LocalizationServer::_on_manifest_file))) {
+		manifest_server->connect(SNAME("file_added"), callable_mp(this, &LocalizationServer::_on_manifest_file));
+		manifest_server->connect(SNAME("file_removed"), callable_mp(this, &LocalizationServer::_on_manifest_file));
 	}
-	const int added = add_catalog_list(list);
-	if (project_catalog.is_null()) {
-		return added;
+	PCKPackageServer *pack_server = PCKPackageServer::get_singleton();
+	if (pack_server && !pack_server->is_connected(SNAME("pack_unmounted"), callable_mp(this, &LocalizationServer::_on_pack))) {
+		pack_server->connect(SNAME("pack_mounted"), callable_mp(this, &LocalizationServer::_on_pack));
+		pack_server->connect(SNAME("pack_unmounted"), callable_mp(this, &LocalizationServer::_on_pack));
 	}
-	if (added == 0) {
-		_catalogs_changed();
+	_catalogs_changed();
+	return added;
+}
+
+void LocalizationServer::_on_manifest_file(const String &p_name, const String &p_path) {
+	if (manifest_names.has(p_name)) {
+		_on_pack(p_path);
 	}
-	return added + 1;
+}
+
+void LocalizationServer::_on_pack(const String &p_path) {
+	// Several files or packs at once: one reload.
+	if (!reload_queued) {
+		reload_queued = true;
+		callable_mp(this, &LocalizationServer::_reload_project_catalogs).call_deferred();
+	}
+}
+
+void LocalizationServer::_reload_project_catalogs() {
+	reload_queued = false;
+	load_project_catalogs();
 }
 
 PackedStringArray LocalizationServer::get_available_locales() const {
-	PackedStringArray locales;
-	for (const Layer &layer : layers) {
-		for (const String &locale : layer.catalog->get_locales()) {
-			if (!locales.has(locale)) {
-				locales.push_back(locale);
-			}
-		}
-	}
-	return locales;
+	return _get_data()->keys->locales;
 }
 
 PackedStringArray LocalizationServer::get_all_available_locales() {
@@ -389,37 +546,27 @@ int LocalizationServer::get_key_count() const {
 }
 
 void LocalizationServer::_bind_methods() {
-	ClassDB::bind_static_method("LocalizationServer", D_METHOD("set_locale", "locale"), &LocalizationServer::set_locale);
-	ClassDB::bind_static_method("LocalizationServer", D_METHOD("get_locale"), &LocalizationServer::get_locale);
-	ClassDB::bind_static_method("LocalizationServer", D_METHOD("get_fallback_locale"), &LocalizationServer::get_fallback_locale);
-	ClassDB::bind_static_method("LocalizationServer", D_METHOD("get_locale_chain", "locale"), &LocalizationServer::get_locale_chain);
-
+	ClassDB::bind_method(D_METHOD("get_locale_chain", "locale"), &LocalizationServer::get_locale_chain);
 	ClassDB::bind_method(D_METHOD("add_catalog", "catalog", "priority"), &LocalizationServer::add_catalog, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("remove_catalog", "catalog"), &LocalizationServer::remove_catalog);
 	ClassDB::bind_method(D_METHOD("has_catalog", "catalog"), &LocalizationServer::has_catalog);
 	ClassDB::bind_method(D_METHOD("get_catalogs"), &LocalizationServer::get_catalogs);
 	ClassDB::bind_method(D_METHOD("clear_catalogs"), &LocalizationServer::clear_catalogs);
-	ClassDB::bind_method(D_METHOD("add_catalog_list", "list"), &LocalizationServer::add_catalog_list);
+	ClassDB::bind_method(D_METHOD("add_catalog_manifest", "manifest", "priority"), &LocalizationServer::add_catalog_manifest, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("load_project_catalogs"), &LocalizationServer::load_project_catalogs);
 	ClassDB::bind_method(D_METHOD("get_available_locales"), &LocalizationServer::get_available_locales);
 	ClassDB::bind_method(D_METHOD("get_key_count"), &LocalizationServer::get_key_count);
 
-	ADD_SIGNAL(MethodInfo("locale_changed", PropertyInfo(Variant::STRING, "locale"), PropertyInfo(Variant::STRING, "previous_locale")));
 	ADD_SIGNAL(MethodInfo("locale_loaded", PropertyInfo(Variant::STRING, "locale")));
 	ADD_SIGNAL(MethodInfo("catalogs_changed"));
 }
 
 LocalizationServer::LocalizationServer() {
-	locale_hook.instantiate();
-	locale_hook->server = this;
-	locale_hook->set_as_translation_remapped(true);
 	live_servers.push_back(this);
 }
 
 LocalizationServer::~LocalizationServer() {
 	live_servers.erase(this);
-	locale_hook->server = nullptr;
-	locale_hook->set_as_translation_remapped(false);
 	_free_retired();
 	Data *current = data.exchange(nullptr);
 	if (current) {

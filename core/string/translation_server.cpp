@@ -486,8 +486,10 @@ void TranslationServer::set_locale(const String &p_locale) {
 		return;
 	}
 
+	const String previous_locale = locale;
 	locale = new_locale;
 	ResourceLoader::reload_translation_remaps();
+	emit_signal(SNAME("locale_changed"), StringName(), locale, previous_locale);
 
 	if (OS::get_singleton()->get_main_loop()) {
 		OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_TRANSLATION_CHANGED);
@@ -498,8 +500,63 @@ String TranslationServer::get_locale() const {
 	return locale;
 }
 
+void TranslationServer::_set_channel_locale(const StringName &p_channel, const String &p_locale) {
+	const String previous_locale = get_locale_for(p_channel);
+	if (p_locale.is_empty()) {
+		channel_locales.erase(p_channel);
+	} else {
+		channel_locales[p_channel] = p_locale;
+	}
+	const bool is_interface = p_channel == SNAME("interface");
+	if (is_interface) {
+		// The main domain answers tr() and the controls; their shaping language follows its override too.
+		main_domain->set_locale_override(p_locale);
+	}
+	const String current_locale = get_locale_for(p_channel);
+	if (current_locale == previous_locale) {
+		return;
+	}
+	emit_signal(SNAME("locale_changed"), p_channel, current_locale, previous_locale);
+	if (is_interface && OS::get_singleton()->get_main_loop()) {
+		OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_TRANSLATION_CHANGED);
+	}
+}
+
+void TranslationServer::set_locale_for(const StringName &p_channel, const String &p_locale) {
+	if (p_channel == StringName()) {
+		set_locale(p_locale);
+		return;
+	}
+	ERR_FAIL_COND_MSG(p_locale.is_empty(), "Locale cannot be an empty string. Use clear_locale_for() to let the channel follow the general locale.");
+	_set_channel_locale(p_channel, standardize_locale(p_locale));
+}
+
+String TranslationServer::get_locale_for(const StringName &p_channel) const {
+	const String *channel_locale = channel_locales.getptr(p_channel);
+	return channel_locale ? *channel_locale : locale;
+}
+
+void TranslationServer::clear_locale_for(const StringName &p_channel) {
+	ERR_FAIL_COND_MSG(p_channel == StringName(), "The general locale can't be cleared.");
+	_set_channel_locale(p_channel, String());
+}
+
+PackedStringArray TranslationServer::get_locale_channels() const {
+	PackedStringArray channels({ "interface", "audio", "subtitles" });
+	for (const KeyValue<StringName, String> &E : channel_locales) {
+		if (!channels.has(E.key)) {
+			channels.push_back(E.key);
+		}
+	}
+	return channels;
+}
+
 void TranslationServer::set_fallback_locale(const String &p_locale) {
+	if (fallback == p_locale) {
+		return;
+	}
 	fallback = p_locale;
+	emit_signal(SNAME("fallback_locale_changed"), fallback);
 }
 
 String TranslationServer::get_fallback_locale() const {
@@ -704,6 +761,10 @@ void TranslationServer::get_argument_options(const StringName &p_function, int p
 void TranslationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &TranslationServer::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &TranslationServer::get_locale);
+	ClassDB::bind_method(D_METHOD("set_locale_for", "channel", "locale"), &TranslationServer::set_locale_for);
+	ClassDB::bind_method(D_METHOD("get_locale_for", "channel"), &TranslationServer::get_locale_for);
+	ClassDB::bind_method(D_METHOD("clear_locale_for", "channel"), &TranslationServer::clear_locale_for);
+	ClassDB::bind_method(D_METHOD("get_locale_channels"), &TranslationServer::get_locale_channels);
 	ClassDB::bind_method(D_METHOD("get_tool_locale"), &TranslationServer::get_tool_locale);
 
 	ClassDB::bind_method(D_METHOD("compare_locales", "locale_a", "locale_b"), &TranslationServer::compare_locales);
@@ -753,6 +814,9 @@ void TranslationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("reload_pseudolocalization"), &TranslationServer::reload_pseudolocalization);
 	ClassDB::bind_method(D_METHOD("pseudolocalize", "message"), &TranslationServer::pseudolocalize);
 	ADD_PROPERTY(PropertyInfo(Variant::Type::BOOL, "pseudolocalization_enabled"), "set_pseudolocalization_enabled", "is_pseudolocalization_enabled");
+
+	ADD_SIGNAL(MethodInfo("locale_changed", PropertyInfo(Variant::STRING_NAME, "channel"), PropertyInfo(Variant::STRING, "locale"), PropertyInfo(Variant::STRING, "previous_locale")));
+	ADD_SIGNAL(MethodInfo("fallback_locale_changed", PropertyInfo(Variant::STRING, "locale")));
 }
 
 void TranslationServer::load_project_translations(Ref<TranslationDomain> p_domain) {

@@ -48,13 +48,12 @@ class TextLocalizationServer : public LocalizationServer {
 
 	struct PluralEntry {
 		Vector<String> forms;
-		uint32_t rule = 0; // Index of the chain locale the forms come from.
+		const PluralRules *rule = nullptr; // Of the column the forms come from (shared, see LocalizationCatalog).
 	};
 
 	struct TextData : public Data {
-		LocalVector<String> texts; // Row -> text of the chain, empty = missing.
+		LocalVector<String> texts; // Row -> text of its channel's chain, empty = missing.
 		HashMap<uint32_t, PluralEntry> plurals;
-		LocalVector<PluralRules *> rules; // Per chain locale.
 
 		// Caches, filled on demand.
 		mutable Mutex mutex;
@@ -63,15 +62,12 @@ class TextLocalizationServer : public LocalizationServer {
 		mutable HashMap<String, LocalVector<uint32_t>> reverse; // Text -> rows.
 		mutable bool reverse_built = false;
 		mutable HashSet<StringName> reported_missing;
-
-		virtual ~TextData() override;
 	};
 
 	Ref<Translation> adapter;
 
 	_FORCE_INLINE_ const TextData *_get_text_data() const { return static_cast<const TextData *>(_get_data()); }
 	String _get_text(const TextData *p_data, uint32_t p_row, int p_count) const;
-	String _get_raw_text(const KeyTable *p_keys, const PackedStringArray &p_chain, uint32_t p_row, int p_count) const;
 	String _finish(const TextData *p_data, int p_row, const StringName &p_key, int p_count, const Dictionary &p_args) const;
 
 protected:
@@ -79,7 +75,7 @@ protected:
 
 	virtual StringName _get_catalog_class() const override { return SNAME("TextLocalizationCatalog"); }
 	virtual Data *_create_data() const override;
-	virtual void _resolve(Data *p_data) const override;
+	virtual void _resolve(Data *p_data, const Data *p_previous, const LocalVector<uint8_t> *p_dirty) const override;
 	virtual void _data_published(const Data *p_data, const Data *p_previous) override;
 
 public:
@@ -90,8 +86,6 @@ public:
 	int get_key_id(const StringName &p_key, const StringName &p_context = StringName()) const;
 	String translate_id(int p_id, int p_count = -1, const Dictionary &p_args = Dictionary()) const;
 
-	StringName get_translation_key(const String &p_text) const;
-	StringName get_translation_key_for_locale(const String &p_locale, const String &p_text) const;
 	PackedStringArray get_translation_keys(const String &p_text) const;
 
 	bool has_translation(const StringName &p_key, const StringName &p_context = StringName()) const;

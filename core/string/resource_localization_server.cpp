@@ -36,61 +36,39 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
-#include "core/string/translation_server.h"
 
 ResourceLocalizationServer *ResourceLocalizationServer::singleton = nullptr;
 
-void ResourceLocalizationServer::register_settings() {
-	const String catalog_hint = vformat("%d/%d:%s", Variant::STRING, PROPERTY_HINT_FILE, "*.lcat,*.tres,*.res,*.json,*.csv,*.xml,*.ini,*.toml,*.yaml");
-	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_RESOURCE_CATALOGS, PROPERTY_HINT_TYPE_STRING, catalog_hint), PackedStringArray());
-	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, SETTING_RESOURCE_EXTERNAL_CATALOGS), PackedStringArray());
-}
-
-// Ranks the locale columns that can serve `p_locale`, best last: Godot's remap score (TranslationServer::
-// compare_locales(), so `de_DE` takes `de` or `de_AT`), then the fallback chain. A later layer wins a tie.
-void ResourceLocalizationServer::_get_candidates(const KeyTable *p_keys, const String &p_locale, const PackedStringArray &p_chain, LocalVector<Candidate> &r_candidates) {
-	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	for (uint32_t layer = 0; layer < p_keys->layers.size(); layer++) {
-		const LocalizationCatalog *catalog = p_keys->layers[layer].ptr();
-		for (const String &locale : catalog->get_locales()) {
-			const int score = translation_server ? translation_server->compare_locales(p_locale, locale) : 0;
-			const int chain_index = (int)p_chain.find(locale);
-			const int rank = score > 0 ? 1000 + score : (chain_index < 0 ? 0 : (int)p_chain.size() - chain_index);
-			const LocalizationCatalog::LocaleColumn *column = rank > 0 ? catalog->get_locale_column(catalog->find_locale(locale)) : nullptr;
-			if (!column) {
-				continue;
-			}
-			uint32_t position = r_candidates.size();
-			while (position > 0 && r_candidates[position - 1].rank > rank) {
-				position--;
-			}
-			r_candidates.insert(position, Candidate{ layer, column, rank });
-		}
-	}
-}
-
-String ResourceLocalizationServer::_find_path(const KeyTable *p_keys, const LocalVector<Candidate> &p_candidates, uint32_t p_row) {
-	for (uint32_t i = p_candidates.size(); i-- > 0;) {
-		const int32_t catalog_row = p_keys->get_catalog_row(p_candidates[i].layer, p_row);
-		if (catalog_row >= 0 && p_candidates[i].column->cells.get_length(catalog_row) > 0) {
-			return p_candidates[i].column->cells.get(catalog_row);
-		}
-	}
-	return String();
-}
-
-void ResourceLocalizationServer::_resolve(Data *p_data) const {
+void ResourceLocalizationServer::_resolve(Data *p_data, const Data *p_previous, const LocalVector<uint8_t> *p_dirty) const {
 	ResourceData *resource_data = static_cast<ResourceData *>(p_data);
 	const KeyTable *table = resource_data->keys;
-	LocalVector<Candidate> candidates;
-	if (!resource_data->locale.is_empty()) {
-		_get_candidates(table, resource_data->locale, resource_data->chain, candidates);
+	if (p_previous) {
+		resource_data->paths = static_cast<const ResourceData *>(p_previous)->paths;
+	} else {
+		resource_data->paths.reserve(table->keys.size());
 	}
-	resource_data->paths.reserve(table->keys.size());
-	for (uint32_t row = 0; row < table->keys.size(); row++) {
-		const String key = table->keys[row].key;
-		const String path = _find_path(table, candidates, row);
-		resource_data->paths.insert(key, path.is_empty() ? key : path);
+	LocalVector<const LocalizationCatalog::LocaleColumn *> columns;
+	for (uint32_t channel = 0; channel < table->channels.size(); channel++) {
+		if (p_dirty && !(*p_dirty)[channel]) {
+			continue;
+		}
+		const LocalVector<Source> &sources = resource_data->channels[channel].sources;
+		columns.clear();
+		for (const Source &source : sources) {
+			columns.push_back(table->layers[source.layer]->get_locale_column(source.column));
+		}
+		for (const uint32_t row : table->channel_rows[channel]) {
+			const String key = table->keys[row].key;
+			String path = key;
+			for (uint32_t i = 0; i < sources.size(); i++) {
+				const int32_t catalog_row = table->get_catalog_row(sources[i].layer, row);
+				if (catalog_row >= 0 && columns[i] && columns[i]->cells.get_length(catalog_row) > 0) {
+					path = columns[i]->cells.get(catalog_row);
+					break;
+				}
+			}
+			resource_data->paths[key] = path;
+		}
 	}
 }
 
@@ -199,18 +177,17 @@ Ref<LocalizationCatalog> ResourceLocalizationServer::_get_project_catalog() {
 
 String ResourceLocalizationServer::get_localized_path(const String &p_path, const String &p_locale) const {
 	const ResourceData *resource_data = _get_resource_data();
-	if (p_locale.is_empty() || p_locale == resource_data->locale) {
-		const String *path = resource_data->paths.getptr(p_path);
+	const String *path = resource_data->paths.getptr(p_path);
+	if (!path || p_locale.is_empty()) {
 		return path ? *path : p_path;
 	}
 	const int row = resource_data->keys->find(p_path, StringName());
-	if (row < 0) {
-		return p_path;
+	const PackedStringArray chain = get_locale_chain(p_locale);
+	if (!chain.is_empty() && chain[0] == resource_data->channels[resource_data->keys->row_channels[row]].locale) {
+		return *path;
 	}
-	LocalVector<Candidate> candidates;
-	_get_candidates(resource_data->keys, p_locale, get_locale_chain(p_locale), candidates);
-	const String path = _find_path(resource_data->keys, candidates, row);
-	return path.is_empty() ? p_path : path;
+	String localized;
+	return _read_row(resource_data->keys, chain, row, localized) >= 0 ? localized : p_path;
 }
 
 bool ResourceLocalizationServer::has_localization(const String &p_path) const {
@@ -230,10 +207,11 @@ TypedDictionary<String, String> ResourceLocalizationServer::get_localized_paths(
 			continue;
 		}
 		const LocalizationCatalog *catalog = table->layers[layer].ptr();
-		for (const String &locale : catalog->get_locales()) {
-			const LocalizationCatalog::LocaleColumn *column = catalog->get_locale_column(catalog->find_locale(locale));
-			if (column && column->cells.get_length(catalog_row) > 0) {
-				paths[locale] = column->cells.get(catalog_row); // A later layer overrides.
+		const PackedStringArray locales = catalog->get_locales();
+		String localized;
+		for (int column = 0; column < locales.size(); column++) {
+			if (catalog->read_cell(column, catalog_row, localized)) {
+				paths[locales[column]] = localized; // A later layer overrides.
 			}
 		}
 	}

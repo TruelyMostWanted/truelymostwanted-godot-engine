@@ -99,14 +99,14 @@ bool LanguageSettingsServer::_is_developer_locale(const String &p_locale) {
 }
 
 String LanguageSettingsServer::_resolve_locale(const String &p_locale) {
-	const TranslationServer *translation_server = TranslationServer::get_singleton();
 	const PackedStringArray available = get_available_locales();
 	if (available.is_empty()) {
 		// No translations: the game may still use the locale for its own texts.
 		return p_locale;
 	}
-	for (const String &locale : available) {
-		if (translation_server->compare_locales(p_locale, locale) > 0) {
+	// The same matching rule as the localization servers: the locale, its parents or the closest other locale.
+	for (const String &locale : LocalizationServer::build_locale_chain(p_locale, available, false)) {
+		if (available.has(locale)) {
 			return p_locale;
 		}
 	}

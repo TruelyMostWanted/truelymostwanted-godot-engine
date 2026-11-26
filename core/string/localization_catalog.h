@@ -75,9 +75,6 @@ public:
 		uint32_t translated = 0; // Non-empty cells; known before the column is loaded.
 		uint64_t block_offset = 0; // Position of the column in `source_path`; 0 = not backed by the file.
 		bool loaded = true;
-		PluralRules *compiled_rule = nullptr;
-
-		~LocaleColumn();
 	};
 
 private:
@@ -86,6 +83,7 @@ private:
 	LocalVector<LocaleColumn *> columns;
 	HashMap<uint32_t, String> row_extras; // Sparse: plural key (text) or expected type (resource) per row.
 	String source_path; // Binary file the unloaded columns are read from.
+	StringName channel;
 	mutable Mutex load_mutex;
 
 	static CharString _make_id(const StringName &p_key, const StringName &p_context);
@@ -131,10 +129,27 @@ public:
 
 	static constexpr const char *BINARY_EXTENSION = "lcat";
 
-	// C++ access for the servers (#343, #344).
+	// The file extensions of catalogs: `lcat` and the text formats (the one list for settings, manifests and loader).
+	static PackedStringArray get_file_extensions();
+	// One compiled rule per rule text, shared and immutable (any thread): `p_rule`, else the default rule of
+	// `p_locale`, else English. Freed by finish_plural_rules() on shutdown.
+	static const PluralRules *get_plural_rules(const String &p_rule, const String &p_locale);
+	// PluralRules caches results: evaluated under a lock.
+	static int evaluate_plural_rules(const PluralRules *p_rules, int p_n);
+	static void finish_plural_rules();
+
+	// C++ access for the servers (#343, #344). get_locale_column() is for the main thread (the servers' rebuilds).
 	const Cells &get_id_cells() const { return ids; }
 	int find_locale(const String &p_locale) const;
 	const LocaleColumn *get_locale_column(int p_index) const;
+	// Copies a non-empty cell (and its plural forms) of any column, loading it if needed. Read under the load lock,
+	// so it is safe on any thread while the main thread unloads columns (#357).
+	bool read_cell(int p_column, uint32_t p_row, String &r_text, Vector<String> *r_forms = nullptr) const;
+	// The locale channel the key of `p_row` follows (TranslationServer.get_locale_for()).
+	virtual StringName get_row_channel(int p_row) const { return channel; }
+
+	void set_channel(const StringName &p_channel);
+	StringName get_channel() const { return channel; }
 
 	int get_key_count() const { return ids.size(); }
 	int add_key(const StringName &p_key, const StringName &p_context = StringName());
@@ -186,6 +201,8 @@ public:
 
 	void add_translation(const Ref<Translation> &p_translation);
 	TypedArray<Translation> to_translations();
+
+	TextLocalizationCatalog();
 };
 
 // Localized resource paths per key (the original path) and locale, with the expected resource type per key.
@@ -205,38 +222,10 @@ public:
 
 	void add_translation_remaps(const Dictionary &p_remaps);
 	Dictionary to_translation_remaps();
-};
 
-// Catalog files with a priority; paths may hold the wildcards `*` and `?` in folder and file names.
-class LocalizationCatalogList : public Resource {
-	GDCLASS(LocalizationCatalogList, Resource);
-
-	struct Entry {
-		String path;
-		int priority = 0;
-	};
-	LocalVector<Entry> entries;
-
-protected:
-	static void _bind_methods();
-	bool _set(const StringName &p_name, const Variant &p_value);
-	bool _get(const StringName &p_name, Variant &r_ret) const;
-	void _get_property_list(List<PropertyInfo> *p_list) const;
-
-public:
-	void add_entry(const String &p_path, int p_priority = 0);
-	void remove_entry(int p_index);
-	void set_entry_count(int p_count);
-	int get_entry_count() const { return entries.size(); }
-	void set_entry_path(int p_index, const String &p_path);
-	String get_entry_path(int p_index) const;
-	void set_entry_priority(int p_index, int p_priority);
-	int get_entry_priority(int p_index) const;
-	void clear();
-
-	PackedStringArray get_catalog_paths() const;
-	// Files of one entry, wildcards expanded (C++ access for the servers, #343).
-	PackedStringArray get_entry_catalog_paths(int p_index) const;
+	// The channel, or if it is empty the one of the key's type: AudioStream -> `audio`, Subtitle -> `subtitles`,
+	// otherwise `interface`.
+	virtual StringName get_row_channel(int p_row) const override;
 };
 
 class ResourceFormatLoaderLocalizationCatalog : public ResourceFormatLoader {
@@ -245,6 +234,8 @@ class ResourceFormatLoaderLocalizationCatalog : public ResourceFormatLoader {
 public:
 	virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = nullptr, bool p_use_sub_threads = false, float *r_progress = nullptr, CacheMode p_cache_mode = CACHE_MODE_REUSE) override;
 	virtual void get_recognized_extensions(List<String> *p_extensions) const override;
+	// Text formats only with a catalog type hint: they don't name their kind, and other loaders own them otherwise.
+	virtual bool recognize_path(const String &p_path, const String &p_for_type = String()) const override;
 	virtual bool handles_type(const String &p_type) const override;
 	virtual String get_resource_type(const String &p_path) const override;
 };

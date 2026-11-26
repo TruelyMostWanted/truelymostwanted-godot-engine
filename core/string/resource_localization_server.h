@@ -37,7 +37,7 @@
 #include "core/variant/typed_dictionary.h"
 
 // Localized resource paths from ResourceLocalizationCatalogs (#344); keys are the original paths. On a locale or
-// catalog change the paths of the active locale are resolved into one snapshot that ResourceLoader asks on every
+// catalog change the paths of the active locales (per channel: voice files follow `audio`) are resolved into one snapshot that ResourceLoader asks on every
 // load() (lock-free). Cached resources whose path changed are loaded again in the background and updated in place.
 // Replaces `internationalization/locale/translation_remaps`, which is imported as the first project layer.
 class ResourceLocalizationServer : public LocalizationServer {
@@ -47,12 +47,6 @@ class ResourceLocalizationServer : public LocalizationServer {
 
 	struct ResourceData : public Data {
 		HashMap<String, String> paths; // Every key -> its path for the active locale (the key itself if none).
-	};
-
-	struct Candidate {
-		uint32_t layer = 0;
-		const LocalizationCatalog::LocaleColumn *column = nullptr;
-		int rank = 0;
 	};
 
 	struct Relocalization {
@@ -67,8 +61,6 @@ class ResourceLocalizationServer : public LocalizationServer {
 	Ref<ResourceLocalizationCatalog> remaps_catalog;
 
 	_FORCE_INLINE_ const ResourceData *_get_resource_data() const { return static_cast<const ResourceData *>(_get_data()); }
-	static void _get_candidates(const KeyTable *p_keys, const String &p_locale, const PackedStringArray &p_chain, LocalVector<Candidate> &r_candidates);
-	static String _find_path(const KeyTable *p_keys, const LocalVector<Candidate> &p_candidates, uint32_t p_row);
 	static bool _localize_path(const String &p_path, String &r_path);
 	static void _relocalize_resource(void *p_userdata, uint32_t p_index);
 	void _relocalize(const PackedStringArray &p_paths);
@@ -79,19 +71,14 @@ protected:
 
 	virtual StringName _get_catalog_class() const override { return SNAME("ResourceLocalizationCatalog"); }
 	virtual Data *_create_data() const override { return memnew(ResourceData); }
-	virtual void _resolve(Data *p_data) const override;
+	virtual void _resolve(Data *p_data, const Data *p_previous, const LocalVector<uint8_t> *p_dirty) const override;
 	virtual void _data_published(const Data *p_data, const Data *p_previous) override;
-	virtual const char *_get_catalogs_setting() const override { return SETTING_RESOURCE_CATALOGS; }
-	virtual const char *_get_external_catalogs_setting() const override { return SETTING_RESOURCE_EXTERNAL_CATALOGS; }
 	virtual Ref<LocalizationCatalog> _get_project_catalog() override;
 
 public:
-	static constexpr const char *SETTING_RESOURCE_CATALOGS = "internationalization/localization/resource_catalogs";
-	static constexpr const char *SETTING_RESOURCE_EXTERNAL_CATALOGS = "internationalization/localization/resource_external_catalogs";
 	static constexpr const char *SETTING_TRANSLATION_REMAPS = "internationalization/locale/translation_remaps";
 
 	static ResourceLocalizationServer *get_singleton() { return singleton; }
-	static void register_settings();
 
 	String get_localized_path(const String &p_path, const String &p_locale = String()) const;
 	bool has_localization(const String &p_path) const;
