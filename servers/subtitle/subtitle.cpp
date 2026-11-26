@@ -284,8 +284,12 @@ void Subtitle::add_segment(const Ref<SubtitleSegment> &p_segment) {
 
 void Subtitle::remove_segment(int p_index) {
 	ERR_FAIL_INDEX(p_index, segments.size());
-	_disconnect_segment(segments[p_index]);
+	const Ref<SubtitleSegment> removed = segments[p_index];
 	segments.remove_at(p_index);
+	// The same segment can be in the list more than once: keep listening while it is.
+	if (!segments.has(removed)) {
+		_disconnect_segment(removed);
+	}
 	emit_changed();
 }
 
