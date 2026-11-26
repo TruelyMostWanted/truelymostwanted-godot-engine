@@ -31,9 +31,13 @@
 #include "syntax_highlighters.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/resource_text_serializer.h"
+#include "core/io/text_data_format.h"
+#include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "editor/settings/editor_settings.h"
+#include "scene/gui/text_edit.h"
 #include "scene/resources/shader.h"
 #include "servers/rendering/shader_preprocessor.h"
 #include "servers/rendering/shader_types.h"
@@ -308,6 +312,226 @@ Ref<EditorSyntaxHighlighter> EditorConfigFileSyntaxHighlighter::_create() const 
 	Ref<EditorConfigFileSyntaxHighlighter> syntax_highlighter;
 	syntax_highlighter.instantiate();
 	return syntax_highlighter;
+}
+
+////
+
+void EditorLineStateSyntaxHighlighter::_lines_edited_from(int p_from_line, int p_to_line) {
+	const int keep = MAX(0, MIN(p_from_line, p_to_line));
+	if (keep < (int)line_end_states.size()) {
+		line_end_states.resize(keep);
+	}
+}
+
+void EditorLineStateSyntaxHighlighter::_set_color(Dictionary &r_colors, int p_column, const Color &p_color) {
+	Dictionary entry;
+	entry["color"] = p_color;
+	r_colors[p_column] = entry;
+}
+
+void EditorLineStateSyntaxHighlighter::_update_cache() {
+	line_end_states.clear();
+	const Callable edited = callable_mp(this, &EditorLineStateSyntaxHighlighter::_lines_edited_from);
+	if (!text_edit->is_connected("lines_edited_from", edited)) {
+		text_edit->connect("lines_edited_from", edited);
+	}
+}
+
+Dictionary EditorLineStateSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_line) {
+	while ((int)line_end_states.size() < p_line) {
+		const int line = line_end_states.size();
+		Dictionary unused;
+		line_end_states.push_back(_highlight_line(text_edit->get_line(line), line > 0 ? line_end_states[line - 1] : 0, unused));
+	}
+	Dictionary colors;
+	const int end_state = _highlight_line(text_edit->get_line(p_line), p_line > 0 ? line_end_states[p_line - 1] : 0, colors);
+	if ((int)line_end_states.size() == p_line) {
+		line_end_states.push_back(end_state);
+	}
+	return colors;
+}
+
+////
+
+void EditorCSVSyntaxHighlighter::_update_cache() {
+	EditorLineStateSyntaxHighlighter::_update_cache();
+
+	// Columns cycle through the highlighting colors, so the column of a cell is visible at a glance.
+	const char *color_names[COLUMN_COLOR_COUNT] = { "text_color", "keyword_color", "function_color", "member_variable_color", "number_color", "base_type_color" };
+	for (int i = 0; i < COLUMN_COLOR_COUNT; i++) {
+		column_colors[i] = EDITOR_GET(String("text_editor/theme/highlighting/") + color_names[i]);
+	}
+	symbol_color = EDITOR_GET("text_editor/theme/highlighting/symbol_color");
+
+	// The delimiter of the edited file (its `options`, or the project default).
+	Ref<TextDataFormat> data_file = _get_edited_resource();
+	delimiter = ResourceTextSerializer::get_csv_delimiter(ResourceTextSerializer::get_options(data_file.is_valid() ? data_file->get_options() : Ref<SerializerOptions>()));
+}
+
+int EditorCSVSyntaxHighlighter::_highlight_line(const String &p_line, int p_state, Dictionary &r_colors) const {
+	// State: column index * 2 + 1 inside a quoted cell that continues on the next line; a line outside
+	// quotes starts a new record.
+	bool in_quotes = p_state & 1;
+	int column = in_quotes ? p_state >> 1 : 0;
+	_set_color(r_colors, 0, column_colors[column % COLUMN_COLOR_COUNT]);
+	const char32_t *chars = p_line.ptr();
+	for (int i = 0; i < p_line.length(); i++) {
+		if (chars[i] == '"') {
+			in_quotes = !in_quotes; // An escaped quote ("") toggles twice.
+		} else if (chars[i] == delimiter && !in_quotes) {
+			column++;
+			_set_color(r_colors, i, symbol_color);
+			_set_color(r_colors, i + 1, column_colors[column % COLUMN_COLOR_COUNT]);
+		}
+	}
+	return in_quotes ? column * 2 + 1 : 0;
+}
+
+Ref<EditorSyntaxHighlighter> EditorCSVSyntaxHighlighter::_create() const {
+	Ref<EditorCSVSyntaxHighlighter> syntax_highlighter;
+	syntax_highlighter.instantiate();
+	return syntax_highlighter;
+}
+
+////
+
+void EditorXMLSyntaxHighlighter::_update_cache() {
+	EditorLineStateSyntaxHighlighter::_update_cache();
+
+	text_color = EDITOR_GET("text_editor/theme/highlighting/text_color");
+	symbol_color = EDITOR_GET("text_editor/theme/highlighting/symbol_color");
+	tag_color = EDITOR_GET("text_editor/theme/highlighting/function_color");
+	attribute_color = EDITOR_GET("text_editor/theme/highlighting/member_variable_color");
+	string_color = EDITOR_GET("text_editor/theme/highlighting/string_color");
+	comment_color = EDITOR_GET("text_editor/theme/highlighting/comment_color");
+	keyword_color = EDITOR_GET("text_editor/theme/highlighting/keyword_color");
+}
+
+static bool _xml_is_name_char(char32_t p_char) {
+	return is_unicode_identifier_continue(p_char) || p_char == ':' || p_char == '-' || p_char == '.';
+}
+
+int EditorXMLSyntaxHighlighter::_highlight_line(const String &p_line, int p_state, Dictionary &r_colors) const {
+	int state = p_state;
+	const Color state_colors[] = { text_color, text_color, string_color, string_color, comment_color, string_color, keyword_color };
+	_set_color(r_colors, 0, state_colors[state]);
+	const int length = p_line.length();
+	for (int i = 0; i < length; i++) {
+		const char32_t c = p_line[i];
+		switch (state) {
+			case STATE_TEXT: {
+				if (c != '<') {
+					break;
+				}
+				if (p_line.substr(i, 4) == "<!--") {
+					state = STATE_COMMENT;
+					_set_color(r_colors, i, comment_color);
+					i += 3;
+				} else if (p_line.substr(i, 9) == "<![CDATA[") {
+					state = STATE_CDATA;
+					_set_color(r_colors, i, string_color);
+					i += 8;
+				} else if (i + 1 < length && (p_line[i + 1] == '?' || p_line[i + 1] == '!')) {
+					state = STATE_DECLARATION;
+					_set_color(r_colors, i, keyword_color);
+				} else {
+					// `<name` or `</name`.
+					state = STATE_TAG;
+					_set_color(r_colors, i, symbol_color);
+					int end = i + 1;
+					if (end < length && p_line[end] == '/') {
+						end++;
+					}
+					_set_color(r_colors, end, tag_color);
+					while (end < length && _xml_is_name_char(p_line[end])) {
+						end++;
+					}
+					i = end - 1;
+				}
+			} break;
+			case STATE_TAG: {
+				if (c == '"' || c == '\'') {
+					state = c == '"' ? STATE_VALUE_DOUBLE_QUOTED : STATE_VALUE_SINGLE_QUOTED;
+					_set_color(r_colors, i, string_color);
+				} else if (c == '>') {
+					state = STATE_TEXT;
+					_set_color(r_colors, i, symbol_color);
+					_set_color(r_colors, i + 1, text_color);
+				} else if (c == '/' || c == '=') {
+					_set_color(r_colors, i, symbol_color);
+				} else if (_xml_is_name_char(c) && (i == 0 || !_xml_is_name_char(p_line[i - 1]))) {
+					_set_color(r_colors, i, attribute_color);
+				}
+			} break;
+			case STATE_VALUE_DOUBLE_QUOTED:
+			case STATE_VALUE_SINGLE_QUOTED: {
+				if (c == char32_t(state == STATE_VALUE_DOUBLE_QUOTED ? '"' : '\'')) {
+					state = STATE_TAG;
+					_set_color(r_colors, i + 1, text_color);
+				}
+			} break;
+			case STATE_COMMENT:
+			case STATE_CDATA: {
+				if (p_line.substr(i, 3) == (state == STATE_COMMENT ? "-->" : "]]>")) {
+					state = STATE_TEXT;
+					i += 2;
+					_set_color(r_colors, i + 1, text_color);
+				}
+			} break;
+			case STATE_DECLARATION: {
+				if (c == '>') {
+					state = STATE_TEXT;
+					_set_color(r_colors, i + 1, text_color);
+				}
+			} break;
+		}
+	}
+	return state;
+}
+
+Ref<EditorSyntaxHighlighter> EditorXMLSyntaxHighlighter::_create() const {
+	Ref<EditorXMLSyntaxHighlighter> syntax_highlighter;
+	syntax_highlighter.instantiate();
+	return syntax_highlighter;
+}
+
+////
+
+Dictionary EditorKeyValueSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_line) {
+	const Dictionary colors = highlighter->get_line_syntax_highlighting(p_line);
+	int start = 0;
+	bool section = false;
+	const int end = _find_key(text_edit->get_line(p_line), start, section);
+	if (end <= start) {
+		return colors;
+	}
+	// Rebuilt in column order: the colors before the key, the key, then the color in effect at its end.
+	Dictionary result;
+	Variant after;
+	for (const Variant *key = colors.next(nullptr); key; key = colors.next(key)) {
+		const int column = *key;
+		if (column <= end) {
+			after = colors[*key];
+		}
+		if (column < start) {
+			result[*key] = colors[*key];
+		}
+	}
+	Dictionary key_entry;
+	key_entry["color"] = section ? section_color : key_color;
+	result[start] = key_entry;
+	if (after.get_type() == Variant::NIL) {
+		Dictionary text_entry;
+		text_entry["color"] = text_color;
+		after = text_entry;
+	}
+	result[end] = after;
+	for (const Variant *key = colors.next(nullptr); key; key = colors.next(key)) {
+		if (int(*key) > end) {
+			result[*key] = colors[*key];
+		}
+	}
+	return result;
 }
 
 ////

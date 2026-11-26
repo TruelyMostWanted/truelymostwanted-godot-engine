@@ -547,11 +547,13 @@
 /modules/toml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/toml/editor/                         @TruelyMostWanted @godotengine/editor
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
 /modules/yaml/                                @TruelyMostWanted
 /modules/yaml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
 /modules/yaml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/yaml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/yaml/editor/                         @TruelyMostWanted @godotengine/editor
 /modules/yaml/tests/                          @TruelyMostWanted @godotengine/tests
 /modules/sqlite/                              @TruelyMostWanted
 /modules/sqlite/**/*.py                       @TruelyMostWanted @godotengine/buildsystem
@@ -563,6 +565,7 @@
 /modules/flow_graph/**/*.py                   @TruelyMostWanted @godotengine/buildsystem
 /modules/flow_graph/**/SCsub                  @TruelyMostWanted @godotengine/buildsystem
 /modules/flow_graph/doc_classes/              @TruelyMostWanted @godotengine/documentation
+/modules/flow_graph/editor/                   @TruelyMostWanted @godotengine/editor
 /modules/flow_graph/tests/                    @TruelyMostWanted @godotengine/tests
 /thirdparty/sqlite/                           @TruelyMostWanted @godotengine/buildsystem
 /servers/settings/                            @TruelyMostWanted

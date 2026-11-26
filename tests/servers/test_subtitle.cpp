@@ -37,6 +37,7 @@ TEST_FORCE_LINK(test_subtitle)
 #include "core/io/resource_saver.h"
 #include "servers/subtitle/subtitle.h"
 #include "servers/subtitle/subtitle_format_srt.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestSubtitle {
@@ -298,6 +299,38 @@ TEST_CASE("[Subtitle][SRT] ResourceLoader and ResourceSaver") {
 	CHECK(tres->get_time_offset() == -1.0);
 	CHECK(tres->get_segment(0)->get_speaker() == StringName("narrator"));
 	CHECK(tres->get_segment(0)->get_placement() == SubtitleSegment::PLACEMENT_TOP);
+}
+
+TEST_CASE("[Subtitle] Changes of a segment reach the subtitle") {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	Ref<SubtitleSegment> segment = make_segment(0.0, 1.0, "A");
+	subtitle->add_segment(segment);
+	// Adding the same segment again must not connect twice.
+	subtitle->add_segment(segment);
+	subtitle->remove_segment(1);
+
+	SIGNAL_WATCH(subtitle.ptr(), "changed");
+	segment->set_end_time(2.0);
+	SIGNAL_CHECK("changed", { {} });
+
+	subtitle->remove_segment(0);
+	SIGNAL_DISCARD("changed");
+	segment->set_end_time(3.0);
+	SIGNAL_CHECK_FALSE("changed");
+
+	TypedArray<SubtitleSegment> array;
+	array.push_back(segment);
+	subtitle->set_segments(array);
+	SIGNAL_DISCARD("changed");
+	segment->set_end_time(4.0);
+	SIGNAL_CHECK("changed", { {} });
+
+	subtitle->set_segments(TypedArray<SubtitleSegment>());
+	SIGNAL_DISCARD("changed");
+	segment->set_end_time(5.0);
+	SIGNAL_CHECK_FALSE("changed");
+	SIGNAL_UNWATCH(subtitle.ptr(), "changed");
 }
 
 } // namespace TestSubtitle

@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		The wait node has the flow input [code]in[/code] and the flow output [code]out[/code]. When the execution reaches it, the playback pauses the graph for [member seconds] and then continues at [code]out[/code].
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		At runtime the node holds the [FlowGraphPlayback] ([method FlowGraphPlayback.is_waiting]) and counts the time in [method FlowNode._process_waiting], which [method FlowGraphPlayback.process] drives (a [FlowGraphPlayer] does this by itself). The elapsed time is kept in the node memory of the playback, so it is saved in [FlowGraphState] and a restored wait continues where it stopped. When [member seconds] have passed the playback continues at [code]out[/code]. [method FlowGraphPlayback.advance] ends the wait early.
 		[codeblocks]
 		[gdscript]
 		var wait := FlowWaitNode.new()

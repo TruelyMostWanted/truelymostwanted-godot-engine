@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowExit" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		One way to leave the current node of a [FlowGraphPlayback].
+	</brief_description>
+	<description>
+		[method FlowGraphPlayback.get_available_exits] returns one [FlowExit] per way out of the current node, for example to build a choice menu; [method FlowGraphPlayback.choose] takes its index. Node types create their own exits in [method FlowNode._get_available_exits], for example with a label per option or with options disabled by a condition.
+		[codeblocks]
+		[gdscript]
+		var exits := playback.get_available_exits()
+		var index := 0
+		for exit: FlowExit in exits:
+		    var button := Button.new()
+		    button.text = exit.label
+		    button.disabled = not exit.enabled
+		    button.pressed.connect(playback.choose.bind(index))
+		    menu.add_child(button)
+		    index += 1
+		[/gdscript]
+		[csharp]
+		var exits = playback.GetAvailableExits();
+		int index = 0;
+		foreach (FlowExit exit in exits)
+		{
+		    int choice = index++;
+		    var button = new Button { Text = exit.Label, Disabled = !exit.Enabled };
+		    button.Pressed += () =&gt; playback.Choose(choice);
+		    menu.AddChild(button);
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="true">
+			If [code]false[/code], [method FlowGraphPlayback.choose] refuses this exit. Show it grayed out, or hide it.
+		</member>
+		<member name="label" type="String" setter="set_label" getter="get_label" default="&quot;&quot;">
+			The text to show. The default exits use the label of the [FlowPort], else its name.
+		</member>
+		<member name="node_id" type="int" setter="set_node_id" getter="get_node_id" default="-1">
+			The node this exit leads to, or [code]-1[/code] if the output has no connection. Filled by [method FlowGraphPlayback.get_available_exits].
+		</member>
+		<member name="port" type="StringName" setter="set_port" getter="get_port" default="&amp;&quot;&quot;">
+			The flow output of the node that this exit leaves through.
+		</member>
+	</members>
+</class>
