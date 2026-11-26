@@ -4,6 +4,7 @@ from misc.utility.scons_hints import *
 import os
 
 import core_builders
+import truely_version_builders
 
 import methods
 
