@@ -36,6 +36,7 @@
 #include "core/io/json.h"
 #include "core/io/serializer_options.h"
 #include "core/io/text_data_format.h"
+#include "core/io/xml_format.h"
 #include "core/object/class_db.h"
 #include "core/os/thread.h"
 #include "core/string/plural_rules.h"

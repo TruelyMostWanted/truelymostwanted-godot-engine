@@ -50,7 +50,7 @@
 		<method name="get_plural_key" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the plural key of [param key] (the [code]?plural[/code] column of a CSV file, the untranslated plural text), or an empty [String].
 			</description>
@@ -67,7 +67,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="locale" type="String" />
 			<param index="2" name="n" type="int" />
-			<param index="3" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the plural form of [param key] in [param locale] for the number [param n] (see [method get_plural_form]). Without plural forms, returns the text of the key.
 			</description>
@@ -76,7 +76,7 @@
 			<return type="PackedStringArray" />
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="locale" type="String" />
-			<param index="2" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns all plural forms of [param key] in [param locale]. Without plural forms, returns the text as the only element (or an empty array if there is no text).
 			</description>
@@ -85,7 +85,7 @@
 			<return type="String" />
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="locale" type="String" />
-			<param index="2" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the text of [param key] with [param context] in [param locale] (the first plural form for plural keys), or an empty [String]. The locale is not resolved: [code]"de_DE"[/code] does not fall back to [code]"de"[/code] here (that is the job of the localization server).
 			</description>
@@ -94,7 +94,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="plural_key" type="String" />
-			<param index="2" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Sets the plural key of [param key] (see [method get_plural_key]). Adds the key if needed.
 			</description>
@@ -112,7 +112,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="locale" type="String" />
 			<param index="2" name="texts" type="PackedStringArray" />
-			<param index="3" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Sets the plural forms of [param key] in [param locale]. The first form is also the text returned by [method get_text]. Adds the key and the locale if needed.
 			</description>
@@ -122,7 +122,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="locale" type="String" />
 			<param index="2" name="text" type="String" />
-			<param index="3" name="context" type="StringName" default="&quot;&quot;" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Sets the text of [param key] with [param context] in [param locale]. Adds the key and the locale if needed. An empty [param text] marks the key as missing in that locale.
 			</description>
