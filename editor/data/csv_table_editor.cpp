@@ -227,8 +227,9 @@ void CSVTableEditor::_render() {
 			if (field.is_valid() && field->get_value_type() == Variant::BOOL) {
 				item->set_cell_mode(column, TreeItem::CELL_MODE_CHECK);
 				item->set_checked(column, text.to_lower() == "true" || text == "1");
-			} else if (field.is_valid() && field->get_hint() == PROPERTY_HINT_ENUM) {
+			} else if (field.is_valid() && field->get_hint() == PROPERTY_HINT_ENUM && (field->get_value_type() != Variant::STRING || field->get_hint_string().split(",").has(text))) {
 				// Like the inspector: "Name:value" options for numbers, the option index for strings.
+				// A string that is no option stays a text cell below, so the wrong value is visible.
 				item->set_cell_mode(column, TreeItem::CELL_MODE_RANGE);
 				item->set_text(column, field->get_hint_string());
 				item->set_range(column, field->get_value_type() == Variant::STRING ? (int)field->get_hint_string().split(",").find(text) : text.to_int());
