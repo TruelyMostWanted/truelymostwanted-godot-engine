@@ -148,6 +148,37 @@ void TextEditor::apply_code() {
 	code_editor->get_text_editor()->get_syntax_highlighter()->update_cache();
 }
 
+bool TextEditor::_requires_space_indent() const {
+	// YAML forbids tabs in indentation, so these files always indent with spaces, whatever the indent type
+	// setting is (also when "Convert Indent on Save" runs).
+	if (edited_res.is_null()) {
+		return false;
+	}
+	const String extension = edited_res->get_path().get_extension().to_lower();
+	return extension == "yaml" || extension == "yml" || edited_res->is_class("YAML");
+}
+
+void TextEditor::set_edited_resource(const Ref<Resource> &p_res) {
+	TextEditorBase::set_edited_resource(p_res);
+	if (_requires_space_indent()) {
+		code_editor->set_indent_using_spaces(true);
+	}
+}
+
+void TextEditor::update_settings() {
+	TextEditorBase::update_settings();
+	if (_requires_space_indent()) {
+		code_editor->set_indent_using_spaces(true);
+	}
+}
+
+void TextEditor::convert_indent() {
+	if (_requires_space_indent()) {
+		code_editor->set_indent_using_spaces(true);
+	}
+	TextEditorBase::convert_indent();
+}
+
 ScriptEditorBase *TextEditor::create_editor(const Ref<Resource> &p_resource) {
 	if (Object::cast_to<TextFile>(*p_resource) || Object::cast_to<JSON>(*p_resource) || Object::cast_to<TextDataFormat>(*p_resource)) {
 		return memnew(TextEditor);
