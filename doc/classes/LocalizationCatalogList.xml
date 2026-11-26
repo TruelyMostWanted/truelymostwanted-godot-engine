@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LocalizationCatalogList" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A list of localization catalog files with priorities.
+	</brief_description>
+	<description>
+		A [LocalizationCatalogList] names the catalog files of a project, a DLC or a mod, each with a priority. Folder and file names of a path may contain the wildcards [code]*[/code] and [code]?[/code] (for example [code]exec://mods/*.lcat[/code] or [code]user://mods/*/translations/*.lcat[/code]); [method get_catalog_paths] expands them and sorts all paths by priority. When two catalogs have the same key, the later one (higher priority) wins.
+		Entries are edited in the inspector as an array (path and priority) or with the methods below.
+		[codeblocks]
+		[gdscript]
+		var list = LocalizationCatalogList.new()
+		list.add_entry("res://translations/game.lcat")
+		list.add_entry("exec://mods/*.json", 10)
+		for path in list.get_catalog_paths():
+			var catalog = TextLocalizationCatalog.new()
+			catalog.load_from_file(path)
+		[/gdscript]
+		[csharp]
+		var list = new LocalizationCatalogList();
+		list.AddEntry("res://translations/game.lcat");
+		list.AddEntry("exec://mods/*.json", 10);
+		foreach (string path in list.GetCatalogPaths())
+		{
+			var catalog = new TextLocalizationCatalog();
+			catalog.LoadFromFile(path);
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Localization-Catalogs</link>
+	</tutorials>
+	<methods>
+		<method name="add_entry">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="priority" type="int" default="0" />
+			<description>
+				Appends an entry with [param path] (a file, or a path with wildcards in folder or file names) and [param priority].
+			</description>
+		</method>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Removes all entries.
+			</description>
+		</method>
+		<method name="get_catalog_paths" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the catalog files of all entries, sorted by priority (lowest first; entries with the same priority keep their order). A path with wildcards expands to the matching files of the matching folders in alphabetical order, only files with a catalog extension ([code]lcat[/code], [code]csv[/code], [code]json[/code], [code]yaml[/code], [code]yml[/code], [code]toml[/code], [code]ini[/code], [code]xml[/code]); a missing folder gives no files. Paths without wildcards are returned as they are, even if the file does not exist.
+			</description>
+		</method>
+		<method name="get_entry_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the path of the entry at [param index].
+			</description>
+		</method>
+		<method name="get_entry_priority" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the priority of the entry at [param index].
+			</description>
+		</method>
+		<method name="remove_entry">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the entry at [param index].
+			</description>
+		</method>
+		<method name="set_entry_path">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="path" type="String" />
+			<description>
+				Sets the path of the entry at [param index].
+			</description>
+		</method>
+		<method name="set_entry_priority">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<param index="1" name="priority" type="int" />
+			<description>
+				Sets the priority of the entry at [param index]. Higher priorities come later and win over lower ones.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="entry_count" type="int" setter="set_entry_count" getter="get_entry_count" default="0">
+			The number of entries. Raising it appends empty entries.
+		</member>
+	</members>
+</class>

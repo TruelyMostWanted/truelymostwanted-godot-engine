@@ -65,7 +65,9 @@ static constexpr const char *SETTING_SORT_KEYS = "filesystem/resources/text_form
 static constexpr const char *SETTING_FULL_PRECISION_FLOATS = "filesystem/resources/text_formats/full_precision_floats";
 static constexpr const char *SETTING_CSV_DELIMITER = "filesystem/resources/text_formats/csv_delimiter";
 static constexpr const char *SETTING_CSV_HEADERS = "filesystem/resources/text_formats/csv_headers";
-static constexpr const char *SETTING_INI_PLAIN_VALUES = "filesystem/resources/text_formats/ini_plain_values";
+static constexpr const char *SETTING_INI_VALUE_STYLE = "filesystem/resources/text_formats/ini_value_style";
+// Bool setting before ini_value_style; still read if a project.godot has it and ini_value_style is the default.
+static constexpr const char *SETTING_INI_PLAIN_VALUES_LEGACY = "filesystem/resources/text_formats/ini_plain_values";
 static constexpr const char *SETTING_XML_DECLARATION = "filesystem/resources/text_formats/xml_declaration";
 
 // Set while a resource is encoded with SerializerOptions.full_precision_floats (see _plain_real()).
@@ -100,7 +102,7 @@ void ResourceTextSerializer::register_settings() {
 	GLOBAL_DEF(SETTING_FULL_PRECISION_FLOATS, false);
 	GLOBAL_DEF(SETTING_CSV_DELIMITER, ",");
 	GLOBAL_DEF(SETTING_CSV_HEADERS, true);
-	GLOBAL_DEF(SETTING_INI_PLAIN_VALUES, false);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_INI_VALUE_STYLE, PROPERTY_HINT_ENUM, "Plain,Godot Variant"), int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT));
 	GLOBAL_DEF(SETTING_XML_DECLARATION, true);
 }
 
@@ -128,8 +130,11 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_default_options() {
 	if (settings->has_setting(SETTING_CSV_HEADERS)) {
 		options.csv_headers = settings->get_setting_with_override(SETTING_CSV_HEADERS);
 	}
-	if (settings->has_setting(SETTING_INI_PLAIN_VALUES)) {
-		options.ini_plain_values = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES);
+	const int ini_style = settings->has_setting(SETTING_INI_VALUE_STYLE) ? int(settings->get_setting_with_override(SETTING_INI_VALUE_STYLE)) : int(SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT);
+	if (ini_style != SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT) {
+		options.ini_plain_values = ini_style == SerializerOptions::INI_VALUE_STYLE_PLAIN;
+	} else if (settings->has_setting(SETTING_INI_PLAIN_VALUES_LEGACY)) {
+		options.ini_plain_values = settings->get_setting_with_override(SETTING_INI_PLAIN_VALUES_LEGACY);
 	}
 	if (settings->has_setting(SETTING_XML_DECLARATION)) {
 		options.xml_declaration = settings->get_setting_with_override(SETTING_XML_DECLARATION);
@@ -151,7 +156,7 @@ ResourceTextSerializer::Options ResourceTextSerializer::get_options(const Ref<Se
 	options.full_precision_floats = p_options->is_full_precision_floats();
 	options.csv_delimiter = p_options->get_csv_delimiter();
 	options.csv_headers = p_options->is_csv_headers();
-	options.ini_plain_values = p_options->is_ini_plain_values();
+	options.ini_plain_values = p_options->get_ini_value_style() == SerializerOptions::INI_VALUE_STYLE_PLAIN;
 	options.xml_declaration = p_options->is_xml_declaration();
 	return options;
 }
@@ -428,6 +433,20 @@ static double _plain_float32(float p_value) {
 		return p_value;
 	}
 	return String::num_scientific(p_value).to_float();
+}
+
+// A plain float that is exactly a 32-bit float (a C++ `float` property read as a Variant, such as 0.2f read as
+// 0.20000000298023224) is written in its shortest 32-bit form (0.2), like the components of vectors. Other values,
+// such as 0.1 + 0.2, are 64-bit and written exactly. SerializerOptions.full_precision_floats writes every value exactly.
+static double _plain_float(double p_value) {
+	if (tls_full_precision_floats || !Math::is_finite(p_value)) {
+		return p_value;
+	}
+	const float as_float32 = float(p_value);
+	if (double(as_float32) != p_value) {
+		return p_value;
+	}
+	return String::num_scientific(as_float32).to_float();
 }
 
 static bool _is_math_type(Variant::Type p_type) {
@@ -1111,9 +1130,10 @@ Variant TreeEncoder::encode_value(const Variant &p_value, const PropertyInfo &p_
 	switch (type) {
 		case Variant::NIL:
 		case Variant::BOOL:
-		case Variant::FLOAT:
 		case Variant::STRING:
 			return p_value;
+		case Variant::FLOAT:
+			return _plain_float(p_value);
 		case Variant::INT: {
 			if (enums_as_names) {
 				LocalVector<EnumValue> values;
@@ -1865,7 +1885,15 @@ Error ResourceTextSerializer::write_ini(const Ref<Resource> &p_resource, const O
 	return OK;
 }
 
-Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error) {
+String ResourceTextSerializer::ini_value_to_text(const Variant &p_value, bool p_plain) {
+	return p_plain ? _ini_plain_text(p_value) : _ini_variant_text(p_value);
+}
+
+Variant ResourceTextSerializer::ini_text_to_value(const String &p_text) {
+	return _ini_parse_value(p_text);
+}
+
+Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVector<Section> &r_sections, String &r_error, int *r_error_line) {
 	r_sections.clear();
 	int current = -1;
 	const Vector<String> lines = p_text.split("\n");
@@ -1880,6 +1908,9 @@ Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVect
 		if (line[0] == '[') {
 			if (!line.ends_with("]")) {
 				r_error = vformat("Line %d: ']' expected.", i + 1);
+				if (r_error_line != nullptr) {
+					*r_error_line = i + 1;
+				}
 				return ERR_PARSE_ERROR;
 			}
 			r_sections.push_back(Section(line.substr(1, line.length() - 2).strip_edges(), Dictionary()));
@@ -1889,6 +1920,9 @@ Error ResourceTextSerializer::parse_ini_sections(const String &p_text, LocalVect
 		const int equal = line.find_char('=');
 		if (equal <= 0) {
 			r_error = vformat("Line %d: 'key=value' expected.", i + 1);
+			if (r_error_line != nullptr) {
+				*r_error_line = i + 1;
+			}
 			return ERR_PARSE_ERROR;
 		}
 		String key = line.substr(0, equal).strip_edges();
@@ -2033,11 +2067,22 @@ Error ResourceTextSerializer::parse_ini(const String &p_text, const String &p_ty
 // CSV.
 
 Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_text, char32_t p_delimiter) {
+	// An unclosed quote takes the rest of the text as its cell.
 	Vector<Vector<String>> rows;
+	String error;
+	int error_line = 0;
+	parse_csv_rows(p_text, p_delimiter, rows, error, error_line);
+	return rows;
+}
+
+Error ResourceTextSerializer::parse_csv_rows(const String &p_text, char32_t p_delimiter, Vector<Vector<String>> &r_rows, String &r_error, int &r_error_line) {
+	r_rows.clear();
 	Vector<String> row;
 	String cell;
 	bool in_quotes = false;
 	bool row_has_content = false;
+	int line = 1;
+	int quote_line = 0;
 	int start = 0;
 	if (!p_text.is_empty() && p_text[0] == 0xFEFF) {
 		start = 1; // UTF-8 byte order mark.
@@ -2045,6 +2090,9 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 	const int length = p_text.length();
 	for (int i = start; i < length; i++) {
 		const char32_t c = p_text[i];
+		if (c == '\n') {
+			line++;
+		}
 		if (in_quotes) {
 			if (c == '"') {
 				if (i + 1 < length && p_text[i + 1] == '"') {
@@ -2060,6 +2108,7 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 		}
 		if (c == '"' && cell.is_empty()) {
 			in_quotes = true;
+			quote_line = line;
 			row_has_content = true;
 		} else if (c == p_delimiter) {
 			row.push_back(cell);
@@ -2068,10 +2117,11 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 		} else if (c == '\n' || c == '\r') {
 			if (c == '\r' && i + 1 < length && p_text[i + 1] == '\n') {
 				i++;
+				line++;
 			}
 			if (row_has_content || !cell.is_empty()) {
 				row.push_back(cell);
-				rows.push_back(row);
+				r_rows.push_back(row);
 			}
 			row.clear();
 			cell = String();
@@ -2082,9 +2132,18 @@ Vector<Vector<String>> ResourceTextSerializer::parse_csv_rows(const String &p_te
 	}
 	if (row_has_content || !cell.is_empty()) {
 		row.push_back(cell);
-		rows.push_back(row);
+		r_rows.push_back(row);
 	}
-	return rows;
+	if (in_quotes) {
+		r_error = vformat("Line %d: the quoted cell is not closed.", quote_line);
+		r_error_line = quote_line;
+		return ERR_PARSE_ERROR;
+	}
+	return OK;
+}
+
+char32_t ResourceTextSerializer::get_csv_delimiter(const Options &p_options) {
+	return _csv_delimiter(p_options);
 }
 
 String ResourceTextSerializer::write_csv_row(const Vector<String> &p_cells, char32_t p_delimiter) {

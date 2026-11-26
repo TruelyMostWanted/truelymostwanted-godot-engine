@@ -105,6 +105,17 @@
 				Clears all tile proxies.
 			</description>
 		</method>
+		<method name="convert_map_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="coords" type="Vector2i" />
+			<param index="1" name="from_layout" type="int" enum="TileSet.TileLayout" />
+			<param index="2" name="from_swap_x_and_y_axis" type="bool" default="false" />
+			<param index="3" name="from_flip_x" type="bool" default="false" />
+			<param index="4" name="from_flip_y" type="bool" default="false" />
+			<description>
+				Returns the cell at the same place on screen for [param coords] that were made with [param from_layout] and the coordinate system [param from_swap_x_and_y_axis], [param from_flip_x] and [param from_flip_y], under the current [member tile_layout], [member swap_x_and_y_axis], [member flip_x] and [member flip_y]. Layouts whose cell centers lie on different grids ([constant TILE_LAYOUT_STACKED] and [constant TILE_LAYOUT_STACKED_OFFSET]) shift the whole map by half a cell; the shape stays. Used by [method TileMapLayer.convert_cell_coordinates].
+			</description>
+		</method>
 		<method name="get_alternative_level_tile_proxy">
 			<return type="Array" />
 			<param index="0" name="source_from" type="int" />
@@ -347,6 +358,13 @@
 				Returns if there is a source-level proxy for the given source ID.
 			</description>
 		</method>
+		<method name="layout_to_map_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="layout_coords" type="Vector2i" />
+			<description>
+				Returns the map coordinates for the layout coordinates [param layout_coords]: the coordinates of [member tile_layout] alone, before [member swap_x_and_y_axis], [member flip_x] and [member flip_y] are applied. [TileMapPattern] stores layout coordinates.
+			</description>
+		</method>
 		<method name="map_tile_proxy" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="source_from" type="int" />
@@ -356,6 +374,13 @@
 				According to the configured proxies, maps the provided identifiers to a new set of identifiers. The source ID, atlas coordinates ID and alternative tile ID are returned as a 3 elements Array.
 				This function first look for matching alternative-level proxies, then coordinates-level proxies, then source-level proxies.
 				If no proxy corresponding to provided identifiers are found, returns the same values the ones used as arguments.
+			</description>
+		</method>
+		<method name="map_to_layout_coords" qualifiers="const">
+			<return type="Vector2i" />
+			<param index="0" name="map_coords" type="Vector2i" />
+			<description>
+				Returns the layout coordinates for the map coordinates [param map_coords], the reverse of [method layout_to_map_coords]. When [member swap_x_and_y_axis], [member flip_x] and [member flip_y] are all [code]false[/code], both are the same.
 			</description>
 		</method>
 		<method name="move_custom_data_layer">
@@ -638,6 +663,18 @@
 		</method>
 	</methods>
 	<members>
+		<member name="flip_x" type="bool" setter="set_flip_x" getter="is_flip_x" default="false">
+			If [code]true[/code], X counts the other way: the cell to the right of cell [code](0, 0)[/code] in the layout becomes [code](-1, 0)[/code]. Applied after [member swap_x_and_y_axis]. Part of the coordinate system, see [member swap_x_and_y_axis].
+		</member>
+		<member name="flip_y" type="bool" setter="set_flip_y" getter="is_flip_y" default="false">
+			If [code]true[/code], Y counts the other way, for example upwards with [constant TILE_SHAPE_SQUARE]. Applied after [member swap_x_and_y_axis]. Part of the coordinate system, see [member swap_x_and_y_axis].
+		</member>
+		<member name="swap_x_and_y_axis" type="bool" setter="set_swap_x_and_y_axis" getter="is_swap_x_and_y_axis" default="false">
+			If [code]true[/code], X counts where Y counted, and Y where X counted. Applied before [member flip_x] and [member flip_y].
+			Together these three properties are the coordinate system: the direction in which cell coordinates count. [member tile_layout] decides along which lines the cells are numbered (rows, stairs or diagonals); the coordinate system decides which way X and Y point along those lines. The tiles stay where they are, only the numbering changes, so [method TileMapLayer.local_to_map], [method TileMapLayer.map_to_local], [method TileMapLayer.set_cell] and every other method use the new coordinates. Neighbor names ([constant CELL_NEIGHBOR_RIGHT_SIDE] and others) stay relative to the screen.
+			Examples: [constant TILE_SHAPE_ISOMETRIC] with [constant TILE_LAYOUT_DIAMOND_RIGHT] and [member swap_x_and_y_axis] counts X towards the bottom right and Y towards the top right; [constant TILE_SHAPE_SQUARE] with [member flip_y] counts Y upwards. Swapping and flipping both axes is a half turn; swapping and flipping one axis is a quarter turn.
+			Changing the coordinate system on a painted map makes it look different, like changing [member tile_layout]. The TileMap editor offers to convert the cells; in code, call [method TileMapLayer.convert_cell_coordinates].
+		</member>
 		<member name="tile_layout" type="int" setter="set_tile_layout" getter="get_tile_layout" enum="TileSet.TileLayout" default="0">
 			For all half-offset shapes (Isometric, Hexagonal and Half-Offset square), changes the way tiles are indexed in the [TileMapLayer] grid.
 		</member>

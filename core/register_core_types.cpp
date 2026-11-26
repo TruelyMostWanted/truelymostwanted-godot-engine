@@ -43,16 +43,22 @@
 #include "core/extension/gdextension_resource_format.h"
 #include "core/extension/godot_instance.h"
 #include "core/input/input.h"
+#include "core/input/input_action.h"
+#include "core/input/input_actions.h"
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
 #include "core/io/config_file.h"
+#include "core/io/csv_format.h"
+#include "core/io/data_schema.h"
 #include "core/io/dir_access.h"
 #include "core/io/dtls_server.h"
 #include "core/io/files_manifest.h"
 #include "core/io/files_manifest_server.h"
+#include "core/io/files_manifest_validation.h"
 #include "core/io/http_client.h"
 #include "core/io/image_loader.h"
 #include "core/io/image_resource_format.h"
+#include "core/io/ini_format.h"
 #include "core/io/json.h"
 #include "core/io/json_resource_format.h"
 #include "core/io/marshalls.h"
@@ -61,6 +67,7 @@
 #include "core/io/packet_peer_dtls.h"
 #include "core/io/packet_peer_udp.h"
 #include "core/io/path_prefix_server.h"
+#include "core/io/pck_build_plan.h"
 #include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/io/pck_package_server.h"
@@ -69,6 +76,7 @@
 #include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_format_pck.h"
+#include "core/io/resource_format_text_data.h"
 #include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
@@ -81,9 +89,11 @@
 #include "core/io/stream_peer_tls.h"
 #include "core/io/streaming_assets_server.h"
 #include "core/io/tcp_server.h"
+#include "core/io/text_data_format.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
+#include "core/io/xml_format.h"
 #include "core/io/xml_parser.h"
 #include "core/io/xml_writer.h"
 #include "core/math/a_star.h"
@@ -101,8 +111,11 @@
 #include "core/os/os.h"
 #include "core/os/time.h"
 #include "core/string/fuzzy_search.h"
+#include "core/string/localization_catalog.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/regex.h"
+#include "core/string/text_insertion_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
 #ifndef DISABLE_DEPRECATED
@@ -115,6 +128,8 @@ static Ref<ResourceFormatImporter> resource_format_importer;
 static Ref<ResourceFormatImporterSaver> resource_format_importer_saver;
 static Ref<ResourceFormatLoaderImage> resource_format_image;
 static Ref<TranslationLoaderPO> resource_format_po;
+static Ref<ResourceFormatLoaderLocalizationCatalog> resource_loader_localization_catalog;
+static Ref<ResourceFormatSaverLocalizationCatalog> resource_saver_localization_catalog;
 static Ref<ResourceFormatSaverCrypto> resource_format_saver_crypto;
 static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<GDExtensionResourceLoader> resource_loader_gdextension;
@@ -128,6 +143,12 @@ static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
 static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
 static Ref<ResourceFormatLoaderResourceXML> resource_loader_resource_xml;
 static Ref<ResourceFormatSaverResourceXML> resource_saver_resource_xml;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_ini;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_ini;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_csv;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_csv;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_xml;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_xml;
 static Ref<ResourceFormatLoaderPck> resource_loader_pck;
 static Ref<ResourceFormatSaverPck> resource_saver_pck;
 static ResourceTextSerializer *_resource_text_serializer = nullptr;
@@ -135,7 +156,7 @@ static ResourceTextSerializer *_resource_text_serializer = nullptr;
 static CoreBind::ResourceLoader *_resource_loader = nullptr;
 static PathPrefixServer *_path_prefix_server = nullptr;
 static FilesManifestServer *_files_manifest_server = nullptr;
-static PckPackageServer *_pck_package_server = nullptr;
+static PCKPackageServer *_pck_package_server = nullptr;
 static StreamingAssetsServer *_streaming_assets_server = nullptr;
 static ResourceDatabase *_resource_database = nullptr;
 static CoreBind::ResourceSaver *_resource_saver = nullptr;
@@ -162,6 +183,8 @@ extern void unregister_global_constants();
 
 static ResourceUID *resource_uid = nullptr;
 static SeedServer *seed_server = nullptr;
+static TextInsertionServer *text_insertion_server = nullptr;
+static TextLocalizationServer *text_localization_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -241,6 +264,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(InputEventMagnifyGesture);
 	GDREGISTER_CLASS(InputEventPanGesture);
 	GDREGISTER_CLASS(InputEventMIDI);
+	GDREGISTER_CLASS(InputAction);
+	GDREGISTER_CLASS(InputActions);
 
 	// Network
 	GDREGISTER_ABSTRACT_CLASS(StreamPeer);
@@ -314,7 +339,21 @@ void register_core_types() {
 	resource_saver_resource_xml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
-	// `.pck` files as `PckPackage` resources: loading opens a pack without mounting it, saving builds one.
+	// Plain data files (no type marker) as INI, CSV and XML resources, after the text-tree loaders above.
+	resource_loader_text_data_ini.instantiate("INI", Vector<String>{ "ini" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_ini);
+	resource_saver_text_data_ini.instantiate("INI");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_ini);
+	resource_loader_text_data_csv.instantiate("CSV", Vector<String>{ "csv" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_csv);
+	resource_saver_text_data_csv.instantiate("CSV");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_csv);
+	resource_loader_text_data_xml.instantiate("XML", Vector<String>{ "xml" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_xml);
+	resource_saver_text_data_xml.instantiate("XML");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_xml);
+
+	// `.pck` files as `PCKPackage` resources: loading opens a pack without mounting it, saving builds one.
 	resource_loader_pck.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_pck);
 	resource_saver_pck.instantiate();
@@ -323,7 +362,22 @@ void register_core_types() {
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
 	GDREGISTER_CLASS(TranslationDomain);
+	GDREGISTER_CLASS(TextInsertionValues);
+	GDREGISTER_CLASS(TextInsertionTemplate);
+	GDREGISTER_ABSTRACT_CLASS(TextInsertionServer);
+	text_insertion_server = memnew(TextInsertionServer);
 	GDREGISTER_CLASS(OptimizedTranslation);
+	GDREGISTER_ABSTRACT_CLASS(LocalizationCatalog);
+	GDREGISTER_CLASS(TextLocalizationCatalog);
+	GDREGISTER_CLASS(ResourceLocalizationCatalog);
+	GDREGISTER_CLASS(LocalizationCatalogList);
+	resource_loader_localization_catalog.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog);
+	resource_saver_localization_catalog.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog);
+	GDREGISTER_ABSTRACT_CLASS(LocalizationServer);
+	GDREGISTER_ABSTRACT_CLASS(TextLocalizationServer);
+	text_localization_server = memnew(TextLocalizationServer);
 	GDREGISTER_CLASS(UndoRedo);
 	GDREGISTER_CLASS(TriangleMesh);
 
@@ -337,6 +391,15 @@ void register_core_types() {
 	GDREGISTER_CLASS(XMLParser);
 	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
+	GDREGISTER_ABSTRACT_CLASS(TextDataFormat);
+	GDREGISTER_CLASS(XMLElement);
+	GDREGISTER_CLASS(XML);
+	GDREGISTER_CLASS(INI);
+	GDREGISTER_CLASS(CSV);
+	GDREGISTER_CLASS(DataField);
+	GDREGISTER_CLASS(DataSchema);
+	GDREGISTER_CLASS(DataValidationOptions);
+	GDREGISTER_CLASS(DataValidation);
 	GDREGISTER_CLASS(RegExMatch);
 	GDREGISTER_CLASS(RegEx);
 
@@ -393,9 +456,12 @@ void register_core_types() {
 	GDREGISTER_CLASS(PathPrefix);
 	GDREGISTER_CLASS(PathPrefixServer);
 	GDREGISTER_ABSTRACT_CLASS(FilesManifestServer);
-	GDREGISTER_CLASS(PckExtractResult);
-	GDREGISTER_CLASS(PckPackage);
-	GDREGISTER_ABSTRACT_CLASS(PckPackageServer);
+	GDREGISTER_CLASS(FilesManifestValidation);
+	GDREGISTER_CLASS(PCKExtractResult);
+	GDREGISTER_CLASS(PCKPackage);
+	GDREGISTER_CLASS(PCKPackageEntry);
+	GDREGISTER_CLASS(PCKBuildPlan);
+	GDREGISTER_ABSTRACT_CLASS(PCKPackageServer);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
 	GDREGISTER_CLASS(PreloadList);
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
@@ -425,7 +491,7 @@ void register_core_types() {
 	_resource_loader = memnew(CoreBind::ResourceLoader);
 	_resource_saver = memnew(CoreBind::ResourceSaver);
 	_files_manifest_server = memnew(FilesManifestServer);
-	_pck_package_server = memnew(PckPackageServer);
+	_pck_package_server = memnew(PCKPackageServer);
 	// Registers the locked `streaming://` prefix; `setup()` points it at the files later.
 	_streaming_assets_server = memnew(StreamingAssetsServer);
 	_resource_database = memnew(ResourceDatabase);
@@ -458,6 +524,8 @@ void register_core_settings() {
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 	ResourceTextSerializer::register_settings();
 	StreamingAssetsServer::register_settings();
+	TextInsertionServer::register_settings();
+	LocalizationServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -479,6 +547,8 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceSaver", CoreBind::ResourceSaver::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", CoreBind::Marshalls::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextInsertionServer", TextInsertionServer::get_singleton(), "TextInsertionServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextLocalizationServer", TextLocalizationServer::get_singleton(), "TextLocalizationServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
@@ -486,7 +556,7 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("PathPrefixServer", PathPrefixServer::get_singleton(), "PathPrefixServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("FilesManifestServer", FilesManifestServer::get_singleton(), "FilesManifestServer"));
-	Engine::get_singleton()->add_singleton(Engine::Singleton("PckPackageServer", PckPackageServer::get_singleton(), "PckPackageServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("PCKPackageServer", PCKPackageServer::get_singleton(), "PCKPackageServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("StreamingAssetsServer", StreamingAssetsServer::get_singleton(), "StreamingAssetsServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceDatabase", ResourceDatabase::get_singleton(), "ResourceDatabase"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceTextSerializer", ResourceTextSerializer::get_singleton(), "ResourceTextSerializer"));
@@ -552,6 +622,8 @@ void unregister_core_types() {
 	memdelete(resource_uid);
 
 	memdelete(seed_server);
+	memdelete(text_localization_server);
+	memdelete(text_insertion_server);
 	memdelete(_resource_text_serializer);
 
 	memdelete(ip);
@@ -578,6 +650,11 @@ void unregister_core_types() {
 		resource_format_po.unref();
 	}
 
+	ResourceLoader::remove_resource_format_loader(resource_loader_localization_catalog);
+	resource_loader_localization_catalog.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_localization_catalog);
+	resource_saver_localization_catalog.unref();
+
 	if constexpr (GD_IS_CLASS_ENABLED(Crypto)) {
 		ResourceSaver::remove_resource_format_saver(resource_format_saver_crypto);
 		resource_format_saver_crypto.unref();
@@ -600,6 +677,18 @@ void unregister_core_types() {
 	resource_saver_resource_csv.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_resource_xml);
 	resource_loader_resource_xml.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_ini);
+	resource_loader_text_data_ini.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_ini);
+	resource_saver_text_data_ini.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_csv);
+	resource_loader_text_data_csv.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_csv);
+	resource_saver_text_data_csv.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_xml);
+	resource_loader_text_data_xml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_xml);
+	resource_saver_text_data_xml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_resource_xml);
 	resource_saver_resource_xml.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_pck);

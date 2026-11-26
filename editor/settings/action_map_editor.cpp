@@ -41,6 +41,7 @@
 #include "scene/gui/margin_container.h"
 #include "scene/gui/separator.h"
 #include "scene/gui/tree.h"
+#include "scene/main/input_icon_server.h"
 
 static bool _is_action_name_valid(const String &p_name) {
 	const char32_t *cstr = p_name.get_data();
@@ -368,8 +369,26 @@ void ActionMapEditor::drop_data_fw(const Point2 &p_point, const Variant &p_data,
 	}
 }
 
+void ActionMapEditor::_on_input_icons_changed() {
+	if (!actions_cache.is_empty()) {
+		update_action_list();
+	}
+}
+
 void ActionMapEditor::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_ENTER_TREE: {
+			if (InputIconServer::get_singleton()) {
+				InputIconServer::get_singleton()->connect("icon_set_changed", callable_mp(this, &ActionMapEditor::_on_input_icons_changed).unbind(1), CONNECT_DEFERRED);
+			}
+		} break;
+
+		case NOTIFICATION_EXIT_TREE: {
+			if (InputIconServer::get_singleton()) {
+				InputIconServer::get_singleton()->disconnect("icon_set_changed", callable_mp(this, &ActionMapEditor::_on_input_icons_changed).unbind(1));
+			}
+		} break;
+
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 			if (!actions_cache.is_empty()) {
 				update_action_list();
@@ -563,6 +582,15 @@ void ActionMapEditor::update_action_list(const Vector<ActionInfo> &p_action_info
 			Ref<InputEventJoypadMotion> jm = event;
 			if (jm.is_valid()) {
 				event_item->set_icon(0, get_editor_theme_icon(SNAME("JoyAxis")));
+			}
+
+			// Custom icon of the project's InputIconSet (#198), limited to the editor icon size.
+			if (InputIconServer::get_singleton()) {
+				const Ref<Texture2D> custom_icon = InputIconServer::get_singleton()->get_icon(event);
+				if (custom_icon.is_valid()) {
+					event_item->set_icon(0, custom_icon);
+					event_item->set_icon_max_width(0, get_theme_constant(SNAME("class_icon_size"), EditorStringName(Editor)));
+				}
 			}
 
 			// Third Column - Buttons

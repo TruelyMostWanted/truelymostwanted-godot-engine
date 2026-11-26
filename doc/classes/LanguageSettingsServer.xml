@@ -57,7 +57,7 @@
 		<method name="get_available_locales" qualifiers="static">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the locales of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
+				Returns the locales of the localization catalogs (see [method LocalizationServer.get_available_locales]) and of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
 			</description>
 		</method>
 		<method name="get_command_line_locale" qualifiers="static">
@@ -125,4 +125,32 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="layout_direction_changed">
+			<param index="0" name="direction" type="int" enum="Window.LayoutDirection" />
+			<description>
+				Emitted once when a changed [member LanguageSettings.layout_direction] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				Use it for layouts that are not under the root window.
+			</description>
+		</signal>
+		<signal name="locale_changed">
+			<param index="0" name="locale" type="String" />
+			<description>
+				Emitted once when a changed [member LanguageSettings.locale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+				An empty [param locale] means the locale of the system. Use it for text that is not translated automatically, for example cached strings or a font for the language. [method TranslationServer.get_locale] returns the locale in use.
+			</description>
+		</signal>
+		<signal name="pseudolocalization_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member LanguageSettings.pseudolocalization_enabled] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+		<signal name="root_auto_translate_mode_changed">
+			<param index="0" name="mode" type="int" enum="Node.AutoTranslateMode" />
+			<description>
+				Emitted once when a changed [member LanguageSettings.root_auto_translate_mode] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
+	</signals>
 </class>

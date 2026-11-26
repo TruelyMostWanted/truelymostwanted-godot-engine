@@ -1,0 +1,119 @@
+# Release notes categories, read by .github/truely/release-notes.sh.
+# Columns: issue_or_label<TAB>category. A number is a per-issue override; anything else is a label.
+# An issue gets the category of its override, else of the first label row below that it carries
+# (so the order of the label rows matters), else "Core". Category "-" leaves the issue out of the notes.
+# Categories follow the topic groups of Godot's interactive changelog, in this order:
+# 2D, 3D, Animation, Audio, Buildsystem, C#, Core, Editor, Export, GDExtension, GDScript, GUI, Import,
+# Input, Navigation, Network, Physics, Platforms, Rendering, Shaders, Tests, Thirdparty, XR.
+# Type: "type: feature" = Feature, "type: refactoring" = Enhancement, "type: bug" = Bugfix.
+# "type: task" and "type: concept" appear (as Enhancement) only with an issue override here, since only
+# the author knows whether they shipped code; without one they are left out. "type: review" and
+# "type: playtest" are always left out.
+1	Core
+2	Core
+3	Core
+5	Core
+7	Core
+8	Core
+9	Core
+10	Export
+11	Core
+12	Audio
+15	Core
+16	Audio
+17	Core
+18	Input
+19	Input
+20	Rendering
+21	Rendering
+22	Rendering
+23	Rendering
+24	Rendering
+25	Rendering
+26	Core
+27	GUI
+28	3D
+29	Audio
+30	XR
+34	Core
+35	Core
+36	Core
+37	Core
+38	-
+39	Core
+46	-
+48	-
+50	2D
+51	Editor
+53	Core
+60	Core
+68	Core
+70	Core
+71	Core
+73	Core
+74	Audio
+75	Audio
+76	Audio
+77	Core
+78	Core
+79	Core
+80	Core
+83	Export
+84	Editor
+85	Editor
+86	Export
+87	Core
+88	Export
+89	Export
+90	Export
+91	Export
+93	Core
+95	Import
+96	GUI
+99	Core
+100	Network
+101	Import
+102	Audio
+103	Audio
+104	Audio
+105	Rendering
+122	Audio
+155	Core
+172	Input
+173	Core
+184	Core
+185	Audio
+189	Core
+191	Input
+194	-
+198	Input
+199	Audio
+200	Rendering
+201	Thirdparty
+202	Import
+207	-
+211	Editor
+214	-
+217	-
+area: dotnet	C#
+area: tests	Tests
+area: thirdparty	Thirdparty
+area: build	Buildsystem
+area: editor	Editor
+platform: xr	XR
+topic: networking	Network
+topic: animation	Animation
+topic: audio	Audio
+topic: input	Input
+topic: import	Import
+topic: 3d	3D
+topic: 2d	2D
+topic: rendering	Rendering
+topic: shaders	Shaders
+topic: physics	Physics
+topic: pathfinding	Navigation
+topic: ui	GUI
+area: core	Core
+area: servers	Core
+area: modules	Core
+area: scene	GUI

@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+Import("env")
+Import("env_modules")
+
+env_yaml = env_modules.Clone()
+
+# Own YAML 1.2 subset reader and writer, no third-party code.
+env_yaml.add_source_files(env.modules_sources, "*.cpp")
+
+if env.editor_build:
+    env_yaml.add_source_files(env.modules_sources, "editor/*.cpp")

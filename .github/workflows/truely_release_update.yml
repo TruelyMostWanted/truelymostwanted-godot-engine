@@ -1,0 +1,141 @@
+name: 📦 Truely Release Update
+
+# Publishes or updates a release from the artifacts of a finished "Truely Release" run, without
+# building again: for releases whose macOS jobs were not assigned a runner (capacity). With
+# `partial`, missing macOS builds are left out; re-run the missing jobs of that run later and start
+# this workflow again to add them to the same release post (files are replaced with --clobber).
+# `replace_tag` moves an existing release post (e.g. the previous pre-release) to the new version:
+# new tag, title and notes, its old files removed.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: ID of a finished "Truely Release" run whose artifacts are published
+        required: true
+        type: string
+      replace_tag:
+        description: Tag of an existing release post to update instead of creating a new one (optional)
+        required: false
+        type: string
+        default: ""
+      partial:
+        description: Leave out macOS builds that are missing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: truely-release
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  PYTHONIOENCODING: utf8
+
+jobs:
+  publish:
+    name: 📦 Publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Commit of the run
+        id: run
+        run: |
+          sha="$(gh run view "${{ inputs.run_id }}" -R "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.run.outputs.sha }}
+          fetch-depth: 0
+
+      # The packaging scripts come from this workflow's commit (they may be newer than the release).
+      - name: Scripts of this workflow
+        run: |
+          mkdir -p "$RUNNER_TEMP/truely"
+          for f in package-release.sh verify-release.py; do
+            git show "$GITHUB_SHA:.github/truely/$f" > "$RUNNER_TEMP/truely/$f"
+          done
+          echo "TOOLS=$RUNNER_TEMP/truely" >> "$GITHUB_ENV"
+
+      - name: Compute names
+        run: |
+          python3 - <<'PY'
+          import os, re, runpy
+          v = runpy.run_path("version.py")
+          status = open("truely/godot-status.txt", encoding="utf-8").read().strip()
+          truely = open("truely/version.txt", encoding="utf-8").read().strip()
+          number = f"{v['major']}.{v['minor']}" + (f".{v['patch']}" if v["patch"] else "")
+          sha = os.environ["SHA"][:7]
+          base = f"{number}-{status}"
+          m = re.fullmatch(r"([a-z]+)(\d*)", status)
+          pretty = f"{number} {m.group(1)} {m.group(2)}".strip() if m else f"{number} {status}"
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"TRUELY={truely}\nCONFIG={number}.{status}\nNAME=Truely-v{truely}_Godot{base}_{sha}\n")
+              f.write(f"TAG=truely-v{truely}-godot{base}\nTITLE=Truely v{truely} (Godot {pretty}, {sha})\n")
+          PY
+
+      - name: Download artifacts of the run
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Check the version string
+        run: |
+          chmod +x artifacts/godot.linuxbsd.*
+          [ "$(./artifacts/godot.linuxbsd.editor.x86_64 --version | tail -n 1)" = "$CONFIG.truely.${SHA:0:9}" ]
+          [ "$(./artifacts/godot.linuxbsd.editor.x86_64 --truely-version | tail -n 1)" = "$TRUELY" ]
+
+      - name: Package
+        run: |
+          if [ "${{ inputs.partial }}" = "true" ]; then export PARTIAL=1; fi
+          DIST="$PWD/misc/dist" bash "$TOOLS/package-release.sh" artifacts release "$NAME" "$CONFIG"
+
+      - name: Verify release files
+        run: python3 "$TOOLS/verify-release.py" release "$NAME" "$CONFIG"
+
+      - name: Release notes
+        run: |
+          bash .github/truely/release-notes.sh "$SHA" "$TAG" "$CONFIG" > notes.md
+          missing=""
+          for m in "" ".mono"; do
+            [ -e "artifacts/godot.macos.editor.universal$m" ] || missing="$missing macOS${m:+ (.NET)}"
+          done
+          if [ -n "$missing" ]; then
+            printf '\n> [!NOTE]\n> Not included yet:%s. These files follow as soon as GitHub assigns a macOS runner.\n' "$missing" >> notes.md
+          fi
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish
+        run: |
+          flags="--prerelease"
+          if [ "$(tr -d '[:space:]' < truely/godot-status.txt)" = "stable" ]; then flags="--latest"; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Updating release $TAG"
+            gh release upload "$TAG" release/* --clobber
+            # Keep the (curated) notes of an existing release; drop only the "Not included yet"
+            # note once nothing is missing any more.
+            if ! grep -q 'Not included yet' notes.md; then
+              gh release view "$TAG" --json body --jq .body | grep -v -e '^> \[!NOTE\]$' -e '^> Not included yet:' > body.md
+              gh release edit "$TAG" --notes-file body.md
+            fi
+          elif [ -n "${{ inputs.replace_tag }}" ] && gh release view "${{ inputs.replace_tag }}" >/dev/null 2>&1; then
+            old="${{ inputs.replace_tag }}"
+            echo "Moving release post $old to $TAG"
+            for a in $(gh release view "$old" --json assets --jq '.assets[].name'); do
+              gh release delete-asset "$old" "$a" --yes
+            done
+            gh release edit "$old" --tag "$TAG" --target "$SHA" --title "$TITLE" --notes-file notes.md $flags --draft=false
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --target "$SHA" --title "$TITLE" --notes-file notes.md $flags
+          fi

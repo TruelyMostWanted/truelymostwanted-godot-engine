@@ -11,7 +11,7 @@ Gilt für jedes Feature- und Refactoring-Issue. Branches und Remotes stehen in [
 
 Die Regeln für Code und Issues stehen in [`CONVENTIONS.md`](CONVENTIONS.md). Kurz:
 - Neue Systeme sind **keine Nodes**, sondern C++-Singletons (Server) und `Resource`s (Daten), gebunden in `_bind_methods()`.
-- C# bekommt die API über den generierten Glue: `TtsServer` (statisch) und `TtsServerInstance`.
+- C# bekommt die API über den generierten Glue: `TTSServer` (statisch) und `TTSServerInstance`.
 - Jedes Feature hat Klassenreferenz, Wiki-Seite und Checks in GDScript und C# (Mono-Build).
 - Issues auf Englisch, nach Vorlage, mit „Feasibility to check“ und den fünf Abnahmepunkten.
 
@@ -53,7 +53,8 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.4 CI in Stapeln
 
-- Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
+- Die volle CI läuft nur **auf `truely-godot-engine-releases`**, wenn `truely-godot-engine` per `release.ps1` dorthin kommt (Fast-forward). Merges nach `truely-godot-engine` und Feature-Branches starten keine CI; dort zählt der lokale Windows-Build mit Mono und die Checks in GDScript und C#.
+- Rot auf `truely-godot-engine-releases`: auf dem Feature-Branch (oder einem Bug-Branch) beheben, nach `truely-godot-engine` mergen, erneut freigeben.
 - Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
 - Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
 - **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
@@ -62,7 +63,7 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.5 Mergen
 
-Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft danach auf `truely-godot-engine` (2.4).
+Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft erst bei der Freigabe auf `truely-godot-engine-releases` (2.4).
 
 **Richtung:** Feature-Branches enthalten nur ihre eigenen Änderungen, wie ein PR. Sie gehen nach `truely-godot-engine`, nie umgekehrt: `truely-godot-engine` wird nicht in einen Feature-Branch gemergt.
 
@@ -72,6 +73,7 @@ gh pr merge --squash              # OHNE --delete-branch
 ```
 
 - **Den Feature-Branch niemals löschen**, weder auf GitHub noch lokal. Er bleibt immer bestehen.
+- **Truely-Version** ([`version.txt`](version.txt), SemVer): wird **einmal pro Release** erhöht, nicht in jedem Feature-Branch (sonst Konflikte zwischen parallelen Branches). Wer nach `truely-godot-engine` merged, vergleicht `truely/version.txt` mit dem letzten Release-Tag (`git describe --tags --match 'truely-v*' --abbrev=0`): Ist sie dort noch gleich, wird sie direkt danach in einem eigenen Commit erhöht (`Raise the Truely version to 0.2.0 (#N)`), **MINOR** für ein Feature, **PATCH** nur für Fehlerbehebungen (MINOR schließt PATCH ein: ist schon MINOR erhöht, nichts tun; war nur PATCH erhöht und kommt ein Feature dazu, auf MINOR umstellen). **MAJOR** bei einem neuen Godot-Major/Minor (4.8 → 4.9) oder inkompatiblen API-Änderungen. `release.ps1` und der Release-Workflow brechen ab, wenn der Tag der Version schon existiert.
 - In den Repo-Einstellungen ist „Automatically delete head branches“ (`delete_branch_on_merge`) **aus** und bleibt aus.
 - Beim PR das *base repository* prüfen: `TruelyMostWanted/truelymostwanted-godot-engine`, nicht `godotengine/godot`.
 
@@ -181,12 +183,12 @@ Die Seiten folgen dem Aufbau der **offiziellen Godot-Docs**. Es gibt zwei Arten 
 
 ### 5.1 Klassenreferenz: eine Seite pro Klasse
 
-Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TtsServer`.
+Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TTSServer`.
 Inhalt wie `doc/classes/<Klasse>.xml`, in dieser Reihenfolge:
 
 | Abschnitt | Inhalt |
 |---|---|
-| Kopf | `# TtsServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
+| Kopf | `# TTSServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
 | Description | ausführliche Beschreibung, bei Bedarf mit Beispielen |
 | Tutorials | Links zu den Guide-Seiten des Features |
 | Properties | Tabelle: Typ, Name, Default |

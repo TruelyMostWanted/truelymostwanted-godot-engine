@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ProgressBarStyle" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The shared look of world-space bars drawn by [ProgressBarServer].
+	</brief_description>
+	<description>
+		Describes size, position, [StyleBox]es, fill direction and follow behavior of bars created with [method ProgressBarServer.bar_create]. Many bars share one style; changing the style (or one of its [StyleBox]es) emits [signal Resource.changed] and redraws every bar that uses it.
+		Save a style as a [code].tres[/code] file to edit it in the Inspector and share it between unit types.
+		[codeblocks]
+		[gdscript]
+		var style = ProgressBarStyle.new()
+		style.size = Vector2(40, 5)
+		style.offset = Vector2(0, -32)
+		var fill = StyleBoxFlat.new()
+		fill.bg_color = Color.GREEN
+		style.fill = fill
+		style.follow_mode = ProgressBarStyle.FOLLOW_MODE_POSITION_ONLY
+		[/gdscript]
+		[csharp]
+		var style = new ProgressBarStyle();
+		style.Size = new Vector2(40, 5);
+		style.Offset = new Vector2(0, -32);
+		var fill = new StyleBoxFlat();
+		fill.BgColor = Colors.Green;
+		style.Fill = fill;
+		style.FollowMode = ProgressBarStyle.FollowModeEnum.PositionOnly;
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="background" type="StyleBox" setter="set_background" getter="get_background">
+			The [StyleBox] drawn behind the fill, over the whole bar. If [code]null[/code], the [code skip-lint]background[/code] theme item of [ProgressBar] is used (project theme first, then the default theme).
+		</member>
+		<member name="fill" type="StyleBox" setter="set_fill" getter="get_fill">
+			The [StyleBox] drawn for the filled part. Like [ProgressBar], the fill keeps the minimum size of this [StyleBox] and is not drawn at ratio [code]0.0[/code]. If [code]null[/code], the [code skip-lint]fill[/code] theme item of [ProgressBar] is used.
+		</member>
+		<member name="fill_mode" type="int" setter="set_fill_mode" getter="get_fill_mode" enum="ProgressBar.FillMode" default="0">
+			The direction in which the bar fills, see [enum ProgressBar.FillMode]. There is no right-to-left mirroring in world space.
+		</member>
+		<member name="follow_mode" type="int" setter="set_follow_mode" getter="get_follow_mode" enum="ProgressBarStyle.FollowMode" default="0">
+			How the bar follows its parent's transform.
+		</member>
+		<member name="hide_when_empty" type="bool" setter="set_hide_when_empty" getter="is_hide_when_empty" default="false">
+			If [code]true[/code], bars with ratio [code]0.0[/code] are hidden.
+		</member>
+		<member name="hide_when_full" type="bool" setter="set_hide_when_full" getter="is_hide_when_full" default="false">
+			If [code]true[/code], bars with ratio [code]1.0[/code] are hidden, for example health bars of unhurt units.
+		</member>
+		<member name="offset" type="Vector2" setter="set_offset" getter="get_offset" default="Vector2(0, -20)">
+			The center of the bar in the parent's local space (for example above the unit). It is added to the offset set with [method ProgressBarServer.bar_set_offset].
+		</member>
+		<member name="size" type="Vector2" setter="set_size" getter="get_size" default="Vector2(32, 4)">
+			The size of the bar in pixels, in the parent's local space.
+		</member>
+	</members>
+	<constants>
+		<constant name="FOLLOW_MODE_INHERIT" value="0" enum="FollowMode">
+			The bar inherits the full transform of its parent: it moves, rotates and scales with the unit. This costs nothing per frame.
+		</constant>
+		<constant name="FOLLOW_MODE_POSITION_ONLY" value="1" enum="FollowMode">
+			The bar follows only the position of its parent and stays upright and unscaled when the unit rotates or scales. The server updates these bars once per frame.
+		</constant>
+		<constant name="FOLLOW_MODE_MAX" value="2" enum="FollowMode">
+			Represents the size of the [enum FollowMode] enum.
+		</constant>
+	</constants>
+</class>

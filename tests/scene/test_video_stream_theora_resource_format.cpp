@@ -36,6 +36,7 @@ TEST_FORCE_LINK(test_video_stream_theora_resource_format)
 
 #ifdef MODULE_THEORA_ENABLED
 
+#include "core/config/engine.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
@@ -177,6 +178,16 @@ TEST_CASE("[VideoStreamTheoraResourceFormat] Invalid and missing files") {
 	CHECK_FALSE(loader.recognize_path(dir.path_join("clip.ogg")));
 
 	DirAccess::remove_absolute(not_ogg);
+}
+
+TEST_CASE("[VideoStreamTheoraResourceFormat] In the editor, res:// .ogv without an importer is loaded directly") {
+	// Godot has no .ogv importer: a project file without .import must not be left to the import system (#202).
+	const bool was_editor = Engine::get_singleton()->is_editor_hint();
+	Engine::get_singleton()->set_editor_hint(true);
+	CHECK_FALSE(ResourceFormatLoaderTheora::is_imported_path("res://unittest_202/intro.ogv"));
+	ResourceFormatLoaderTheora loader;
+	CHECK(loader.get_resource_type("res://unittest_202/intro.ogv") == "VideoStreamTheora");
+	Engine::get_singleton()->set_editor_hint(was_editor);
 }
 
 } // namespace TestVideoStreamTheoraResourceFormat

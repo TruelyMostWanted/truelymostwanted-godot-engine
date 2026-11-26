@@ -48,6 +48,7 @@
 #include "core/os/time.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/version.h"
 #include "editor/animation/animation_player_editor_plugin.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
@@ -155,6 +156,7 @@
 #include "editor/themes/editor_theme_manager.h"
 #include "editor/translations/editor_translation_parser.h"
 #include "editor/translations/packed_scene_translation_parser_plugin.h"
+#include "editor/translations/resource_translation_parser_plugin.h"
 #include "editor/version_control/version_control_editor_plugin.h"
 #include "main/main.h"
 #include "scene/2d/node_2d.h"
@@ -400,7 +402,7 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME + " (" TRUELY_VERSION_FULL_NAME ")");
 	if (project_title) {
 		project_title->set_text(title);
 	}
@@ -1505,6 +1507,7 @@ void EditorNode::_resources_reimporting(const Vector<String> &p_resources) {
 	scenes_modification_table.clear();
 	scenes_reimported.clear();
 	resources_reimported.clear();
+	uninstanced_scenes_reimported.clear();
 	EditorFileSystem *editor_file_system = EditorFileSystem::get_singleton();
 	for (const String &res_path : p_resources) {
 		// It's faster to use EditorFileSystem::get_file_type than fetching the resource type from disk.
@@ -1560,6 +1563,7 @@ void EditorNode::_resources_reimported(const Vector<String> &p_resources) {
 	}
 
 	reload_instances_with_path_in_edited_scenes();
+	reload_uninstanced_scenes();
 
 	scenes_modification_table.clear();
 	scenes_reimported.clear();
@@ -7434,6 +7438,8 @@ void EditorNode::preload_reimporting_with_path_in_edited_scenes(const List<Strin
 
 					// Search the scene to find nodes that references the nodes will be recreated.
 					get_preload_modifications_reference_to_nodes(edited_scene_root, edited_scene_root, instances_to_reimport, instance_list_with_children, scene_modifications.other_instances_modifications);
+				} else {
+					uninstanced_scenes_reimported.push_back(instance_path);
 				}
 			}
 
@@ -7818,6 +7824,20 @@ void EditorNode::reload_instances_with_path_in_edited_scenes() {
 	editor_data.restore_edited_scene_state(editor_selection, &editor_history);
 
 	progress.step(TTR("Reloading done."), editor_data.get_edited_scene_count());
+}
+
+void EditorNode::reload_uninstanced_scenes() {
+	if (uninstanced_scenes_reimported.is_empty()) {
+		return;
+	}
+	// Reloads resources stored in memory (cached in undo history for example).
+	for (String &scene_path : uninstanced_scenes_reimported) {
+		Error err;
+		Ref<PackedScene> instance_scene_packed_scene = ResourceLoader::load(scene_path, "", ResourceFormatLoader::CACHE_MODE_REPLACE, &err);
+
+		ERR_FAIL_COND(err != OK);
+		ERR_FAIL_COND(instance_scene_packed_scene.is_null());
+	}
 }
 
 void EditorNode::_remove_all_not_owned_children(Node *p_node, Node *p_owner) {
@@ -9746,6 +9766,11 @@ EditorNode::EditorNode() {
 
 	EditorExport::get_singleton()->add_export_plugin(shader_baker_export_plugin);
 #endif // RD_ENABLED
+
+	// Before the scene parser, which also claims "res".
+	Ref<ResourceTranslationParserPlugin> resource_translation_parser_plugin;
+	resource_translation_parser_plugin.instantiate();
+	EditorTranslationParser::get_singleton()->add_parser(resource_translation_parser_plugin, EditorTranslationParser::STANDARD);
 
 	Ref<PackedSceneEditorTranslationParserPlugin> packed_scene_translation_parser_plugin;
 	packed_scene_translation_parser_plugin.instantiate();

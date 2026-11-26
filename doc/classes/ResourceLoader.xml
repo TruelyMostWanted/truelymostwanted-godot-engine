@@ -34,8 +34,52 @@
 				[b]Note:[/b] If you use [method Resource.take_over_path], this method will return [code]true[/code] for the taken path even if the resource wasn't saved (i.e. exists only in resource cache).
 			</description>
 		</method>
+		<method name="get_cached_count">
+			<return type="int" />
+			<param index="0" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns the number of resources in the resource cache of the [param kinds], without building an array of paths. Equal to the size of [method get_cached_paths] with the same [param kinds].
+				[codeblocks]
+				[gdscript]
+				print("Imported: ", ResourceLoader.get_cached_count(ResourceLoader.CACHED_RESOURCE_KIND_IMPORTED))
+				print("Own files: ", ResourceLoader.get_cached_count(ResourceLoader.CACHED_RESOURCE_KIND_FILE))
+				[/gdscript]
+				[csharp]
+				GD.Print("Imported: ", ResourceLoader.GetCachedCount(ResourceLoader.CachedResourceKind.Imported));
+				GD.Print("Own files: ", ResourceLoader.GetCachedCount(ResourceLoader.CachedResourceKind.File));
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="get_cached_count_for_type">
+			<return type="int" />
+			<param index="0" name="type" type="StringName" />
+			<param index="1" name="exact_type" type="bool" default="false" />
+			<param index="2" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns the number of cached resources of [param type], like the size of [method get_cached_paths_for_type] with the same arguments, without building an array.
+			</description>
+		</method>
+		<method name="get_cached_count_in_directory">
+			<return type="int" />
+			<param index="0" name="directory" type="String" />
+			<param index="1" name="recursive" type="bool" default="true" />
+			<param index="2" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns the number of cached resources inside [param directory], like the size of [method get_cached_paths_in_directory] with the same arguments, without building an array.
+			</description>
+		</method>
+		<method name="get_cached_count_with_extension">
+			<return type="int" />
+			<param index="0" name="extension" type="String" />
+			<param index="1" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns the number of cached resources with the file extension [param extension], like the size of [method get_cached_paths_with_extension] with the same arguments, without building an array.
+			</description>
+		</method>
 		<method name="get_cached_paths">
 			<return type="PackedStringArray" />
+			<param index="0" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
 			<description>
 				Returns the paths of all resources that are currently in the resource cache, in no particular order. A resource stays in the cache as long as at least one reference to it exists. Each returned path can be passed to [method get_cached_ref] or [method has_cached].
 				The result includes the paths of built-in sub-resources that were cached together with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code]. Resources without a path are never cached and are not included. To get only some of the paths, prefer [method get_cached_paths_for_type], [method get_cached_paths_with_extension] and [method get_cached_paths_in_directory], which filter in C++ and copy only the matching paths. Other filters can be applied in your script:
@@ -48,15 +92,17 @@
 				[/csharp]
 				[/codeblocks]
 				[b]Note:[/b] The result is a snapshot. It is safe to call this method while other threads load resources, but those threads may add or remove paths right after it returns.
+				[param kinds] limits the result to some kinds of resources, for example [code]CACHED_RESOURCE_KIND_FILE | CACHED_RESOURCE_KIND_BUILT_IN[/code] to leave out imported textures and sounds (see [enum CachedResourceKind]).
 			</description>
 		</method>
 		<method name="get_cached_paths_for_type">
 			<return type="PackedStringArray" />
 			<param index="0" name="type" type="StringName" />
-			<param index="1" name="exact" type="bool" default="false" />
+			<param index="1" name="exact_type" type="bool" default="false" />
+			<param index="2" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
 			<description>
 				Returns the paths of the cached resources whose class is [param type] or inherits from it, in no particular order. [param type] can be a native class (including GDExtension classes) or a global script class ([code]class_name[/code] in GDScript, [code][GlobalClass][/code] in C#); a resource matches a script class if its script or one of its base scripts has that name.
-				If [param exact] is [code]true[/code], only resources whose most derived named class is [param type] match: the first global class name found on the resource's script and its base scripts, otherwise its native class. A resource with a [code]class_name[/code] script therefore does not match its native base class exactly.
+				If [param exact_type] is [code]true[/code], only resources whose most derived named class is [param type] match: the first global class name found on the resource's script and its base scripts, otherwise its native class. A resource with a [code]class_name[/code] script therefore does not match its native base class exactly.
 				An unknown class name returns an empty array. Like [method get_cached_paths], the result includes built-in sub-resources and is a snapshot that is safe to take while other threads load resources.
 				[codeblocks]
 				[gdscript]
@@ -68,12 +114,14 @@
 				string[] onlyCurves = ResourceLoader.GetCachedPathsForType("Curve", true);
 				[/csharp]
 				[/codeblocks]
+				[param kinds] limits the result to some kinds of resources, for example [code]CACHED_RESOURCE_KIND_FILE | CACHED_RESOURCE_KIND_BUILT_IN[/code] to leave out imported textures and sounds (see [enum CachedResourceKind]).
 			</description>
 		</method>
 		<method name="get_cached_paths_in_directory">
 			<return type="PackedStringArray" />
 			<param index="0" name="directory" type="String" />
 			<param index="1" name="recursive" type="bool" default="true" />
+			<param index="2" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
 			<description>
 				Returns the paths of the cached resources inside [param directory], in no particular order. A missing trailing slash is added, so [code]"res://levels"[/code] matches [code]res://levels/a.tres[/code] but not [code]res://levels2/a.tres[/code]. The comparison is a case-sensitive string prefix and works with any path prefix, such as [code]res://[/code] or [code]user://[/code].
 				If [param recursive] is [code]false[/code], only resources directly in [param directory] are returned, not those in its subdirectories. Built-in sub-resources (such as [code]res://levels/a.tscn::Gradient_x1y2z[/code]) belong to the directory of their file.
@@ -87,11 +135,13 @@
 				string[] topLevelOnly = ResourceLoader.GetCachedPathsInDirectory("res://levels/", false);
 				[/csharp]
 				[/codeblocks]
+				[param kinds] limits the result to some kinds of resources, for example [code]CACHED_RESOURCE_KIND_FILE | CACHED_RESOURCE_KIND_BUILT_IN[/code] to leave out imported textures and sounds (see [enum CachedResourceKind]).
 			</description>
 		</method>
 		<method name="get_cached_paths_with_extension">
 			<return type="PackedStringArray" />
 			<param index="0" name="extension" type="String" />
+			<param index="1" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
 			<description>
 				Returns the paths of the cached resources whose file has the extension [param extension], in no particular order. The extension is compared case-insensitively and may be given with or without a leading dot ([code]"tscn"[/code] or [code]".tscn"[/code]). Built-in sub-resources count as the extension of their file. An empty [param extension] returns the paths without an extension.
 				[codeblocks]
@@ -102,6 +152,7 @@
 				string[] scenes = ResourceLoader.GetCachedPathsWithExtension("tscn");
 				[/csharp]
 				[/codeblocks]
+				[param kinds] limits the result to some kinds of resources, for example [code]CACHED_RESOURCE_KIND_FILE | CACHED_RESOURCE_KIND_BUILT_IN[/code] to leave out imported textures and sounds (see [enum CachedResourceKind]).
 			</description>
 		</method>
 		<method name="get_cached_ref">
@@ -110,6 +161,35 @@
 			<description>
 				Returns the cached resource reference for the given [param path].
 				[b]Note:[/b] If the resource is not cached, the returned [Resource] will be invalid.
+			</description>
+		</method>
+		<method name="get_cached_resources_for_type">
+			<return type="Resource[]" />
+			<param index="0" name="type" type="StringName" />
+			<param index="1" name="exact_type" type="bool" default="false" />
+			<param index="2" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns the cached resources of [param type] themselves, not their paths, in no particular order. The same filter as [method get_cached_paths_for_type]; [param kinds] limits the result to some kinds of resources, for example [code]CACHED_RESOURCE_KIND_FILE | CACHED_RESOURCE_KIND_BUILT_IN[/code] to leave out imported textures and sounds (see [enum CachedResourceKind]). Holding the returned array keeps the resources in the cache.
+			</description>
+		</method>
+		<method name="get_cached_type_counts">
+			<return type="Dictionary" />
+			<param index="0" name="kinds" type="int" enum="ResourceLoader.CachedResourceKind" is_bitfield="true" default="7" />
+			<description>
+				Returns how many cached resources there are per class: a [Dictionary] with the class name ([StringName]) as key and the count as value. The class name is the most derived named class of the resource: its global script class ([code]class_name[/code]) if it has one, otherwise its native class. Useful to see what fills the memory.
+				[codeblocks]
+				[gdscript]
+				var counts = ResourceLoader.get_cached_type_counts()
+				for type in counts:
+				    print(type, ": ", counts[type])
+				[/gdscript]
+				[csharp]
+				foreach (var (type, count) in ResourceLoader.GetCachedTypeCounts())
+				{
+				    GD.Print(type, ": ", count);
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_dependencies">
@@ -166,11 +246,11 @@
 				Once a resource has been loaded by the engine, it is cached in memory for faster access, and future calls to the [method load] method will use the cached version. The cached resource can be overridden by using [method Resource.take_over_path] on a new resource for that same path.
 			</description>
 		</method>
-		<method name="is_extension_registered">
+		<method name="has_extension_loader">
 			<return type="bool" />
 			<param index="0" name="extension" type="String" />
 			<description>
-				Returns [code]true[/code] if a load [Callable] is registered for [param extension] with [method register_extension]. The extension is compared without the leading dot and case-insensitively.
+				Returns [code]true[/code] if a load [Callable] is registered for [param extension] with [method register_extension_loader]. The extension is compared without the leading dot and case-insensitively.
 			</description>
 		</method>
 		<method name="list_directory">
@@ -328,7 +408,7 @@
 				[b]Note:[/b] In builds without threads (the default Web export), the worker thread pool runs each request on the calling thread, so this method blocks until all resources are loaded, like [method load_manifest].
 			</description>
 		</method>
-		<method name="refresh_format_index">
+		<method name="rebuild_extension_index">
 			<return type="void" />
 			<description>
 				Reads the recognized extensions of every registered [ResourceFormatLoader] again and rebuilds the index that finds loaders by the extension of a path.
@@ -337,34 +417,34 @@
 				[codeblocks]
 				[gdscript]
 				my_loader.extensions = PackedStringArray(["mydata"])
-				ResourceLoader.refresh_format_index()
+				ResourceLoader.rebuild_extension_index()
 				print(ResourceLoader.exists("res://level.mydata")) # Asks my_loader.
 				[/gdscript]
 				[csharp]
 				myLoader.Extensions = ["mydata"];
-				ResourceLoader.RefreshFormatIndex();
+				ResourceLoader.RebuildExtensionIndex();
 				GD.Print(ResourceLoader.Exists("res://level.mydata")); // Asks myLoader.
 				[/csharp]
 				[/codeblocks]
 			</description>
 		</method>
-		<method name="register_extension">
+		<method name="register_extension_loader">
 			<return type="int" enum="Error" />
 			<param index="0" name="extension" type="String" />
-			<param index="1" name="load" type="Callable" />
+			<param index="1" name="loader" type="Callable" />
 			<param index="2" name="type" type="StringName" default="&amp;&quot;Resource&quot;" />
 			<param index="3" name="at_front" type="bool" default="false" />
 			<description>
-				Registers a simple resource format with one call: files whose name ends with [param extension] are loaded by calling [param load], without writing a [ResourceFormatLoader]. Use [method ResourceSaver.register_extension] to save files of the same format.
-				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param load] receives the path of the file ([code]func(path: String)[/code]) and returns the loaded [Resource], or an [enum Error] code if loading fails. If it returns [constant ERR_FILE_UNRECOGNIZED], the file is handed to the next loader that recognizes it, without an error message.
+				Registers a simple resource format with one call: files whose name ends with [param extension] are loaded by calling [param loader], without writing a [ResourceFormatLoader]. Use [method ResourceSaver.register_extension_saver] to save files of the same format.
+				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param loader] receives the path of the file ([code]func(path: String)[/code]) and returns the loaded [Resource], or an [enum Error] code if loading fails. If it returns [constant ERR_FILE_UNRECOGNIZED], the file is handed to the next loader that recognizes it, without an error message.
 				[param type] is the class of the loaded resources: a [Resource] class or a global script class ([code]class_name[/code]) that extends [Resource]. A load with a type hint only uses this format if [param type] is the hint or inherits it, and [method get_resource_type] reports [param type] (or the native base class of a script class). If [param at_front] is [code]true[/code], the format is asked before all other registered loaders, so it can take over extensions of other formats.
 				Registering an extension again replaces the previous [Callable]. Returns [constant OK], or [constant ERR_INVALID_PARAMETER] if the extension, the callable or the type is not valid.
 				The format behaves like any other [ResourceFormatLoader]: loaded resources are cached as with [method load], and [method load_threaded_request] works as well. No [code].uid[/code] files are used for these files.
-				[b]Note:[/b] [param load] returns a [Variant] (a [Resource] or an [enum Error] code) for the same reason as [method ResourceFormatLoader._load]: script functions have no out-parameters, and the binding layer cannot return a C++ struct. Callers of [method load] who need the code and the message use [method load_result].
+				[b]Note:[/b] [param loader] returns a [Variant] (a [Resource] or an [enum Error] code) for the same reason as [method ResourceFormatLoader._load]: script functions have no out-parameters, and the binding layer cannot return a C++ struct. Callers of [method load] who need the code and the message use [method load_result].
 				[codeblocks]
 				[gdscript]
 				func _ready():
-					ResourceLoader.register_extension("quiz", _load_quiz, &amp;"QuizSet")
+					ResourceLoader.register_extension_loader("quiz", _load_quiz, &amp;"QuizSet")
 					var quiz: QuizSet = load("res://questions.quiz")
 
 				static func _load_quiz(path: String) -&gt; Variant:
@@ -378,7 +458,7 @@
 				[csharp]
 				public override void _Ready()
 				{
-					ResourceLoader.RegisterExtension("quiz", Callable.From&lt;string, Variant&gt;(LoadQuiz), "QuizSet");
+					ResourceLoader.RegisterExtensionLoader("quiz", Callable.From&lt;string, Variant&gt;(LoadQuiz), "QuizSet");
 					var quiz = GD.Load&lt;QuizSet&gt;("res://questions.quiz");
 				}
 
@@ -395,8 +475,8 @@
 				}
 				[/csharp]
 				[/codeblocks]
-				[b]Note:[/b] [param load] is called on the thread that loads the file. With [method load_threaded_request], this is a worker thread, so [param load] must be safe to call from other threads; a static function that only reads the file is. No engine lock is held while [param load] runs. In the single-threaded Web export, it always runs on the main thread.
-				[b]Note:[/b] If the object that [param load] is bound to is freed, loading fails with an error. Call [method unregister_extension] before freeing it. All registrations are removed when the engine shuts down.
+				[b]Note:[/b] [param loader] is called on the thread that loads the file. With [method load_threaded_request], this is a worker thread, so [param loader] must be safe to call from other threads; a static function that only reads the file is. No engine lock is held while [param loader] runs. In the single-threaded Web export, it always runs on the main thread.
+				[b]Note:[/b] If the object that [param loader] is bound to is freed, loading fails with an error. Call [method unregister_extension_loader] before freeing it. All registrations are removed when the engine shuts down.
 			</description>
 		</method>
 		<method name="remove_resource_format_loader">
@@ -413,11 +493,11 @@
 				Changes the behavior on missing sub-resources. The default behavior is to abort loading.
 			</description>
 		</method>
-		<method name="unregister_extension">
+		<method name="unregister_extension_loader">
 			<return type="int" enum="Error" />
 			<param index="0" name="extension" type="String" />
 			<description>
-				Removes the format registered for [param extension] with [method register_extension]. Loading such a file afterwards fails with the usual error for files that no loader recognizes, unless another loader takes the extension. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no load [Callable] is registered for [param extension].
+				Removes the format registered for [param extension] with [method register_extension_loader]. Loading such a file afterwards fails with the usual error for files that no loader recognizes, unless another loader takes the extension. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no load [Callable] is registered for [param extension].
 			</description>
 		</method>
 	</methods>
@@ -433,6 +513,18 @@
 		</constant>
 		<constant name="THREAD_LOAD_LOADED" value="3" enum="ThreadLoadStatus">
 			The resource was loaded successfully and can be accessed via [method load_threaded_get].
+		</constant>
+		<constant name="CACHED_RESOURCE_KIND_FILE" value="1" enum="CachedResourceKind" is_bitfield="true">
+			Resources saved in their own file and not imported, such as [code].tres[/code], [code].tscn[/code] and [code].res[/code] files.
+		</constant>
+		<constant name="CACHED_RESOURCE_KIND_IMPORTED" value="2" enum="CachedResourceKind" is_bitfield="true">
+			Resources loaded through an importer, such as textures, sounds and fonts ([member Resource.resource_path] is the source file, for example [code]res://icon.svg[/code]).
+		</constant>
+		<constant name="CACHED_RESOURCE_KIND_BUILT_IN" value="4" enum="CachedResourceKind" is_bitfield="true">
+			Built-in sub-resources that were cached with their owner, such as [code]res://level.tscn::StyleBoxFlat_abc12[/code].
+		</constant>
+		<constant name="CACHED_RESOURCE_KIND_ALL" value="7" enum="CachedResourceKind" is_bitfield="true">
+			All of the above.
 		</constant>
 		<constant name="CACHE_MODE_IGNORE" value="0" enum="CacheMode">
 			Neither the main resource (the one requested to be loaded) nor any of its subresources are retrieved from cache nor stored into it. Dependencies (external resources) are loaded with [constant CACHE_MODE_REUSE].

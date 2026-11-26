@@ -63,10 +63,13 @@ class LanguageSettingsServer : public SettingsServer {
 	void _push_pending_root_values();
 
 	void _on_loaded();
-	void _on_startup_applied(int p_phase);
+	void _on_startup_applied(ApplyPhase p_phase);
 
 protected:
 	static void _bind_methods();
+
+	// Emits the typed `<value>_changed` signal of an applied value.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
@@ -78,7 +81,7 @@ public:
 	static String get_project_locale();
 	// The locale passed with `--language` or `-l`, or an empty string.
 	static String get_command_line_locale();
-	// The locales of the loaded translations (TranslationServer.get_loaded_locales()), sorted.
+	// The locales of the localization catalogs and of the loaded translations, sorted.
 	static PackedStringArray get_available_locales();
 
 	virtual StringName get_domain() const override;

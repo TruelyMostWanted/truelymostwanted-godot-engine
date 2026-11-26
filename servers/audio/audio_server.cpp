@@ -1648,6 +1648,8 @@ void AudioServer::set_bus_layout(const Ref<AudioBusLayout> &p_bus_layout) {
 	unlock();
 
 	// Samples bus sync.
+
+	emit_signal(SNAME("bus_layout_changed"));
 }
 
 Ref<AudioBusLayout> AudioServer::generate_bus_layout() const {
@@ -1980,6 +1982,8 @@ AudioServer::AudioServer() {
 AudioServer::~AudioServer() {
 	// Cleanup resources while we still have an active AudioServer singleton,
 	// for resources that depend on the singleton still existing.
+	_cleanup_lists();
+	// Bus details wait one frame in each graveyard; the mix thread has stopped, so free both generations.
 	_cleanup_lists();
 
 	singleton = nullptr;

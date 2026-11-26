@@ -32,6 +32,7 @@
 
 #include "core/object/object.h"
 #include "core/templates/hash_map.h"
+#include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 #include "scene/resources/audio/audio_mixer_channel.h"
 #include "scene/resources/audio/audio_mixer_layout.h"
@@ -102,6 +103,13 @@ private:
 		bool paused = false;
 		bool tree_paused = false;
 		bool bus_warned = false;
+		// Ducking (scene/audio/audio_mixer_ducking.cpp): an offset in dB added to volume_db.
+		float duck_db = 0.0f;
+		float duck_target_db = 0.0f;
+		Fade duck_fade; // In dB.
+		bool ducked = false;
+		bool manual_duck = false;
+		float manual_duck_db = 0.0f;
 	};
 
 	enum SignalType {
@@ -109,6 +117,7 @@ private:
 		SIGNAL_CHANNEL_FINISHED,
 		SIGNAL_QUEUE_FINISHED,
 		SIGNAL_FADE_FINISHED,
+		SIGNAL_DUCKING_CHANGED, // index: 1 ducked, 0 restored.
 	};
 
 	struct PendingSignal {
@@ -124,6 +133,12 @@ private:
 	uint64_t last_tick_usec = 0;
 	bool default_layout_checked = false;
 	AudioCommandRegistry *command_registry = nullptr; // Data-driven commands, see scene/audio/audio_command.h.
+
+	// Ducking while TTSServer speaks, see scene/audio/audio_mixer_ducking.cpp.
+	HashSet<int64_t> active_utterances;
+	bool ducking_enabled = true;
+	double tts_poll_elapsed = 0.0;
+	double tts_silent_time = 0.0;
 
 	static void _update_callback(void *p_self);
 	void _ensure_callback();
@@ -158,6 +173,16 @@ private:
 	void _set_channel_paused(Channel &p_channel);
 	void _process_channel(const StringName &p_name, Channel &p_channel, double p_delta, ObjectID p_scene_id, bool p_tree_paused);
 
+	void _connect_tts();
+	void _disconnect_tts();
+	void _on_tts_utterance_started(int64_t p_id);
+	void _on_tts_utterance_finished(int64_t p_id);
+	bool _is_tts_ducked(const Channel &p_channel) const;
+	void _update_duck(const StringName &p_name, Channel &p_channel, float p_fade_time);
+	void _update_all_ducks();
+	bool _process_duck(const StringName &p_name, Channel &p_channel, double p_delta);
+	void _process_utterance_safeguard(double p_delta);
+
 	void _queue_signal(SignalType p_type, const StringName &p_channel, int p_index = -1, const String &p_path = String());
 	void _flush_signals();
 
@@ -168,7 +193,7 @@ public:
 	static AudioMixerServer *get_singleton();
 
 	// Channels.
-	void load_layout(const Ref<AudioMixerLayout> &p_layout);
+	void apply_layout(const Ref<AudioMixerLayout> &p_layout);
 	void add_channel(const Ref<AudioMixerChannel> &p_channel);
 	void remove_channel(const StringName &p_channel);
 	bool has_channel(const StringName &p_channel) const;
@@ -193,10 +218,10 @@ public:
 	void dequeue(const StringName &p_channel, int p_index = -1);
 	void clear_queue(const StringName &p_channel);
 	PackedStringArray get_queue(const StringName &p_channel) const;
-	void change_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
-	void next(const StringName &p_channel, float p_fade_time = -1.0f);
-	void previous(const StringName &p_channel, float p_fade_time = -1.0f);
-	int get_index(const StringName &p_channel) const;
+	void set_queue_index(const StringName &p_channel, int p_index, float p_fade_time = -1.0f);
+	void play_next(const StringName &p_channel, float p_fade_time = -1.0f);
+	void play_previous(const StringName &p_channel, float p_fade_time = -1.0f);
+	int get_queue_index(const StringName &p_channel) const;
 
 	// Mixing.
 	void fade_in(const StringName &p_channel, float p_time, FadeCurve p_curve = FADE_CURVE_LINEAR);
@@ -208,8 +233,17 @@ public:
 	float get_channel_volume_db(const StringName &p_channel) const;
 	void set_channel_pitch_scale(const StringName &p_channel, float p_pitch_scale);
 	float get_channel_pitch_scale(const StringName &p_channel) const;
-	void switch_clip(const StringName &p_channel, const StringName &p_clip);
+	void switch_to_clip(const StringName &p_channel, const StringName &p_clip);
 	Ref<AudioStreamPlayback> get_channel_playback(const StringName &p_channel) const;
+
+	// Ducking (while TTSServer speaks, or manually for dialog played as audio).
+	void set_ducking_enabled(bool p_enabled);
+	bool is_ducking_enabled() const;
+	void duck(const StringName &p_channel, float p_volume_db, float p_fade_time = -1.0f);
+	void unduck(const StringName &p_channel, float p_fade_time = -1.0f);
+	bool is_ducked(const StringName &p_channel) const;
+	float get_duck_volume_db(const StringName &p_channel) const;
+	int get_active_utterance_count() const;
 
 	// Commands (AudioCommand, AudioCommandList), implemented by AudioCommandRegistry.
 	Error execute(const Ref<AudioCommand> &p_command);

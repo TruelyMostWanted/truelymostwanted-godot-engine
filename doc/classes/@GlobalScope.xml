@@ -1550,8 +1550,13 @@
 		<member name="AccessibilityServer" type="AccessibilityServer" setter="" getter="">
 			The [AccessibilityServer] singleton.
 		</member>
+		<member name="AccessibilitySettingsServer" type="AccessibilitySettingsServer" setter="" getter="">
+		</member>
 		<member name="AudioBusSettingsServer" type="AudioBusSettingsServer" setter="" getter="">
 			The [AudioBusSettingsServer] singleton.
+		</member>
+		<member name="AudioDeviceSettingsServer" type="AudioDeviceSettingsServer" setter="" getter="">
+			The [AudioDeviceSettingsServer] singleton.
 		</member>
 		<member name="AudioMixerServer" type="AudioMixerServer" setter="" getter="">
 			The [AudioMixerServer] singleton.
@@ -1559,8 +1564,8 @@
 		<member name="AudioServer" type="AudioServer" setter="" getter="">
 			The [AudioServer] singleton.
 		</member>
-		<member name="AudioSettingsServer" type="AudioSettingsServer" setter="" getter="">
-			The [AudioSettingsServer] singleton.
+		<member name="Camera3DSettingsServer" type="Camera3DSettingsServer" setter="" getter="">
+			The [Camera3DSettingsServer] singleton.
 		</member>
 		<member name="CameraServer" type="CameraServer" setter="" getter="">
 			The [CameraServer] singleton.
@@ -1581,6 +1586,9 @@
 		<member name="EngineDebugger" type="EngineDebugger" setter="" getter="">
 			The [EngineDebugger] singleton.
 		</member>
+		<member name="EngineSettingsServer" type="EngineSettingsServer" setter="" getter="">
+			The [EngineSettingsServer] singleton.
+		</member>
 		<member name="FilesManifestServer" type="FilesManifestServer" setter="" getter="">
 			The [FilesManifestServer] singleton.
 		</member>
@@ -1597,14 +1605,23 @@
 		<member name="Geometry3D" type="Geometry3D" setter="" getter="">
 			The [Geometry3D] singleton.
 		</member>
+		<member name="GraphicsPresetSettingsServer" type="GraphicsPresetSettingsServer" setter="" getter="">
+			The [GraphicsPresetSettingsServer] singleton.
+		</member>
 		<member name="IP" type="IP" setter="" getter="">
 			The [IP] singleton.
 		</member>
 		<member name="Input" type="Input" setter="" getter="">
 			The [Input] singleton.
 		</member>
+		<member name="InputIconServer" type="InputIconServer" setter="" getter="">
+			The [InputIconServer] singleton.
+		</member>
 		<member name="InputMap" type="InputMap" setter="" getter="">
 			The [InputMap] singleton.
+		</member>
+		<member name="InputMapSettingsServer" type="InputMapSettingsServer" setter="" getter="">
+			The [InputMapSettingsServer] singleton.
 		</member>
 		<member name="InputSettingsServer" type="InputSettingsServer" setter="" getter="">
 			The [InputSettingsServer] singleton.
@@ -1616,9 +1633,6 @@
 		<member name="JavaScriptBridge" type="JavaScriptBridge" setter="" getter="">
 			The [JavaScriptBridge] singleton.
 			[b]Note:[/b] Only implemented on the Web platform.
-		</member>
-		<member name="KeyBindingSettingsServer" type="KeyBindingSettingsServer" setter="" getter="">
-			The [KeyBindingSettingsServer] singleton.
 		</member>
 		<member name="LanguageSettingsServer" type="LanguageSettingsServer" setter="" getter="">
 			The [LanguageSettingsServer] singleton.
@@ -1648,11 +1662,11 @@
 		<member name="OS" type="OS" setter="" getter="">
 			The [OS] singleton.
 		</member>
+		<member name="PCKPackageServer" type="PCKPackageServer" setter="" getter="">
+			The [PCKPackageServer] singleton.
+		</member>
 		<member name="PathPrefixServer" type="PathPrefixServer" setter="" getter="">
 			The [PathPrefixServer] singleton.
-		</member>
-		<member name="PckPackageServer" type="PckPackageServer" setter="" getter="">
-			The [PckPackageServer] singleton.
 		</member>
 		<member name="Performance" type="Performance" setter="" getter="">
 			The [Performance] singleton.
@@ -1672,8 +1686,17 @@
 		<member name="PhysicsServer3DManager" type="PhysicsServer3DManager" setter="" getter="">
 			The [PhysicsServer3DManager] singleton.
 		</member>
+		<member name="ProgressBarServer" type="ProgressBarServer" setter="" getter="">
+			The [ProgressBarServer] singleton.
+		</member>
 		<member name="ProjectSettings" type="ProjectSettings" setter="" getter="">
 			The [ProjectSettings] singleton.
+		</member>
+		<member name="RenderEffectSettingsServer" type="RenderEffectSettingsServer" setter="" getter="">
+			The [RenderEffectSettingsServer] singleton.
+		</member>
+		<member name="RenderQualitySettingsServer" type="RenderQualitySettingsServer" setter="" getter="">
+			The [RenderQualitySettingsServer] singleton.
 		</member>
 		<member name="RenderingServer" type="RenderingServer" setter="" getter="">
 			The [RenderingServer] singleton.
@@ -1693,20 +1716,45 @@
 		<member name="ResourceUID" type="ResourceUID" setter="" getter="">
 			The [ResourceUID] singleton.
 		</member>
+		<member name="ScreenshotServer" type="ScreenshotServer" setter="" getter="">
+			The [ScreenshotServer] singleton.
+		</member>
 		<member name="SeedServer" type="SeedServer" setter="" getter="">
 			The [SeedServer] singleton.
 		</member>
 		<member name="SettingsServerManager" type="SettingsServerManager" setter="" getter="">
 			The [SettingsServerManager] singleton.
 		</member>
+		<member name="ShadowSettingsServer" type="ShadowSettingsServer" setter="" getter="">
+			The [ShadowSettingsServer] singleton.
+		</member>
 		<member name="StreamingAssetsServer" type="StreamingAssetsServer" setter="" getter="">
 			The [StreamingAssetsServer] singleton.
+		</member>
+		<member name="SubtitleServer" type="SubtitleServer" setter="" getter="">
+			The [SubtitleServer] singleton.
+		</member>
+		<member name="TTSPersonaSettingsServer" type="TTSPersonaSettingsServer" setter="" getter="">
+			The [TTSPersonaSettingsServer] singleton.
+		</member>
+		<member name="TTSServer" type="TTSServer" setter="" getter="">
+			The [TTSServer] singleton.
+		</member>
+		<member name="TextInsertionServer" type="TextInsertionServer" setter="" getter="">
+		</member>
+		<member name="TextLocalizationServer" type="TextLocalizationServer" setter="" getter="">
 		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.
 		</member>
+		<member name="TextureSettingsServer" type="TextureSettingsServer" setter="" getter="">
+			The [TextureSettingsServer] singleton.
+		</member>
 		<member name="TextureStreaming" type="TextureStreaming" setter="" getter="">
 			The [TextureStreaming] singleton.
+		</member>
+		<member name="TextureStreamingSettingsServer" type="TextureStreamingSettingsServer" setter="" getter="">
+			The [TextureStreamingSettingsServer] singleton.
 		</member>
 		<member name="ThemeDB" type="ThemeDB" setter="" getter="">
 			The [ThemeDB] singleton.
@@ -1717,14 +1765,20 @@
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>
-		<member name="TtsServer" type="TtsServer" setter="" getter="">
-			The [TtsServer] singleton.
+		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
+			The [ViewportServer] singleton.
+		</member>
+		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
+			The [WindowSettingsServer] singleton.
 		</member>
 		<member name="WorkerThreadPool" type="WorkerThreadPool" setter="" getter="">
 			The [WorkerThreadPool] singleton.
 		</member>
 		<member name="XRServer" type="XRServer" setter="" getter="">
 			The [XRServer] singleton.
+		</member>
+		<member name="XRSettingsServer" type="XRSettingsServer" setter="" getter="">
+			The [XRSettingsServer] singleton.
 		</member>
 	</members>
 	<constants>

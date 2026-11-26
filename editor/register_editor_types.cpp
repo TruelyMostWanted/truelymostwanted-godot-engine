@@ -36,8 +36,10 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
+#include "core/string/localization_server.h"
 #include "editor/animation/animation_tree_editor_plugin.h"
 #include "editor/audio/audio_stream_randomizer_editor_plugin.h"
+#include "editor/data/csv_table_editor.h"
 #include "editor/debugger/debug_adapter/debug_adapter_server.h"
 #include "editor/debugger/editor_debugger_plugin.h"
 #include "editor/docks/filesystem_dock.h"
@@ -50,8 +52,11 @@
 #include "editor/export/editor_export_platform_extension.h"
 #include "editor/export/editor_export_platform_pc.h"
 #include "editor/export/editor_export_plugin.h"
+#include "editor/export/pck_export_plugin.h"
+#include "editor/export/pck_package_exporter.h"
 #include "editor/export/register_exporters.h"
 #include "editor/export/streaming_assets_export_plugin.h"
+#include "editor/export/streaming_assets_pack_builder.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -73,13 +78,16 @@
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
+#include "editor/inspector/audio_bus_list_settings_editor_plugin.h"
 #include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/inspector/editor_resource_picker.h"
 #include "editor/inspector/editor_resource_preview.h"
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
+#include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
+#include "editor/inspector/subtitle_editor_plugin.h"
 #include "editor/inspector/tool_button_editor_plugin.h"
 #include "editor/plugins/pck_extract_editor_plugin.h"
 #include "editor/scene/2d/camera_2d_editor_plugin.h"
@@ -124,8 +132,8 @@
 #include "editor/scene/sprite_frames_editor_plugin.h"
 #include "editor/scene/texture/bit_map_editor_plugin.h"
 #include "editor/scene/texture/gradient_texture_2d_editor_plugin.h"
+#include "editor/scene/texture/sprite_sheet_editor_plugin.h"
 #include "editor/scene/texture/texture_3d_editor_plugin.h"
-#include "editor/scene/texture/texture_atlas_editor_plugin.h"
 #include "editor/scene/texture/texture_editor_plugin.h"
 #include "editor/scene/texture/texture_layered_editor_plugin.h"
 #include "editor/scene/texture/texture_region_editor_plugin.h"
@@ -183,6 +191,8 @@ void register_editor_types() {
 	GDREGISTER_CLASS(EditorExportPlatformExtension);
 	GDREGISTER_ABSTRACT_CLASS(EditorExportPreset);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsExportPlugin);
+	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsPackBuilder);
+	GDREGISTER_ABSTRACT_CLASS(PCKPackageExporter);
 
 	register_exporter_types();
 
@@ -231,6 +241,8 @@ void register_editor_types() {
 
 	// This list is alphabetized, and plugins that depend on Node2D or Node3D are in their own section below.
 	EditorPlugins::add_by_type<AnimationTreeEditorPlugin>();
+	EditorPlugins::add_by_type<CSVTableEditorPlugin>();
+	EditorPlugins::add_by_type<AudioBusListSettingsEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
 	EditorPlugins::add_by_type<BitMapEditorPlugin>();
 	EditorPlugins::add_by_type<ControlEditorPlugin>();
@@ -247,7 +259,10 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<MarginContainerEditorPlugin>();
 	EditorPlugins::add_by_type<MaterialEditorPlugin>();
 	EditorPlugins::add_by_type<PackedSceneEditorPlugin>();
-	EditorPlugins::add_by_type<PckExtractEditorPlugin>();
+	EditorPlugins::add_by_type<PCKExtractEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageEditorPlugin>();
+	EditorPlugins::add_by_type<SubtitleEditorPlugin>();
+	EditorPlugins::add_by_type<PCKPackageExporterEditorPlugin>();
 	EditorPlugins::add_by_type<ResourcePreloaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderEditorPlugin>();
 	EditorPlugins::add_by_type<ShaderFileEditorPlugin>();
@@ -258,7 +273,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<TextureEditorPlugin>();
 	EditorPlugins::add_by_type<TextureLayeredEditorPlugin>();
 	EditorPlugins::add_by_type<TextureRegionEditorPlugin>();
-	EditorPlugins::add_by_type<TextureAtlasEditorPlugin>();
+	EditorPlugins::add_by_type<SpriteSheetEditorPlugin>();
 	EditorPlugins::add_by_type<ThemeEditorPlugin>();
 	EditorPlugins::add_by_type<ToolButtonEditorPlugin>();
 	EditorPlugins::add_by_type<VirtualJoystickEditorPlugin>();
@@ -308,6 +323,8 @@ void register_editor_types() {
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "editor/run/main_run_args", PROPERTY_HINT_NONE, "monospace"), "");
 
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "editor/script/templates_search_path", PROPERTY_HINT_DIR), "res://script_templates");
+	// DataSchema files; the editor validates data files that match their `file_patterns`.
+	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, "filesystem/data/schema_files", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:*.tres,*.res", Variant::STRING, PROPERTY_HINT_FILE)), PackedStringArray());
 
 	GLOBAL_DEF("editor/naming/default_signal_callback_name", "_on_{node_name}_{signal_name}");
 	GLOBAL_DEF("editor/naming/default_signal_callback_to_self_name", "_on_{signal_name}");
@@ -339,6 +356,9 @@ void register_editor_types() {
 	// Required as GDExtensions can register docs at init time way before this
 	// class is actually instantiated.
 	EditorHelp::init_gdext_pointers();
+
+	// EditorNode clears the translation remaps, which drops the locale hooks of the localization servers.
+	EditorNode::add_init_callback(&LocalizationServer::restore_locale_hooks);
 
 	OS::get_singleton()->benchmark_end_measure("Editor", "Register Types");
 }

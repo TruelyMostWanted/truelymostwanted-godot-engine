@@ -1630,6 +1630,12 @@
 		<member name="text_editor/completion/use_single_quotes" type="bool" setter="" getter="">
 			If [code]true[/code], performs string autocompletion with single quotes. If [code]false[/code], performs string autocompletion with double quotes (which matches the [url=$DOCS_URL/tutorials/scripting/gdscript/gdscript_styleguide.html]GDScript style guide[/url]).
 		</member>
+		<member name="text_editor/data_files/live_parse_max_size_mb" type="int" setter="" getter="">
+			The largest data file (JSON, INI, CSV, XML, TOML, YAML), in MiB, that the script editor parses while typing to show parse errors and schema issues. Larger files are only parsed when saved.
+		</member>
+		<member name="text_editor/data_files/schema_validation_max_size_mb" type="int" setter="" getter="">
+			The largest data file, in MiB, that the script editor validates against its [DataSchema] (see [member ProjectSettings.filesystem/data/schema_files]) while typing. Larger files up to [member text_editor/data_files/live_parse_max_size_mb] only show parse errors.
+		</member>
 		<member name="text_editor/external/exec_flags" type="String" setter="" getter="">
 			The command-line arguments to pass to the external text editor that is run when [member text_editor/external/use_external_editor] is [code]true[/code]. See also [member text_editor/external/exec_path].
 		</member>

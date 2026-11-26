@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="YAML" inherits="TextDataFormat" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Reads and writes YAML, and any [Resource] as a YAML file.
+	</brief_description>
+	<description>
+		[YAML] reads and writes [url=https://yaml.org/spec/1.2.2/]YAML 1.2[/url] documents, a configuration and data format that is easy for people to read and edit. A document is read into a tree of [Dictionary] (mappings, keys in the order of the file), [Array] (sequences), [String], [int], [float], [bool] and [code]null[/code].
+		The module also registers a loader and a saver for the file extensions [code].yaml[/code] and [code].yml[/code], so any [Resource] can be saved and loaded as YAML with [method ResourceSaver.save] and [method ResourceLoader.load]. It uses the same property mapping as the JSON and TOML formats of [ResourceTextSerializer]: the root mapping has the keys [code]$type[/code] and [code]$format_version[/code], followed by one key per stored property; nested resources are nested mappings, arrays of resources are sequences of mappings. YAML files without a [code]$type[/code] key are left to other loaders unless a type hint is given. The module also implements [constant ResourceTextSerializer.FORMAT_YAML], so [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_YAML)[/code] and [method ResourceTextSerializer.deserialize] work with YAML like with the built-in formats.
+		[codeblocks]
+		[gdscript]
+		var settings = AudioBusSettings.new() # A Resource with class_name AudioBusSettings.
+		settings.master_volume = 0.8
+		ResourceSaver.save(settings, "user://audio.yaml")
+		var loaded = ResourceLoader.load("user://audio.yaml") as AudioBusSettings
+		print(loaded.master_volume) # Prints 0.8
+
+		# Any YAML document:
+		var yaml = YAML.new()
+		if yaml.parse("window:\n  width: 1280\n") == OK:
+			print(yaml.get_data()["window"]["width"]) # Prints 1280
+		else:
+			print("Line %d: %s" % [yaml.get_error_line(), yaml.get_error_message()])
+		[/gdscript]
+		[csharp]
+		var settings = new AudioBusSettings(); // A [GlobalClass] Resource.
+		settings.MasterVolume = 0.8f;
+		ResourceSaver.Save(settings, "user://audio.yaml");
+		var loaded = ResourceLoader.Load&lt;AudioBusSettings&gt;("user://audio.yaml");
+		GD.Print(loaded.MasterVolume); // Prints 0.8
+
+		// Any YAML document:
+		var yaml = new Yaml();
+		if (yaml.Parse("window:\n  width: 1280\n") == Error.Ok)
+		{
+			GD.Print(yaml.GetData().AsGodotDictionary()["window"].AsGodotDictionary()["width"]); // Prints 1280
+		}
+		else
+		{
+			GD.Print($"Line {yaml.GetErrorLine()}: {yaml.GetErrorMessage()}");
+		}
+		[/csharp]
+		[/codeblocks]
+		A resource file looks like this:
+		[codeblock lang=text]
+		$type: AudioBusSettings
+		$format_version: 1
+		master_volume: 0.8
+		mode: Stereo
+		buses:
+		  - name: Music
+		    volume: 0.5
+		    offset: [0.0, 1.5]
+		[/codeblock]
+		[b]Reading:[/b] block mappings and sequences (also [code]- key: value[/code] entries and sequences at the indentation of their key), flow mappings and sequences ([code]{a: 1}[/code], [code][1, 2][/code]) over one or more lines, plain, single-quoted and double-quoted scalars with all YAML escapes and line folding, literal ([code]|[/code]) and folded ([code]&gt;[/code]) block scalars with chomping ([code]-[/code], [code]+[/code]) and indentation indicators, comments, the [code]%YAML[/code] directive at the start, and several documents, each started by [code]---[/code] and optionally ended by [code]...[/code]. Plain scalars are typed by the YAML 1.2 core schema: [code]null[/code], [code]~[/code] and empty values are [code]null[/code]; [code]true[/code] and [code]false[/code] are [bool]s (YAML 1.2 does not treat [code]yes[/code] or [code]on[/code] as booleans); integers in decimal, octal ([code]0o17[/code]) and hexadecimal ([code]0x1F[/code]) are [int]s; numbers with a point or exponent, [code].inf[/code], [code]-.inf[/code] and [code].nan[/code] are [float]s; everything else is a [String]. Quoted and block scalars are always strings, and so are mapping keys. The tags [code]!!str[/code], [code]!!int[/code], [code]!!float[/code], [code]!!bool[/code] and [code]!!null[/code] set the type of a scalar.
+		[b]Not supported:[/b] anchors ([code]&amp;a[/code]) and aliases ([code]*a[/code]), merge keys ([code]&lt;&lt;[/code]), other tags and the [code]%TAG[/code] directive, complex keys ([code]?[/code]), collections as keys, content on the line of [code]---[/code], tabs in indentation, plain scalars over several lines inside flow collections, integers outside 64 bits and nesting deeper than 256 levels. They stop the parsing with an error that has the line and column. Comments are not kept when a document is written again.
+		[b]Writing:[/b] keys keep their order (or are sorted with [member SerializerOptions.sort_keys]). Mappings and sequences are written in block style, indented by the number of spaces in [member SerializerOptions.indent] (a tab counts as four spaces); an empty [member SerializerOptions.indent] writes the whole document in flow style on one line. Arrays of only numbers, booleans and [code]null[/code] (for example vectors and colors of a resource) stay on one line: [code][1.5, 2.0][/code]. Strings are written without quotes where they read back as the same string, otherwise in double quotes; strings with line breaks become literal block scalars ([code]|[/code]).
+		[b]Resource and files:[/b] [YAML] is a [Resource] (see [TextDataFormat]). [code]load("res://x.yaml")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_value] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings. The extensions [code].yaml[/code] and [code].yml[/code] are recognized.
+		[b]Paths:[/b] a path is made of mapping keys and sequence indices separated by [code]/[/code] ([code]"enemies/0/name"[/code]); the empty path is the whole document. Inside a key, [code]~[/code] is written [code]~0[/code] and [code]/[/code] is written [code]~1[/code], as in JSON Pointer ([url=https://www.rfc-editor.org/rfc/rfc6901]RFC 6901[/url]). [method set_value] with an index equal to the size of the sequence appends.
+		[b]Several documents:[/b] a file can hold several documents separated by [code]---[/code] lines. [member TextDataFormat.data] is the first document, so files with one document and all path methods work on it; [method get_document_count], [method get_document], [method add_document] and [method remove_document] reach all documents. Writing puts [code]---[/code] before every document after the first. [method parse_string], [method stringify], [method serialize] and [method deserialize] use the first document only. [method Resource.duplicate] copies only the first document.
+		[codeblocks]
+		[gdscript]
+		var yaml = YAML.new()
+		yaml.parse("enemies:\n  - name: Slime\n")
+		yaml.set_value("enemies/0/hp", 12)
+		yaml.set_value("enemies/1", { "name": "Bat" }) # Index 1 == size, so this appends.
+		print(yaml.get_value("enemies/1/name")) # Prints Bat
+		[/gdscript]
+		[csharp]
+		var yaml = new Yaml();
+		yaml.Parse("enemies:\n  - name: Slime\n");
+		yaml.SetValue("enemies/0/hp", 12);
+		yaml.SetValue("enemies/1", new Godot.Collections.Dictionary { { "name", "Bat" } }); // Index 1 == size, so this appends.
+		GD.Print(yaml.GetValue("enemies/1/name")); // Prints Bat
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The static methods can be called from any thread. A [YAML] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+		<link title="YAML 1.2.2 specification">https://yaml.org/spec/1.2.2/</link>
+	</tutorials>
+	<methods>
+		<method name="add_document">
+			<return type="void" />
+			<param index="0" name="data" type="Variant" />
+			<description>
+				Appends [param data] as a new document after the last one. Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a resource from YAML [param text]. The class comes from the key [code]$type[/code] of the root mapping, or from [param type_hint]. Missing keys keep the default value of the class; unknown keys are skipped with a warning. Returns [code]null[/code] and prints an error if the text can't be read. [param options] is accepted for symmetry with [method ResourceTextSerializer.deserialize]; reading YAML has no options yet. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_YAML, type_hint, options)[/code].
+				[codeblocks]
+				[gdscript]
+				var entry = YAML.deserialize("name: Ann\nlevel: 3\n", &amp;"PlayerEntry") as PlayerEntry
+				[/gdscript]
+				[csharp]
+				var entry = Yaml.Deserialize("name: Ann\nlevel: 3\n", "PlayerEntry") as PlayerEntry;
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="erase_value">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Erases the mapping key or removes the sequence element at [param path]. Prints an error if it does not exist. An empty [param path] clears all documents (see [method TextDataFormat.clear]). Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="get_document" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the document at [param index]; [code]0[/code] is [member TextDataFormat.data]. Dictionaries and arrays are returned by reference, so changing them changes the document (call [method add_document] or [method remove_document], or set [member TextDataFormat.data], to drop the kept parsed text). Prints an error and returns [code]null[/code] if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_document_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of documents. It is at least [code]1[/code]: an empty file is one [code]null[/code] document.
+			</description>
+		</method>
+		<method name="get_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value at [param path], or [param default] if the path does not exist.
+			</description>
+		</method>
+		<method name="has_value" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns [code]true[/code] if a value exists at [param path].
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Variant" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Reads the YAML document [param text] and returns it as a tree of [Dictionary], [Array], [String], [int], [float], [bool] and [code]null[/code]. Returns [code]null[/code] and prints an error with line and column if the text is not valid YAML. Use [method TextDataFormat.parse] to tell an empty document from an error. If [param text] has several documents, returns the first one.
+			</description>
+		</method>
+		<method name="remove_document">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the document at [param index]. Removing document [code]0[/code] makes the next document [member TextDataFormat.data]; removing the only document clears it. Prints an error if [param index] is out of range. Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as YAML text, with the same property mapping as the JSON format of [ResourceTextSerializer]. Of [param options], [member SerializerOptions.indent], [member SerializerOptions.enums_as_names], [member SerializerOptions.defaults], [member SerializerOptions.include_type_marker], [member SerializerOptions.sort_keys] and [member SerializerOptions.full_precision_floats] apply. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code]. Returns an empty string and prints an error if the resource can't be written, for example if it contains itself. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_YAML, options)[/code].
+			</description>
+		</method>
+		<method name="set_value">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Sets the value at [param path]. An empty [param path] replaces the whole document. Missing mappings on the way are created. An index equal to the size of a sequence appends to it. Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Variant" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param data] as a YAML document. [param data] can be any value: [Dictionary], [Array] and packed arrays become mappings and sequences; [bool], [int], [float], [String], [StringName], [NodePath] and [code]null[/code] become scalars. Godot types without YAML syntax ([Vector2], [Color], ...) are written as strings, like [method JSON.stringify] does. Of [param options], [member SerializerOptions.indent] and [member SerializerOptions.sort_keys] apply; [code]null[/code] uses the project settings. Returns an empty string and prints an error for [Object]s, [RID]s, [Callable]s and [Signal]s and for containers that contain themselves.
+				[codeblocks]
+				[gdscript]
+				var text = YAML.stringify({ "name": "Game", "window": { "width": 1280 }, "tags": ["a", "b"] })
+				# name: Game
+				# window:
+				#   width: 1280
+				# tags:
+				#   - a
+				#   - b
+				[/gdscript]
+				[csharp]
+				string text = Yaml.Stringify(new Godot.Collections.Dictionary { { "name", "Game" }, { "window", new Godot.Collections.Dictionary { { "width", 1280 } } } });
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="null" />
+	</members>
+</class>

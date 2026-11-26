@@ -224,7 +224,7 @@ Error FilesManifestServer::remove_extension(const String &p_name, const String &
 	return _edit_extension(p_name, false, p_extension);
 }
 
-PackedStringArray FilesManifestServer::get_paths(const String &p_name) {
+PackedStringArray FilesManifestServer::get_file_paths(const String &p_name) {
 	Entry *entry = _get_entry(p_name);
 	ERR_FAIL_NULL_V(entry, PackedStringArray());
 	if (!entry->cached) {
@@ -240,17 +240,22 @@ Error FilesManifestServer::refresh(const String &p_name) {
 	return OK;
 }
 
-Dictionary FilesManifestServer::validate(const String &p_name) {
-	Dictionary result;
+Ref<FilesManifestValidation> FilesManifestServer::validate(const String &p_name) {
+	Ref<FilesManifestValidation> result;
+	result.instantiate();
 	Entry *entry = _get_entry(p_name);
-	ERR_FAIL_NULL_V(entry, result);
-	PackedStringArray missing_folders;
+	if (entry == nullptr) {
+		// `_get_entry()` already printed the error.
+		result->error = ERR_DOES_NOT_EXIST;
+		return result;
+	}
+	PackedStringArray &missing_folders = result->missing_folders;
 	for (const String &folder : entry->manifest->get_folder_paths()) {
 		if (!DirAccess::dir_exists_absolute(FilesManifest::normalize_path(folder))) {
 			missing_folders.push_back(folder);
 		}
 	}
-	PackedStringArray missing_files;
+	PackedStringArray &missing_files = result->missing_files;
 	for (const String &file : entry->manifest->get_file_paths()) {
 		if (!FileAccess::exists(FilesManifest::normalize_path(file))) {
 			missing_files.push_back(file);
@@ -258,17 +263,20 @@ Dictionary FilesManifestServer::validate(const String &p_name) {
 	}
 	List<String> known;
 	ResourceLoader::get_recognized_extensions_for_type("", &known);
-	PackedStringArray unknown_extensions;
+	PackedStringArray &unknown_extensions = result->unknown_extensions;
 	for (const String &extension : entry->manifest->get_extensions()) {
 		// Multi-part extensions (".tres.json") are known if their last part is.
 		if (!known.find(extension.get_extension().to_lower())) {
 			unknown_extensions.push_back(extension);
 		}
 	}
-	result["missing_folders"] = missing_folders;
-	result["missing_files"] = missing_files;
-	result["unknown_extensions"] = unknown_extensions;
-	result["valid"] = missing_folders.is_empty() && missing_files.is_empty() && unknown_extensions.is_empty();
+	if (!missing_folders.is_empty() || !missing_files.is_empty()) {
+		result->error = ERR_FILE_NOT_FOUND;
+	} else if (!unknown_extensions.is_empty()) {
+		result->error = ERR_FILE_UNRECOGNIZED;
+	} else {
+		result->error = OK;
+	}
 	return result;
 }
 
@@ -379,7 +387,7 @@ void FilesManifestServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("remove_file", "name", "path"), &FilesManifestServer::remove_file);
 	ClassDB::bind_method(D_METHOD("add_extension", "name", "extension"), &FilesManifestServer::add_extension);
 	ClassDB::bind_method(D_METHOD("remove_extension", "name", "extension"), &FilesManifestServer::remove_extension);
-	ClassDB::bind_method(D_METHOD("get_paths", "name"), &FilesManifestServer::get_paths);
+	ClassDB::bind_method(D_METHOD("get_file_paths", "name"), &FilesManifestServer::get_file_paths);
 	ClassDB::bind_method(D_METHOD("refresh", "name"), &FilesManifestServer::refresh);
 	ClassDB::bind_method(D_METHOD("validate", "name"), &FilesManifestServer::validate);
 	ClassDB::bind_method(D_METHOD("create_missing_folders", "name"), &FilesManifestServer::create_missing_folders);

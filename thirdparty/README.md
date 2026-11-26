@@ -94,6 +94,7 @@ Patches:
 - `0004-clang-warning-exclude.patch` ([GH-111346](https://github.com/godotengine/godot/pull/111346))
 - `0005-unused-typedef.patch` ([GH-111445](https://github.com/godotengine/godot/pull/111445))
 - `0006-explicit-includes.patch` ([GH-111767](https://github.com/godotengine/godot/pull/111767))
+- `0007-unused-value.patch` ([GH-125561](https://github.com/godotengine/godot/pull/125561))
 
 
 ## brotli
@@ -618,6 +619,32 @@ Files extracted from upstream source:
 - `COPYING`
 
 
+## libopus
+
+- Upstream: https://gitlab.xiph.org/xiph/opus
+- Version: 1.6.1 (6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1, 2026)
+- License: BSD-3-Clause
+
+Files extracted from upstream source:
+
+- All `.c` and `.h` files in `celt/`, `silk/` and `src/`, except `celt/opus_custom_demo.c`, `src/opus_demo.c`, `src/qext_compare.c` and `src/repacketizer_demo.c`
+- All `.h` files in `include/` as `opus/`
+- `COPYING`
+
+
+## libopusfile
+
+- Upstream: https://gitlab.xiph.org/xiph/opusfile
+- Version: 0.12 (118d8601c12dd6a44f52423e68ca9083cc9f2bfe72da7a8c1acb22a80ae3550b, 2020)
+- License: BSD-3-Clause
+
+Files extracted from upstream source:
+
+- All `.c` and `.h` files in `src/`
+- All `.h` files in `include/` as `opus/`
+- `COPYING`
+
+
 ## libpng
 
 - Upstream: https://github.com/pnggroup/libpng
@@ -630,6 +657,17 @@ Files extracted from upstream source:
 - `arm/`, `intel/`, `loongarch/`, and `powerpc/` folders, except `arm/filter_neon.S` and `.editorconfig` files
 - `scripts/pnglibconf.h.prebuilt` as `pnglibconf.h`
 - `LICENSE`
+
+
+## libsimplewebm
+
+- Upstream: https://github.com/The-Simplicity-Group/libsimplewebm
+- Version: git (0754c5156573b503875d352d640ddb3821c44c0a, 2026)
+- License: MIT
+
+Files extracted from upstream source:
+
+- `*`, except `example/`
 
 
 ## libtheora
@@ -656,6 +694,17 @@ Files extracted from upstream source:
 - `lib/*` except from: `CMakeLists.txt`, `lookups.pl`, `Makefile.*`, `misc.c`
 - `include/vorbis/` minus `Makefile.am`
 - `COPYING`
+
+
+## libvpx
+
+- Upstream: https://github.com/webmproject/libvpx
+- Version: 1.17.0 (6df3ec34557879fff673706f4a1d9fbd0f3a6f0e, 2026)
+- License: BSD-3-Clause
+
+Files extracted from upstream source:
+
+- `*`
 
 
 ## libwebp
@@ -1141,6 +1190,17 @@ Patches:
 - `0001-zero-size-for-sc-sized-arrays.patch` ([GH-94985](https://github.com/godotengine/godot/pull/94985))
 - `0002-spirv-headers.patch` ([GH-111452](https://github.com/godotengine/godot/pull/111452))
 - `0003-findnode-id-lookup-table.patch` ([GH-121835](https://github.com/godotengine/godot/pull/121835))
+
+
+## sqlite
+
+- Upstream: https://sqlite.org
+- Version: 3.54.1 (555e07ef33f69a0957d24d8e555b702464a131d6f1607f4c3c1e4551e8e6ca76, 2026)
+- License: Public Domain
+
+Files extracted from the upstream amalgamation (`sqlite-amalgamation-3540100.zip`):
+
+- `sqlite3.c`, `sqlite3.h`
 
 
 ## swappy-frame-pacing

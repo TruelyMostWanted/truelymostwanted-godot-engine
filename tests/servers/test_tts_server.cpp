@@ -42,10 +42,10 @@ TEST_FORCE_LINK(test_tts_server)
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
-namespace TestTtsServer {
+namespace TestTTSServer {
 
-static Ref<TtsPersona> make_persona(const String &p_name, const String &p_voice, const String &p_language) {
-	Ref<TtsPersona> persona;
+static Ref<TTSPersona> make_persona(const String &p_name, const String &p_voice, const String &p_language) {
+	Ref<TTSPersona> persona;
 	persona.instantiate();
 	persona->set_persona_name(p_name);
 	persona->set_voice(p_voice);
@@ -53,14 +53,14 @@ static Ref<TtsPersona> make_persona(const String &p_name, const String &p_voice,
 	return persona;
 }
 
-TEST_CASE("[TtsServer] Singleton is registered") {
-	TtsServer *server = TtsServer::get_singleton();
+TEST_CASE("[TTSServer] Singleton is registered") {
+	TTSServer *server = TTSServer::get_singleton();
 	REQUIRE(server != nullptr);
-	CHECK(Engine::get_singleton()->has_singleton("TtsServer"));
+	CHECK(Engine::get_singleton()->has_singleton("TTSServer"));
 }
 
-TEST_CASE("[TtsServer] TtsPersona defaults and value ranges") {
-	Ref<TtsPersona> persona;
+TEST_CASE("[TTSServer] TTSPersona defaults and value ranges") {
+	Ref<TTSPersona> persona;
 	persona.instantiate();
 	CHECK(persona->get_persona_name().is_empty());
 	CHECK(persona->get_voice().is_empty());
@@ -84,8 +84,8 @@ TEST_CASE("[TtsServer] TtsPersona defaults and value ranges") {
 	CHECK(persona->get_rate() == doctest::Approx(10.0));
 }
 
-TEST_CASE("[TtsServer] TtsPersona saves and loads as .tres") {
-	Ref<TtsPersona> persona = make_persona("narrator", "Some Voice", "en_US");
+TEST_CASE("[TTSServer] TTSPersona saves and loads as .tres") {
+	Ref<TTSPersona> persona = make_persona("narrator", "Some Voice", "en_US");
 	persona->set_volume(80);
 	persona->set_pitch(1.25f);
 	persona->set_rate(0.75f);
@@ -94,7 +94,7 @@ TEST_CASE("[TtsServer] TtsPersona saves and loads as .tres") {
 	const String path = TestUtils::get_temp_path("tts_persona.tres");
 	REQUIRE(ResourceSaver::save(persona, path) == OK);
 
-	Ref<TtsPersona> loaded = ResourceLoader::load(path, "", ResourceLoader::CACHE_MODE_IGNORE);
+	Ref<TTSPersona> loaded = ResourceLoader::load(path, "", ResourceLoader::CACHE_MODE_IGNORE);
 	REQUIRE(loaded.is_valid());
 	CHECK(loaded != persona);
 	CHECK(loaded->get_persona_name() == "narrator");
@@ -106,19 +106,19 @@ TEST_CASE("[TtsServer] TtsPersona saves and loads as .tres") {
 	CHECK(loaded->is_interrupt());
 }
 
-TEST_CASE("[TtsServer] Persona list and default persona") {
-	TtsServer *server = TtsServer::get_singleton();
+TEST_CASE("[TTSServer] Persona list and default persona") {
+	TTSServer *server = TTSServer::get_singleton();
 	REQUIRE(server != nullptr);
 	server->clear_personas();
 
 	// Without own personas, the built-in default persona is used.
-	Ref<TtsPersona> builtin = server->get_default_persona();
+	Ref<TTSPersona> builtin = server->get_default_persona();
 	REQUIRE(builtin.is_valid());
 	CHECK(server->get_default_persona_name().is_empty());
 	CHECK(builtin->get_volume() == 50);
 
-	Ref<TtsPersona> narrator = make_persona("narrator", "", "en");
-	Ref<TtsPersona> guard = make_persona("guard", "", "de");
+	Ref<TTSPersona> narrator = make_persona("narrator", "", "en");
+	Ref<TTSPersona> guard = make_persona("guard", "", "de");
 	server->add_persona(narrator);
 	server->add_persona(guard);
 	CHECK(server->has_persona("narrator"));
@@ -130,7 +130,7 @@ TEST_CASE("[TtsServer] Persona list and default persona") {
 	CHECK(server->get_persona_names().size() == 2);
 
 	ERR_PRINT_OFF;
-	server->add_persona(Ref<TtsPersona>());
+	server->add_persona(Ref<TTSPersona>());
 	server->add_persona(make_persona("", "", ""));
 	server->set_default_persona("king");
 	ERR_PRINT_ON;
@@ -142,7 +142,7 @@ TEST_CASE("[TtsServer] Persona list and default persona") {
 	CHECK(server->get_default_persona() == guard);
 
 	// Adding a persona with the same name replaces it.
-	Ref<TtsPersona> guard2 = make_persona("guard", "", "fr");
+	Ref<TTSPersona> guard2 = make_persona("guard", "", "fr");
 	server->add_persona(guard2);
 	CHECK(server->get_personas().size() == 2);
 	CHECK(server->get_default_persona() == guard2);
@@ -158,8 +158,79 @@ TEST_CASE("[TtsServer] Persona list and default persona") {
 	CHECK(server->get_personas().is_empty());
 }
 
-TEST_CASE("[TtsServer] Graceful behavior without text to speech") {
-	TtsServer *server = TtsServer::get_singleton();
+TEST_CASE("[TTSServer] The player's persona overrides come before the personas of the game") {
+	TTSServer *server = TTSServer::get_singleton();
+	REQUIRE(server != nullptr);
+	server->clear_personas();
+	server->clear_persona_overrides();
+
+	Ref<TTSPersona> narrator = make_persona("narrator", "", "en");
+	Ref<TTSPersona> guard = make_persona("guard", "", "de");
+	server->add_persona(narrator);
+	server->add_persona(guard);
+	server->set_default_persona("narrator");
+
+	// The player's narrator replaces the game's narrator; the game's one stays the base persona.
+	Ref<TTSPersona> player_narrator = make_persona("narrator", "Player Voice", "en");
+	server->set_persona_override(player_narrator);
+	CHECK(server->has_persona_override("narrator"));
+	CHECK_FALSE(server->has_persona_override("guard"));
+	CHECK(server->get_persona("narrator") == player_narrator);
+	CHECK(server->get_persona_override("narrator") == player_narrator);
+	CHECK(server->get_base_persona("narrator") == narrator);
+	CHECK(server->get_default_persona() == player_narrator);
+
+	// A persona only the player has.
+	Ref<TTSPersona> helper = make_persona("helper", "", "fr");
+	server->set_persona_override(helper);
+	CHECK(server->has_persona("helper"));
+	CHECK(server->get_base_persona("helper").is_null());
+	CHECK(server->get_persona_names() == PackedStringArray({ "narrator", "guard", "helper" }));
+	const TypedArray<TTSPersona> personas = server->get_personas();
+	REQUIRE(personas.size() == 3);
+	CHECK(Ref<TTSPersona>(personas[0]) == player_narrator);
+	CHECK(Ref<TTSPersona>(personas[2]) == helper);
+	CHECK(server->get_persona_overrides().size() == 2);
+
+	// The game adding its persona again (for example in _ready()) does not hide the player's version.
+	server->add_persona(make_persona("narrator", "", "en"));
+	CHECK(server->get_persona("narrator") == player_narrator);
+
+	// The player's default persona wins over the game's; a missing one falls back to the game's.
+	server->set_default_persona_override("helper");
+	CHECK(server->get_default_persona_override() == StringName("helper"));
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+	CHECK(server->get_default_persona() == helper);
+	server->set_default_persona("guard");
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+	server->set_default_persona_override("not_there");
+	CHECK(server->get_default_persona_name() == StringName("guard"));
+	// The game may choose a persona only the player has.
+	server->set_default_persona("helper");
+	CHECK(server->get_default_persona_name() == StringName("helper"));
+
+	// Removing the override brings the game's persona back.
+	server->remove_persona_override("narrator");
+	CHECK(server->get_persona("narrator").is_valid());
+	CHECK(server->get_persona("narrator") != player_narrator);
+	CHECK_FALSE(server->has_persona_override("narrator"));
+
+	// Speaking with an unknown persona name warns and uses the default persona (TTS is off in tests: -1).
+	ERR_PRINT_OFF;
+	CHECK(server->speak_with_persona("Hello", "nobody") == -1);
+	CHECK(server->speak_with_persona("Hello", "helper") == -1);
+	ERR_PRINT_ON;
+
+	server->clear_persona_overrides();
+	CHECK(server->get_persona_overrides().is_empty());
+	CHECK(server->get_default_persona_override().is_empty());
+	CHECK_FALSE(server->has_persona("helper"));
+	server->clear_personas();
+	CHECK(server->get_personas().is_empty());
+}
+
+TEST_CASE("[TTSServer] Graceful behavior without text to speech") {
+	TTSServer *server = TTSServer::get_singleton();
 	REQUIRE(server != nullptr);
 	// Unit tests run without a DisplayServer that supports TTS, and with "audio/general/text_to_speech" off.
 	CHECK_FALSE(server->is_available());
@@ -179,13 +250,13 @@ TEST_CASE("[TtsServer] Graceful behavior without text to speech") {
 	CHECK(server->get_pending_utterances().is_empty());
 
 	// Without a voice list, the voice of the persona is passed on as it is.
-	CHECK(server->resolve_voice(make_persona("x", "Some Voice", "en")) == "Some Voice");
-	CHECK(server->resolve_voice(make_persona("x", "", "en")).is_empty());
-	CHECK(server->resolve_voice(Ref<TtsPersona>()).is_empty());
+	CHECK(server->resolve_voice_id(make_persona("x", "Some Voice", "en")) == "Some Voice");
+	CHECK(server->resolve_voice_id(make_persona("x", "", "en")).is_empty());
+	CHECK(server->resolve_voice_id(Ref<TTSPersona>()).is_empty());
 }
 
-TEST_CASE("[TtsServer] Utterance events become signals on the main thread") {
-	TtsServer *server = TtsServer::get_singleton();
+TEST_CASE("[TTSServer] Utterance events become signals on the main thread") {
+	TTSServer *server = TTSServer::get_singleton();
 	REQUIRE(server != nullptr);
 	MessageQueue::get_singleton()->flush();
 
@@ -225,4 +296,4 @@ TEST_CASE("[TtsServer] Utterance events become signals on the main thread") {
 	SIGNAL_UNWATCH(server, "utterance_boundary");
 }
 
-} // namespace TestTtsServer
+} // namespace TestTTSServer

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitlePlayback" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Plays a [Subtitle] against a time you provide and signals when segments start and end.
+	</brief_description>
+	<description>
+		A playback keeps track of the [SubtitleSegment]s that are active at a time. Pass it a time with [method update] (every frame) or [method seek] (a jump). It emits [signal segment_ended], [signal segment_started] and [signal segment_changed], in this order, whenever the active segments change. While nothing changes, it emits nothing and does not allocate memory.
+		[SubtitlePlayer] drives a playback from a scene. A playback also works on its own, without a scene and without threads, for example in tools, in tests or with a clock of your own:
+		[codeblocks]
+		[gdscript]
+		var playback = SubtitlePlayback.new()
+		var time = 0.0
+
+		func _ready():
+		    playback.subtitle = load("res://intro.srt")
+		    playback.segment_changed.connect(_on_segment_changed)
+
+		func _process(delta):
+		    time += delta
+		    playback.update(time)
+
+		func _on_segment_changed(segment):
+		    $SubtitleLabel.text = segment.text if segment else ""
+		[/gdscript]
+		[csharp]
+		private readonly SubtitlePlayback _playback = new SubtitlePlayback();
+		private double _time;
+
+		public override void _Ready()
+		{
+		    _playback.Subtitle = GD.Load&lt;Subtitle&gt;("res://intro.srt");
+		    _playback.SegmentChanged += segment =&gt; GetNode&lt;Label&gt;("SubtitleLabel").Text = segment?.Text ?? "";
+		}
+
+		public override void _Process(double delta)
+		{
+		    _time += delta;
+		    _playback.Update(_time);
+		}
+		[/csharp]
+		[/codeblocks]
+		Times are playback times: the times of the segments plus [member Subtitle.time_offset], as in [method Subtitle.get_segments_at]. Finding the active segments costs a binary search over the segments sorted by start time. The segments need not be sorted in the [Subtitle].
+		[b]Note:[/b] The playback reports all segments. It does not check [member SubtitleServer.enabled] or [member SubtitleServer.captions_enabled]. To get the text to show for a segment, use [method SubtitleServer.get_display_text].
+		The playback reads the segment times again whenever the [Subtitle] emits [signal Resource.changed], which includes changes to its [SubtitleSegment]s.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_active_segments" qualifiers="const">
+			<return type="SubtitleSegment[]" />
+			<description>
+				Returns the segments that are active at [method get_time], sorted by start time. Overlapping segments are all included.
+			</description>
+		</method>
+		<method name="get_current_segment" qualifiers="const">
+			<return type="SubtitleSegment" />
+			<description>
+				Returns the active segment that started last, or [code]null[/code] if no segment is active. This is the segment of the last [signal segment_changed].
+			</description>
+		</method>
+		<method name="get_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the time of the last [method update] or [method seek], in seconds. Returns [code]0.0[/code] after [method reset].
+			</description>
+		</method>
+		<method name="reset">
+			<return type="void" />
+			<description>
+				Ends all active segments: emits [signal segment_ended] for each of them, then [signal segment_changed] with [code]null[/code]. The playback forgets its time, so the next [method update] does not report skipped segments.
+			</description>
+		</method>
+		<method name="seek">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Jumps to [param time], forward or backward. Only the segments that are active before or after the jump are reported: segments in between are skipped silently.
+			</description>
+		</method>
+		<method name="update">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Moves to [param time], usually once per frame. If [param time] is later than the previous time, segments that started and ended in between (after a long frame, or while a browser tab was hidden) still emit [signal segment_started] and [signal segment_ended], but no [signal segment_changed]. If [param time] is earlier, this works like [method seek].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="subtitle" type="Subtitle" setter="set_subtitle" getter="get_subtitle">
+			The subtitle to play. Assigning another subtitle first calls [method reset].
+		</member>
+	</members>
+	<signals>
+		<signal name="segment_changed">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted after [signal segment_ended] and [signal segment_started] when the current segment changes (see [method get_current_segment]). [param segment] is [code]null[/code] when no segment is active. Connect this signal to show one line of text.
+			</description>
+		</signal>
+		<signal name="segment_ended">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when [param segment] stops being active: its end time has passed, the time jumped away from it, or [method reset] was called.
+			</description>
+		</signal>
+		<signal name="segment_started">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when [param segment] becomes active. Connect this signal and [signal segment_ended] to show overlapping segments at the same time.
+			</description>
+		</signal>
+	</signals>
+</class>

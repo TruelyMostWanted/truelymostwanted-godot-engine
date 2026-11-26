@@ -1181,6 +1181,9 @@ void EditorExportPlatformAppleEmbedded::_add_assets_to_project(const String &p_o
 			type = "compiled.mach-o.dylib";
 		} else if (asset.exported_path.ends_with(".a")) {
 			type = "archive.ar";
+		} else if (!asset.is_framework && DirAccess::dir_exists_absolute(p_out_dir.path_join(asset.exported_path))) {
+			// A folder reference: Xcode copies the folder with its whole structure.
+			type = "folder";
 		} else {
 			type = "file";
 		}
@@ -1402,6 +1405,33 @@ Error EditorExportPlatformAppleEmbedded::_export_additional_assets(const Ref<Edi
 	}
 	Error err = _export_additional_assets(p_preset, p_out_dir, library_paths, true, true, r_exported_assets);
 	ERR_FAIL_COND_V(err, err);
+
+	// Data files for the bundle root, added with `EditorExportPlugin::add_bundle_resource()`. They are staged
+	// in `<project>/bundle_resources/<target>`, and one folder or file reference is added per top-level item,
+	// so Xcode copies them with their structure into the app bundle before it signs the app.
+	const String staging_dir = p_out_dir.path_join("bundle_resources");
+	const String binary_name = p_out_dir.get_file().get_basename();
+	Vector<String> top_level_items;
+	for (int i = 0; i < export_plugins.size(); i++) {
+		const Vector<EditorExportPlugin::BundleResource> &bundle_resources = export_plugins[i]->get_bundle_resources();
+		if (bundle_resources.is_empty()) {
+			continue;
+		}
+		String failed_path;
+		err = export_plugins[i]->copy_bundle_resources(staging_dir, failed_path);
+		if (err != OK) {
+			add_message(EXPORT_MESSAGE_ERROR, TTR("Export"), vformat(TTR("Could not copy the bundle resource \"%s\" into the Xcode project."), failed_path));
+			return err;
+		}
+		for (const EditorExportPlugin::BundleResource &bundle_resource : bundle_resources) {
+			const String top_level_item = bundle_resource.target.get_slicec('/', 0);
+			if (!top_level_items.has(top_level_item)) {
+				top_level_items.push_back(top_level_item);
+				AppleEmbeddedExportAsset exported_asset = { binary_name.path_join("bundle_resources").path_join(top_level_item), false, false };
+				r_exported_assets.push_back(exported_asset);
+			}
+		}
+	}
 
 	return OK;
 }
@@ -1815,7 +1845,7 @@ Error EditorExportPlatformAppleEmbedded::_export_project_helper(const Ref<Editor
 					for (String n = da->get_next(); !n.is_empty(); n = da->get_next()) {
 						if (!n.begins_with(".")) { // Ignore ".", ".." and hidden files.
 							if (da->current_is_dir()) {
-								if (n == "dylibs" || n == "Images.xcassets" || n.ends_with(".lproj") || n == "godot-publish-dotnet" || n.ends_with(".xcframework") || n.ends_with(".framework")) {
+								if (n == "dylibs" || n == "bundle_resources" || n == "Images.xcassets" || n.ends_with(".lproj") || n == "godot-publish-dotnet" || n.ends_with(".xcframework") || n.ends_with(".framework")) {
 									expected_files++;
 								}
 							} else {

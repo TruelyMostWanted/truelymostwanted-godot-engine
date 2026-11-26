@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowEmitEventNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Emits a named event with arguments to the game.
+	</brief_description>
+	<description>
+		The emit event node tells the game that something happened, for example [code]give_item[/code] with the arguments [code]sword[/code] and [code]1[/code]. It has the flow input [code]in[/code] and the flow output [code]out[/code]. The event is delivered through the playback (its [code]event_emitted[/code] signal); the graph itself has no knowledge of the game. An empty [member event_name] is a configuration warning.
+		At runtime the node emits [signal FlowGraphPlayback.event_emitted] with [member event_name] and [member arguments] when it is entered, then continues at [code]out[/code] without waiting. [FlowGraphPlayer] forwards the signal.
+		[codeblocks]
+		[gdscript]
+		var event := FlowEmitEventNode.new()
+		event.event_name = &amp;"give_item"
+		event.arguments = ["sword", 1]
+		graph.add_node(event)
+		[/gdscript]
+		[csharp]
+		var eventNode = new FlowEmitEventNode { EventName = "give_item", Arguments = ["sword", 1] };
+		graph.AddNode(eventNode);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="arguments" type="Array" setter="set_arguments" getter="get_arguments" default="[]">
+			The arguments that are delivered together with the event. They are stored as written; there is no per-argument port.
+		</member>
+		<member name="event_name" type="StringName" setter="set_event_name" getter="get_event_name" default="&amp;&quot;&quot;">
+			The name of the event.
+		</member>
+	</members>
+</class>

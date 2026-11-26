@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/data_validation.h"
 #include "editor/script/script_editor_base.h"
 
 class TextEditor : public TextEditorBase {
@@ -38,6 +39,14 @@ class TextEditor : public TextEditorBase {
 	static ScriptEditorBase *create_editor(const Ref<Resource> &p_resource);
 
 	static inline EditMenus *edit_menus = nullptr;
+
+	// Live errors of data files: at most this many schema issues per check, all with a line are marked.
+	static constexpr int MAX_ISSUES = 200;
+	Ref<DataValidationOptions> validation_options;
+	LocalVector<int> issue_lines; // Marked lines (0-based), sorted.
+
+	void _caret_changed();
+	bool _requires_space_indent() const;
 
 protected:
 	class EditMenusTEB : public EditMenus {
@@ -53,6 +62,9 @@ protected:
 
 public:
 	virtual void apply_code() override;
+	virtual void set_edited_resource(const Ref<Resource> &p_res) override;
+	virtual void update_settings() override;
+	virtual void convert_indent() override;
 
 	virtual EditMenusBase *create_edit_menu(DocumentEditorContainer *p_document_editor_container) override { return memnew(EditMenusTEB(p_document_editor_container)); }
 

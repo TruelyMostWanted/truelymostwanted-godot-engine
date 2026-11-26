@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SQLiteDatabase" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A connection to an SQLite database file.
+	</brief_description>
+	<description>
+		[SQLiteDatabase] opens an SQLite 3 database file and runs SQL on it. All file access goes through [FileAccess], so databases work in [code]user://[/code] (also on the Web, where [code]user://[/code] is stored in IndexedDB), in absolute paths, and read-only in [code]res://[/code] and exported PCK files.
+		[codeblock]
+		var db = SQLiteDatabase.new()
+		if db.open("user://save.db") != OK:
+			push_error(db.get_last_error_message())
+			return
+		db.execute("CREATE TABLE IF NOT EXISTS scores (name TEXT, points INTEGER);")
+		db.execute("INSERT INTO scores VALUES (?, ?);", ["Ada", 120])
+		for row in db.query("SELECT name, points FROM scores WHERE points &gt; :min;", { "min": 100 }):
+			print(row.name, ": ", row.points)
+		db.close()
+		[/codeblock]
+		Parameters are passed as an [Array] for positional placeholders ([code]?[/code], [code]?1[/code]) or as a [Dictionary] for named placeholders ([code]:name[/code], [code]@name[/code], [code]$name[/code]; the keys are written without the prefix). Values map to SQLite types as follows: [code]null[/code] to NULL, [bool] and [int] to INTEGER, [float] to REAL, [String] and [StringName] to TEXT, [PackedByteArray] to BLOB. Other types are rejected with [constant ERR_INVALID_PARAMETER]. Results come back as [int], [float], [String], [PackedByteArray] or [code]null[/code].
+		Methods return an [enum Error]; [method get_last_error_message] gives the details of the last failure. SQL errors are not printed to the output.
+		The build includes FTS5 full-text search, the JSON functions and the math functions. Write-ahead logging (WAL) and loadable extensions are not available. Locks are not used: open each database file through one [SQLiteDatabase] at a time, and use one [SQLiteDatabase] from one thread at a time.
+		[SQLiteDatabase] is a [Resource]: files ending in [code].db[/code], [code].sqlite[/code], [code].sqlite3[/code] or [code].db3[/code] can be loaded with [method @GDScript.load] or assigned to an exported property. Loading only creates the object; [method open] without a path then opens the loaded file. In the editor, selecting such a file shows its tables in the Inspector; the [b]Edit[/b] button next to a table opens a window to edit, insert and delete its rows. The files are exported as they are.
+		[codeblock]
+		var db: SQLiteDatabase = load("res://data/items.db")
+		db.open() # Read-only, like every file in res://.
+		for table in db.get_table_names():
+			print(table, ": ", db.get_row_count(table), " rows")
+		[/codeblock]
+		The schema methods ([method get_table_names], [method has_table], [method get_columns], [method get_column_names], [method get_column_count], [method get_row_count]) take plain table names (no schema prefix) and never paste them into SQL unquoted. For an unknown table they return an empty result or [code]-1[/code] and set [method get_last_error] to [constant ERR_DOES_NOT_EXIST].
+		[b]Note:[/b] [method @GDScript.load] returns the same object for the same file while it is in use. For a second, separate connection, create one with [code]SQLiteDatabase.new()[/code] and open the path explicitly.
+		[b]Note:[/b] Databases in [code]res://[/code] are read-only for scripts, also in the editor (the Inspector's table editor can still change them). To modify a database shipped with the project, copy it to [code]user://[/code] first, for example with [method DirAccess.copy_absolute].
+		[b]Note:[/b] On the Web, the rollback journal is kept in memory and the database file is written to IndexedDB on every commit.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="begin_transaction">
+			<return type="int" enum="Error" />
+			<description>
+				Starts a transaction ([code]BEGIN[/code]). Changes become permanent with [method commit] or are discarded with [method rollback]. Grouping many writes into one transaction is much faster than writing them one by one.
+			</description>
+		</method>
+		<method name="close">
+			<return type="void" />
+			<description>
+				Closes the database and finalizes the [SQLiteStatement]s prepared from it: they stop working, and the file is no longer held open. Does nothing if the database is not open. The database is also closed when the [SQLiteDatabase] is freed.
+			</description>
+		</method>
+		<method name="commit">
+			<return type="int" enum="Error" />
+			<description>
+				Commits the current transaction ([code]COMMIT[/code]). Returns [constant ERR_QUERY_FAILED] if no transaction is active.
+			</description>
+		</method>
+		<method name="execute">
+			<return type="int" enum="Error" />
+			<param index="0" name="sql" type="String" />
+			<param index="1" name="params" type="Variant" default="null" />
+			<description>
+				Runs [param sql], which may contain several statements separated by [code];[/code]. Result rows are discarded; use [method query] to read them. [param params] is an [Array] (positional placeholders) or a [Dictionary] (named placeholders) and is bound to every statement that has placeholders; their number must match.
+				Returns [constant OK] on success, [constant ERR_UNCONFIGURED] if the database is not open, [constant ERR_INVALID_PARAMETER] for missing or unsupported parameters, [constant ERR_FILE_NO_PERMISSION] when writing to a read-only database, and [constant ERR_QUERY_FAILED] for other SQL errors (see [method get_last_error_message]).
+			</description>
+		</method>
+		<method name="get_changes" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of rows inserted, changed or deleted by the last [code]INSERT[/code], [code]UPDATE[/code] or [code]DELETE[/code] statement.
+			</description>
+		</method>
+		<method name="get_column_count">
+			<return type="int" />
+			<param index="0" name="table" type="String" />
+			<description>
+				Returns the number of columns of [param table], or [code]-1[/code] if there is no such table.
+			</description>
+		</method>
+		<method name="get_column_names">
+			<return type="PackedStringArray" />
+			<param index="0" name="table" type="String" />
+			<description>
+				Returns the names of the columns of [param table] in table order. Empty if there is no such table.
+			</description>
+		</method>
+		<method name="get_columns">
+			<return type="SQLiteColumn[]" />
+			<param index="0" name="table" type="String" />
+			<description>
+				Returns the columns of [param table] in table order, with their declared type, affinity, [code]NOT NULL[/code] constraint, default value and position in the primary key. Empty if there is no such table.
+				[codeblock]
+				for column in db.get_columns("items"):
+					print(column.name, " ", column.declared_type, " key: ", column.primary_key_index)
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_database_path" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the path the database was opened with, or an empty string if it is not open. Unlike [member Resource.resource_path], which is the file the resource was loaded from, this is also set for a database created with [code]SQLiteDatabase.new()[/code].
+			</description>
+		</method>
+		<method name="get_last_error" qualifiers="const">
+			<return type="int" enum="Error" />
+			<description>
+				Returns the result of the last operation on this database or on one of its statements, [constant OK] if it succeeded.
+			</description>
+		</method>
+		<method name="get_last_error_message" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the message of the last failed operation, for example [code]near "SELEC": syntax error[/code]. Empty if the last operation succeeded.
+			</description>
+		</method>
+		<method name="get_last_insert_rowid" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the [code]rowid[/code] of the last row inserted through this connection, or [code]0[/code] if no row was inserted. For a table with an [code]INTEGER PRIMARY KEY[/code] column, this is the value of that column.
+			</description>
+		</method>
+		<method name="get_open_mode" qualifiers="const">
+			<return type="int" enum="SQLiteDatabase.OpenMode" />
+			<description>
+				Returns the mode the database was opened with.
+			</description>
+		</method>
+		<method name="get_row_count">
+			<return type="int" />
+			<param index="0" name="table" type="String" />
+			<description>
+				Returns the number of rows in [param table] ([code]SELECT COUNT(*)[/code]), or [code]-1[/code] if there is no such table.
+				[b]Note:[/b] SQLite reads the whole table to count its rows, which takes a while for big tables.
+			</description>
+		</method>
+		<method name="get_table_names">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the tables in the database, sorted by name. Virtual tables (such as FTS5 tables) are included; views, SQLite's internal [code]sqlite_*[/code] tables and the shadow tables of virtual tables are not.
+			</description>
+		</method>
+		<method name="has_table">
+			<return type="bool" />
+			<param index="0" name="table" type="String" />
+			<description>
+				Returns [code]true[/code] if the database has a table named [param table], ignoring case like SQLite does. Only tables listed by [method get_table_names] count.
+			</description>
+		</method>
+		<method name="is_in_transaction" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while a transaction started with [method begin_transaction] (or [code]BEGIN[/code]) is active.
+			</description>
+		</method>
+		<method name="is_open" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the database is open.
+			</description>
+		</method>
+		<method name="open">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" default="&quot;&quot;" />
+			<param index="1" name="mode" type="int" enum="SQLiteDatabase.OpenMode" default="2" />
+			<description>
+				Opens the database at [param path], closing a database that is already open. [param path] can be any path [FileAccess] can open, such as [code]user://save.db[/code] or [code]res://data/items.db[/code].
+				If [param path] is empty, opens the file this resource was loaded from (see [member Resource.resource_path]). A loaded file in [code]res://[/code] then always opens with [constant OPEN_MODE_READ_ONLY]. Returns [constant ERR_INVALID_PARAMETER] if the database was not loaded from a file.
+				Returns [constant ERR_FILE_NOT_FOUND] if the file does not exist and [param mode] is not [constant OPEN_MODE_CREATE], [constant ERR_FILE_NO_PERMISSION] for a writable mode on a [code]res://[/code] path, [constant ERR_FILE_CORRUPT] if the file is not an SQLite database, and [constant ERR_FILE_CANT_OPEN] if the file can't be opened.
+			</description>
+		</method>
+		<method name="prepare">
+			<return type="SQLiteStatement" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Compiles the first statement of [param sql] into an [SQLiteStatement] that can be bound and run many times. Returns [code]null[/code] on failure; see [method get_last_error] and [method get_last_error_message].
+			</description>
+		</method>
+		<method name="query">
+			<return type="Dictionary[]" />
+			<param index="0" name="sql" type="String" />
+			<param index="1" name="params" type="Variant" default="null" />
+			<description>
+				Runs [param sql] like [method execute] and returns its result rows. Each row is a [Dictionary] that maps column names to values. If [param sql] contains several statements, the rows of all of them are returned. Returns an empty array on failure; check [method get_last_error] to tell a failure from an empty result.
+			</description>
+		</method>
+		<method name="rollback">
+			<return type="int" enum="Error" />
+			<description>
+				Discards the changes of the current transaction ([code]ROLLBACK[/code]). Returns [constant ERR_QUERY_FAILED] if no transaction is active.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="OPEN_MODE_READ_ONLY" value="0" enum="OpenMode">
+			Opens an existing database for reading. Required for databases in [code]res://[/code].
+		</constant>
+		<constant name="OPEN_MODE_READ_WRITE" value="1" enum="OpenMode">
+			Opens an existing database for reading and writing.
+		</constant>
+		<constant name="OPEN_MODE_CREATE" value="2" enum="OpenMode">
+			Opens a database for reading and writing and creates the file if it does not exist.
+		</constant>
+	</constants>
+</class>

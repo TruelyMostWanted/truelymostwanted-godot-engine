@@ -40,6 +40,8 @@ class DisplayServerMock : public DisplayServerHeadless {
 private:
 	friend class DisplayServer;
 
+	Vector2i size = Size2i(1920, 1080);
+	Vector2i max_window_size; // Zero: no limit.
 	Point2i mouse_position = Point2i(-1, -1); // Outside of Window.
 	DisplayServerEnums::CursorShape cursor_shape = DisplayServerEnums::CursorShape::CURSOR_ARROW;
 	bool window_over = false;
@@ -78,8 +80,15 @@ public:
 	virtual void clipboard_set_primary(const String &p_text) override { primary_clipboard_text = p_text; }
 	virtual String clipboard_get_primary() const override { return primary_clipboard_text; }
 
+	virtual void window_set_size(const Size2i p_size, DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) override {
+		size = max_window_size == Vector2i() ? p_size : p_size.min(max_window_size);
+	}
+
+	// Simulates a display server that limits the size of its windows, like an OS clamping a window to the desktop.
+	void set_max_window_size(const Size2i &p_size) { max_window_size = p_size; }
+
 	virtual Size2i window_get_size(DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) const override {
-		return Size2i(1920, 1080);
+		return size;
 	}
 
 	virtual void cursor_set_shape(DisplayServerEnums::CursorShape p_shape) override {

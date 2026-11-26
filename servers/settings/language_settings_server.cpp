@@ -34,6 +34,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
@@ -75,7 +76,14 @@ PackedStringArray LanguageSettingsServer::get_available_locales() {
 	if (translation_server == nullptr) {
 		return PackedStringArray();
 	}
-	Vector<String> locales = translation_server->get_loaded_locales();
+	PackedStringArray locales = LocalizationServer::get_all_available_locales();
+	// Skips the tr() adapter of the localization catalogs: its locale is always the active one.
+	const TextLocalizationServer *text_server = TextLocalizationServer::get_singleton();
+	for (const Ref<Translation> &translation : translation_server->get_main_domain()->get_translations()) {
+		if ((text_server == nullptr || !text_server->is_adapter(translation)) && !locales.has(translation->get_locale())) {
+			locales.push_back(translation->get_locale());
+		}
+	}
 	locales.sort();
 	return locales;
 }
@@ -92,12 +100,12 @@ bool LanguageSettingsServer::_is_developer_locale(const String &p_locale) {
 
 String LanguageSettingsServer::_resolve_locale(const String &p_locale) {
 	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	const PackedStringArray loaded = translation_server->get_loaded_locales();
-	if (loaded.is_empty()) {
+	const PackedStringArray available = get_available_locales();
+	if (available.is_empty()) {
 		// No translations: the game may still use the locale for its own texts.
 		return p_locale;
 	}
-	for (const String &locale : loaded) {
+	for (const String &locale : available) {
 		if (translation_server->compare_locales(p_locale, locale) > 0) {
 			return p_locale;
 		}
@@ -207,7 +215,7 @@ void LanguageSettingsServer::_on_loaded() {
 	}
 }
 
-void LanguageSettingsServer::_on_startup_applied(int p_phase) {
+void LanguageSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		_push_pending_root_values();
 	}
@@ -279,7 +287,29 @@ Node::AutoTranslateMode LanguageSettingsServer::get_root_auto_translate_mode() c
 	return Node::AutoTranslateMode(int(get_value(SNAME("root_auto_translate_mode"))));
 }
 
+void LanguageSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"locale",
+		"pseudolocalization_enabled",
+		"layout_direction",
+		"root_auto_translate_mode",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void LanguageSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("locale_changed", PropertyInfo(Variant::STRING, "locale")));
+	ADD_SIGNAL(MethodInfo("pseudolocalization_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("layout_direction_changed", PropertyInfo(Variant::INT, "direction", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.LayoutDirection")));
+	ADD_SIGNAL(MethodInfo("root_auto_translate_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Node.AutoTranslateMode")));
+
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &LanguageSettingsServer::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &LanguageSettingsServer::get_locale);
 	ClassDB::bind_method(D_METHOD("set_pseudolocalization_enabled", "enabled"), &LanguageSettingsServer::set_pseudolocalization_enabled);

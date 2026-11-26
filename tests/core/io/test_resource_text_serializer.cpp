@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_resource_text_serializer)
 
+#include "core/io/csv_format.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -42,6 +43,8 @@ TEST_FORCE_LINK(test_resource_text_serializer)
 #include "core/object/class_db.h"
 #include "core/variant/typed_array.h"
 #include "tests/test_utils.h"
+
+#include "modules/modules_enabled.gen.h" // For yaml.
 
 namespace TestResourceTextSerializer {
 
@@ -403,7 +406,7 @@ TEST_CASE("[ResourceTextSerializer] INI round trip") {
 	SUBCASE("Plain values") {
 		Ref<SerializerOptions> plain;
 		plain.instantiate();
-		plain->set_ini_plain_values(true);
+		plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 		const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI, plain);
 		CHECK(text.contains("$type=TextFormatSettings\n"));
 		CHECK(text.contains("quality=High\n"));
@@ -497,10 +500,10 @@ TEST_CASE("[ResourceTextSerializer] CSV round trip") {
 		const Ref<TextFormatList> from_file = ResourceLoader::load(path, "TextFormatList", ResourceFormatLoader::CACHE_MODE_IGNORE);
 		REQUIRE(from_file.is_valid());
 		CHECK(from_file->get_entries().size() == 2);
-		// CSV has no type in the file: without a hint it can't be loaded.
-		ERR_PRINT_OFF;
-		CHECK(ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE).is_null());
-		ERR_PRINT_ON;
+		// CSV has no type in the file: without a hint it loads as a plain CSV resource.
+		const Ref<CSV> plain = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+		REQUIRE(plain.is_valid());
+		CHECK(plain->get_row_count() == 2);
 		DirAccess::remove_absolute(path);
 	}
 
@@ -553,12 +556,56 @@ TEST_CASE("[ResourceTextSerializer] Precision of floats and colors") {
 
 	Ref<SerializerOptions> plain;
 	plain.instantiate();
-	plain->set_ini_plain_values(true);
+	plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	const Ref<TextFormatEntry> ini = serializer->deserialize(serializer->serialize(entry, ResourceTextSerializer::FORMAT_INI, plain), ResourceTextSerializer::FORMAT_INI);
 	REQUIRE(ini.is_valid());
 	CHECK(ini->get_speed() == entry->get_speed());
 	CHECK(ini->get_tint() == entry->get_tint());
 	CHECK(ini->get_offset() == entry->get_offset());
+}
+
+TEST_CASE("[ResourceTextSerializer] A float that is exactly a 32-bit float is written without float noise") {
+	register_test_classes();
+	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
+	Ref<TextFormatEntry> entry;
+	entry.instantiate();
+	entry->set_speed(double(0.2f)); // 0.20000000298023224, as a C++ `float` property reads back.
+
+	const String json = serializer->serialize(entry, ResourceTextSerializer::FORMAT_JSON);
+	CHECK(json.contains("0.2"));
+	CHECK_FALSE(json.contains("0.200000"));
+
+	Ref<SerializerOptions> plain;
+	plain.instantiate();
+	plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
+	const String ini = serializer->serialize(entry, ResourceTextSerializer::FORMAT_INI, plain);
+	CHECK(ini.contains("0.2\n"));
+	CHECK_FALSE(ini.contains("0.200000"));
+
+	Ref<TextFormatList> list;
+	list.instantiate();
+	TypedArray<TextFormatEntry> entries;
+	entries.push_back(entry);
+	list->set_entries(entries);
+	const String csv = serializer->serialize(list, ResourceTextSerializer::FORMAT_CSV);
+	CHECK(csv.contains(",0.2,"));
+	CHECK_FALSE(csv.contains("0.200000"));
+
+	// Read back into a 32-bit property, 0.2 is the same value again.
+	const Ref<TextFormatEntry> back = serializer->deserialize(json, ResourceTextSerializer::FORMAT_JSON);
+	REQUIRE(back.is_valid());
+	CHECK(float(back->get_speed()) == 0.2f);
+
+	// A 64-bit value is still written exactly.
+	entry->set_speed(0.1 + 0.2);
+	CHECK(serializer->serialize(entry, ResourceTextSerializer::FORMAT_JSON).contains("0.30000000000000004"));
+
+	// full_precision_floats writes the exact value of the 32-bit float.
+	entry->set_speed(double(0.2f));
+	Ref<SerializerOptions> full;
+	full.instantiate();
+	full->set_full_precision_floats(true);
+	CHECK(serializer->serialize(entry, ResourceTextSerializer::FORMAT_JSON, full).contains("0.20000000298023224"));
 }
 
 TEST_CASE("[SerializerOptions] Defaults match the project settings") {
@@ -572,7 +619,7 @@ TEST_CASE("[SerializerOptions] Defaults match the project settings") {
 	CHECK_FALSE(options->is_full_precision_floats());
 	CHECK(options->get_csv_delimiter() == ",");
 	CHECK(options->is_csv_headers());
-	CHECK_FALSE(options->is_ini_plain_values());
+	CHECK(options->get_ini_value_style() == SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT);
 	CHECK(options->is_xml_declaration());
 
 	// null = project settings; new() = class defaults; both give the same text.
@@ -676,8 +723,8 @@ TEST_CASE("[SerializerOptions] Every option changes the output") {
 		check_entry(back->get_entries()[0], "Bob", 1, 0);
 	}
 
-	SUBCASE("ini_plain_values") {
-		options->set_ini_plain_values(true);
+	SUBCASE("ini_value_style") {
+		options->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 		const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI, options);
 		CHECK(text.contains("cell=1, -2, 3"));
 		check_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_INI));
@@ -718,13 +765,17 @@ TEST_CASE("[ResourceTextSerializer] Unavailable formats and can_serialize()") {
 	const Ref<TextFormatSettings> settings = make_settings();
 	CHECK(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_JSON));
 	CHECK_FALSE(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_CSV));
+#ifndef MODULE_YAML_ENABLED
 	CHECK_FALSE(serializer->can_serialize(settings, ResourceTextSerializer::FORMAT_YAML));
+#endif
 	CHECK_FALSE(serializer->can_serialize(Ref<Resource>(), ResourceTextSerializer::FORMAT_JSON));
 
 	String text;
 	String error;
+#ifndef MODULE_YAML_ENABLED
 	CHECK(ResourceTextSerializer::write_format(ResourceTextSerializer::FORMAT_YAML, settings, ResourceTextSerializer::get_default_options(), text, error) == ERR_UNAVAILABLE);
 	CHECK(error.contains("YAML"));
+#endif
 	CHECK(ResourceTextSerializer::write_format(ResourceTextSerializer::FORMAT_MAX, settings, ResourceTextSerializer::get_default_options(), text, error) == ERR_UNAVAILABLE);
 	CHECK(ResourceTextSerializer::TEXT_LAYOUT_VERSION == 1);
 }
