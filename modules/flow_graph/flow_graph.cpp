@@ -422,6 +422,34 @@ PackedInt32Array FlowGraph::find_flow_path(int p_from_id, int p_to_id) const {
 	return path;
 }
 
+int FlowGraph::get_flow_target(int p_from_id, const StringName &p_from_port) const {
+	_ensure_index();
+	const LocalVector<uint32_t> *outputs = output_index.getptr(p_from_id);
+	if (outputs != nullptr) {
+		for (uint32_t index : *outputs) {
+			if (connections[index].from_port == p_from_port) {
+				return connections[index].to_id;
+			}
+		}
+	}
+	return NODE_ID_NONE;
+}
+
+bool FlowGraph::get_data_source(int p_to_id, const StringName &p_to_port, int &r_from_id, StringName &r_from_port) const {
+	_ensure_index();
+	const LocalVector<uint32_t> *inputs = input_index.getptr(p_to_id);
+	if (inputs != nullptr) {
+		for (uint32_t index : *inputs) {
+			if (connections[index].to_port == p_to_port) {
+				r_from_id = connections[index].from_id;
+				r_from_port = connections[index].from_port;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void FlowGraph::set_frames(const TypedArray<FlowFrame> &p_frames) {
 	frames = p_frames;
 	emit_changed();

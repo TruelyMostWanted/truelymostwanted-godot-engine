@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphPlayer" inherits="Node" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Plays a [FlowGraph] in the scene tree.
+	</brief_description>
+	<description>
+		A [FlowGraphPlayer] is a thin node around a [FlowGraphPlayback] (like [AnimationPlayer] around its animations): it plays [member graph], optionally when it is ready ([member autostart]), drives waiting nodes from the scene tree and repeats all signals of the playback. Use [method get_playback] for everything else (choices, travel, variables, save and restore).
+		[b]Processing.[/b] The player processes only while the current node waits through [method FlowNode._process_waiting] (for example a [FlowWaitNode]); an idle player, or one that waits for the game (a dialog line, a signal), costs nothing per frame. [member callback_mode_process] chooses the physics or the idle frame; in [constant CALLBACK_MODE_PROCESS_MANUAL], call [method FlowGraphPlayback.process] yourself. Pausing follows [member Node.process_mode].
+		[codeblocks]
+		[gdscript]
+		@onready var player: FlowGraphPlayer = $FlowGraphPlayer
+		@onready var label: Label = $Label
+
+		func _ready():
+		    player.node_entered.connect(func(id, node): label.text = node.get_title())
+		    player.finished.connect(func(end_id): label.text = "Done")
+		    player.play()
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var player = GetNode&lt;FlowGraphPlayer&gt;("FlowGraphPlayer");
+		    var label = GetNode&lt;Label&gt;("Label");
+		    player.NodeEntered += (id, node) =&gt; label.Text = node.GetTitle();
+		    player.Finished += endId =&gt; label.Text = "Done";
+		    player.Play();
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_playback" qualifiers="const">
+			<return type="FlowGraphPlayback" />
+			<description>
+				Returns the playback of this player.
+			</description>
+		</method>
+		<method name="is_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the graph plays. See [method FlowGraphPlayback.is_playing].
+			</description>
+		</method>
+		<method name="play">
+			<return type="int" enum="Error" />
+			<param index="0" name="from_id" type="int" default="-1" />
+			<description>
+				Starts [member graph] at [param from_id], or at its start node for [code]-1[/code]. See [method FlowGraphPlayback.start]. Returns [constant ERR_UNCONFIGURED] without a graph.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops the playback.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="autostart" type="bool" setter="set_autostart" getter="is_autostart" default="false">
+			If [code]true[/code], the player plays [member graph] when it is ready (not in the editor).
+		</member>
+		<member name="blackboard" type="FlowBlackboard" setter="set_blackboard" getter="get_blackboard" default="null">
+			An optional blackboard for the variables, for example one shared by several players. If [code]null[/code], the playback uses its own blackboard.
+		</member>
+		<member name="callback_mode_process" type="int" setter="set_callback_mode_process" getter="get_callback_mode_process" enum="FlowGraphPlayer.CallbackModeProcess" default="1">
+			When waiting nodes are processed.
+		</member>
+		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph" default="null">
+			The graph to play.
+		</member>
+	</members>
+	<signals>
+		<signal name="event_emitted">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="arguments" type="Array" />
+			<description>
+				Repeats [signal FlowGraphPlayback.event_emitted].
+			</description>
+		</signal>
+		<signal name="finished">
+			<param index="0" name="end_node_id" type="int" />
+			<description>
+				Repeats [signal FlowGraphPlayback.finished].
+			</description>
+		</signal>
+		<signal name="node_entered">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Repeats [signal FlowGraphPlayback.node_entered].
+			</description>
+		</signal>
+		<signal name="node_exited">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Repeats [signal FlowGraphPlayback.node_exited].
+			</description>
+		</signal>
+		<signal name="node_waiting">
+			<param index="0" name="node_id" type="int" />
+			<param index="1" name="node" type="FlowNode" />
+			<description>
+				Repeats [signal FlowGraphPlayback.node_waiting].
+			</description>
+		</signal>
+		<signal name="started">
+			<description>
+				Repeats [signal FlowGraphPlayback.started].
+			</description>
+		</signal>
+		<signal name="stopped">
+			<description>
+				Repeats [signal FlowGraphPlayback.stopped].
+			</description>
+		</signal>
+		<signal name="variable_changed">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Repeats [signal FlowGraphPlayback.variable_changed].
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="CALLBACK_MODE_PROCESS_PHYSICS" value="0" enum="CallbackModeProcess">
+			Process waiting nodes during physics frames ([constant Node.NOTIFICATION_INTERNAL_PHYSICS_PROCESS]).
+		</constant>
+		<constant name="CALLBACK_MODE_PROCESS_IDLE" value="1" enum="CallbackModeProcess">
+			Process waiting nodes during process frames ([constant Node.NOTIFICATION_INTERNAL_PROCESS]).
+		</constant>
+		<constant name="CALLBACK_MODE_PROCESS_MANUAL" value="2" enum="CallbackModeProcess">
+			Do not process; call [method FlowGraphPlayback.process] yourself.
+		</constant>
+		<constant name="CALLBACK_MODE_PROCESS_MAX" value="3" enum="CallbackModeProcess">
+			Represents the size of the [enum CallbackModeProcess] enum.
+		</constant>
+	</constants>
+</class>
