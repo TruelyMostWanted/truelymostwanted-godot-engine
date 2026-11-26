@@ -7,7 +7,7 @@
 		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
 		Cells that contain the delimiter, a double quote, a line break or leading or trailing spaces are written in double quotes, and a double quote inside is doubled ([code]""[/code]). The delimiter comes from [member SerializerOptions.csv_delimiter] (one character, for example [code];[/code] or a tab).
 		The [member TextDataFormat.data] of an instance is an [Array] of rows, each row a [PackedStringArray]. With [member SerializerOptions.csv_headers] (the default), the first line names the columns: it is stored in [member header] and is not part of the data, and [method get_row_as_dictionary] keys a row by column name. Without it, [member header] is empty and every line is a data row. Columns are [int] indices; [method find_column] resolves a name. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
-The static [method parse_string] returns an [Array] of [Dictionary] keyed by column name when headers are on, and an [Array] of [PackedStringArray] otherwise.
+		The static [method parse_string] returns an [Array] of [Dictionary] keyed by column name when headers are on, and an [Array] of [PackedStringArray] otherwise.
 		[codeblocks]
 		[gdscript]
 		var csv = CSV.new()
@@ -177,6 +177,7 @@ The static [method parse_string] returns an [Array] of [Dictionary] keyed by col
 		</method>
 	</methods>
 	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="[]" />
 		<member name="header" type="PackedStringArray" setter="set_header" getter="get_header" default="PackedStringArray()">
 			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line. Changing it drops the kept parsed text.
 		</member>
