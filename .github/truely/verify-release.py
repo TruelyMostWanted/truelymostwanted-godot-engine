@@ -3,7 +3,7 @@
 
 Usage: python .github/truely/verify-release.py <release-dir> <name> <config>
   release-dir  folder with the zips and .tpz files
-  name         e.g. Truely_Godot4.8-beta5_a1b2c3d
+  name         e.g. Truely-v0.1.0_Godot4.8-beta5_a1b2c3d
   config       version.txt of the standard templates, e.g. 4.8.beta5
 
 Checks:
