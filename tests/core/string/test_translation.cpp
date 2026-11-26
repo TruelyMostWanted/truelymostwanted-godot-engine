@@ -308,10 +308,7 @@ TEST_CASE("[TranslationCSV] Data CSV logs one warning, not one error per column"
 	options["compress"] = 0;
 	options["delimiter"] = 0;
 
-	const String path = write_temp_csv("data_units.csv", "name,health,speed,armor
-knight,100,4,20
-archer,60,6,5
-");
+	const String path = write_temp_csv("data_units.csv", "name,health,speed,armor\nknight,100,4,20\narcher,60,6,5\n");
 	List<String> gen_files;
 	Error result;
 	int errors;
@@ -338,9 +335,7 @@ TEST_CASE("[TranslationCSV] Header problems are reported once per file") {
 	options["delimiter"] = 0;
 
 	// Column 3 is empty (invalid locale), 'comment' and 'remark' have unknown language codes, '_notes' is ignored.
-	const String path = write_temp_csv("mixed_columns.csv", "keys,en,,comment,remark,_notes
-HELLO,Hello,x,greeting,first,ignored
-");
+	const String path = write_temp_csv("mixed_columns.csv", "keys,en,,comment,remark,_notes\nHELLO,Hello,x,greeting,first,ignored\n");
 	List<String> gen_files;
 	Error result;
 	int errors;
