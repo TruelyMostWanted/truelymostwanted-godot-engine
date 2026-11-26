@@ -1,0 +1,239 @@
+/**************************************************************************/
+/*  test_resource_localization_server.cpp                                 */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#include "tests/test_macros.h"
+
+TEST_FORCE_LINK(test_resource_localization_server)
+
+#include "core/config/project_settings.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
+#include "core/io/resource_loader.h"
+#include "core/io/resource_saver.h"
+#include "core/object/message_queue.h"
+#include "core/os/os.h"
+#include "core/string/localization_catalog.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/translation_server.h"
+#include "tests/signal_watcher.h"
+#include "tests/test_utils.h"
+
+namespace TestResourceLocalizationServer {
+
+struct ServerState {
+	ResourceLocalizationServer *server = ResourceLocalizationServer::get_singleton();
+	String previous_locale = TranslationServer::get_singleton()->get_locale();
+
+	~ServerState() {
+		server->clear_catalogs();
+		TranslationServer::get_singleton()->set_locale(previous_locale);
+		MessageQueue::get_singleton()->flush();
+	}
+};
+
+static String make_folder(const String &p_name) {
+	const String folder = TestUtils::get_temp_path(p_name);
+	Ref<DirAccess> dir = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
+	dir->make_dir_recursive(folder);
+	return folder;
+}
+
+static void wait_for_relocalization(ResourceLocalizationServer *p_server) {
+	for (int attempt = 0; attempt < 5000; attempt++) {
+		MessageQueue::get_singleton()->flush();
+		if (!p_server->is_relocalizing()) {
+			return;
+		}
+		OS::get_singleton()->delay_usec(1000);
+	}
+}
+
+TEST_CASE("[ResourceLocalizationServer] Paths, layers and locale matching") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	const String voice = "res://voice/intro.ogg";
+
+	Ref<ResourceLocalizationCatalog> game;
+	game.instantiate();
+	game->set_localized_path(voice, "de", "res://voice/de/intro.ogg");
+	game->set_localized_path(voice, "de_AT", "res://voice/de_AT/intro.ogg");
+	game->set_localized_path(voice, "fr", "res://voice/fr/intro.ogg");
+	Ref<ResourceLocalizationCatalog> mod;
+	mod.instantiate();
+	mod->set_localized_path(voice, "pl", "user://mods/polish/voice/intro.ogg");
+	mod->set_localized_path(voice, "fr", "user://mods/polish/voice/intro_fr.ogg");
+	server->add_catalog(game);
+	server->add_catalog(mod, 10);
+
+	CHECK(server->has_localization(voice));
+	CHECK_FALSE(server->has_localization("res://voice/other.ogg"));
+	CHECK(server->get_localized_path("res://voice/other.ogg", "de") == "res://voice/other.ogg");
+
+	// The best compare_locales() score, like translation_remaps: `de` (5) beats `de_AT` (4) for `de_DE`.
+	CHECK(server->get_localized_path(voice, "de_DE") == "res://voice/de/intro.ogg");
+	CHECK(server->get_localized_path(voice, "de_AT") == "res://voice/de_AT/intro.ogg");
+	CHECK(server->get_localized_path(voice, "pl") == "user://mods/polish/voice/intro.ogg");
+	CHECK(server->get_localized_path(voice, "fr") == "user://mods/polish/voice/intro_fr.ogg"); // Higher layer.
+	CHECK(server->get_localized_path(voice, "ja") == voice);
+
+	game->set_localized_path(voice, "de_DE", "res://voice/de_DE/intro.ogg");
+	MessageQueue::get_singleton()->flush(); // Catalog changes are applied deferred.
+	CHECK(server->get_localized_path(voice, "de_DE") == "res://voice/de_DE/intro.ogg");
+
+	// The active locale comes from the snapshot.
+	LocalizationServer::set_locale("pl");
+	CHECK(server->get_localized_path(voice) == "user://mods/polish/voice/intro.ogg");
+	LocalizationServer::set_locale("de_CH");
+	CHECK(server->get_localized_path(voice) == "res://voice/de/intro.ogg");
+
+	const Dictionary paths = server->get_localized_paths(voice);
+	CHECK(paths.size() == 5);
+	CHECK(String(paths["fr"]) == "user://mods/polish/voice/intro_fr.ogg");
+	CHECK(String(paths["de_AT"]) == "res://voice/de_AT/intro.ogg");
+
+	const PackedStringArray locales = server->get_available_locales();
+	CHECK(locales.size() == 5);
+	game->set_localized_path("res://ui/logo.png", "de", "res://ui/logo_de.png");
+	MessageQueue::get_singleton()->flush();
+	const PackedStringArray missing = server->get_missing_locales("res://ui/logo.png");
+	CHECK(missing.size() == 4);
+	CHECK_FALSE(missing.has("de"));
+	CHECK(server->get_missing_locales(voice).is_empty());
+}
+
+TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	const String folder = make_folder("resource_localization_remaps");
+	const PackedStringArray files = { "logo.bin", "logo_de.bin", "logo_at.bin", "logo_pt.bin", "logo_en.bin", "intro.bin", "intro_fr.bin" };
+	for (const String &file : files) {
+		Ref<FileAccess> f = FileAccess::open(folder.path_join(file), FileAccess::WRITE);
+		REQUIRE(f.is_valid());
+		f->store_8(0);
+	}
+	const String logo = folder.path_join("logo.bin");
+	const String intro = folder.path_join("intro.bin");
+	Dictionary remaps;
+	remaps[logo] = PackedStringArray({ folder.path_join("logo_de.bin") + ":de", folder.path_join("logo_at.bin") + ":de_AT", folder.path_join("logo_pt.bin") + ":pt" });
+	remaps[intro] = PackedStringArray({ folder.path_join("intro_fr.bin") + ":fr", folder.path_join("intro_missing.bin") + ":ja" });
+
+	const Variant previous_remaps = ProjectSettings::get_singleton()->get_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, Dictionary());
+	ProjectSettings::get_singleton()->set_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, remaps);
+	ResourceLoader::load_translation_remaps(); // Godot's table, for comparison.
+	CHECK(server->load_project_catalogs() == 1); // The remaps, imported as a layer.
+	CHECK(server->has_localization(logo));
+
+	const PackedStringArray locales = { "en", "de", "de_DE", "de_AT", "de_CH", "pt_BR", "fr", "fr_CA", "ja", "zh_TW" };
+	for (const String &locale : locales) {
+		LocalizationServer::set_locale(locale);
+		for (const String &path : PackedStringArray({ logo, intro })) {
+			const ResourceLoader::PathLocalizer localizer = ResourceLoader::path_localizer;
+			ResourceLoader::path_localizer = nullptr;
+			ERR_PRINT_OFF;
+			const String godot_path = ResourceLoader::path_remap(path);
+			ERR_PRINT_ON;
+			ResourceLoader::path_localizer = localizer;
+			ERR_PRINT_OFF;
+			const String server_path = ResourceLoader::path_remap(path);
+			ERR_PRINT_ON;
+			CHECK_MESSAGE(server_path == godot_path, vformat("%s %s", locale, path).utf8().get_data());
+		}
+	}
+	// `ja` points to a missing file: both fall back to the original path.
+	LocalizationServer::set_locale("ja");
+	ERR_PRINT_OFF;
+	CHECK(ResourceLoader::path_remap(intro) == intro);
+	ERR_PRINT_ON;
+	CHECK(server->get_localized_path(intro) == folder.path_join("intro_missing.bin")); // The catalog entry itself.
+
+	// A project catalog overrides the imported remaps on the same priority.
+	Ref<ResourceLocalizationCatalog> project;
+	project.instantiate();
+	project->set_localized_path(logo, "de", folder.path_join("logo_en.bin"));
+	server->add_catalog(project);
+	CHECK(server->get_localized_path(logo, "de") == folder.path_join("logo_en.bin"));
+
+	ProjectSettings::get_singleton()->set_setting(ResourceLocalizationServer::SETTING_TRANSLATION_REMAPS, previous_remaps);
+}
+
+TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	LocalizationServer::set_locale("en");
+	const String folder = make_folder("resource_localization_load");
+	for (const String &locale : PackedStringArray({ "en", "de", "pl" })) {
+		Ref<Resource> resource;
+		resource.instantiate();
+		resource->set_name(locale);
+		const String file = locale == "en" ? String("voice.tres") : vformat("voice_%s.tres", locale);
+		REQUIRE(ResourceSaver::save(resource, folder.path_join(file)) == OK);
+	}
+	const String voice = folder.path_join("voice.tres");
+	Ref<ResourceLocalizationCatalog> game;
+	game.instantiate();
+	game->set_localized_path(voice, "de", folder.path_join("voice_de.tres"));
+	server->add_catalog(game);
+
+	const Ref<Resource> loaded = ResourceLoader::load(voice);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_name() == "en");
+	CHECK(loaded->get_path() == voice); // Cached under the original path.
+
+	SIGNAL_WATCH(server, SNAME("resources_relocalized"));
+	LocalizationServer::set_locale("de");
+	wait_for_relocalization(server);
+	CHECK(loaded->get_name() == "de"); // Updated in place.
+	CHECK(ResourceLoader::load(voice) == loaded);
+	Array relocalized;
+	relocalized.push_back(Array({ PackedStringArray({ voice }) }));
+	SIGNAL_CHECK("resources_relocalized", relocalized);
+
+	// A mod adds Polish: the cached resource follows when the locale is switched.
+	Ref<ResourceLocalizationCatalog> mod;
+	mod.instantiate();
+	mod->set_localized_path(voice, "pl", folder.path_join("voice_pl.tres"));
+	server->add_catalog(mod, 100);
+	LocalizationServer::set_locale("pl");
+	wait_for_relocalization(server);
+	CHECK(loaded->get_name() == "pl");
+	SIGNAL_CHECK("resources_relocalized", relocalized);
+
+	// Removing the mod goes back to the original resource; a locale change without new paths reloads nothing.
+	server->remove_catalog(mod);
+	wait_for_relocalization(server);
+	CHECK(loaded->get_name() == "en");
+	SIGNAL_DISCARD("resources_relocalized");
+	LocalizationServer::set_locale("fr");
+	wait_for_relocalization(server);
+	SIGNAL_CHECK_FALSE("resources_relocalized");
+	SIGNAL_UNWATCH(server, SNAME("resources_relocalized"));
+}
+
+} // namespace TestResourceLocalizationServer

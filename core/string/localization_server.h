@@ -120,6 +120,10 @@ protected:
 	// Fills the subclass part of `p_data` from `p_data->keys` and `p_data->chain`.
 	virtual void _resolve(Data *p_data) const = 0;
 	virtual void _data_published(const Data *p_data) {}
+	// Project settings read by load_project_catalogs(), and a catalog of the subclass added before them as priority 0.
+	virtual const char *_get_catalogs_setting() const { return SETTING_CATALOGS; }
+	virtual const char *_get_external_catalogs_setting() const { return SETTING_EXTERNAL_CATALOGS; }
+	virtual Ref<LocalizationCatalog> _get_project_catalog() { return Ref<LocalizationCatalog>(); }
 
 	_FORCE_INLINE_ const Data *_get_data() const { return data.load(std::memory_order_acquire); }
 	// Builds and publishes new data for the current locale; `p_keys` also rebuilds the key table.

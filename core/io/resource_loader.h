@@ -389,6 +389,10 @@ public:
 	static bool get_abort_on_missing_resources() { return abort_on_missing_resource; }
 
 	static String path_remap(const String &p_path);
+	// Asked before translation_remaps (ResourceLocalizationServer, #344). Returns true if it handles `p_path`; its
+	// resources are not flagged as translation-remapped, it relocalizes them itself.
+	typedef bool (*PathLocalizer)(const String &p_path, String &r_path);
+	static PathLocalizer path_localizer;
 	static String import_remap(const String &p_path);
 
 	static void reload_translation_remaps();

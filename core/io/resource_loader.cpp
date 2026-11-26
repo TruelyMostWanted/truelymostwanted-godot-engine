@@ -1638,8 +1638,9 @@ bool ResourceLoader::should_create_uid_file(const String &p_path) {
 
 String ResourceLoader::_path_remap(const String &p_path, bool *r_translation_remapped) {
 	String new_path = p_path;
+	const bool localized = path_localizer && path_localizer(p_path, new_path);
 
-	if (translation_remaps.has(p_path)) {
+	if (!localized && translation_remaps.has(p_path)) {
 		// translation_remaps has the following format:
 		//   { "res://path.png": PackedStringArray( "res://path-ru.png:ru", "res://path-de.png:de" ) }
 
@@ -2000,5 +2001,6 @@ HashMap<String, ResourceLoader::LoadToken *> ResourceLoader::user_load_tokens;
 
 SelfList<Resource>::List ResourceLoader::remapped_list;
 HashMap<String, Vector<String>> ResourceLoader::translation_remaps;
+ResourceLoader::PathLocalizer ResourceLoader::path_localizer = nullptr;
 
 ResourceLoaderImport ResourceLoader::import = nullptr;

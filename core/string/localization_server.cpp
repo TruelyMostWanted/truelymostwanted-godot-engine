@@ -324,16 +324,28 @@ int LocalizationServer::add_catalog_list(const Ref<LocalizationCatalogList> &p_l
 }
 
 int LocalizationServer::load_project_catalogs() {
+	const Ref<LocalizationCatalog> project_catalog = _get_project_catalog();
+	if (project_catalog.is_valid()) {
+		_remove_layer(project_catalog);
+		_add_layer(project_catalog, 0);
+	}
 	Ref<LocalizationCatalogList> list;
 	list.instantiate();
-	for (const String &path : PackedStringArray(GLOBAL_GET(SETTING_CATALOGS))) {
+	for (const String &path : PackedStringArray(GLOBAL_GET(_get_catalogs_setting()))) {
 		list->add_entry(path, 0);
 	}
 	const int external_priority = GLOBAL_GET(SETTING_EXTERNAL_CATALOGS_PRIORITY);
-	for (const String &path : PackedStringArray(GLOBAL_GET(SETTING_EXTERNAL_CATALOGS))) {
+	for (const String &path : PackedStringArray(GLOBAL_GET(_get_external_catalogs_setting()))) {
 		list->add_entry(path, external_priority);
 	}
-	return add_catalog_list(list);
+	const int added = add_catalog_list(list);
+	if (project_catalog.is_null()) {
+		return added;
+	}
+	if (added == 0) {
+		_catalogs_changed();
+	}
+	return added + 1;
 }
 
 PackedStringArray LocalizationServer::get_available_locales() const {
