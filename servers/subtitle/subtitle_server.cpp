@@ -32,6 +32,7 @@
 
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "core/string/translation_domain.h"
 #include "core/string/translation_server.h"
 #include "servers/audio/audio_server.h"
 
@@ -294,7 +295,8 @@ String SubtitleServer::get_display_text(const Ref<Subtitle> &p_subtitle, const R
 	ERR_FAIL_COND_V(p_segment.is_null(), String());
 	String text = p_segment->get_text();
 	if (p_subtitle.is_valid() && p_subtitle->is_auto_translate() && TranslationServer::get_singleton()) {
-		text = TranslationServer::get_singleton()->translate(text, p_segment->get_translation_context());
+		// The subtitles channel (#357): the domain "subtitles" follows TranslationServer.set_locale_for(&"subtitles", ...).
+		text = TranslationServer::get_singleton()->get_or_add_domain(SNAME("subtitles"))->translate(text, p_segment->get_translation_context());
 	}
 	if (p_bbcode) {
 		text = text.replace("[", "[lb]");
