@@ -48,6 +48,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **Design decisions**: wiki page with the concept decisions and their follow-up work. Wiki: [`Design-Decisions`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Design-Decisions).
 
+**Dialogue graph** (`DialogueLineNode`, `DialogueChoiceNode`, `DialogueOption`): a `FlowGraph` with line and choice nodes. Lines and choices wait; the game's own UI shows them on `node_waiting` and continues with `advance()` or `choose()`. Texts are translated with `tr()` (sentences or CSV keys); options have `Expression` conditions over the blackboard and `once`. Texts reach POT generation through the generic `ResourceTranslationParserPlugin` (`tres`, `res`, `mmd`, any resource with `get_translatable_strings()`). No UI node. In code: `modules/flow_graph/dialogue/`, `editor/translations/resource_translation_parser_plugin.*`. Issues: #259. Wiki: [`259-feature-flow-graph-dialogue`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/259-feature-flow-graph-dialogue). Not to confuse with `AcceptDialog`/`ConfirmationDialog` (editor and UI windows).
+
 **Recursive directory listing**: `DirAccess` lists all files or folders below a path in one C++ call, optionally filtered by extension. In code: `core/io/dir_access.*`. Wiki: [`Recursive-Directory-Listing`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Recursive-Directory-Listing).
 
 ### E
@@ -208,7 +210,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Packs and streaming assets | `PCKPackage*`, `PCKBuildPlan`, `StreamingAssets*` | `core/io/pck_*.*`, `core/io/resource_format_pck.*`, `core/io/streaming_assets_server.*`, `editor/export/`, `editor/inspector/pck_package_editor_plugin.*` | `tests/core/io/test_pck_package_server.cpp`, `test_resource_format_pck.cpp`, `test_streaming_assets_server.cpp` |
 | Runtime file formats | image, audio, video, scene and font loaders and savers | `scene/resources/*_resource_format.*`, `modules/{mp3,vorbis,theora,opus,webm,gltf,fbx}/` | `modules/*/tests/` |
 | Databases | `SQLiteDatabase`, `SQLiteStatement` | `modules/sqlite/` | `modules/sqlite/tests/` |
-| Flow graphs | `FlowGraph`, `FlowNode`, `FlowPort`, `FlowConnection`, `FlowFrame`, `FlowVariable`, `FlowBlackboard`, `FlowGraphValidation`, built-in `Flow*Node`s, `FlowGraphPlayback`, `FlowGraphPlayer`, `FlowGraphState`, `FlowExit` | `modules/flow_graph/` | `modules/flow_graph/tests/` |
+| Flow graphs | `FlowGraph`, `FlowNode`, `FlowPort`, `FlowConnection`, `FlowFrame`, `FlowVariable`, `FlowBlackboard`, `FlowGraphValidation`, built-in `Flow*Node`s, `FlowGraphPlayback`, `FlowGraphPlayer`, `FlowGraphState`, `FlowExit`, `DialogueLineNode`, `DialogueChoiceNode`, `DialogueOption` | `modules/flow_graph/` | `modules/flow_graph/tests/` |
 | Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommandList` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
 | Subtitles, TTS | `SubtitleServer`, `Subtitle`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |

@@ -7,3 +7,4 @@ Import("env_modules")
 env_flow_graph = env_modules.Clone()
 
 env_flow_graph.add_source_files(env.modules_sources, "*.cpp")
+env_flow_graph.add_source_files(env.modules_sources, "dialogue/*.cpp")
