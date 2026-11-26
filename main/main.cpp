@@ -59,6 +59,7 @@
 #include "core/profiling/profiling.h"
 #include "core/register_core_types.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/variant/variant_parser.h"
 #include "core/version.h"
 #include "drivers/register_driver_types.h"
@@ -399,15 +400,15 @@ void Main::print_header(bool p_rich) {
 	if (GODOT_VERSION_TIMESTAMP > 0) {
 		// Version timestamp available.
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich("\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
 		}
 	} else {
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich("\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
 		}
 	}
 }
@@ -514,6 +515,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_title("General options");
 	print_help_option("-h, --help", "Display this help message.\n");
 	print_help_option("--version", "Display the version string.\n");
+	print_help_option("--truely-version", "Display the Truely version number (truely/version.txt), e.g. \"0.1.0\".\n");
 	print_help_option("-v, --verbose", "Use verbose stdout mode.\n");
 	print_help_option("-q, --quiet", "Quiet mode, silences stdout messages. Errors are still displayed.\n");
 	print_help_option("--no-header", "Do not print engine version and rendering driver/method header on startup.\n");
@@ -1208,6 +1210,11 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 		} else if (arg == "--version") {
 			print_line(get_full_version_string());
+			exit_err = ERR_HELP; // Hack to force an early exit in `main()` with a success code.
+			goto error;
+
+		} else if (arg == "--truely-version") {
+			print_line(TRUELY_VERSION_NUMBER);
 			exit_err = ERR_HELP; // Hack to force an early exit in `main()` with a success code.
 			goto error;
 
