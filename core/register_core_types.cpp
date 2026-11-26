@@ -111,6 +111,7 @@
 #include "core/os/os.h"
 #include "core/os/time.h"
 #include "core/string/fuzzy_search.h"
+#include "core/string/localization_catalog.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/regex.h"
 #include "core/string/translation.h"
@@ -125,6 +126,8 @@ static Ref<ResourceFormatImporter> resource_format_importer;
 static Ref<ResourceFormatImporterSaver> resource_format_importer_saver;
 static Ref<ResourceFormatLoaderImage> resource_format_image;
 static Ref<TranslationLoaderPO> resource_format_po;
+static Ref<ResourceFormatLoaderLocalizationCatalog> resource_loader_localization_catalog;
+static Ref<ResourceFormatSaverLocalizationCatalog> resource_saver_localization_catalog;
 static Ref<ResourceFormatSaverCrypto> resource_format_saver_crypto;
 static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<GDExtensionResourceLoader> resource_loader_gdextension;
@@ -356,6 +359,14 @@ void register_core_types() {
 	GDREGISTER_CLASS(Translation);
 	GDREGISTER_CLASS(TranslationDomain);
 	GDREGISTER_CLASS(OptimizedTranslation);
+	GDREGISTER_ABSTRACT_CLASS(LocalizationCatalog);
+	GDREGISTER_CLASS(TextLocalizationCatalog);
+	GDREGISTER_CLASS(ResourceLocalizationCatalog);
+	GDREGISTER_CLASS(LocalizationCatalogList);
+	resource_loader_localization_catalog.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog);
+	resource_saver_localization_catalog.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog);
 	GDREGISTER_CLASS(UndoRedo);
 	GDREGISTER_CLASS(TriangleMesh);
 
@@ -621,6 +632,11 @@ void unregister_core_types() {
 		ResourceLoader::remove_resource_format_loader(resource_format_po);
 		resource_format_po.unref();
 	}
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_localization_catalog);
+	resource_loader_localization_catalog.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_localization_catalog);
+	resource_saver_localization_catalog.unref();
 
 	if constexpr (GD_IS_CLASS_ENABLED(Crypto)) {
 		ResourceSaver::remove_resource_format_saver(resource_format_saver_crypto);
