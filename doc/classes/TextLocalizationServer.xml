@@ -6,7 +6,8 @@
 	<description>
 		[TextLocalizationServer] is the text server of the localization system and replaces [TranslationServer] for game code. It reads [TextLocalizationCatalog]s (see [LocalizationServer] for layers, priorities and the locale chain).
 		On a locale or catalog change it builds one resolved column for the active locale chain: one text per key. [method translate] is then one hash lookup and one array read, [method translate_id] one array read. Texts are [String]s, not [StringName]s.
-		[b]tr() keeps working:[/b] while the server has catalogs, an adapter [Translation] in the main [TranslationDomain] answers [method Object.tr], [method Node.atr], [member Node.auto_translate_mode], [method TranslationServer.translate] and their plural forms from the same column. Pseudolocalization and POT generation work as before.
+		[b]tr() keeps working:[/b] while the server has catalogs, one adapter [Translation] per channel domain answers [method Object.tr], [method Node.atr], [member Node.auto_translate_mode], [method TranslationServer.translate] and their plural forms from the same column, for the keys of that channel: the catalogs of the [code]interface[/code] channel in the main [TranslationDomain], those of [code]subtitles[/code] in the domain [code]"subtitles"[/code] (nodes with [method Object.set_translation_domain] [code]"subtitles"[/code]), and so on. Pseudolocalization and POT generation work as before.
+		[b]Channels:[/b] every key is translated in the locale of its channel ([method TranslationServer.get_locale_for]); a change of one channel rebuilds only its keys.
 		[b]Missing texts:[/b] a key without a text in the chain returns the key itself. In debug builds [signal key_missing] is emitted once per key and locale.
 		[b]Placeholders:[/b] when [code]args[/code] is not empty, [code]{name}[/code] placeholders are filled with [method TextInsertionServer.insert_template]; the parsed template is cached per key. Without [code]args[/code] the text is returned as it is (use [method TextInsertionServer.insert] to fill global values).
 		[codeblocks]
@@ -45,22 +46,7 @@
 			<return type="PackedStringArray" />
 			<param index="0" name="locale" type="String" default="&quot;&quot;" />
 			<description>
-				Returns the keys that have no text in [param locale] or its parent locales, so they show the text of the fallback locale or the key. An empty [param locale] means the active locale. Meant for tools and tests: it reads every key.
-			</description>
-		</method>
-		<method name="get_translation_key" qualifiers="const">
-			<return type="StringName" />
-			<param index="0" name="text" type="String" />
-			<description>
-				Returns the key whose text in the active locale chain is [param text], or an empty [StringName]. If several keys have this text, the first one is returned (see [method get_translation_keys]). The reverse index is built on the first call after each locale or catalog change.
-			</description>
-		</method>
-		<method name="get_translation_key_for_locale" qualifiers="const">
-			<return type="StringName" />
-			<param index="0" name="locale" type="String" />
-			<param index="1" name="text" type="String" />
-			<description>
-				Like [method get_translation_key], for the chain of [param locale]. For a locale other than the active one, every key is compared.
+				Returns the keys that have no text in [param locale] or its parent locales, so they show the text of the fallback locale or the key. An empty [param locale] means the locale of each key's channel. Meant for tools and tests: it reads every key.
 			</description>
 		</method>
 		<method name="get_translation_keys" qualifiers="const">
