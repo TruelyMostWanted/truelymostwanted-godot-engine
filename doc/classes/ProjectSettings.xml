@@ -1900,6 +1900,15 @@
 			If non-empty, this locale will be used instead of the automatically detected system locale.
 			[b]Note:[/b] This setting also applies to the exported project. To only affect testing within the editor, override this setting with an [code]editor[/code] [url=$DOCS_URL/tutorials/export/feature_tags.html]feature tag[/url] for localization testing purposes.
 		</member>
+		<member name="internationalization/localization/catalogs" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Catalog files of the game ([TextLocalizationCatalog]s and resource catalogs), added with priority 0 at startup by [method LocalizationServer.load_project_catalogs]. Wildcards [code]*[/code] and [code]?[/code] are allowed in folder and file names (see [LocalizationCatalogList]). Each server only takes catalogs of its own class.
+		</member>
+		<member name="internationalization/localization/external_catalogs" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Catalog files outside of the game's own catalogs, for example of DLCs or mods: [code]user://mods/*/translations/*.lcat[/code]. Added at startup with [member internationalization/localization/external_catalogs_priority]; missing folders are skipped. On the Web, only paths in [code]user://[/code] or the PCK can be read.
+		</member>
+		<member name="internationalization/localization/external_catalogs_priority" type="int" setter="" getter="" default="100">
+			Priority of the catalogs of [member internationalization/localization/external_catalogs]. Higher than the game's catalogs (0) by default, so mods override texts of the game.
+		</member>
 		<member name="internationalization/pseudolocalization/double_vowels" type="bool" setter="" getter="" default="false">
 			Double vowels in strings during pseudolocalization to simulate the lengthening of text due to localization.
 		</member>

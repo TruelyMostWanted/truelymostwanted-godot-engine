@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="TranslationServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="TranslationServer" inherits="Object" api_type="core" deprecated="Use [TextLocalizationServer] for texts and the static locale methods of [LocalizationServer] in game code. [TranslationServer] stays functional: the editor and [method Object.tr] use it." xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		The server responsible for language translations.
 	</brief_description>
 	<description>
 		The translation server is the API backend that manages all language translations.
+		[b]Note:[/b] In this engine, game code uses [TextLocalizationServer] (texts from [TextLocalizationCatalog]s) and [LocalizationServer] (locale and fallback chain) instead. The locale itself is still stored here, and [method Object.tr] keeps working through an adapter translation of [TextLocalizationServer] in the main domain.
 		Translations are stored in [TranslationDomain]s, which can be accessed by name. The most commonly used translation domain is the main translation domain. It always exists and can be accessed using an empty [StringName]. The translation server provides wrapper methods for accessing the main translation domain directly, without having to fetch the translation domain first. Custom translation domains are mainly for advanced usages like editor plugins. Names starting with [code]godot.[/code] are reserved for engine internals.
 	</description>
 	<tutorials>

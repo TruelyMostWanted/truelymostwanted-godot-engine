@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LocalizationServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Base class of the localization servers: catalog layers, the locale and its fallback chain.
+	</brief_description>
+	<description>
+		[LocalizationServer] is the abstract base of [TextLocalizationServer] (texts). It holds [LocalizationCatalog]s as layers with a priority, one key index over all layers and the data of the active locale chain.
+		[b]Locale:[/b] the locale is stored in [TranslationServer], so controls, the editor and resource remaps follow it too. [method set_locale], [method get_locale] and [method get_fallback_locale] are static and forward to it. A call to [method TranslationServer.set_locale] reaches the servers as well, before the scene tree re-translates its nodes.
+		[b]Locale chain:[/b] a text is looked up for the locale, then for its parent locales and then for the fallback locale, for example [code]de_DE[/code] → [code]de[/code] → [code]en[/code] (see [method get_locale_chain]).
+		[b]Priority:[/b] the chain comes first (a text for [code]de_DE[/code] beats a text for [code]de[/code]), then the layers: the catalog with the higher priority wins; with equal priority, the catalog added later wins. A typical order is game (0) &lt; DLC (50) &lt; mods (100).
+		[b]On-demand locales:[/b] catalogs loaded from [code].lcat[/code] files read a locale only when it is needed. The server reads the locales of the active chain and unloads the other locales of file-backed catalogs on a locale change.
+		[b]Project settings:[/b] the catalogs of [member ProjectSettings.internationalization/localization/catalogs] and [member ProjectSettings.internationalization/localization/external_catalogs] are loaded at startup (see [method load_project_catalogs]).
+		[b]Threads:[/b] reading is lock-free. Changes of catalogs and the locale are applied on the main thread; calls from other threads are deferred. Signals are emitted on the main thread.
+		[codeblocks]
+		[gdscript]
+		LocalizationServer.set_locale("de_DE")
+		print(LocalizationServer.get_locale_chain("de_DE")) # ["de_DE", "de", "en"]
+
+		var mod_texts = load("user://mods/knights/translations/texts.lcat")
+		TextLocalizationServer.add_catalog(mod_texts, 100)
+		[/gdscript]
+		[csharp]
+		LocalizationServer.SetLocale("de_DE");
+		GD.Print(LocalizationServer.GetLocaleChain("de_DE")); // ["de_DE", "de", "en"]
+
+		var modTexts = GD.Load&lt;TextLocalizationCatalog&gt;("user://mods/knights/translations/texts.lcat");
+		TextLocalizationServer.AddCatalog(modTexts, 100);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_catalog">
+			<return type="void" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<param index="1" name="priority" type="int" default="0" />
+			<description>
+				Adds [param catalog] as a layer with [param priority]. A catalog that was already added moves to the new priority. The catalog must be of the class this server takes ([TextLocalizationCatalog] for [TextLocalizationServer]). Changes of the catalog's content are picked up on the next idle frame. Emits [signal catalogs_changed].
+			</description>
+		</method>
+		<method name="add_catalog_list">
+			<return type="int" />
+			<param index="0" name="list" type="LocalizationCatalogList" />
+			<description>
+				Loads and adds the catalogs of all entries of [param list], each with the priority of its entry, and returns the number of catalogs added. Files of another catalog class are skipped, so one list may name text and resource catalogs. [code].lcat[/code], [code].tres[/code] and [code].res[/code] files are loaded with [ResourceLoader]; text formats (JSON, CSV, XML, INI, TOML, YAML) are read with [method LocalizationCatalog.load_from_file] as this server's catalog class. Main thread only.
+			</description>
+		</method>
+		<method name="clear_catalogs">
+			<return type="void" />
+			<description>
+				Removes all catalogs. Key ids returned by [method TextLocalizationServer.get_key_id] stay valid. Emits [signal catalogs_changed].
+			</description>
+		</method>
+		<method name="get_available_locales" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the locales of all catalogs, each once, for example to fill a language menu.
+			</description>
+		</method>
+		<method name="get_catalogs" qualifiers="const">
+			<return type="LocalizationCatalog[]" />
+			<description>
+				Returns the catalogs, the lowest priority first.
+			</description>
+		</method>
+		<method name="get_fallback_locale" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns the fallback locale of [TranslationServer] ([member ProjectSettings.internationalization/locale/fallback]), the last part of every locale chain.
+			</description>
+		</method>
+		<method name="get_key_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of keys (rows) the server knows. Rows are never removed while the server runs, so this also counts keys of removed catalogs.
+			</description>
+		</method>
+		<method name="get_locale" qualifiers="static">
+			<return type="String" />
+			<description>
+				Returns the active locale, as [method TranslationServer.get_locale].
+			</description>
+		</method>
+		<method name="get_locale_chain" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns the locales a text is looked up in, in order: the standardized [param locale], its parent locales and then the fallback locale and its parents, each once. For example [code]"de_DE"[/code] gives [code]["de_DE", "de", "en"][/code] with the fallback locale [code]en[/code].
+			</description>
+		</method>
+		<method name="has_catalog" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<description>
+				Returns [code]true[/code] if [param catalog] was added.
+			</description>
+		</method>
+		<method name="load_project_catalogs">
+			<return type="int" />
+			<description>
+				Adds the catalogs of [member ProjectSettings.internationalization/localization/catalogs] with priority 0 and those of [member ProjectSettings.internationalization/localization/external_catalogs] with [member ProjectSettings.internationalization/localization/external_catalogs_priority], as with [method add_catalog_list], and returns the number of catalogs added. The engine calls it at startup; call it again after mods were installed.
+			</description>
+		</method>
+		<method name="remove_catalog">
+			<return type="void" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<description>
+				Removes [param catalog]. Its keys keep their ids but have no text from it anymore. Emits [signal catalogs_changed].
+			</description>
+		</method>
+		<method name="set_locale" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Sets the active locale with [method TranslationServer.set_locale]. Every localization server builds the data of the new locale chain and emits [signal locale_changed]; then the nodes re-translate.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="catalogs_changed">
+			<description>
+				Emitted after catalogs were added or removed, or after the content of a catalog changed, once the server's data was rebuilt.
+			</description>
+		</signal>
+		<signal name="locale_changed">
+			<param index="0" name="locale" type="String" />
+			<param index="1" name="previous_locale" type="String" />
+			<description>
+				Emitted when the active locale changed and the data of the new chain is ready, before the nodes re-translate.
+			</description>
+		</signal>
+		<signal name="locale_loaded">
+			<param index="0" name="locale" type="String" />
+			<description>
+				Emitted when the texts of [param locale] became available: when it joins the active locale chain and a catalog has it.
+			</description>
+		</signal>
+	</signals>
+</class>
