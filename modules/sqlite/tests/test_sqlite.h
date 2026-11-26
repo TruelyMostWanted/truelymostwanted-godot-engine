@@ -35,6 +35,7 @@
 
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/resource_loader.h"
 #include "tests/test_macros.h"
 #include "tests/test_utils.h"
 
@@ -58,7 +59,7 @@ TEST_CASE("[SQLite] Open, create, execute and query") {
 
 	REQUIRE(db->open(db_path) == OK);
 	CHECK(db->is_open());
-	CHECK(db->get_path() == db_path);
+	CHECK(db->get_database_path() == db_path);
 	CHECK(db->get_open_mode() == SQLiteDatabase::OPEN_MODE_CREATE);
 
 	CHECK(db->execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, weight REAL, data BLOB, flag INTEGER);") == OK);
@@ -284,6 +285,140 @@ TEST_CASE("[SQLite] Prepared statements") {
 	insert.unref();
 	select.unref();
 	last.unref();
+	DirAccess::remove_absolute(db_path);
+}
+
+TEST_CASE("[SQLite] Schema: tables, columns and row counts") {
+	const String db_path = _fresh_db_path("sqlite_schema.db");
+	Ref<SQLiteDatabase> db;
+	db.instantiate();
+
+	CHECK(db->get_table_names().is_empty());
+	CHECK(db->get_last_error() == ERR_UNCONFIGURED);
+
+	REQUIRE(db->open(db_path) == OK);
+	CHECK(db->get_table_names().is_empty());
+	CHECK(db->get_last_error() == OK);
+
+	CHECK(db->execute(
+				  "CREATE TABLE items (id INTEGER PRIMARY KEY, name VARCHAR(40) NOT NULL DEFAULT 'none', weight DOUBLE, data BLOB, price DECIMAL(10,2), note);"
+				  "CREATE TABLE \"odd \"\"name\" (a TEXT, b INT, PRIMARY KEY (b, a));"
+				  "CREATE VIEW heavy AS SELECT * FROM items WHERE weight > 1;"
+				  "CREATE VIRTUAL TABLE notes USING fts5(body);"
+				  "INSERT INTO items (name, weight) VALUES ('sword', 2.5), ('shield', 4), ('ring', 0.1);"
+				  "INSERT INTO \"odd \"\"name\" VALUES ('x', 1);") == OK);
+
+	// Tables and virtual tables, sorted; no views, no sqlite_* tables, no FTS5 shadow tables.
+	const PackedStringArray tables = db->get_table_names();
+	REQUIRE(tables.size() == 3);
+	CHECK(tables[0] == "items");
+	CHECK(tables[1] == "notes");
+	CHECK(tables[2] == "odd \"name");
+
+	CHECK(db->has_table("items"));
+	CHECK(db->has_table("ITEMS"));
+	CHECK(db->has_table("odd \"name"));
+	CHECK_FALSE(db->has_table("heavy"));
+	CHECK_FALSE(db->has_table("notes_data"));
+	CHECK_FALSE(db->has_table("missing"));
+
+	const TypedArray<SQLiteColumn> columns = db->get_columns("items");
+	REQUIRE(columns.size() == 6);
+	const Ref<SQLiteColumn> id = columns[0];
+	CHECK(id->get_name() == "id");
+	CHECK(id->get_declared_type() == "INTEGER");
+	CHECK(id->get_affinity() == SQLiteColumn::AFFINITY_INTEGER);
+	CHECK(id->get_primary_key_index() == 1);
+	CHECK_FALSE(id->is_not_null());
+	const Ref<SQLiteColumn> name = columns[1];
+	CHECK(name->get_declared_type() == "VARCHAR(40)");
+	CHECK(name->get_affinity() == SQLiteColumn::AFFINITY_TEXT);
+	CHECK(name->is_not_null());
+	CHECK(name->get_default_value() == "'none'");
+	CHECK(name->get_primary_key_index() == 0);
+	CHECK(Ref<SQLiteColumn>(columns[2])->get_affinity() == SQLiteColumn::AFFINITY_REAL);
+	CHECK(Ref<SQLiteColumn>(columns[2])->get_default_value().is_empty());
+	CHECK(Ref<SQLiteColumn>(columns[3])->get_affinity() == SQLiteColumn::AFFINITY_BLOB);
+	CHECK(Ref<SQLiteColumn>(columns[4])->get_affinity() == SQLiteColumn::AFFINITY_NUMERIC);
+	CHECK(Ref<SQLiteColumn>(columns[5])->get_declared_type().is_empty());
+	CHECK(Ref<SQLiteColumn>(columns[5])->get_affinity() == SQLiteColumn::AFFINITY_BLOB);
+
+	// Composite key: the position in the key, not in the table.
+	const TypedArray<SQLiteColumn> odd_columns = db->get_columns("odd \"name");
+	REQUIRE(odd_columns.size() == 2);
+	CHECK(Ref<SQLiteColumn>(odd_columns[0])->get_primary_key_index() == 2);
+	CHECK(Ref<SQLiteColumn>(odd_columns[1])->get_primary_key_index() == 1);
+
+	const PackedStringArray names = db->get_column_names("items");
+	REQUIRE(names.size() == 6);
+	CHECK(names[0] == "id");
+	CHECK(names[5] == "note");
+	CHECK(db->get_column_count("items") == 6);
+	CHECK(db->get_column_count("notes") == 1);
+
+	CHECK(db->get_row_count("items") == 3);
+	CHECK(db->get_row_count("Items") == 3);
+	CHECK(db->get_row_count("odd \"name") == 1);
+	CHECK(db->get_row_count("notes") == 0);
+
+	// Unknown tables, and names that would break pasted SQL.
+	CHECK(db->get_columns("missing").is_empty());
+	CHECK(db->get_last_error() == ERR_DOES_NOT_EXIST);
+	CHECK(db->get_last_error_message().contains("missing"));
+	CHECK(db->get_column_names("missing").is_empty());
+	CHECK(db->get_column_count("missing") == -1);
+	CHECK(db->get_row_count("missing") == -1);
+	CHECK(db->get_row_count("items\"; DROP TABLE items; --") == -1);
+	CHECK(db->get_last_error() == ERR_DOES_NOT_EXIST);
+	CHECK(db->has_table("items"));
+	CHECK(db->get_row_count("heavy") == -1);
+
+	db->close();
+	DirAccess::remove_absolute(db_path);
+}
+
+TEST_CASE("[SQLite] Affinity of declared types") {
+	CHECK(SQLiteColumn::get_affinity_for_type("BIGINT") == SQLiteColumn::AFFINITY_INTEGER);
+	CHECK(SQLiteColumn::get_affinity_for_type("int") == SQLiteColumn::AFFINITY_INTEGER);
+	CHECK(SQLiteColumn::get_affinity_for_type("NVARCHAR(100)") == SQLiteColumn::AFFINITY_TEXT);
+	CHECK(SQLiteColumn::get_affinity_for_type("CLOB") == SQLiteColumn::AFFINITY_TEXT);
+	CHECK(SQLiteColumn::get_affinity_for_type("") == SQLiteColumn::AFFINITY_BLOB);
+	CHECK(SQLiteColumn::get_affinity_for_type("FLOAT") == SQLiteColumn::AFFINITY_REAL);
+	CHECK(SQLiteColumn::get_affinity_for_type("DOUBLE PRECISION") == SQLiteColumn::AFFINITY_REAL);
+	CHECK(SQLiteColumn::get_affinity_for_type("BOOLEAN") == SQLiteColumn::AFFINITY_NUMERIC);
+	CHECK(SQLiteColumn::get_affinity_for_type("DATETIME") == SQLiteColumn::AFFINITY_NUMERIC);
+	// The rules apply in order: "INT" comes before "CHAR".
+	CHECK(SQLiteColumn::get_affinity_for_type("CHARINT") == SQLiteColumn::AFFINITY_INTEGER);
+}
+
+TEST_CASE("[SQLite] Database files as resources") {
+	const String db_path = _fresh_db_path("sqlite_resource.db");
+	{
+		Ref<SQLiteDatabase> writer;
+		writer.instantiate();
+		REQUIRE(writer->open(db_path) == OK);
+		CHECK(writer->execute("CREATE TABLE t (a INTEGER); INSERT INTO t VALUES (1), (2);") == OK);
+	}
+
+	CHECK(ResourceLoader::get_resource_type(db_path) == "SQLiteDatabase");
+	CHECK(ResourceLoader::get_resource_type("user://x.sqlite3") == "SQLiteDatabase");
+
+	Ref<SQLiteDatabase> db = ResourceLoader::load(db_path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(db.is_valid());
+	CHECK_FALSE(db->is_open());
+	// Without a path, open() opens the file the resource was loaded from.
+	REQUIRE(db->open() == OK);
+	CHECK(db->get_database_path() == db_path);
+	CHECK(db->get_row_count("t") == 2);
+	db->close();
+
+	// Created with new(): no file to fall back to.
+	Ref<SQLiteDatabase> plain;
+	plain.instantiate();
+	CHECK(plain->open() == ERR_INVALID_PARAMETER);
+	CHECK_FALSE(plain->is_open());
+
+	db.unref();
 	DirAccess::remove_absolute(db_path);
 }
 

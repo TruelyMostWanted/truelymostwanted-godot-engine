@@ -30,7 +30,10 @@
 
 #pragma once
 
-#include "core/object/ref_counted.h"
+#include "sqlite_column.h"
+
+#include "core/io/resource.h"
+#include "core/io/resource_loader.h"
 #include "core/variant/binder_common.h"
 #include "core/variant/typed_array.h"
 
@@ -39,8 +42,8 @@ struct sqlite3_stmt;
 
 class SQLiteStatement;
 
-class SQLiteDatabase : public RefCounted {
-	GDCLASS(SQLiteDatabase, RefCounted);
+class SQLiteDatabase : public Resource {
+	GDCLASS(SQLiteDatabase, Resource);
 
 public:
 	enum OpenMode {
@@ -57,6 +60,7 @@ private:
 	String last_error_message;
 
 	Error _run(const String &p_sql, const Variant &p_params, TypedArray<Dictionary> *r_rows);
+	bool _check_table(const String &p_table);
 
 protected:
 	static void _bind_methods();
@@ -76,10 +80,10 @@ public:
 	Error set_error(Error p_error, const String &p_message);
 	sqlite3 *get_handle() const { return db; }
 
-	Error open(const String &p_path, OpenMode p_mode = OPEN_MODE_CREATE);
+	Error open(const String &p_path = String(), OpenMode p_mode = OPEN_MODE_CREATE);
 	void close();
 	bool is_open() const;
-	String get_path() const;
+	String get_database_path() const;
 	OpenMode get_open_mode() const;
 
 	Error execute(const String &p_sql, const Variant &p_params = Variant());
@@ -91,6 +95,13 @@ public:
 	Error rollback();
 	bool is_in_transaction() const;
 
+	PackedStringArray get_table_names();
+	bool has_table(const String &p_table);
+	TypedArray<SQLiteColumn> get_columns(const String &p_table);
+	PackedStringArray get_column_names(const String &p_table);
+	int get_column_count(const String &p_table);
+	int64_t get_row_count(const String &p_table);
+
 	int64_t get_last_insert_rowid() const;
 	int64_t get_changes() const;
 	Error get_last_error() const;
@@ -100,3 +111,18 @@ public:
 };
 
 VARIANT_ENUM_CAST(SQLiteDatabase::OpenMode);
+
+// Loads `.db`, `.sqlite`, `.sqlite3` and `.db3` files as an unopened SQLiteDatabase; `open()` opens them.
+class ResourceFormatLoaderSQLite : public ResourceFormatLoader {
+	GDSOFTCLASS(ResourceFormatLoaderSQLite, ResourceFormatLoader);
+
+public:
+	virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = nullptr, bool p_use_sub_threads = false, float *r_progress = nullptr, CacheMode p_cache_mode = CACHE_MODE_REUSE) override;
+	virtual void get_recognized_extensions(List<String> *p_extensions) const override;
+	virtual bool handles_type(const String &p_type) const override;
+	virtual String get_resource_type(const String &p_path) const override;
+
+	// Database files are data, like JSON files: no `*.uid` file next to them.
+	virtual ResourceUID::ID get_resource_uid(const String &p_path) const override { return ResourceUID::INVALID_ID; }
+	virtual bool has_custom_uid_support() const override { return true; }
+};

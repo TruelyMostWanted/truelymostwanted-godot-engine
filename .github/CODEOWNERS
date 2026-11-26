@@ -557,6 +557,7 @@
 /modules/sqlite/**/*.py                       @TruelyMostWanted @godotengine/buildsystem
 /modules/sqlite/**/SCsub                      @TruelyMostWanted @godotengine/buildsystem
 /modules/sqlite/doc_classes/                  @TruelyMostWanted @godotengine/documentation
+/modules/sqlite/editor/                       @TruelyMostWanted @godotengine/editor
 /modules/sqlite/tests/                        @TruelyMostWanted @godotengine/tests
 /thirdparty/sqlite/                           @TruelyMostWanted @godotengine/buildsystem
 /servers/settings/                            @TruelyMostWanted

@@ -144,7 +144,7 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **SpriteSheet**: resource that cuts a texture into frames, with an editor plugin. In code: `scene/resources/sprite_sheet.*`, `editor/scene/texture/sprite_sheet_editor_plugin.*`. Wiki: [`Sprite-Sheet`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Sprite-Sheet).
 
-**SQLite** (`SQLiteDatabase`, `SQLiteStatement`): module with an SQLite database for GDScript and C#; the VFS works on `user://`. In code: `modules/sqlite/`. Wiki: [`SQLite`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/SQLite).
+**SQLite** (`SQLiteDatabase`, `SQLiteStatement`, `SQLiteColumn`): module with an SQLite database for GDScript and C#; the VFS works on `user://`. `.db`/`.sqlite` files load as `SQLiteDatabase` resources; a schema API (tables, columns, row counts) and a read-only table overview in the Inspector (`modules/sqlite/editor/`). In code: `modules/sqlite/`. Wiki: [`SQLite`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/SQLite).
 
 **Streaming assets** (`StreamingAssetsServer`, `StreamingAssetsPackBuilder`, `StreamingAssetsExportPlugin`): files in `res://streaming_assets` that the export ships unchanged next to the main pack (videos with seeking, data opened by OS path, moddable files). In code: `core/io/streaming_assets_server.*`, `editor/export/streaming_assets_*.*`. Wiki: [`Streaming-Assets`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Streaming-Assets).
 
@@ -201,7 +201,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Text serialization | `ResourceTextSerializer`, `SerializerOptions`, `JSON`, `INI`, `CSV`, `XML`, `XMLWriter`, `TOML`, `YAML` | `core/io/resource_text_serializer.*`, `core/io/*_format.*`, `core/io/xml_writer.*`, `modules/toml/`, `modules/yaml/` | `tests/core/io/test_resource_text_serializer*.cpp`, `test_xml_writer.cpp`, `modules/toml/tests/`, `modules/yaml/tests/` |
 | Packs and streaming assets | `PCKPackage*`, `PCKBuildPlan`, `StreamingAssets*` | `core/io/pck_*.*`, `core/io/resource_format_pck.*`, `core/io/streaming_assets_server.*`, `editor/export/`, `editor/inspector/pck_package_editor_plugin.*` | `tests/core/io/test_pck_package_server.cpp`, `test_resource_format_pck.cpp`, `test_streaming_assets_server.cpp` |
 | Runtime file formats | image, audio, video, scene and font loaders and savers | `scene/resources/*_resource_format.*`, `modules/{mp3,vorbis,theora,opus,webm,gltf,fbx}/` | `modules/*/tests/` |
-| Databases | `SQLiteDatabase`, `SQLiteStatement` | `modules/sqlite/` | `modules/sqlite/tests/` |
+| Databases | `SQLiteDatabase`, `SQLiteStatement`, `SQLiteColumn` | `modules/sqlite/` | `modules/sqlite/tests/` |
 | Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommandList` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
 | Subtitles, TTS | `SubtitleServer`, `Subtitle`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |

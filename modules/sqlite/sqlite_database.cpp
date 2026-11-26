@@ -211,18 +211,31 @@ Error SQLiteDatabase::set_error(Error p_error, const String &p_message) {
 Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 	close();
 
-	const CharString utf8_path = p_path.utf8();
-	if (p_mode != OPEN_MODE_READ_ONLY && SQLiteVFS::is_read_only_path(utf8_path.get_data())) {
+	String file_path = p_path;
+	OpenMode mode = p_mode;
+	if (file_path.is_empty()) {
+		// The file this resource was loaded from; res:// can only be read.
+		file_path = get_path();
+		if (file_path.is_empty()) {
+			return set_error(ERR_INVALID_PARAMETER, "No path given, and the database was not loaded from a file.");
+		}
+		if (SQLiteVFS::is_read_only_path(file_path.utf8().get_data())) {
+			mode = OPEN_MODE_READ_ONLY;
+		}
+	}
+
+	const CharString utf8_path = file_path.utf8();
+	if (mode != OPEN_MODE_READ_ONLY && SQLiteVFS::is_read_only_path(utf8_path.get_data())) {
 		return set_error(ERR_FILE_NO_PERMISSION, "Databases in res:// are read-only. Open them with OPEN_MODE_READ_ONLY, or copy them to user:// first.");
 	}
-	if (p_mode != OPEN_MODE_CREATE && !FileAccess::exists(p_path)) {
-		return set_error(ERR_FILE_NOT_FOUND, vformat("Database file not found: \"%s\".", p_path));
+	if (mode != OPEN_MODE_CREATE && !FileAccess::exists(file_path)) {
+		return set_error(ERR_FILE_NOT_FOUND, vformat("Database file not found: \"%s\".", file_path));
 	}
 
 	int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
-	if (p_mode == OPEN_MODE_READ_ONLY) {
+	if (mode == OPEN_MODE_READ_ONLY) {
 		flags = SQLITE_OPEN_READONLY;
-	} else if (p_mode == OPEN_MODE_READ_WRITE) {
+	} else if (mode == OPEN_MODE_READ_WRITE) {
 		flags = SQLITE_OPEN_READWRITE;
 	}
 
@@ -231,7 +244,7 @@ Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 	if (result != SQLITE_OK) {
 		const String message = handle ? String::utf8(sqlite3_errmsg(handle)) : String::utf8(sqlite3_errstr(result));
 		sqlite3_close_v2(handle);
-		return set_error(sqlite_result_to_error(result), vformat("Can't open database \"%s\": %s", p_path, message));
+		return set_error(sqlite_result_to_error(result), vformat("Can't open database \"%s\": %s", file_path, message));
 	}
 
 	// SQLite opens lazily; read the header now so that a file that is not a
@@ -240,11 +253,11 @@ Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 	if (check != SQLITE_OK) {
 		const String message = String::utf8(sqlite3_errmsg(handle));
 		sqlite3_close_v2(handle);
-		return set_error(sqlite_result_to_error(check), vformat("Can't open database \"%s\": %s", p_path, message));
+		return set_error(sqlite_result_to_error(check), vformat("Can't open database \"%s\": %s", file_path, message));
 	}
 
 #ifdef WEB_ENABLED
-	if (p_mode != OPEN_MODE_READ_ONLY) {
+	if (mode != OPEN_MODE_READ_ONLY) {
 		// The Web keeps the rollback journal in memory; the database file itself
 		// is persisted to IndexedDB on every commit (see SQLiteVFS).
 		sqlite3_exec(handle, "PRAGMA journal_mode=MEMORY;", nullptr, nullptr, nullptr);
@@ -252,8 +265,8 @@ Error SQLiteDatabase::open(const String &p_path, OpenMode p_mode) {
 #endif
 
 	db = handle;
-	path = p_path;
-	open_mode = p_mode;
+	path = file_path;
+	open_mode = mode;
 	return set_error(OK, String());
 }
 
@@ -270,7 +283,7 @@ bool SQLiteDatabase::is_open() const {
 	return db != nullptr;
 }
 
-String SQLiteDatabase::get_path() const {
+String SQLiteDatabase::get_database_path() const {
 	return path;
 }
 
@@ -390,6 +403,79 @@ bool SQLiteDatabase::is_in_transaction() const {
 	return db && sqlite3_get_autocommit(db) == 0;
 }
 
+// User tables and virtual tables of the main database, without SQLite's own tables and the shadow tables of virtual tables.
+static const char *TABLE_LIST_SQL = "SELECT name FROM pragma_table_list WHERE schema = 'main' AND type IN ('table', 'virtual') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'";
+
+PackedStringArray SQLiteDatabase::get_table_names() {
+	PackedStringArray names;
+	const TypedArray<Dictionary> rows = query(String(TABLE_LIST_SQL) + " ORDER BY name;");
+	for (int i = 0; i < rows.size(); i++) {
+		names.push_back(String(Dictionary(rows[i])["name"]));
+	}
+	return names;
+}
+
+bool SQLiteDatabase::has_table(const String &p_table) {
+	return !query(String(TABLE_LIST_SQL) + " AND name = ? COLLATE NOCASE;", varray(p_table)).is_empty();
+}
+
+bool SQLiteDatabase::_check_table(const String &p_table) {
+	if (has_table(p_table)) {
+		return true;
+	}
+	if (last_error == OK) {
+		set_error(ERR_DOES_NOT_EXIST, vformat("No table \"%s\" in the database.", p_table));
+	}
+	return false;
+}
+
+TypedArray<SQLiteColumn> SQLiteDatabase::get_columns(const String &p_table) {
+	TypedArray<SQLiteColumn> columns;
+	if (!_check_table(p_table)) {
+		return columns;
+	}
+	// A table-valued pragma takes the name as a bound parameter: no quoting needed.
+	const TypedArray<Dictionary> rows = query("SELECT name, type, \"notnull\", dflt_value, pk FROM pragma_table_info(?) ORDER BY cid;", varray(p_table));
+	for (int i = 0; i < rows.size(); i++) {
+		const Dictionary row = rows[i];
+		Ref<SQLiteColumn> column;
+		column.instantiate();
+		column->name = String(row["name"]);
+		column->declared_type = String(row["type"]);
+		column->not_null = int64_t(row["notnull"]) != 0;
+		column->default_value = row["dflt_value"].get_type() == Variant::NIL ? String() : String(row["dflt_value"]);
+		column->primary_key_index = int(row["pk"]);
+		columns.push_back(column);
+	}
+	return columns;
+}
+
+PackedStringArray SQLiteDatabase::get_column_names(const String &p_table) {
+	PackedStringArray names;
+	const TypedArray<SQLiteColumn> columns = get_columns(p_table);
+	for (int i = 0; i < columns.size(); i++) {
+		names.push_back(Ref<SQLiteColumn>(columns[i])->get_name());
+	}
+	return names;
+}
+
+int SQLiteDatabase::get_column_count(const String &p_table) {
+	const TypedArray<SQLiteColumn> columns = get_columns(p_table);
+	return last_error == OK ? columns.size() : -1;
+}
+
+int64_t SQLiteDatabase::get_row_count(const String &p_table) {
+	if (!_check_table(p_table)) {
+		return -1;
+	}
+	// The name is quoted as an identifier; COUNT(*) reads the whole table.
+	const TypedArray<Dictionary> rows = query("SELECT COUNT(*) AS count FROM \"" + p_table.replace("\"", "\"\"") + "\";");
+	if (rows.is_empty()) {
+		return -1;
+	}
+	return int64_t(Dictionary(rows[0])["count"]);
+}
+
 int64_t SQLiteDatabase::get_last_insert_rowid() const {
 	return db ? (int64_t)sqlite3_last_insert_rowid(db) : 0;
 }
@@ -407,10 +493,10 @@ String SQLiteDatabase::get_last_error_message() const {
 }
 
 void SQLiteDatabase::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("open", "path", "mode"), &SQLiteDatabase::open, DEFVAL(OPEN_MODE_CREATE));
+	ClassDB::bind_method(D_METHOD("open", "path", "mode"), &SQLiteDatabase::open, DEFVAL(String()), DEFVAL(OPEN_MODE_CREATE));
 	ClassDB::bind_method(D_METHOD("close"), &SQLiteDatabase::close);
 	ClassDB::bind_method(D_METHOD("is_open"), &SQLiteDatabase::is_open);
-	ClassDB::bind_method(D_METHOD("get_path"), &SQLiteDatabase::get_path);
+	ClassDB::bind_method(D_METHOD("get_database_path"), &SQLiteDatabase::get_database_path);
 	ClassDB::bind_method(D_METHOD("get_open_mode"), &SQLiteDatabase::get_open_mode);
 
 	ClassDB::bind_method(D_METHOD("execute", "sql", "params"), &SQLiteDatabase::execute, DEFVAL(Variant()));
@@ -421,6 +507,13 @@ void SQLiteDatabase::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("commit"), &SQLiteDatabase::commit);
 	ClassDB::bind_method(D_METHOD("rollback"), &SQLiteDatabase::rollback);
 	ClassDB::bind_method(D_METHOD("is_in_transaction"), &SQLiteDatabase::is_in_transaction);
+
+	ClassDB::bind_method(D_METHOD("get_table_names"), &SQLiteDatabase::get_table_names);
+	ClassDB::bind_method(D_METHOD("has_table", "table"), &SQLiteDatabase::has_table);
+	ClassDB::bind_method(D_METHOD("get_columns", "table"), &SQLiteDatabase::get_columns);
+	ClassDB::bind_method(D_METHOD("get_column_names", "table"), &SQLiteDatabase::get_column_names);
+	ClassDB::bind_method(D_METHOD("get_column_count", "table"), &SQLiteDatabase::get_column_count);
+	ClassDB::bind_method(D_METHOD("get_row_count", "table"), &SQLiteDatabase::get_row_count);
 
 	ClassDB::bind_method(D_METHOD("get_last_insert_rowid"), &SQLiteDatabase::get_last_insert_rowid);
 	ClassDB::bind_method(D_METHOD("get_changes"), &SQLiteDatabase::get_changes);
@@ -434,4 +527,41 @@ void SQLiteDatabase::_bind_methods() {
 
 SQLiteDatabase::~SQLiteDatabase() {
 	close();
+}
+
+// ResourceFormatLoaderSQLite
+
+Ref<Resource> ResourceFormatLoaderSQLite::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
+	// `open()` opens the file, not the loader: loading is instant and does not hold the file.
+	if (!FileAccess::exists(p_path)) {
+		if (r_error) {
+			*r_error = ERR_FILE_NOT_FOUND;
+		}
+		return Ref<Resource>();
+	}
+	if (r_error) {
+		*r_error = OK;
+	}
+	Ref<SQLiteDatabase> database;
+	database.instantiate();
+	return database;
+}
+
+void ResourceFormatLoaderSQLite::get_recognized_extensions(List<String> *p_extensions) const {
+	p_extensions->push_back("db");
+	p_extensions->push_back("sqlite");
+	p_extensions->push_back("sqlite3");
+	p_extensions->push_back("db3");
+}
+
+bool ResourceFormatLoaderSQLite::handles_type(const String &p_type) const {
+	return p_type == "SQLiteDatabase";
+}
+
+String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
+	const String extension = p_path.get_extension().to_lower();
+	if (extension == "db" || extension == "sqlite" || extension == "sqlite3" || extension == "db3") {
+		return "SQLiteDatabase";
+	}
+	return String();
 }
