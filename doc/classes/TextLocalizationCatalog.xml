@@ -127,6 +127,23 @@
 				Sets the text of [param key] with [param context] in [param locale]. Adds the key and the locale if needed. An empty [param text] marks the key as missing in that locale.
 			</description>
 		</method>
+		<method name="to_po" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="locale" type="String" default="&quot;&quot;" />
+			<description>
+				Returns the catalog in the gettext format: a template (POT) with empty translations if [param locale] is empty, otherwise a PO file of [param locale] with its texts, its plural rule as [code]Plural-Forms[/code] header and [code]Language[/code] header. Contexts become [code]msgctxt[/code], plural keys [code]msgid_plural[/code] with [code]msgstr[N][/code] per form, translator notes [code]#.[/code] comments ([code]#. max_length: 12[/code] for other note columns than [code]notes[/code]). Godot's PO loader reads the PO files as [Translation]. The inspector of a text catalog has a "Save POT..." button.
+				[codeblocks]
+				[gdscript]
+				var file = FileAccess.open("res://localization/ui.pot", FileAccess.WRITE)
+				file.store_string(catalog.to_po())
+				[/gdscript]
+				[csharp]
+				using var file = FileAccess.Open("res://localization/ui.pot", FileAccess.ModeFlags.Write);
+				file.StoreString(catalog.ToPo());
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="to_translations">
 			<return type="Translation[]" />
 			<description>
