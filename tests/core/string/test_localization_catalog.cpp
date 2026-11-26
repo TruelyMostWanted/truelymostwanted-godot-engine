@@ -35,6 +35,8 @@ TEST_FORCE_LINK(test_localization_catalog)
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
+#include "core/io/serializer_options.h"
+#include "core/io/text_data_format.h"
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
 #include "core/string/localization_catalog.h"
@@ -384,6 +386,177 @@ TEST_CASE("[LocalizationCatalog] Memory per message") {
 		MESSAGE(vformat("LocalizationCatalog: %.1f bytes per message (%.1f bytes of text), keys only %d bytes; Translation (#340) ~380, OptimizedTranslation ~72.", bytes_per_message, double(text_bytes) / message_count, keys_only - before));
 		CHECK(bytes_per_message < 100);
 	}
+	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[LocalizationCatalog] Entries in the dictionary shape") {
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	const Dictionary hello = catalog->get_entry("HELLO");
+	CHECK(hello["en"] == "Hello");
+	CHECK(hello["_notes"] == "greeting");
+	CHECK_FALSE(hello.has("_key")); // Only keys with a context name their key and context.
+	const Dictionary hello_menu = catalog->get_entry("HELLO", "menu");
+	CHECK(hello_menu["_context"] == "menu");
+	const Dictionary apple = catalog->get_entry("APPLE");
+	CHECK(apple["_plural"] == "APPLES");
+	CHECK(PackedStringArray(apple["de"]) == PackedStringArray({ String(U"%d Apfel"), String(U"%d Äpfel") }));
+	CHECK(catalog->get_entry("MISSING").is_empty());
+
+	// set_entry() replaces the texts, notes and plural key of the key.
+	Dictionary entry;
+	entry["de"] = "Servus";
+	entry["fr"] = "Salut";
+	entry["_notes"] = "informal";
+	catalog->set_entry("HELLO", entry);
+	CHECK(catalog->get_text("HELLO", "de") == "Servus");
+	CHECK(catalog->get_text("HELLO", "en").is_empty());
+	CHECK(catalog->get_text("HELLO", "fr") == "Salut");
+	CHECK(catalog->get_note("HELLO") == "informal");
+	CHECK(catalog->get_translated_count("en") == 4);
+
+	// Undo in the editor: the old entry restores the key.
+	catalog->set_entry("HELLO", hello);
+	CHECK(catalog->get_entry("HELLO") == hello);
+	catalog->set_entry("APPLE", Dictionary());
+	CHECK(catalog->get_plural_key("APPLE").is_empty());
+	CHECK(catalog->get_plural_texts("APPLE", "de").is_empty());
+	catalog->set_entry("APPLE", apple);
+	CHECK(catalog->get_plural_text("APPLE", "de", 5) == String(U"%d Äpfel"));
+	catalog->set_entry("NEW", entry, "ctx");
+	CHECK(catalog->get_text("NEW", "fr", "ctx") == "Salut");
+}
+
+TEST_CASE("[LocalizationCatalog] validate() reports missing translations, duplicates and invalid locales") {
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	Ref<DataValidation> result = catalog->validate();
+	REQUIRE(result->get_issue_count() == 1);
+	CHECK(result->get_issue_kind(0) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED);
+	CHECK(result->get_issue_row(0) == 4);
+	CHECK(result->get_issue_column(0) == 1);
+	CHECK(result->get_issue_field(0) == StringName("de"));
+	CHECK(result->get_issue_path(0) == "BYE");
+
+	REQUIRE(catalog->load_from_text("keys,en,de\nA,a,\nB,b,\nA,a2,\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(catalog->get_key_count() == 2);
+	result = catalog->validate();
+	REQUIRE(result->get_issue_count() == 3);
+	CHECK(result->get_issue_kind(0) == DataValidation::ISSUE_KIND_DUPLICATE_KEY);
+	CHECK(result->get_issue_row(0) == 0);
+	CHECK(result->get_issue_kind(1) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED);
+	CHECK(result->get_issue_kind(2) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED);
+	catalog->clear();
+	CHECK(catalog->validate()->is_valid()); // Duplicates belong to the last load.
+
+	Ref<TextLocalizationCatalog> invalid_locale;
+	invalid_locale.instantiate();
+	invalid_locale->set_text("A", "qqq", "a");
+	result = invalid_locale->validate();
+	REQUIRE(result->get_issue_count() == 1);
+	CHECK(result->get_issue_kind(0) == DataValidation::ISSUE_KIND_INVALID_LOCALE);
+
+	// Options limit the issues.
+	Ref<DataValidationOptions> options;
+	options.instantiate();
+	options->set_stop_on_first(true);
+	REQUIRE(catalog->load_from_text("keys,en,de\nA,,\nB,,\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(catalog->validate(options)->get_issue_count() == 1);
+	CHECK(catalog->validate()->get_issue_count() == 4);
+}
+
+TEST_CASE("[LocalizationCatalog] validate() gives lines for catalogs loaded from text files") {
+	// CSV: the line of the key row, also after quoted line breaks and plural rows.
+	const String csv_path = TestUtils::get_temp_path("validate_catalog.csv");
+	{
+		Ref<FileAccess> file = FileAccess::open(csv_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("keys,?plural,en,de\nA,,a,\"Zeile\nzwei\"\nAPPLE,APPLES,apple,\n,,apples,\nB,,b,\n");
+	}
+	Ref<TextLocalizationCatalog> catalog;
+	catalog.instantiate();
+	REQUIRE(catalog->load_from_file(csv_path) == OK);
+	catalog->set_path_cache(csv_path);
+	Ref<DataValidation> result = catalog->validate();
+	REQUIRE(result->get_issue_count() == 2);
+	CHECK(result->get_issue_path(0) == "APPLE");
+	CHECK(result->get_issue_line(0) == 4);
+	CHECK(result->get_issue_path(1) == "B");
+	CHECK(result->get_issue_line(1) == 6);
+	DirAccess::remove_absolute(csv_path);
+
+	// JSON: the line of the entry.
+	const String json_path = TestUtils::get_temp_path("validate_catalog.json");
+	{
+		Ref<FileAccess> file = FileAccess::open(json_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("{\n\t\"A\": {\n\t\t\"en\": \"a\",\n\t\t\"de\": \"a\"\n\t},\n\t\"B\": {\n\t\t\"en\": \"b\"\n\t}\n}\n");
+	}
+	REQUIRE(catalog->load_from_file(json_path) == OK);
+	catalog->set_path_cache(json_path);
+	result = catalog->validate();
+	REQUIRE(result->get_issue_count() == 1);
+	CHECK(result->get_issue_line(0) == 6);
+	DirAccess::remove_absolute(json_path);
+}
+
+TEST_CASE("[LocalizationCatalog] CSV delimiters and serializer options") {
+	Ref<TextLocalizationCatalog> catalog;
+	catalog.instantiate();
+	REQUIRE(catalog->load_from_text("keys;en;de\nHELLO;Hello, world;Hallo, Welt\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(catalog->get_text("HELLO", "de") == "Hallo, Welt");
+	REQUIRE(catalog->load_from_text("keys\ten\tde\nHELLO\tHello\tHallo\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(catalog->get_text("HELLO", "de") == "Hallo");
+
+	Ref<SerializerOptions> options;
+	options.instantiate();
+	options->set_csv_delimiter(";");
+	const String text = catalog->to_text(ResourceTextSerializer::FORMAT_CSV, options);
+	CHECK(text.begins_with("keys;en;de"));
+	Ref<TextLocalizationCatalog> copy;
+	copy.instantiate();
+	REQUIRE(copy->load_from_text(text, ResourceTextSerializer::FORMAT_CSV, options) == OK);
+	CHECK(copy->get_text("HELLO", "en") == "Hello");
+	CHECK(options->is_csv_headers()); // The caller's options are not changed.
+
+	CHECK(ResourceTextSerializer::create_data_format(ResourceTextSerializer::FORMAT_JSON).is_null());
+	const Ref<TextDataFormat> format = ResourceTextSerializer::create_data_format(ResourceTextSerializer::FORMAT_CSV, options);
+	REQUIRE(format.is_valid());
+	CHECK(format->get_options() == options);
+}
+
+TEST_CASE("[LocalizationCatalog] ResourceSaver writes catalogs in their text format") {
+	// The editor saves catalogs through ResourceSaver: not the generic resource JSON of the text resource savers.
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	const String path = TestUtils::get_temp_path("saved_catalog.json");
+	REQUIRE(ResourceSaver::save(catalog, path) == OK);
+	Ref<TextLocalizationCatalog> copy;
+	copy.instantiate();
+	REQUIRE(copy->load_from_file(path) == OK);
+	CHECK(copy->get_plural_text("APPLE", "de", 5) == String(U"%d Äpfel"));
+	CHECK(copy->get_note("HELLO") == "greeting");
+	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[LocalizationCatalog] POT and PO files") {
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	const String pot = catalog->to_po();
+	CHECK(pot.contains("#. greeting\nmsgid \"HELLO\"\nmsgstr \"\"\n"));
+	CHECK(pot.contains("msgctxt \"menu\"\nmsgid \"HELLO\"\n"));
+	CHECK(pot.contains("msgid \"APPLE\"\nmsgid_plural \"APPLES\"\nmsgstr[0] \"\"\nmsgstr[1] \"\"\n"));
+
+	// The PO file of a locale loads as Translation with Godot's PO loader.
+	const String path = TestUtils::get_temp_path("catalog_de.po");
+	{
+		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string(catalog->to_po("de"));
+	}
+	const Ref<Translation> translation = ResourceLoader::load(path, "Translation", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(translation.is_valid());
+	CHECK(translation->get_locale() == "de");
+	CHECK(translation->get_message("HELLO") == "Hallo");
+	CHECK(translation->get_message("HELLO", "menu") == String(U"Hallo (Menü)"));
+	CHECK(translation->get_message("LINE") == "Eins\nZwei");
+	CHECK(translation->get_plural_message("APPLE", "APPLES", 5) == String(U"%d Äpfel"));
 	DirAccess::remove_absolute(path);
 }
 

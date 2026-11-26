@@ -8,4 +8,30 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="get_current_index" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the index in [member AudioStreamPlaylist.streams] of the track that is playing, or [code]-1[/code] when the playback is stopped or has ended. The value is updated once per mix block and can be read from any thread without a lock.
+			</description>
+		</method>
+		<method name="get_current_stream" qualifiers="const">
+			<return type="AudioStream" />
+			<description>
+				Returns the stream of the track that is playing, or [code]null[/code] when the playback is stopped.
+			</description>
+		</method>
+		<method name="get_position_in_playlist" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the position in seconds since the start of the playlist, in the current play order (the shuffled order if [member AudioStreamPlaylist.shuffle] is on): the start of the current track plus [method get_position_in_stream]. Updated once per mix block.
+			</description>
+		</method>
+		<method name="get_position_in_stream" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the position in seconds inside the current track (not inside the whole playlist, see [method AudioStreamPlayback.get_playback_position]). Updated once per mix block.
+			</description>
+		</method>
+	</methods>
 </class>

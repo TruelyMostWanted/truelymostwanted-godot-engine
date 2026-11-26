@@ -182,6 +182,7 @@
 #include "scene/resources/style_box_texture.h"
 #include "scene/resources/surface_tool.h"
 #include "scene/resources/syntax_highlighter.h"
+#include "scene/resources/system_font_resource_format.h"
 #include "scene/resources/text_line.h"
 #include "scene/resources/text_paragraph.h"
 #include "scene/resources/texture.h"
@@ -425,6 +426,7 @@ static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
 
 static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
 static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
+static Ref<ResourceFormatLoaderSystemFont> resource_loader_system_font;
 
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
@@ -493,6 +495,11 @@ void register_scene_types() {
 
 		resource_loader_font_file.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		resource_loader_system_font.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_system_font);
 	}
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -1513,6 +1520,11 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_font_file);
 		resource_loader_font_file.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_system_font);
+		resource_loader_system_font.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either

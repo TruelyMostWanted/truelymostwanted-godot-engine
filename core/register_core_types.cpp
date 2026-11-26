@@ -375,7 +375,7 @@ void register_core_types() {
 	resource_loader_localization_catalog.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog, true); // Before the text resource loaders (#357).
 	resource_saver_localization_catalog.instantiate();
-	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog);
+	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog, true); // Before the text resource savers (#346).
 	GDREGISTER_ABSTRACT_CLASS(LocalizationServer);
 	GDREGISTER_ABSTRACT_CLASS(TextLocalizationServer);
 	text_localization_server = memnew(TextLocalizationServer);
