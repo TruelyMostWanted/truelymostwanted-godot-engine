@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="LanguageSettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings resource of [LanguageSettingsServer]: locale, pseudolocalization, layout direction and auto-translate mode.
+		Settings resource of [LanguageSettingsServer]: locale, locale channels, pseudolocalization, layout direction and auto-translate mode.
 	</brief_description>
 	<description>
 		The data of the settings domain [code]"language"[/code]. [LanguageSettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/language.ini[/code]. Change the values through [method LanguageSettingsServer.set_locale] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
@@ -10,6 +10,12 @@
 	<tutorials>
 	</tutorials>
 	<members>
+		<member name="audio_locale" type="String" setter="set_audio_locale" getter="get_audio_locale" default="&quot;&quot;">
+			The locale of the [code]"audio"[/code] channel (voice resources, see [ResourceLocalizationServer]). An empty string is the same as [member locale]. Leading and trailing spaces are removed.
+		</member>
+		<member name="interface_locale" type="String" setter="set_interface_locale" getter="get_interface_locale" default="&quot;&quot;">
+			The locale of the [code]"interface"[/code] channel (menus, [method Object.tr], auto-translated controls). An empty string is the same as [member locale]. Leading and trailing spaces are removed.
+		</member>
 		<member name="layout_direction" type="int" setter="set_layout_direction" getter="get_layout_direction" default="0">
 			The layout direction of the root window, one of the values of [enum Window.LayoutDirection]. [constant Window.LAYOUT_DIRECTION_INHERITED] follows [member ProjectSettings.internationalization/rendering/root_node_layout_direction].
 		</member>
@@ -21,6 +27,9 @@
 		</member>
 		<member name="root_auto_translate_mode" type="int" setter="set_root_auto_translate_mode" getter="get_root_auto_translate_mode" default="1">
 			The auto-translate mode of the root window, one of the values of [enum Node.AutoTranslateMode]. Its default comes from [member ProjectSettings.internationalization/rendering/root_node_auto_translate].
+		</member>
+		<member name="subtitles_locale" type="String" setter="set_subtitles_locale" getter="get_subtitles_locale" default="&quot;&quot;">
+			The locale of the [code]"subtitles"[/code] channel (subtitle texts and subtitle files). An empty string is the same as [member locale]. Leading and trailing spaces are removed.
 		</member>
 	</members>
 </class>

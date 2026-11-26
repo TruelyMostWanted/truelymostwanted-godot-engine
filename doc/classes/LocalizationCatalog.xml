@@ -8,9 +8,10 @@
 		The data is stored compactly: every locale is one column of UTF-8 text with one 4-byte offset per row, so a message costs its text plus 4 bytes (instead of an interned [StringName] per message like in [Translation]).
 		[b]Files:[/b] [method load_from_file] and [method save_to_file] choose the format by the file extension. The binary [code].lcat[/code] format stores one block per locale: a catalog loaded from it (also with [method @GDScript.load]) reads only the keys and the locale table; the text of a locale is read when it is first used, or with [method load_locale]. This keeps unused locales out of memory and works from the PCK and [code]user://[/code] on every platform, including the Web.
 		[b]Text formats[/b] ([method load_from_text], [method to_text], [enum ResourceTextSerializer.Format]):
-		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are ignored, a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not.
-		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs). The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code] and [code skip-lint]channel[/code]. In INI, every key is a [code][section][/code].
-		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules.
+		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are translator notes (the importer ignores them), a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not.
+		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs); other fields starting with [code]_[/code] are translator notes. The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code] and [code skip-lint]channel[/code]. In INI, every key is a [code][section][/code].
+		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules, [code]&lt;note name="notes"&gt;[/code] elements in a message for translator notes.
+		[b]Translator notes:[/b] columns or fields such as [code]_notes[/code] or [code]_max_length[/code] hold notes per key for translators and tools (see [method get_note]). They are kept by every text format and in [code].tres[/code], but never written to [code].lcat[/code], and a catalog loaded through [ResourceLoader] outside the editor (as the localization servers do) skips them, so they cost no memory in a game. [method load_from_file] and [method load_from_text] always keep them.
 		Saved as [code].tres[/code] or [code].res[/code], a catalog stores all locales in one block (no loading per locale).
 		[codeblocks]
 		[gdscript]
@@ -95,6 +96,21 @@
 				Returns the row numbers that have no text in [param locale] (all rows if the catalog has no such locale). Loads the locale.
 			</description>
 		</method>
+		<method name="get_note" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="column" type="StringName" default="&amp;&quot;notes&quot;" />
+			<description>
+				Returns the translator note of [param key] in the note [param column] (the name without the leading [code]_[/code]: [code]"notes"[/code] for a [code]_notes[/code] column), or an empty string. Notes are never used to look up texts.
+			</description>
+		</method>
+		<method name="get_note_columns" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the note columns without the leading [code]_[/code], in the order they were read or added, for example [code]["notes", "max_length"][/code].
+			</description>
+		</method>
 		<method name="get_translated_count" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="locale" type="String" />
@@ -166,6 +182,28 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Writes the catalog to [param path] in the format of its extension (see [method load_from_file]). Loads all locales first.
+			</description>
+		</method>
+		<method name="set_note">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="note" type="String" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="column" type="StringName" default="&amp;&quot;notes&quot;" />
+			<description>
+				Sets the translator note of [param key] in the note [param column], adding the key and the column if needed. An empty [param note] removes it. [code]"key"[/code], [code]"context"[/code] and the column of the kind ([code]"plural"[/code] or [code]"type"[/code]) are reserved.
+				[codeblocks]
+				[gdscript]
+				catalog.set_note("MENU_START", "Button on the title screen")
+				catalog.set_note("MENU_START", "12", &amp;"", &amp;"max_length")
+				catalog.save_to_file("res://translations/menu.csv") # keys,en,_notes,_max_length
+				[/gdscript]
+				[csharp]
+				catalog.SetNote("MENU_START", "Button on the title screen");
+				catalog.SetNote("MENU_START", "12", "", "max_length");
+				catalog.SaveToFile("res://translations/menu.csv"); // keys,en,_notes,_max_length
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="to_text" qualifiers="const">

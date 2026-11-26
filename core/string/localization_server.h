@@ -73,6 +73,7 @@ public:
 		LocalVector<StringName> channels; // The channels of the rows.
 		LocalVector<uint32_t> row_channels; // Row -> index in `channels`.
 		LocalVector<LocalVector<uint32_t>> channel_rows; // Index in `channels` -> its rows.
+		LocalVector<PackedStringArray> channel_locales; // Index in `channels` -> locales of the layers with its rows.
 		PackedStringArray locales; // Of all layers.
 
 		_FORCE_INLINE_ int32_t get_catalog_row(uint32_t p_layer, uint32_t p_row) const { return catalog_rows[p_layer * keys.size() + p_row]; }
@@ -184,8 +185,11 @@ public:
 	int load_project_catalogs();
 
 	PackedStringArray get_available_locales() const;
-	// The locales of the catalogs of all localization servers, standardized and sorted (for LanguageSettingsServer).
-	static PackedStringArray get_all_available_locales();
+	// The locales of the catalogs that give keys of `p_channel`; empty if no catalog does.
+	PackedStringArray get_available_locales_for(const StringName &p_channel) const;
+	// The locales of the catalogs of all localization servers (of one channel if not empty), standardized and sorted
+	// (for LanguageSettingsServer).
+	static PackedStringArray get_all_available_locales(const StringName &p_channel = StringName());
 	int get_key_count() const;
 
 	LocalizationServer();
