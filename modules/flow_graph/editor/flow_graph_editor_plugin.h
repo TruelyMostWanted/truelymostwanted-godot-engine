@@ -32,15 +32,18 @@
 
 #include "../flow_graph.h"
 
+#include "editor/debugger/editor_debugger_plugin.h"
 #include "editor/docks/editor_dock.h"
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 
+class Button;
 class ConfirmationDialog;
 class GraphEdit;
 class GraphNode;
 class Label;
 class LineEdit;
+class OptionButton;
 class PopupMenu;
 class Tree;
 
@@ -88,6 +91,22 @@ class FlowGraphEditor : public EditorDock {
 
 	Clipboard clipboard;
 
+	// Playbacks of the running game, reported by the FlowGraph debugger.
+	struct DebugPlayback {
+		int session = -1;
+		int64_t id = 0;
+		String graph_path;
+		String current_graph_path;
+		int node_id = FlowGraph::NODE_ID_NONE;
+		bool waiting = false;
+	};
+	LocalVector<DebugPlayback> debug_playbacks;
+	OptionButton *debug_selector = nullptr;
+	Button *debug_follow = nullptr;
+	int debug_selected_session = -1;
+	int64_t debug_selected_id = 0;
+	StringName debug_highlighted;
+
 	static Ref<FlowNode> _instantiate_type(const StringName &p_type);
 	static Ref<FlowPort> _port_at(const TypedArray<FlowPort> &p_ports, int p_index);
 	static int _port_index(const TypedArray<FlowPort> &p_ports, const StringName &p_name);
@@ -130,9 +149,15 @@ class FlowGraphEditor : public EditorDock {
 	void _update_add_tree();
 	void _add_dialog_confirmed();
 
+	void _debug_selected(int p_item);
+	void _debug_update();
+
 public:
 	void edit(const Ref<FlowGraph> &p_graph);
 	Ref<FlowGraph> get_edited_graph() const { return graph; }
+
+	void debug_playback_changed(int p_session, const Array &p_data);
+	void debug_session_stopped(int p_session);
 
 	FlowGraphEditor();
 };
@@ -152,10 +177,28 @@ public:
 	EditorInspectorPluginFlowGraph(FlowGraphEditor *p_editor = nullptr) { editor = p_editor; }
 };
 
+// Receives the playback states the running game sends (FlowGraphDebugger) and passes them to the editor.
+class FlowGraphDebuggerPlugin : public EditorDebuggerPlugin {
+	GDCLASS(FlowGraphDebuggerPlugin, EditorDebuggerPlugin);
+
+	FlowGraphEditor *editor = nullptr;
+
+public:
+	virtual void setup_session(int p_session) override;
+	virtual bool capture(const String &p_message, const Array &p_data, int p_session) override;
+	virtual bool has_capture(const String &p_capture) const override;
+
+	FlowGraphDebuggerPlugin(FlowGraphEditor *p_editor = nullptr) { editor = p_editor; }
+};
+
 class FlowGraphEditorPlugin : public EditorPlugin {
 	GDCLASS(FlowGraphEditorPlugin, EditorPlugin);
 
 	FlowGraphEditor *editor = nullptr;
+	Ref<FlowGraphDebuggerPlugin> debugger_plugin;
+
+protected:
+	void _notification(int p_what);
 
 public:
 	virtual String get_plugin_name() const override { return "FlowGraph"; }

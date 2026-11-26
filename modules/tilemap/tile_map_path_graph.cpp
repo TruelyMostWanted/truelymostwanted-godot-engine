@@ -235,16 +235,26 @@ Error TileMapPathGraph::update_all() {
 	cost_layer_index = -1;
 	blocked_layer_index = -1;
 	const String cost_name = options->get_cost_data_layer();
-	if (!cost_name.is_empty()) {
+	if (cost_name.is_empty()) {
+		warned_cost_layer = String();
+	} else {
 		cost_layer_index = tile_set->get_custom_data_layer_by_name(cost_name);
-		if (cost_layer_index < 0) {
+		if (cost_layer_index >= 0) {
+			warned_cost_layer = String();
+		} else if (cost_name != warned_cost_layer) {
+			warned_cost_layer = cost_name;
 			WARN_PRINT(vformat("TileMapPathGraph: the TileSet has no custom data layer \"%s\"; default_cost is used.", cost_name));
 		}
 	}
 	const String blocked_name = options->get_blocked_data_layer();
-	if (!blocked_name.is_empty()) {
+	if (blocked_name.is_empty()) {
+		warned_blocked_layer = String();
+	} else {
 		blocked_layer_index = tile_set->get_custom_data_layer_by_name(blocked_name);
-		if (blocked_layer_index < 0) {
+		if (blocked_layer_index >= 0) {
+			warned_blocked_layer = String();
+		} else if (blocked_name != warned_blocked_layer) {
+			warned_blocked_layer = blocked_name;
 			WARN_PRINT(vformat("TileMapPathGraph: the TileSet has no custom data layer \"%s\"; no tile is blocked by data.", blocked_name));
 		}
 	}

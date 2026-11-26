@@ -32,6 +32,7 @@
 
 TEST_FORCE_LINK(test_translation)
 
+#include "core/io/csv_format.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
@@ -196,6 +197,64 @@ TEST_CASE("[Translation] Plural rules parsing") {
 	}
 }
 
+TEST_CASE("[TranslationCSV] validate_translation() reports header problems, duplicate keys and missing translations") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	// Column 2 is empty (invalid), 'xx' is an unknown language, '_notes' is ignored, '?context' is special.
+	REQUIRE(csv->parse("keys,en,,de,xx,_notes,?context\nHELLO,Hello,,Hallo,hi,note,\nBYE,Bye,,,bye,,\nHELLO,Hi again,,Hallo,hi,,\nHELLO,Hello,,Hallo,hi,,formal\n?pluralrule,,,,,,\n,,,,,,\n") == OK);
+
+	const Ref<DataValidation> result = csv->validate_translation();
+	REQUIRE(result.is_valid());
+	int invalid_locales = 0;
+	int duplicates = 0;
+	int missing = 0;
+	for (int i = 0; i < result->get_issue_count(); i++) {
+		switch (result->get_issue_kind(i)) {
+			case DataValidation::ISSUE_KIND_INVALID_LOCALE: {
+				invalid_locales++;
+				CHECK(result->get_issue_row(i) == DataValidation::POSITION_NONE);
+				const int column = result->get_issue_column(i);
+				CHECK((column == 2 || column == 4));
+			} break;
+			case DataValidation::ISSUE_KIND_DUPLICATE_KEY: {
+				duplicates++;
+				CHECK(result->get_issue_row(i) == 2);
+				CHECK(result->get_issue_column(i) == 0);
+			} break;
+			case DataValidation::ISSUE_KIND_EMPTY_REQUIRED: {
+				missing++;
+				CHECK(result->get_issue_row(i) == 1);
+				CHECK(result->get_issue_column(i) == 3);
+				CHECK(result->get_issue_field(i) == StringName("de"));
+			} break;
+			default: {
+				FAIL("Unexpected issue: ", result->get_issue_message(i));
+			} break;
+		}
+	}
+	CHECK(invalid_locales == 2);
+	CHECK_MESSAGE(duplicates == 1, "The same key in another context is no duplicate.");
+	CHECK(missing == 1);
+}
+
+TEST_CASE("[TranslationCSV] validate_translation() of a data CSV and a CSV without header") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("name,health,speed\nknight,100,4\n") == OK);
+	Ref<DataValidation> result = csv->validate_translation();
+	CHECK_MESSAGE(result->get_issue_count() == 3, "Two unknown language codes and one 'not a translation table' issue, no row checks.");
+	CHECK(result->get_issue_kind(2) == DataValidation::ISSUE_KIND_INVALID_LOCALE);
+	CHECK(result->get_issue_column(2) == DataValidation::POSITION_NONE);
+
+	csv->set_header(PackedStringArray());
+	result = csv->validate_translation();
+	CHECK(result->get_issue_count() == 1);
+	CHECK(result->get_issue_kind(0) == DataValidation::ISSUE_KIND_MISSING_FIELD);
+
+	REQUIRE(csv->parse("keys,en,fr\nHELLO,Hello,Bonjour\n") == OK);
+	CHECK(csv->validate_translation()->is_valid());
+}
+
 #ifdef TOOLS_ENABLED
 TEST_CASE("[OptimizedTranslation] Generate from Translation and read messages") {
 	Ref<Translation> translation = memnew(Translation);
@@ -352,6 +411,37 @@ TEST_CASE("[TranslationCSV] Header problems are reported once per file") {
 	CHECK(gen_files.size() == 3);
 	CHECK_MESSAGE(errors == 1, "The invalid column must be reported in one error.");
 	CHECK_MESSAGE(warnings == 1, "Both unknown language codes must be reported in one warning.");
+
+	for (const String &file : gen_files) {
+		DirAccess::remove_absolute(file);
+	}
+	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[TranslationCSV] A second ?context column is reported and ignored") {
+	Ref<ResourceImporterCSVTranslation> import_csv_translation = memnew(ResourceImporterCSVTranslation);
+	HashMap<StringName, Variant> options;
+	options["compress"] = 0;
+	options["delimiter"] = 0;
+
+	const String path = write_temp_csv("double_context.csv", "keys,en,?context,?CONTEXT\nHELLO,Hello,a,b\n");
+	List<String> gen_files;
+	Error result;
+	int errors;
+	{
+		CSVImportMessageCounter counter;
+		result = import_csv_translation->import(2800001, path, "", options, nullptr, &gen_files);
+		errors = counter.errors;
+	}
+
+	CHECK(result == OK);
+	CHECK(gen_files.size() == 1);
+	CHECK(errors == 1);
+	if (gen_files.size() == 1) {
+		Ref<Translation> translation = ResourceLoader::load(gen_files.front()->get());
+		REQUIRE(translation.is_valid());
+		CHECK(translation->get_message("HELLO", "a") == "Hello");
+	}
 
 	for (const String &file : gen_files) {
 		DirAccess::remove_absolute(file);

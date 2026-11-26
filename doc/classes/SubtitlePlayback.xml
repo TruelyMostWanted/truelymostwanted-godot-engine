@@ -41,7 +41,7 @@
 		[/codeblocks]
 		Times are playback times: the times of the segments plus [member Subtitle.time_offset], as in [method Subtitle.get_segments_at]. Finding the active segments costs a binary search over the segments sorted by start time. The segments need not be sorted in the [Subtitle].
 		[b]Note:[/b] The playback reports all segments. It does not check [member SubtitleServer.enabled] or [member SubtitleServer.captions_enabled]. To get the text to show for a segment, use [method SubtitleServer.get_display_text].
-		[b]Note:[/b] The playback reads the segment times again whenever the [Subtitle] emits [signal Resource.changed]. Changing the times of a single [SubtitleSegment] does not emit this signal on the [Subtitle]. Call [method Subtitle.sort_segments] or assign [member subtitle] again after such a change.
+		The playback reads the segment times again whenever the [Subtitle] emits [signal Resource.changed], which includes changes to its [SubtitleSegment]s.
 	</description>
 	<tutorials>
 	</tutorials>

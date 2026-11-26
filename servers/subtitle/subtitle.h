@@ -138,10 +138,17 @@ private:
 	String language;
 	bool auto_translate = false;
 
+	void _segment_changed();
+	void _connect_segment(const Ref<SubtitleSegment> &p_segment);
+	void _disconnect_segment(const Ref<SubtitleSegment> &p_segment);
+	void _disconnect_all_segments();
+
 protected:
 	static void _bind_methods();
 
 public:
+	~Subtitle();
+
 	void set_segments(const TypedArray<SubtitleSegment> &p_segments);
 	TypedArray<SubtitleSegment> get_segments() const;
 	void set_time_offset(double p_offset);

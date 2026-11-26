@@ -67,10 +67,14 @@ protected:
 	virtual String _get_default_category() const { return String(); }
 	virtual PackedStringArray _get_default_inline_properties() const { return PackedStringArray(); }
 	virtual PackedStringArray _get_default_configuration_warnings() const { return PackedStringArray(); }
+	virtual TypedArray<PackedStringArray> _get_default_translatable_strings() const { return TypedArray<PackedStringArray>(); }
 
 	// Runtime defaults of built-in node types; a script override of the matching virtual takes precedence.
 	virtual FlowGraphPlayback::EnterResult _default_enter(FlowGraphPlayback *p_playback) const { return FlowGraphPlayback::ENTER_RESULT_CONTINUE; }
+	// Runs before a script's _exit(); p_port is the flow output the playback leaves through.
+	virtual void _default_exit(FlowGraphPlayback *p_playback, const StringName &p_port) const {}
 	virtual StringName _default_choose_exit(FlowGraphPlayback *p_playback) const;
+	virtual TypedArray<FlowExit> _default_get_available_exits(FlowGraphPlayback *p_playback) const;
 	virtual Variant _default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const;
 	virtual bool _default_process_waiting(FlowGraphPlayback *p_playback, double p_delta) const { return false; }
 	virtual bool _has_default_process_waiting() const { return false; }
@@ -117,7 +121,8 @@ public:
 
 	// Runtime, called by FlowGraphPlayback.
 	FlowGraphPlayback::EnterResult enter(FlowGraphPlayback *p_playback) const;
-	void exit(FlowGraphPlayback *p_playback) const;
+	// p_port: the flow output the playback leaves through, empty when it travels or stops.
+	void exit(FlowGraphPlayback *p_playback, const StringName &p_port = StringName()) const;
 	StringName choose_exit(FlowGraphPlayback *p_playback) const;
 	TypedArray<FlowExit> get_available_exits(FlowGraphPlayback *p_playback) const;
 	Variant evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const;

@@ -95,6 +95,9 @@ private:
 	Ref<TileSet> tile_set; // Tile set of the last build, for positions.
 	Backend backend = BACKEND_GRID;
 	Rect2i region; // Cells covered by the graph: the used rect of the layer at the last build.
+	// Layer names already warned about, so rebuilds (every undo/redo in the editor) do not repeat the warning.
+	String warned_cost_layer;
+	String warned_blocked_layer;
 	int cost_layer_index = -1;
 	int blocked_layer_index = -1;
 	Ref<AStarGrid2D> astar_grid;
