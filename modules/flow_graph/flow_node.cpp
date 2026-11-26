@@ -156,8 +156,11 @@ String FlowNode::get_category() const {
 }
 
 TypedArray<PackedStringArray> FlowNode::get_translatable_strings() const {
-	TypedArray<PackedStringArray> strings;
-	GDVIRTUAL_CALL(_get_translatable_strings, strings);
+	TypedArray<PackedStringArray> strings = _get_default_translatable_strings();
+	TypedArray<PackedStringArray> script_strings;
+	if (GDVIRTUAL_CALL(_get_translatable_strings, script_strings)) {
+		strings.append_array(script_strings);
+	}
 	return strings;
 }
 
@@ -180,6 +183,87 @@ PackedStringArray FlowNode::get_inline_properties() const {
 
 bool FlowNode::is_in_graph() const {
 	return graph_id.is_valid() && ObjectDB::get_instance(graph_id) != nullptr;
+}
+
+// Runtime.
+
+StringName FlowNode::_default_choose_exit(FlowGraphPlayback *p_playback) const {
+	_update_ports();
+	for (const Ref<FlowPort> &port : output_ports) {
+		if (port->get_kind() == FlowPort::PORT_KIND_FLOW) {
+			return port->get_port_name();
+		}
+	}
+	return StringName();
+}
+
+Variant FlowNode::_default_evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	const Ref<FlowPort> port = find_output_port(p_port);
+	return port.is_valid() ? port->get_default_value() : Variant();
+}
+
+FlowGraphPlayback::EnterResult FlowNode::enter(FlowGraphPlayback *p_playback) const {
+	FlowGraphPlayback::EnterResult result = FlowGraphPlayback::ENTER_RESULT_CONTINUE;
+	if (GDVIRTUAL_CALL(_enter, Ref<FlowGraphPlayback>(p_playback), result)) {
+		return result;
+	}
+	return _default_enter(p_playback);
+}
+
+void FlowNode::exit(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	_default_exit(p_playback, p_port); // Built-in bookkeeping runs even when a script overrides _exit().
+	GDVIRTUAL_CALL(_exit, Ref<FlowGraphPlayback>(p_playback));
+}
+
+StringName FlowNode::choose_exit(FlowGraphPlayback *p_playback) const {
+	StringName port;
+	if (GDVIRTUAL_CALL(_choose_exit, Ref<FlowGraphPlayback>(p_playback), port)) {
+		return port;
+	}
+	return _default_choose_exit(p_playback);
+}
+
+TypedArray<FlowExit> FlowNode::get_available_exits(FlowGraphPlayback *p_playback) const {
+	TypedArray<FlowExit> exits;
+	if (GDVIRTUAL_CALL(_get_available_exits, Ref<FlowGraphPlayback>(p_playback), exits)) {
+		return exits;
+	}
+	return _default_get_available_exits(p_playback);
+}
+
+TypedArray<FlowExit> FlowNode::_default_get_available_exits(FlowGraphPlayback *p_playback) const {
+	TypedArray<FlowExit> exits;
+	_update_ports();
+	for (const Ref<FlowPort> &port : output_ports) {
+		if (port->get_kind() == FlowPort::PORT_KIND_FLOW) {
+			Ref<FlowExit> flow_exit;
+			flow_exit.instantiate();
+			flow_exit->set_port(port->get_port_name());
+			flow_exit->set_label(port->get_label().is_empty() ? String(port->get_port_name()) : port->get_label());
+			exits.push_back(flow_exit);
+		}
+	}
+	return exits;
+}
+
+Variant FlowNode::evaluate_output(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	Variant value;
+	if (GDVIRTUAL_CALL(_evaluate_output, Ref<FlowGraphPlayback>(p_playback), p_port, value)) {
+		return value;
+	}
+	return _default_evaluate_output(p_playback, p_port);
+}
+
+bool FlowNode::process_waiting(FlowGraphPlayback *p_playback, double p_delta) const {
+	bool done = false;
+	if (GDVIRTUAL_CALL(_process_waiting, Ref<FlowGraphPlayback>(p_playback), p_delta, done)) {
+		return done;
+	}
+	return _default_process_waiting(p_playback, p_delta);
+}
+
+bool FlowNode::uses_process_waiting() const {
+	return GDVIRTUAL_IS_OVERRIDDEN(_process_waiting) || _has_default_process_waiting();
 }
 
 void FlowNode::_bind_methods() {
@@ -216,4 +300,11 @@ void FlowNode::_bind_methods() {
 	GDVIRTUAL_BIND(_get_translatable_strings);
 	GDVIRTUAL_BIND(_get_configuration_warnings);
 	GDVIRTUAL_BIND(_get_inline_properties);
+
+	GDVIRTUAL_BIND(_enter, "playback");
+	GDVIRTUAL_BIND(_exit, "playback");
+	GDVIRTUAL_BIND(_choose_exit, "playback");
+	GDVIRTUAL_BIND(_get_available_exits, "playback");
+	GDVIRTUAL_BIND(_evaluate_output, "playback", "port");
+	GDVIRTUAL_BIND(_process_waiting, "playback", "delta");
 }

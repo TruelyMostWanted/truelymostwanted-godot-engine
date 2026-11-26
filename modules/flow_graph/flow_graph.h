@@ -143,6 +143,10 @@ public:
 	TypedArray<FlowConnection> get_input_connections(int p_id) const;
 	PackedInt32Array find_flow_path(int p_from_id, int p_to_id) const;
 
+	// Runtime lookups through the index, no allocations (FlowGraphPlayback).
+	int get_flow_target(int p_from_id, const StringName &p_from_port) const;
+	bool get_data_source(int p_to_id, const StringName &p_to_port, int &r_from_id, StringName &r_from_port) const;
+
 	void set_frames(const TypedArray<FlowFrame> &p_frames);
 	TypedArray<FlowFrame> get_frames() const { return frames; }
 	void set_variables(const TypedArray<FlowVariable> &p_variables);

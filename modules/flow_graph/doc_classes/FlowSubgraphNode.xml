@@ -4,16 +4,16 @@
 		Runs another [FlowGraph] from its start node and continues when it ends.
 	</brief_description>
 	<description>
-		The subgraph node reuses a graph inside another graph. It has the flow input [code]in[/code] and the flow output [code]out[/code]. When the execution reaches it, the graph in [member graph] runs from its start node; when that graph reaches a [FlowEndNode], the execution continues at [code]out[/code]. How the ends of the inner graph map to the outputs of the node is part of the playback. A missing graph is a configuration warning.
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		The subgraph node reuses a graph inside another graph. It has the flow input [code]in[/code], the flow output [code]out[/code] and one flow output per name in [member exit_names]. When a [FlowGraphPlayback] enters it, the graph in [member graph] runs from its start node on a new graph level with the same blackboard. When that graph ends, the playback continues through the output named like the [member FlowEndNode.end_name] of the inner end node if that name is in [member exit_names], else through [code]out[/code]. A missing graph is a configuration warning; at runtime it stops the playback with an error, as does nesting deeper than [member FlowGraphPlayback.max_subgraph_depth].
 		[codeblocks]
 		[gdscript]
 		var subgraph := FlowSubgraphNode.new()
 		subgraph.graph = preload("res://graphs/shop.tres")
+		subgraph.exit_names = PackedStringArray(["bought", "left"])
 		graph.add_node(subgraph)
 		[/gdscript]
 		[csharp]
-		var subgraph = new FlowSubgraphNode { Graph = GD.Load&lt;FlowGraph&gt;("res://graphs/shop.tres") };
+		var subgraph = new FlowSubgraphNode { Graph = GD.Load&lt;FlowGraph&gt;("res://graphs/shop.tres"), ExitNames = ["bought", "left"] };
 		graph.AddNode(subgraph);
 		[/csharp]
 		[/codeblocks]
@@ -21,6 +21,9 @@
 	<tutorials>
 	</tutorials>
 	<members>
+		<member name="exit_names" type="PackedStringArray" setter="set_exit_names" getter="get_exit_names" default="PackedStringArray()">
+			Extra flow outputs, one per name. When the inner graph ends at a [FlowEndNode] whose [member FlowEndNode.end_name] is in this list, the node continues through the output of that name; any other end continues through [code]out[/code].
+		</member>
 		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph">
 			The graph to run. It is a separate resource and keeps its own nodes, variables and start node.
 		</member>

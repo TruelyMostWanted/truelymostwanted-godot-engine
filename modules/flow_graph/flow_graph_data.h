@@ -71,8 +71,8 @@ protected:
 public:
 	void set_variable_name(const StringName &p_name);
 	StringName get_variable_name() const { return variable_name; }
-	void set_type(Variant::Type p_type);
-	Variant::Type get_type() const { return type; }
+	void set_variable_type(Variant::Type p_type);
+	Variant::Type get_variable_type() const { return type; }
 	void set_default_value(const Variant &p_value);
 	Variant get_default_value() const { return default_value; }
 	void set_description(const String &p_description);
