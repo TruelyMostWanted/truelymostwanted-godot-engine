@@ -1758,6 +1758,9 @@
 		<member name="VideoPresetSettingsServer" type="VideoPresetSettingsServer" setter="" getter="">
 			The [VideoPresetSettingsServer] singleton.
 		</member>
+		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
+			The [ViewportServer] singleton.
+		</member>
 		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
 			The [WindowSettingsServer] singleton.
 		</member>
