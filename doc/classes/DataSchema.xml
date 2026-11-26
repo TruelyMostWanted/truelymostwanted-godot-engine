@@ -109,7 +109,7 @@
 			The fields, in file order (the column order of a CSV file without header).
 		</member>
 		<member name="file_patterns" type="PackedStringArray" setter="set_file_patterns" getter="get_file_patterns" default="PackedStringArray()">
-			Glob patterns of the files this schema describes (such as [code]"res://data/items_*.csv"[/code]). Used by the editor to find the schema of an open file; not used at runtime, where the schema is passed to [method validate] directly.
+			Glob patterns of the files this schema describes (such as [code]"res://data/items_*.csv"[/code]). Used by the editor to find the schema of an open file when this schema is listed in [member ProjectSettings.filesystem/data/schema_files]; not used at runtime, where the schema is passed to [method validate] directly.
 		</member>
 	</members>
 	<constants>
