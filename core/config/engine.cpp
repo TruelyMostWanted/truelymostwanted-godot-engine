@@ -36,6 +36,7 @@
 #include "core/donors.gen.h"
 #include "core/license.gen.h"
 #include "core/object/object.h"
+#include "core/truely_version.h"
 #include "core/variant/typed_array.h"
 #include "core/version.h"
 #ifdef RD_ENABLED
@@ -175,6 +176,13 @@ Dictionary Engine::get_version_info() const {
 	}
 	stringver += "-" + String(dict["status"]) + " (" + String(dict["build"]) + ")";
 	dict["string"] = stringver;
+
+	// Version of the truely-godot-engine fork (truely/version.txt).
+	dict["truely_major"] = TRUELY_VERSION_MAJOR;
+	dict["truely_minor"] = TRUELY_VERSION_MINOR;
+	dict["truely_patch"] = TRUELY_VERSION_PATCH;
+	dict["truely_hex"] = TRUELY_VERSION_HEX;
+	dict["truely_version"] = TRUELY_VERSION_NUMBER;
 
 	return dict;
 }

@@ -1348,9 +1348,13 @@ void Window::_update_window_size() {
 			DisplayServer::get_singleton()->window_set_max_size(max_size_used, window_id);
 			DisplayServer::get_singleton()->window_set_min_size(size_limit, window_id);
 			DisplayServer::get_singleton()->window_set_size(size, window_id);
+		} else {
+			// The main window embedded in the editor can't be resized: reset the size.
+			// Other windows keep the requested size; the display server reports the size it
+			// applied through the rect-changed callback. Reading it back here on every platform
+			// made native popups keep an OS-clamped size and the headless root window 0x0 (#264).
+			size = DisplayServer::get_singleton()->window_get_size(window_id);
 		}
-		// Always check size because WM or embedded window can mess with window set_size
-		size = DisplayServer::get_singleton()->window_get_size(window_id);
 	}
 
 	//update the viewport

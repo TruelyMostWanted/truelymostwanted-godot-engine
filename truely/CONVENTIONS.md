@@ -93,6 +93,10 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 - Datentypen erben von `Resource` und werden mit `GDREGISTER_CLASS` registriert. Damit lassen sie sich im Inspector anlegen und speichern.
 - Gespeicherte Properties haben `PROPERTY_USAGE_STORAGE`. Die Namen sind die späteren Schlüssel in JSON, INI und CSV.
 
+### 1.5 Glossar
+
+- Neue Begriffe (Klassen, Server, Workflow-Begriffe) bekommen im selben Issue einen Eintrag in [`GLOSSARY.md`](../GLOSSARY.md) und, wenn es ein Feature-Bereich ist, eine Zeile im Datei-Index.
+
 ---
 
 ## 2. Branches

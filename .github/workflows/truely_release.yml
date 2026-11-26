@@ -4,9 +4,12 @@ name: 📦 Truely Release
 # Starts by itself after a green "🔗 GHA" run on the release branch truely-godot-engine-releases
 # (fast-forwarded from truely-godot-engine by truely/release.ps1), built from the exact commit that
 # run tested, but only if files other than Markdown and .agents/ changed since the last release tag
-# (truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
-# Names: Truely_Godot<version>-<status>_<hash>_<platform>, tag truely-godot<version>-<status>-<hash>.
-# The status of the Godot base (e.g. beta5) comes from truely/godot-status.txt.
+# (truely-v* or the older truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
+# Names: Truely-v<truely>_Godot<godot>-<status>_<hash>_<platform>, tag truely-v<truely>-godot<godot>-<status>,
+# e.g. Truely-v0.1.0_Godot4.8-beta5_f031fd0_win64.zip and tag truely-v0.1.0-godot4.8-beta5.
+# The Truely version (SemVer) comes from truely/version.txt, the status of the Godot base (e.g. beta5)
+# from truely/godot-status.txt. A tag that already exists on another commit stops the release: raise
+# truely/version.txt first. Releases before #265 keep their names (Truely_Godot..., truely-godot...).
 on:
   workflow_run:
     workflows: ["🔗 GHA"]
@@ -45,6 +48,7 @@ jobs:
     outputs:
       release: ${{ steps.check.outputs.release }}
       status: ${{ steps.names.outputs.status }}
+      truely: ${{ steps.names.outputs.truely }}
       config: ${{ steps.names.outputs.config }}
       name: ${{ steps.names.outputs.name }}
       tag: ${{ steps.names.outputs.tag }}
@@ -62,12 +66,12 @@ jobs:
         id: check
         run: |
           prev=""
-          for t in $(git tag --merged "$SHA" --sort=-committerdate --list 'truely-godot*'); do
+          for t in $(git tag --merged "$SHA" --sort=-committerdate --list 'truely-v*' 'truely-godot*'); do
             if [ "$(git rev-parse "$t^{commit}")" != "$SHA" ]; then prev="$t"; break; fi
           done
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             release=true
-          elif [ -n "$(git tag --points-at "$SHA" --list 'truely-godot*')" ]; then
+          elif [ -n "$(git tag --points-at "$SHA" --list 'truely-v*' 'truely-godot*')" ]; then
             echo "$SHA is already released."
             release=false
           elif [ -z "$prev" ]; then
@@ -88,9 +92,12 @@ jobs:
         id: names
         run: |
           python3 - <<'EOF'
-          import os, re, runpy
+          import os, re, runpy, sys
           v = runpy.run_path("version.py")
           status = open("truely/godot-status.txt", encoding="utf-8").read().strip()
+          truely = open("truely/version.txt", encoding="utf-8").read().strip()
+          if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", truely):
+              sys.exit(f"::error::truely/version.txt holds '{truely}', expected MAJOR.MINOR.PATCH.")
           number = f"{v['major']}.{v['minor']}" + (f".{v['patch']}" if v["patch"] else "")
           sha = os.environ["SHA"][:7]
           base = f"{number}-{status}"
@@ -98,16 +105,32 @@ jobs:
           pretty = f"{number} {m.group(1)} {m.group(2)}".strip() if m else f"{number} {status}"
           out = {
               "status": status,
+              "truely": truely,
               "config": f"{number}.{status}",
-              "name": f"Truely_Godot{base}_{sha}",
-              "tag": f"truely-godot{base}-{sha}",
-              "title": f"Truely (Godot {pretty}, {sha})",
+              "name": f"Truely-v{truely}_Godot{base}_{sha}",
+              "tag": f"truely-v{truely}-godot{base}",
+              "title": f"Truely v{truely} (Godot {pretty}, {sha})",
           }
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               for key, value in out.items():
                   print(f"{key}={value}", file=f)
                   print(f"{key}={value}")
           EOF
+
+      # One release per Truely version: the tag has no hash, so an existing tag on another commit
+      # means truely/version.txt was not raised. Stop instead of overwriting or skipping silently.
+      - name: Check that the version is new
+        if: steps.check.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.names.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            tagged="$(git rev-parse "$TAG^{commit}")"
+            if [ "$tagged" != "$SHA" ]; then
+              echo "::error::Tag $TAG already exists on ${tagged:0:7}. Raise truely/version.txt (MINOR for features, PATCH for fixes) and release again."
+              exit 1
+            fi
+          fi
 
   linux:
     name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
@@ -335,6 +358,7 @@ jobs:
     env:
       NAME: ${{ needs.setup.outputs.name }}
       CONFIG: ${{ needs.setup.outputs.config }}
+      TRUELY: ${{ needs.setup.outputs.truely }}
       TAG: ${{ needs.setup.outputs.tag }}
       TITLE: ${{ needs.setup.outputs.title }}
       GH_TOKEN: ${{ github.token }}
@@ -359,6 +383,9 @@ jobs:
           actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --version | tail -n 1)"
           echo "expected $expected, got $actual"
           [ "$actual" = "$expected" ]
+          actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --truely-version | tail -n 1)"
+          echo "expected Truely $TRUELY, got $actual"
+          [ "$actual" = "$TRUELY" ]
 
       - name: Package
         run: bash .github/truely/package-release.sh artifacts release "$NAME" "$CONFIG"
