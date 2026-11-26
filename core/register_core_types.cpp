@@ -75,6 +75,7 @@
 #include "core/io/resource_error_capture.h"
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_format_pck.h"
+#include "core/io/resource_format_text_data.h"
 #include "core/io/resource_format_text_tree.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
@@ -87,6 +88,7 @@
 #include "core/io/stream_peer_tls.h"
 #include "core/io/streaming_assets_server.h"
 #include "core/io/tcp_server.h"
+#include "core/io/text_data_format.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/uds_server.h"
@@ -135,6 +137,12 @@ static Ref<ResourceFormatLoaderResourceCSV> resource_loader_resource_csv;
 static Ref<ResourceFormatSaverResourceCSV> resource_saver_resource_csv;
 static Ref<ResourceFormatLoaderResourceXML> resource_loader_resource_xml;
 static Ref<ResourceFormatSaverResourceXML> resource_saver_resource_xml;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_ini;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_ini;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_csv;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_csv;
+static Ref<ResourceFormatLoaderTextData> resource_loader_text_data_xml;
+static Ref<ResourceFormatSaverTextData> resource_saver_text_data_xml;
 static Ref<ResourceFormatLoaderPck> resource_loader_pck;
 static Ref<ResourceFormatSaverPck> resource_saver_pck;
 static ResourceTextSerializer *_resource_text_serializer = nullptr;
@@ -323,6 +331,20 @@ void register_core_types() {
 	resource_saver_resource_xml.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
+	// Plain data files (no type marker) as INI, CSV and XML resources, after the text-tree loaders above.
+	resource_loader_text_data_ini.instantiate("INI", Vector<String>{ "ini" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_ini);
+	resource_saver_text_data_ini.instantiate("INI");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_ini);
+	resource_loader_text_data_csv.instantiate("CSV", Vector<String>{ "csv" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_csv);
+	resource_saver_text_data_csv.instantiate("CSV");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_csv);
+	resource_loader_text_data_xml.instantiate("XML", Vector<String>{ "xml" });
+	ResourceLoader::add_resource_format_loader(resource_loader_text_data_xml);
+	resource_saver_text_data_xml.instantiate("XML");
+	ResourceSaver::add_resource_format_saver(resource_saver_text_data_xml);
+
 	// `.pck` files as `PCKPackage` resources: loading opens a pack without mounting it, saving builds one.
 	resource_loader_pck.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_pck);
@@ -346,6 +368,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(XMLParser);
 	GDREGISTER_CLASS(XMLWriter);
 	GDREGISTER_CLASS(JSON);
+	GDREGISTER_ABSTRACT_CLASS(TextDataFormat);
+	GDREGISTER_CLASS(XMLElement);
 	GDREGISTER_CLASS(XML);
 	GDREGISTER_CLASS(INI);
 	GDREGISTER_CLASS(CSV);
@@ -615,6 +639,18 @@ void unregister_core_types() {
 	resource_saver_resource_csv.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_resource_xml);
 	resource_loader_resource_xml.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_ini);
+	resource_loader_text_data_ini.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_ini);
+	resource_saver_text_data_ini.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_csv);
+	resource_loader_text_data_csv.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_csv);
+	resource_saver_text_data_csv.unref();
+	ResourceLoader::remove_resource_format_loader(resource_loader_text_data_xml);
+	resource_loader_text_data_xml.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_text_data_xml);
+	resource_saver_text_data_xml.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_resource_xml);
 	resource_saver_resource_xml.unref();
 	ResourceLoader::remove_resource_format_loader(resource_loader_pck);

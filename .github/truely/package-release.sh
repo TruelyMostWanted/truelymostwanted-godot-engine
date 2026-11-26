@@ -4,7 +4,7 @@
 # Usage: .github/truely/package-release.sh <artifacts-dir> <out-dir> <name> <config>
 #   artifacts-dir  bin/ files of all build jobs (godot.<platform>.<target>...) and
 #                  <platform>/GodotSharp/ for linuxbsd, windows and macos
-#   name           e.g. Truely_Godot4.8-beta5_a1b2c3d
+#   name           e.g. Truely-v0.1.0_Godot4.8-beta5_a1b2c3d
 #   config         version.txt of the standard templates, e.g. 4.8.beta5 (Mono gets ".mono")
 #
 # Editor zips hold one folder with the editor and ._sc_ (self-contained mode).

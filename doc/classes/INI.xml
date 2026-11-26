@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="INI" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="INI" inherits="TextDataFormat" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Reads and writes INI text as dictionaries, and any [Resource] as INI.
 	</brief_description>
 	<description>
-		[INI] converts INI text to a [Dictionary] and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
+		[INI] converts INI text to a [Dictionary] and back, and offers the [ConfigFile] API ([method set_value], [method get_value], [method get_sections], ...) on the same data. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
 		The data is a [Dictionary] of sections: each section name maps to a [Dictionary] of keys and values. Keys before the first [code][section][/code] header belong to the section [code]""[/code] and are written first, without a header. Lines starting with [code];[/code] or [code]#[/code] are comments. A section that appears twice is merged.
-		Values are written in Godot's [Variant] syntax, like [ConfigFile]: strings are quoted, numbers, [code]true[/code]/[code]false[/code] and [code]null[/code] are plain, other types use their constructor ([code]Vector2(1, 2)[/code]). With [member SerializerOptions.ini_plain_values], values are plain text that other tools can read. Reading understands both forms; text that is neither a number, a boolean, [code]null[/code] nor Godot syntax is a [String].
+		Values are written in Godot's [Variant] syntax, like [ConfigFile]: strings are quoted, numbers, [code]true[/code]/[code]false[/code] and [code]null[/code] are plain, other types use their constructor ([code]Vector2(1, 2)[/code]). With [member SerializerOptions.ini_value_style], values are plain text that other tools can read. Reading understands both forms; text that is neither a number, a boolean, [code]null[/code] nor Godot syntax is a [String].
 		[codeblocks]
 		[gdscript]
 		var ini = INI.new()
@@ -39,6 +39,33 @@
 		GD.Print(Ini.Stringify(new Godot.Collections.Dictionary { { "audio", audio } }));
 		[/csharp]
 		[/codeblocks]
+		[b]Resource and files:[/b] [INI] is a [Resource] (see [TextDataFormat]). [code]load("res://x.ini")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_section] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
+		[b]ConfigFile and INI:[/b] the file extension [code].cfg[/code] is not claimed by [INI]; it stays with [ConfigFile]. [method set_value] with a [code]null[/code] value erases the key, and an emptied section is erased with it, like [ConfigFile]. Use [method to_config_file] and [method from_config_file] to convert between the two classes.
+		[codeblocks]
+		[gdscript]
+		var ini = INI.new()
+		ini.set_value("video", "vsync", true)
+		ini.set_value("video", "size", Vector2i(1280, 720))
+		ini.save("user://settings.ini")
+
+		var loaded = INI.new()
+		if loaded.load("user://settings.ini") == OK:
+			print(loaded.get_value("video", "vsync", false)) # Prints true
+		[/gdscript]
+		[csharp]
+		var ini = new Ini();
+		ini.SetValue("video", "vsync", true);
+		ini.SetValue("video", "size", new Vector2I(1280, 720));
+		ini.Save("user://settings.ini");
+
+		var loaded = new Ini();
+		if (loaded.Load("user://settings.ini") == Error.Ok)
+		{
+			GD.Print(loaded.GetValue("video", "vsync", false)); // Prints true
+		}
+		[/csharp]
+		[/codeblocks]
 		[b]Note:[/b] The static methods can be called from any thread. An [INI] instance should be used by one thread at a time.
 	</description>
 	<tutorials>
@@ -53,36 +80,102 @@
 				Creates a [Resource] from INI [param text] written by [method serialize]. The class comes from the key [code]$type[/code] of the section [code][root][/code], or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_INI, type_hint, options)[/code].
 			</description>
 		</method>
-		<method name="get_data" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="erase_section">
+			<return type="void" />
+			<param index="0" name="section" type="String" />
 			<description>
-				Returns the sections read by the last successful call to [method parse], or an empty [Dictionary].
+				Erases the section [param section] with all its keys. Does nothing if it does not exist. Drops the kept parsed text.
 			</description>
 		</method>
-		<method name="get_error_line" qualifiers="const">
-			<return type="int" />
+		<method name="erase_section_key">
+			<return type="void" />
+			<param index="0" name="section" type="String" />
+			<param index="1" name="key" type="String" />
 			<description>
-				Returns the 1-based line of the error of the last call to [method parse], or [code]0[/code] if it succeeded.
+				Erases the key [param key] of the section [param section]. The section is erased too if it is empty afterwards. Does nothing if the key does not exist. Drops the kept parsed text.
 			</description>
 		</method>
-		<method name="get_error_message" qualifiers="const">
-			<return type="String" />
-			<description>
-				Returns the error message of the last call to [method parse], or an empty [String] if it succeeded. The message starts with the position, for example [code]Line 2: ...[/code].
-			</description>
-		</method>
-		<method name="parse">
+		<method name="from_config_file">
 			<return type="int" enum="Error" />
-			<param index="0" name="text" type="String" />
+			<param index="0" name="config" type="ConfigFile" />
 			<description>
-				Parses the INI [param text]. Returns [constant OK] and stores the sections for [method get_data], or [constant ERR_PARSE_ERROR] and stores the error for [method get_error_line] and [method get_error_message]. Errors are a section header without [code]][/code] and a line that is neither a comment, a header nor [code]key=value[/code].
+				Replaces the data with the sections and keys of [param config]. Returns [constant OK], or an error code if [param config] is [code]null[/code]. Drops the kept parsed text. The [ConfigFile] is not changed.
+			</description>
+		</method>
+		<method name="get_section_keys" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="section" type="String" />
+			<description>
+				Returns the keys of the section [param section] in file order, or an empty array if the section does not exist.
+			</description>
+		</method>
+		<method name="get_sections" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of all sections in file order. The section [code]""[/code] for keys before the first header is included if it has keys.
+			</description>
+		</method>
+		<method name="get_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="section" type="String" />
+			<param index="1" name="key" type="String" />
+			<param index="2" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value of [param key] in [param section], or [param default] if the section or key does not exist. Like [method ConfigFile.get_value], it prints an error if it does not exist and [param default] is [code]null[/code].
+			</description>
+		</method>
+		<method name="has_section" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="section" type="String" />
+			<description>
+				Returns [code]true[/code] if the section [param section] exists.
+			</description>
+		</method>
+		<method name="has_section_key" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="section" type="String" />
+			<param index="1" name="key" type="String" />
+			<description>
+				Returns [code]true[/code] if the section [param section] has the key [param key].
+			</description>
+		</method>
+		<method name="load_encrypted">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="key" type="PackedByteArray" />
+			<description>
+				Loads the encrypted INI file at [param path], using the 256-bit AES [param key] it was saved with by [method save_encrypted]. Works like [method ConfigFile.load_encrypted]. Returns [constant OK] or an error code.
+			</description>
+		</method>
+		<method name="load_encrypted_pass">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="password" type="String" />
+			<description>
+				Loads the encrypted INI file at [param path], using the [param password] it was saved with by [method save_encrypted_pass]. Works like [method ConfigFile.load_encrypted_pass]. Returns [constant OK] or an error code.
 			</description>
 		</method>
 		<method name="parse_string" qualifiers="static">
 			<return type="Dictionary" />
 			<param index="0" name="text" type="String" />
 			<description>
-				Parses the INI [param text] and returns its sections. Returns an empty [Dictionary] and prints the error if the text can't be read. Use [method parse] for the error details.
+				Parses the INI [param text] and returns its sections. Returns an empty [Dictionary] and prints the error if the text can't be read. Use [method TextDataFormat.parse] for the error details.
+			</description>
+		</method>
+		<method name="save_encrypted">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="key" type="PackedByteArray" />
+			<description>
+				Saves the data as an encrypted file at [param path], using the 256-bit AES [param key]. Works like [method ConfigFile.save_encrypted]. Returns [constant OK] or an error code. Save to [code]user://[/code] in exported games.
+			</description>
+		</method>
+		<method name="save_encrypted_pass">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="password" type="String" />
+			<description>
+				Saves the data as an encrypted file at [param path], using the [param password]. Works like [method ConfigFile.save_encrypted_pass]. Returns [constant OK] or an error code. Save to [code]user://[/code] in exported games.
 			</description>
 		</method>
 		<method name="serialize" qualifiers="static">
@@ -93,12 +186,27 @@
 				Returns [param resource] as INI text: one section per resource ([code][root][/code], [code][root/main][/code], [code][root/entries/0][/code]) with one key per stored property, and the type marker [code]$type[/code]. [code]null[/code] [param options] uses the project settings [code]filesystem/resources/text_formats/*[/code]. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_INI, options)[/code].
 			</description>
 		</method>
+		<method name="set_value">
+			<return type="void" />
+			<param index="0" name="section" type="String" />
+			<param index="1" name="key" type="String" />
+			<param index="2" name="value" type="Variant" />
+			<description>
+				Sets the value of [param key] in [param section]; the section is created if needed. A [code]null[/code] [param value] erases the key, and the section if it is empty afterwards, like [method ConfigFile.set_value]. Drops the kept parsed text.
+			</description>
+		</method>
 		<method name="stringify" qualifiers="static">
 			<return type="String" />
 			<param index="0" name="data" type="Dictionary" />
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Writes the sections in [param data] as INI text. Every value of [param data] must be a [Dictionary] of keys; the section [code]""[/code] is written first, without a header. [param options] sets the value syntax ([member SerializerOptions.ini_plain_values]) and the order of sections and keys ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Returns an empty [String] and prints an error if a section is not a [Dictionary], a section name contains [code]][/code] or a line break, or a key is empty.
+				Writes the sections in [param data] as INI text. Every value of [param data] must be a [Dictionary] of keys; the section [code]""[/code] is written first, without a header. [param options] sets the value syntax ([member SerializerOptions.ini_value_style]) and the order of sections and keys ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Returns an empty [String] and prints an error if a section is not a [Dictionary], a section name contains [code]][/code] or a line break, or a key is empty.
+			</description>
+		</method>
+		<method name="to_config_file" qualifiers="const">
+			<return type="ConfigFile" />
+			<description>
+				Returns a new [ConfigFile] with the sections and keys of this [INI]. Changes to the [ConfigFile] do not change this instance.
 			</description>
 		</method>
 	</methods>
