@@ -120,7 +120,7 @@ TEST_CASE("[SubtitlePlayback] Update reports skipped segments, seek does not") {
 	playback->set_subtitle(make_subtitle());
 
 	playback->update(0.5);
-	log->take();
+	(void)log->take();
 	playback->update(10.0); // A long frame jumps over B and C.
 	CHECK(log->take() == "-A +B -B +C -C =");
 
