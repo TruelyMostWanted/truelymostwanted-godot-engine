@@ -134,6 +134,25 @@ TEST_CASE("[TextLocalizationServer] Layers, chain, context and fallback") {
 	CHECK(server->translate_for_locale("de", "HELLO") == "Hallo");
 }
 
+TEST_CASE("[TextLocalizationServer] Locale hook after the translation remaps are cleared") {
+	ServerState state;
+	TextLocalizationServer *server = state.server;
+	server->add_catalog(make_game_catalog());
+	LocalizationServer::set_locale("en");
+	CHECK(server->translate("HELLO") == "Hello");
+
+	// What EditorNode does on startup: the hook is dropped, a locale change no longer reaches the server.
+	ResourceLoader::clear_translation_remaps();
+	LocalizationServer::set_locale("de");
+	CHECK(server->translate("HELLO") == "Hello");
+
+	// The editor init callback: registered again and caught up with the active locale.
+	LocalizationServer::restore_locale_hooks();
+	CHECK(server->translate("HELLO") == "Hallo");
+	LocalizationServer::set_locale("en");
+	CHECK(server->translate("HELLO") == "Hello");
+}
+
 TEST_CASE("[TextLocalizationServer] Key ids, plurals and arguments") {
 	ServerState state;
 	TextLocalizationServer *server = state.server;

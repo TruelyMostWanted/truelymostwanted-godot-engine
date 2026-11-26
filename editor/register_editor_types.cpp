@@ -36,6 +36,7 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
+#include "core/string/localization_server.h"
 #include "editor/animation/animation_tree_editor_plugin.h"
 #include "editor/audio/audio_stream_randomizer_editor_plugin.h"
 #include "editor/data/csv_table_editor.h"
@@ -355,6 +356,9 @@ void register_editor_types() {
 	// Required as GDExtensions can register docs at init time way before this
 	// class is actually instantiated.
 	EditorHelp::init_gdext_pointers();
+
+	// EditorNode clears the translation remaps, which drops the locale hooks of the localization servers.
+	EditorNode::add_init_callback(&LocalizationServer::restore_locale_hooks);
 
 	OS::get_singleton()->benchmark_end_measure("Editor", "Register Types");
 }

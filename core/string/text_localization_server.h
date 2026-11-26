@@ -101,6 +101,7 @@ public:
 	StringName get_message(const StringName &p_key, const StringName &p_context) const;
 	StringName get_plural_message(const StringName &p_key, int p_count, const StringName &p_context) const;
 	void get_message_list(List<StringName> *r_messages) const;
+	bool is_adapter(const Ref<Translation> &p_translation) const { return p_translation == adapter; }
 
 	TextLocalizationServer();
 	~TextLocalizationServer();

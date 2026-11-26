@@ -57,7 +57,7 @@
 		<method name="get_available_locales" qualifiers="static">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the locales of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
+				Returns the locales of the localization catalogs (see [method LocalizationServer.get_available_locales]) and of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
 			</description>
 		</method>
 		<method name="get_command_line_locale" qualifiers="static">
