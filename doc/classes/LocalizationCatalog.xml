@@ -122,12 +122,6 @@
 				Returns the translator note of [param key] in the note [param column] (the name without the leading [code]_[/code]: [code]"notes"[/code] for a [code]_notes[/code] column), or an empty string. Notes are never used to look up texts.
 			</description>
 		</method>
-		<method name="get_note_columns" qualifiers="const">
-			<return type="PackedStringArray" />
-			<description>
-				Returns the names of the note columns without the leading [code]_[/code], in the order they were read or added, for example [code]["notes", "max_length"][/code].
-			</description>
-		</method>
 		<method name="get_translated_count" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="locale" type="String" />
@@ -297,7 +291,7 @@
 			The locales of the catalog, in column order, loaded or not.
 		</member>
 		<member name="note_columns" type="PackedStringArray" setter="" getter="get_note_columns" default="PackedStringArray()">
-			The names of the translator note columns, see [method get_note_columns].
+			The names of the translator note columns, without the leading [code]_[/code], in the order they were read or added, for example [code]["notes", "max_length"][/code].
 		</member>
 	</members>
 	<signals>
