@@ -34,6 +34,7 @@
 #include "core/io/resource_saver.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/translation_server.h"
+#include "core/templates/hash_set.h"
 
 String ResourceImporterCSVTranslation::get_importer_name() const {
 	return "csv_translation";
@@ -97,6 +98,20 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 	int plural_column = -1;
 	{
 		const Vector<String> line = f->get_csv_line(delimiter);
+
+		// Header problems are collected and reported once per file, not once per column.
+		// A column whose language code is unknown is still imported as a locale (custom locales),
+		// unless no column has a known language code: then the file is most likely a data CSV.
+		HashSet<String> known_languages;
+		for (const String &language : TranslationServer::get_singleton()->get_all_languages()) {
+			known_languages.insert(language);
+		}
+		HashMap<int, String> locale_columns;
+		Vector<String> invalid_columns; // Not a locale at all (e.g. an empty header cell).
+		Vector<String> unknown_columns; // A locale whose language code is not known.
+		Vector<String> not_known_columns; // Both of the above, in column order.
+		bool has_known_language = false;
+
 		for (int i = 1; i < line.size(); i++) {
 			if (line[i].left(1) == "_") {
 				continue;
@@ -112,18 +127,43 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 				continue;
 			}
 
+			const String column_desc = vformat("'%s' (column %d)", line[i], i + 1);
 			const String locale = TranslationServer::get_singleton()->standardize_locale(line[i]);
-			ERR_CONTINUE_MSG(locale.is_empty(), vformat("Error importing CSV translation: Invalid locale format '%s', should be 'language_Script_COUNTRY_VARIANT@extra'. This column will be ignored.", line[i]));
-
-			Ref<Translation> translation;
-			translation.instantiate();
-			translation->set_locale(locale);
-			column_to_translation[i] = translation;
+			if (locale.is_empty()) {
+				invalid_columns.push_back(column_desc);
+				not_known_columns.push_back(column_desc);
+				continue;
+			}
+			if (known_languages.has(locale.get_slicec('_', 0))) {
+				has_known_language = true;
+			} else {
+				unknown_columns.push_back(column_desc);
+				not_known_columns.push_back(column_desc);
+			}
+			locale_columns[i] = locale;
 		}
 
-		if (column_to_translation.is_empty()) {
-			WARN_PRINT(vformat("CSV file '%s' does not contain any translation.", p_source_file));
+		if (!has_known_language) {
+			if (not_known_columns.is_empty()) {
+				WARN_PRINT(vformat("CSV file '%s' does not contain any translation.", p_source_file));
+			} else {
+				WARN_PRINT(vformat("CSV file '%s' was not imported as a translation: no column of its header row starts with a known language code (%s). If the file holds data, select \"Keep File (exported as is)\" as its import mode in the Import dock. If it is a translation table, name each column after a locale such as 'en' or 'pt_BR'.", p_source_file, String(", ").join(not_known_columns)));
+			}
 			return OK;
+		}
+
+		if (!invalid_columns.is_empty()) {
+			ERR_PRINT(vformat("Error importing CSV translation '%s': Invalid locale format in %s, should be 'language_Script_COUNTRY_VARIANT@extra'. These columns will be ignored.", p_source_file, String(", ").join(invalid_columns)));
+		}
+		if (!unknown_columns.is_empty()) {
+			WARN_PRINT(vformat("CSV translation '%s': Unknown language code in %s. These columns are imported as locales anyway. Prefix a column name with '_' to ignore the column.", p_source_file, String(", ").join(unknown_columns)));
+		}
+
+		for (const KeyValue<int, String> &E : locale_columns) {
+			Ref<Translation> translation;
+			translation.instantiate();
+			translation->set_locale(E.value);
+			column_to_translation[E.key] = translation;
 		}
 	}
 

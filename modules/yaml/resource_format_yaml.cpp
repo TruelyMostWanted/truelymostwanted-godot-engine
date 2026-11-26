@@ -39,7 +39,7 @@ Error ResourceFormatLoaderResourceYAML::_parse_text(const String &p_text, const 
 }
 
 String ResourceFormatLoaderResourceYAML::_get_marker_type(const String &p_text) const {
-	return YAML::get_marker_type(p_text);
+	return _scan_key_marker(p_text);
 }
 
 Error ResourceFormatSaverResourceYAML::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {

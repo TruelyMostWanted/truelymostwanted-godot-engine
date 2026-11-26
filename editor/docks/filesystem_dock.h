@@ -37,6 +37,7 @@
 #include "editor/script/script_create_dialog.h"
 #include "editor/script/script_editor_plugin.h"
 #include "scene/gui/box_container.h"
+#include "scene/gui/color_picker.h"
 #include "scene/gui/control.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/item_list.h"
@@ -149,6 +150,9 @@ private:
 	};
 
 	HashMap<String, TreeItem *> folder_map;
+	static constexpr const char *FOLDER_COLOR_CUSTOM = "custom";
+	static constexpr int MAX_RECENT_FOLDER_COLORS = 8;
+
 	HashMap<String, Color> folder_colors;
 	Dictionary assigned_folder_colors;
 
@@ -212,6 +216,9 @@ private:
 
 	ConfirmationDialog *conversion_dialog = nullptr;
 	ConfirmationDialog *move_confirm_dialog = nullptr;
+	ConfirmationDialog *folder_color_dialog = nullptr;
+	ColorPicker *folder_color_picker = nullptr;
+	Vector<String> folder_color_targets;
 	CheckBox *confirm_before_move_checkbox = nullptr;
 	Label *move_confirm_dialog_label = nullptr;
 
@@ -362,6 +369,9 @@ private:
 	void _file_sort_popup(int p_id);
 
 	void _folder_color_index_pressed(int p_index, PopupMenu *p_menu);
+	void _folder_color_dialog_confirmed();
+	void _set_folder_color(const Vector<String> &p_paths, const Variant &p_color_value);
+	Vector<String> _get_selected_paths_for_folder_color() const;
 	void _file_and_folders_fill_popup(PopupMenu *p_popup, const Vector<String> &p_paths, bool p_display_path_dependent_options = true, bool p_show_expand_options = true);
 	void _add_create_options(PopupMenu *p_popup, const String &p_base_folder);
 	void _tree_rmb_select(const Vector2 &p_pos, MouseButton p_button);
@@ -422,6 +432,8 @@ public:
 	static constexpr double ITEM_ALPHA_MAX = 0.15;
 	static constexpr double ITEM_BG_DARK_SCALE = 0.3;
 
+	// A stored folder color is either a name from `folder_colors` or an HTML color (`#rrggbb`).
+	static Color resolve_folder_color(const HashMap<String, Color> &p_named_colors, const String &p_value, const Color &p_default);
 	static Color get_dir_icon_color(const String &p_dir_path, const Color &p_default);
 	const LocalVector<StringName> &get_path_project_settings() const { return path_project_settings; }
 
