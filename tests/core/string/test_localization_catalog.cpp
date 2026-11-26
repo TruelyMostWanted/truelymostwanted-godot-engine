@@ -523,6 +523,19 @@ TEST_CASE("[LocalizationCatalog] CSV delimiters and serializer options") {
 	CHECK(format->get_options() == options);
 }
 
+TEST_CASE("[LocalizationCatalog] ResourceSaver writes catalogs in their text format") {
+	// The editor saves catalogs through ResourceSaver: not the generic resource JSON of the text resource savers.
+	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
+	const String path = TestUtils::get_temp_path("saved_catalog.json");
+	REQUIRE(ResourceSaver::save(catalog, path) == OK);
+	Ref<TextLocalizationCatalog> copy;
+	copy.instantiate();
+	REQUIRE(copy->load_from_file(path) == OK);
+	CHECK(copy->get_plural_text("APPLE", "de", 5) == String(U"%d Äpfel"));
+	CHECK(copy->get_note("HELLO") == "greeting");
+	DirAccess::remove_absolute(path);
+}
+
 TEST_CASE("[LocalizationCatalog] POT and PO files") {
 	Ref<TextLocalizationCatalog> catalog = make_text_catalog();
 	const String pot = catalog->to_po();
