@@ -6,7 +6,7 @@
 	<description>
 		[INI] converts INI text to a [Dictionary] and back, with the same API as [JSON] and [TOML]: [method parse] (with error details), [method parse_string] and [method stringify] for data, [method serialize] and [method deserialize] for resources.
 		The data is a [Dictionary] of sections: each section name maps to a [Dictionary] of keys and values. Keys before the first [code][section][/code] header belong to the section [code]""[/code] and are written first, without a header. Lines starting with [code];[/code] or [code]#[/code] are comments. A section that appears twice is merged.
-		Values are written in Godot's [Variant] syntax, like [ConfigFile]: strings are quoted, numbers, [code]true[/code]/[code]false[/code] and [code]null[/code] are plain, other types use their constructor ([code]Vector2(1, 2)[/code]). With [member SerializerOptions.ini_plain_values], values are plain text that other tools can read. Reading understands both forms; text that is neither a number, a boolean, [code]null[/code] nor Godot syntax is a [String].
+		Values are written in Godot's [Variant] syntax, like [ConfigFile]: strings are quoted, numbers, [code]true[/code]/[code]false[/code] and [code]null[/code] are plain, other types use their constructor ([code]Vector2(1, 2)[/code]). With [member SerializerOptions.ini_value_style], values are plain text that other tools can read. Reading understands both forms; text that is neither a number, a boolean, [code]null[/code] nor Godot syntax is a [String].
 		[codeblocks]
 		[gdscript]
 		var ini = INI.new()
@@ -98,7 +98,7 @@
 			<param index="0" name="data" type="Dictionary" />
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Writes the sections in [param data] as INI text. Every value of [param data] must be a [Dictionary] of keys; the section [code]""[/code] is written first, without a header. [param options] sets the value syntax ([member SerializerOptions.ini_plain_values]) and the order of sections and keys ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Returns an empty [String] and prints an error if a section is not a [Dictionary], a section name contains [code]][/code] or a line break, or a key is empty.
+				Writes the sections in [param data] as INI text. Every value of [param data] must be a [Dictionary] of keys; the section [code]""[/code] is written first, without a header. [param options] sets the value syntax ([member SerializerOptions.ini_value_style]) and the order of sections and keys ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Returns an empty [String] and prints an error if a section is not a [Dictionary], a section name contains [code]][/code] or a line break, or a key is empty.
 			</description>
 		</method>
 	</methods>

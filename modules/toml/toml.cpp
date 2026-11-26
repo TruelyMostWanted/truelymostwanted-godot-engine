@@ -1302,9 +1302,142 @@ Error TOML::parse_resource(const String &p_text, const String &p_type_hint, Ref<
 	return ResourceTextSerializer::decode_resource(tree, hint, r_resource, r_error);
 }
 
-Error TOML::parse(const String &p_text) {
-	const Error err = parse_text(p_text, data, error_message, error_line, error_column);
+Error TOML::_parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) {
+	Dictionary parsed;
+	const Error err = parse_text(p_text, parsed, r_error, r_line, r_column);
+	r_data = parsed;
 	return err;
+}
+
+Error TOML::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const {
+	return write_text(p_data, r_text, r_error);
+}
+
+Vector<String> TOML::split_table_path(const String &p_path) {
+	Vector<String> parts;
+	if (p_path.is_empty()) {
+		return parts;
+	}
+	String current;
+	for (int i = 0; i < p_path.length(); i++) {
+		const char32_t c = p_path[i];
+		if (c == '\\' && i + 1 < p_path.length()) {
+			current += p_path[i + 1];
+			i++;
+		} else if (c == '.') {
+			parts.push_back(current);
+			current = String();
+		} else {
+			current += c;
+		}
+	}
+	parts.push_back(current);
+	return parts;
+}
+
+String TOML::escape_table_name(const String &p_name) {
+	return p_name.replace("\\", "\\\\").replace(".", "\\.");
+}
+
+bool TOML::_resolve_table(Dictionary p_root, const String &p_path, bool p_create, Dictionary &r_table) {
+	Dictionary table = p_root;
+	for (const String &part : split_table_path(p_path)) {
+		Variant next = table.get(part, Variant());
+		if (next.get_type() != Variant::DICTIONARY) {
+			if (!p_create || next.get_type() != Variant::NIL) {
+				return false;
+			}
+			next = Dictionary();
+			table[part] = next;
+		}
+		table = next;
+	}
+	r_table = table;
+	return true;
+}
+
+void TOML::_collect_tables(const Dictionary &p_table, const String &p_prefix, PackedStringArray &r_paths) {
+	for (const KeyValue<Variant, Variant> &kv : p_table) {
+		if (kv.value.get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		const String path = p_prefix.is_empty() ? escape_table_name(kv.key) : p_prefix + "." + escape_table_name(kv.key);
+		r_paths.push_back(path);
+		_collect_tables(kv.value, path, r_paths);
+	}
+}
+
+void TOML::set_value(const String &p_table_path, const String &p_key, const Variant &p_value) {
+	Dictionary table;
+	if (p_value.get_type() == Variant::NIL) {
+		// TOML has no null: null erases the key.
+		if (_resolve_table(get_data(), p_table_path, false, table) && table.erase(p_key)) {
+			_mark_data_changed();
+		}
+		return;
+	}
+	ERR_FAIL_COND_MSG(!_resolve_table(get_data(), p_table_path, true, table), vformat("\"%s\" is not a table path: a part of it is a value.", p_table_path));
+	table[p_key] = p_value;
+	_mark_data_changed();
+}
+
+Variant TOML::get_value(const String &p_table_path, const String &p_key, const Variant &p_default) const {
+	Dictionary table;
+	if (!_resolve_table(get_data(), p_table_path, false, table)) {
+		return p_default;
+	}
+	return table.get(p_key, p_default);
+}
+
+bool TOML::has_table(const String &p_table_path) const {
+	Dictionary table;
+	return _resolve_table(get_data(), p_table_path, false, table);
+}
+
+bool TOML::has_table_key(const String &p_table_path, const String &p_key) const {
+	Dictionary table;
+	return _resolve_table(get_data(), p_table_path, false, table) && table.has(p_key);
+}
+
+PackedStringArray TOML::get_tables() const {
+	PackedStringArray paths;
+	_collect_tables(get_data(), String(), paths);
+	return paths;
+}
+
+PackedStringArray TOML::get_table_keys(const String &p_table_path) const {
+	PackedStringArray keys;
+	Dictionary table;
+	ERR_FAIL_COND_V_MSG(!_resolve_table(get_data(), p_table_path, false, table), keys, vformat("Cannot get keys from nonexistent table \"%s\".", p_table_path));
+	for (const KeyValue<Variant, Variant> &kv : table) {
+		keys.push_back(kv.key);
+	}
+	return keys;
+}
+
+void TOML::erase_table(const String &p_table_path) {
+	const Vector<String> parts = split_table_path(p_table_path);
+	ERR_FAIL_COND_MSG(parts.is_empty(), "The root table can't be erased; use clear() instead.");
+	String parent_path;
+	for (int i = 0; i < parts.size() - 1; i++) {
+		parent_path += (i == 0 ? "" : ".") + escape_table_name(parts[i]);
+	}
+	Dictionary parent;
+	const String &name = parts[parts.size() - 1];
+	ERR_FAIL_COND_MSG(!_resolve_table(get_data(), parent_path, false, parent) || parent.get(name, Variant()).get_type() != Variant::DICTIONARY, vformat("Cannot erase nonexistent table \"%s\".", p_table_path));
+	parent.erase(name);
+	_mark_data_changed();
+}
+
+void TOML::erase_table_key(const String &p_table_path, const String &p_key) {
+	Dictionary table;
+	ERR_FAIL_COND_MSG(!_resolve_table(get_data(), p_table_path, false, table) || !table.has(p_key), vformat("Cannot erase nonexistent key \"%s\" from table \"%s\".", p_key, p_table_path));
+	table.erase(p_key);
+	_mark_data_changed();
+}
+
+TOML::TOML() {
+	_get_data_ref() = Dictionary();
 }
 
 Dictionary TOML::parse_string(const String &p_text) {
@@ -1351,11 +1484,14 @@ Ref<Resource> TOML::deserialize(const String &p_text, const StringName &p_type_h
 }
 
 void TOML::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("parse", "text"), &TOML::parse);
-	ClassDB::bind_method(D_METHOD("get_data"), &TOML::get_data);
-	ClassDB::bind_method(D_METHOD("get_error_message"), &TOML::get_error_message);
-	ClassDB::bind_method(D_METHOD("get_error_line"), &TOML::get_error_line);
-	ClassDB::bind_method(D_METHOD("get_error_column"), &TOML::get_error_column);
+	ClassDB::bind_method(D_METHOD("set_value", "table_path", "key", "value"), &TOML::set_value);
+	ClassDB::bind_method(D_METHOD("get_value", "table_path", "key", "default"), &TOML::get_value, DEFVAL(Variant()));
+	ClassDB::bind_method(D_METHOD("has_table", "table_path"), &TOML::has_table);
+	ClassDB::bind_method(D_METHOD("has_table_key", "table_path", "key"), &TOML::has_table_key);
+	ClassDB::bind_method(D_METHOD("get_tables"), &TOML::get_tables);
+	ClassDB::bind_method(D_METHOD("get_table_keys", "table_path"), &TOML::get_table_keys);
+	ClassDB::bind_method(D_METHOD("erase_table", "table_path"), &TOML::erase_table);
+	ClassDB::bind_method(D_METHOD("erase_table_key", "table_path", "key"), &TOML::erase_table_key);
 
 	ClassDB::bind_static_method("TOML", D_METHOD("parse_string", "text"), &TOML::parse_string);
 	ClassDB::bind_static_method("TOML", D_METHOD("stringify", "data"), &TOML::stringify);

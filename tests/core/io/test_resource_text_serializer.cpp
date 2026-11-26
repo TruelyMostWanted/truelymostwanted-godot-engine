@@ -405,7 +405,7 @@ TEST_CASE("[ResourceTextSerializer] INI round trip") {
 	SUBCASE("Plain values") {
 		Ref<SerializerOptions> plain;
 		plain.instantiate();
-		plain->set_ini_plain_values(true);
+		plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 		const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI, plain);
 		CHECK(text.contains("$type=TextFormatSettings\n"));
 		CHECK(text.contains("quality=High\n"));
@@ -555,7 +555,7 @@ TEST_CASE("[ResourceTextSerializer] Precision of floats and colors") {
 
 	Ref<SerializerOptions> plain;
 	plain.instantiate();
-	plain->set_ini_plain_values(true);
+	plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	const Ref<TextFormatEntry> ini = serializer->deserialize(serializer->serialize(entry, ResourceTextSerializer::FORMAT_INI, plain), ResourceTextSerializer::FORMAT_INI);
 	REQUIRE(ini.is_valid());
 	CHECK(ini->get_speed() == entry->get_speed());
@@ -576,7 +576,7 @@ TEST_CASE("[ResourceTextSerializer] A float that is exactly a 32-bit float is wr
 
 	Ref<SerializerOptions> plain;
 	plain.instantiate();
-	plain->set_ini_plain_values(true);
+	plain->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 	const String ini = serializer->serialize(entry, ResourceTextSerializer::FORMAT_INI, plain);
 	CHECK(ini.contains("0.2\n"));
 	CHECK_FALSE(ini.contains("0.200000"));
@@ -618,7 +618,7 @@ TEST_CASE("[SerializerOptions] Defaults match the project settings") {
 	CHECK_FALSE(options->is_full_precision_floats());
 	CHECK(options->get_csv_delimiter() == ",");
 	CHECK(options->is_csv_headers());
-	CHECK_FALSE(options->is_ini_plain_values());
+	CHECK(options->get_ini_value_style() == SerializerOptions::INI_VALUE_STYLE_GODOT_VARIANT);
 	CHECK(options->is_xml_declaration());
 
 	// null = project settings; new() = class defaults; both give the same text.
@@ -722,8 +722,8 @@ TEST_CASE("[SerializerOptions] Every option changes the output") {
 		check_entry(back->get_entries()[0], "Bob", 1, 0);
 	}
 
-	SUBCASE("ini_plain_values") {
-		options->set_ini_plain_values(true);
+	SUBCASE("ini_value_style") {
+		options->set_ini_value_style(SerializerOptions::INI_VALUE_STYLE_PLAIN);
 		const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_INI, options);
 		CHECK(text.contains("cell=1, -2, 3"));
 		check_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_INI));
