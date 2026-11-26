@@ -40,8 +40,8 @@
 // Settings domain `render_quality` (#21): 3D scaling (mode, scale, FSR sharpness), mesh LOD, anti-aliasing
 // (MSAA 2D/3D, FXAA/SMAA, TAA, debanding), variable rate shading and occlusion culling (RenderQualitySettings).
 // Applied in APPLY_PHASE_SCENE: the root Viewport exists and holds the project values; values set earlier wait.
-// The per-viewport values also go to the viewports passed to add_viewport() and to every Viewport in the group
-// get_viewport_group() when it enters the tree. The two occlusion values are global (RenderingServer).
+// The per-viewport values also go to the viewports passed to add_viewport() and, by viewport_target, to the viewports
+// in the group get_viewport_group() or to every viewport in ViewportServer, also when they enter the tree. The two occlusion values are global (RenderingServer).
 // Values the current renderer, hardware or build ignores are stored, but not pushed (is_value_supported()).
 // Defaults are the project settings. Precedence: player's file > project settings.
 class RenderQualitySettingsServer : public SettingsServer {
@@ -56,6 +56,7 @@ class RenderQualitySettingsServer : public SettingsServer {
 	// Settings whose skipped value was already reported, so the warning is printed once per value.
 	HashSet<StringName> warned;
 	LocalVector<ObjectID> extra_viewports;
+	ViewportTarget viewport_target = VIEWPORT_TARGET_GROUP;
 	bool defaults_captured = false;
 
 	static Variant _get_project_value(const StringName &p_name);
@@ -140,6 +141,8 @@ public:
 	void add_viewport(Viewport *p_viewport);
 	void remove_viewport(Viewport *p_viewport);
 	bool has_viewport(Viewport *p_viewport) const;
+	void set_viewport_target(ViewportTarget p_target);
+	ViewportTarget get_viewport_target() const;
 
 	RenderQualitySettingsServer();
 	~RenderQualitySettingsServer();

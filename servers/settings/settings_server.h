@@ -56,6 +56,8 @@ enum ApplyPhase {
 
 VARIANT_ENUM_CAST_EXT(SettingsServerEnums::ApplyPhase, SettingsServer::ApplyPhase);
 
+class Viewport;
+
 // Base of all settings servers (one engine singleton per domain: audio, language, video, ...).
 // Keeps three copies of the domain's settings resource: the defaults, the applied state and the
 // pending (edited) state. Loads and saves the player's file in `user://settings/`, pushes changed
@@ -80,6 +82,14 @@ public:
 
 	// The finest step of a [float] setting: at most three decimals.
 	static constexpr double FLOAT_STEP = 0.001;
+
+	// The viewports a graphics settings server with per-viewport values gives them to (#251). The root viewport and
+	// the viewports passed to add_viewport() get them with every target.
+	enum ViewportTarget {
+		VIEWPORT_TARGET_ROOT_ONLY,
+		VIEWPORT_TARGET_GROUP, // Also the viewports in the server's group.
+		VIEWPORT_TARGET_ALL_VIEWPORTS, // Also every viewport in ViewportServer.
+	};
 
 	enum SettingFlags {
 		SETTING_FLAG_NONE = 0,
@@ -210,6 +220,13 @@ protected:
 	// Called by load() after the values of the file are set on `p_settings` and validated (ListSettingsServer validates its entries).
 	virtual void _validate_loaded_settings(const Ref<Resource> &p_settings) {}
 
+	// For the graphics settings servers with per-viewport values: the root viewport, the viewports in `r_extra`
+	// (freed ones are removed from it) and, by `p_target`, the viewports in `p_group` or every viewport in
+	// ViewportServer. Each viewport once, the root first.
+	static LocalVector<Viewport *> _get_target_viewports(ViewportTarget p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra);
+	// Whether a viewport that enters the tree is a target by `p_target` alone (not as root or extra viewport).
+	static bool _is_viewport_targeted(ViewportTarget p_target, const StringName &p_group, const Viewport *p_viewport);
+
 public:
 	// Stored values of a settings resource (no `resource_*`, `script` or `metadata/*`).
 	static void get_value_infos(const Object *p_object, LocalVector<PropertyInfo> &r_infos);
@@ -307,4 +324,5 @@ public:
 };
 
 VARIANT_ENUM_CAST(SettingsServer::ApplyMode);
+VARIANT_ENUM_CAST(SettingsServer::ViewportTarget);
 VARIANT_BITFIELD_CAST(SettingsServer::SettingFlags);

@@ -41,6 +41,9 @@
 #include "core/object/class_db.h"
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
+#include "scene/main/scene_tree.h"
+#include "scene/main/viewport_server.h"
+#include "scene/main/window.h"
 #include "servers/settings/settings_server_manager.h"
 
 static constexpr const char *SETTING_GENERAL_FOLDER = "settings/general/folder";
@@ -1422,6 +1425,47 @@ bool SettingsServer::is_started() const {
 /////////////////////////////////////////////////////////////////////////////
 // Bindings.
 
+LocalVector<Viewport *> SettingsServer::_get_target_viewports(ViewportTarget p_target, const StringName &p_group, LocalVector<ObjectID> &r_extra) {
+	LocalVector<Viewport *> targets;
+	SceneTree *tree = SceneTree::get_singleton();
+	if (tree != nullptr && tree->get_root().ptr() != nullptr) {
+		targets.push_back(tree->get_root().ptr());
+	}
+	for (uint32_t i = 0; i < r_extra.size();) {
+		Viewport *viewport = ObjectDB::get_instance<Viewport>(r_extra[i]);
+		if (viewport == nullptr) {
+			r_extra.remove_at_unordered(i); // Freed without remove_viewport().
+			continue;
+		}
+		if (!targets.has(viewport)) {
+			targets.push_back(viewport);
+		}
+		i++;
+	}
+	if (p_target == VIEWPORT_TARGET_ALL_VIEWPORTS) {
+		ViewportServer *viewport_server = ViewportServer::get_singleton();
+		const TypedArray<Viewport> viewports = viewport_server != nullptr ? viewport_server->get_viewports() : TypedArray<Viewport>();
+		for (int i = 0; i < viewports.size(); i++) {
+			Viewport *viewport = Object::cast_to<Viewport>(viewports[i]);
+			if (viewport != nullptr && !targets.has(viewport)) {
+				targets.push_back(viewport);
+			}
+		}
+	} else if (p_target == VIEWPORT_TARGET_GROUP && tree != nullptr) {
+		for (Node *node : tree->get_nodes_in_group(p_group)) {
+			Viewport *viewport = Object::cast_to<Viewport>(node);
+			if (viewport != nullptr && !targets.has(viewport)) {
+				targets.push_back(viewport);
+			}
+		}
+	}
+	return targets;
+}
+
+bool SettingsServer::_is_viewport_targeted(ViewportTarget p_target, const StringName &p_group, const Viewport *p_viewport) {
+	return p_target == VIEWPORT_TARGET_ALL_VIEWPORTS || (p_target == VIEWPORT_TARGET_GROUP && p_viewport->is_in_group(p_group));
+}
+
 void SettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_domain"), &SettingsServer::get_domain);
 	ClassDB::bind_method(D_METHOD("get_format_version"), &SettingsServer::get_format_version);
@@ -1499,6 +1543,10 @@ void SettingsServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(APPLY_PHASE_SERVERS);
 	BIND_ENUM_CONSTANT(APPLY_PHASE_SCENE);
 	BIND_ENUM_CONSTANT(APPLY_PHASE_MAX);
+
+	BIND_ENUM_CONSTANT(VIEWPORT_TARGET_ROOT_ONLY);
+	BIND_ENUM_CONSTANT(VIEWPORT_TARGET_GROUP);
+	BIND_ENUM_CONSTANT(VIEWPORT_TARGET_ALL_VIEWPORTS);
 
 	BIND_BITFIELD_FLAG(SETTING_FLAG_NONE);
 	BIND_BITFIELD_FLAG(SETTING_FLAG_RESTART_REQUIRED);
