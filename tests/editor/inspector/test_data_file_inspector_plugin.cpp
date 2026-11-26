@@ -58,7 +58,7 @@ TEST_CASE("[DataFileTreeAdapter] Entries of JSON data") {
 	CHECK(root.child_count == 5);
 
 	const LocalVector<Adapter::Entry> entries = children_of(data, false);
-	REQUIRE(entries.size() == 5);
+	REQUIRE(entries.size() == 5u);
 	CHECK(entries[0].key == "name");
 	CHECK(entries[0].type == "String");
 	CHECK(entries[0].value == "knight");
@@ -72,7 +72,7 @@ TEST_CASE("[DataFileTreeAdapter] Entries of JSON data") {
 	CHECK(entries[4].value == "1 key");
 
 	const LocalVector<Adapter::Entry> tags = children_of(entries[2].data, false);
-	REQUIRE(tags.size() == 2);
+	REQUIRE(tags.size() == 2u);
 	CHECK(tags[0].key == "0");
 	CHECK(tags[1].key == "1");
 	CHECK(tags[1].value == "armored");
@@ -85,10 +85,10 @@ TEST_CASE("[DataFileTreeAdapter] Children are paged") {
 	}
 	CHECK(Adapter::get_child_count(items, false) == 1000);
 	const LocalVector<Adapter::Entry> page = children_of(items, false, 200, 200);
-	REQUIRE(page.size() == 200);
+	REQUIRE(page.size() == 200u);
 	CHECK(page[0].key == "200");
 	CHECK(page[199].key == "399");
-	CHECK(children_of(items, false, 950, 200).size() == 50);
+	CHECK(children_of(items, false, 950, 200).size() == 50u);
 	CHECK(children_of(items, false, 1000, 200).is_empty());
 	CHECK(children_of(items, false, -1, 10).is_empty());
 
@@ -97,7 +97,7 @@ TEST_CASE("[DataFileTreeAdapter] Children are paged") {
 		keys[vformat("key_%d", i)] = i;
 	}
 	const LocalVector<Adapter::Entry> key_page = children_of(keys, false, 8, 5);
-	REQUIRE(key_page.size() == 2);
+	REQUIRE(key_page.size() == 2u);
 	CHECK(key_page[0].key == "key_8");
 	CHECK(key_page[1].key == "key_9");
 
@@ -119,14 +119,14 @@ TEST_CASE("[DataFileTreeAdapter] XML elements") {
 	nodes.push_back(data);
 
 	const LocalVector<Adapter::Entry> top = children_of(nodes, true);
-	REQUIRE(top.size() == 1);
+	REQUIRE(top.size() == 1u);
 	CHECK(top[0].key == "level");
 	CHECK(top[0].type == "Element");
 	// Two attributes and three child nodes.
 	CHECK(top[0].child_count == 5);
 
 	const LocalVector<Adapter::Entry> level = children_of(top[0].data, true);
-	REQUIRE(level.size() == 5);
+	REQUIRE(level.size() == 5u);
 	CHECK(level[0].key == "@name");
 	CHECK(level[0].type == "Attribute");
 	CHECK(level[0].value == "Forest");
@@ -141,7 +141,7 @@ TEST_CASE("[DataFileTreeAdapter] XML elements") {
 
 	// A page that starts inside the attributes and ends in the child nodes.
 	const LocalVector<Adapter::Entry> page = children_of(top[0].data, true, 1, 2);
-	REQUIRE(page.size() == 2);
+	REQUIRE(page.size() == 2u);
 	CHECK(page[0].key == "@time");
 	CHECK(page[1].key == "spawn");
 }
@@ -233,7 +233,7 @@ TEST_CASE("[DataFileTreeAdapter] Big data: the first page and the preview stay c
 	start = OS::get_singleton()->get_ticks_usec();
 	const LocalVector<Adapter::Entry> page = children_of(objects, false, 0, 200);
 	const uint64_t tree_usec = OS::get_singleton()->get_ticks_usec() - start;
-	CHECK(page.size() == 200);
+	CHECK(page.size() == 200u);
 	MESSAGE(vformat("CSV preview widths of 20 000 rows: %d us; first tree page of 20 000 deep JSON objects: %d us.", csv_usec, tree_usec));
 }
 

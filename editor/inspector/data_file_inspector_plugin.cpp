@@ -30,6 +30,7 @@
 
 #include "data_file_inspector_plugin.h"
 
+#include "core/core_string_names.h"
 #include "core/io/csv_format.h"
 #include "core/io/ini_format.h"
 #include "core/io/json.h"
@@ -48,6 +49,7 @@
 #include "scene/gui/line_edit.h"
 #include "scene/gui/tree.h"
 #include "scene/main/timer.h"
+#include "scene/resources/font.h"
 #include "scene/scene_string_names.h"
 
 enum {
@@ -69,9 +71,9 @@ DataFileTreeAdapter::Entry DataFileTreeAdapter::make_entry(const String &p_key, 
 	entry.child_count = get_child_count(p_value, p_xml);
 	if (p_xml && p_value.get_type() == Variant::DICTIONARY) {
 		const Dictionary element = p_value;
-		entry.key = element.get(XML::KEY_NAME, String());
+		entry.key = String(element.get(XML::KEY_NAME, String()));
 		entry.type = "Element";
-		entry.value = element.get(XML::KEY_TEXT, String());
+		entry.value = String(element.get(XML::KEY_TEXT, String()));
 		if (entry.value.is_empty()) {
 			const Dictionary attributes = element.get(XML::KEY_ATTRIBUTES, Dictionary());
 			PackedStringArray parts;
@@ -342,7 +344,7 @@ void DataFileInspectorView::_update_tree() {
 				item->set_custom_color(COLUMN_KEY, match_color);
 			}
 		}
-		more_label->set_text(paths.size() >= MAX_MATCHES ? vformat(TTR("The first %d matches."), MAX_MATCHES) : vformat(TTRN("%d match.", "%d matches.", paths.size()), paths.size()));
+		more_label->set_text(paths.size() >= MAX_MATCHES ? vformat(TTR("The first %d matches."), MAX_MATCHES) : vformat(TTRN("%d match.", "%d matches.", (int)paths.size()), paths.size()));
 		more_label->show();
 	}
 
