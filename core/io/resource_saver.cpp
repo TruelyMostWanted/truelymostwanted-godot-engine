@@ -50,12 +50,7 @@ ResourceSaverGetResourceIDForPath ResourceSaver::save_get_id_for_path = nullptr;
 
 Error ResourceFormatSaver::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
 	Error err = ERR_METHOD_NOT_FOUND;
-	if (!GDVIRTUAL_CALL(_save, p_resource, p_path, p_flags, err)) {
-#ifndef DISABLE_DEPRECATED
-		// Overrides compiled against the old `uint32_t` signature.
-		GDVIRTUAL_CALL(_save_bind_compat_367, p_resource, p_path, p_flags, err);
-#endif
-	}
+	GDVIRTUAL_CALL(_save, p_resource, p_path, p_flags, err);
 	return err;
 }
 
@@ -103,9 +98,6 @@ bool ResourceFormatSaver::recognize_path(const Ref<Resource> &p_resource, const 
 
 void ResourceFormatSaver::_bind_methods() {
 	GDVIRTUAL_BIND(_save, "resource", "path", "flags");
-#ifndef DISABLE_DEPRECATED
-	GDVIRTUAL_BIND_COMPAT(_save_bind_compat_367, "resource", "path", "flags");
-#endif
 	GDVIRTUAL_BIND(_set_uid, "path", "uid");
 	GDVIRTUAL_BIND(_recognize, "resource");
 	GDVIRTUAL_BIND(_get_recognized_extensions, "resource");

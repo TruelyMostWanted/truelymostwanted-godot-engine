@@ -71,10 +71,7 @@ protected:
 	GDVIRTUAL2RC(Error, _rename_dependencies, String, Dictionary)
 	GDVIRTUAL1RC(bool, _exists, String)
 
-	GDVIRTUAL4RC_REQUIRED(Variant, _load, String, String, bool, CacheMode)
-#ifndef DISABLE_DEPRECATED
-	GDVIRTUAL4RC_COMPAT(_load_bind_compat_367, Variant, _load, String, String, bool, int)
-#endif
+	GDVIRTUAL4RC_REQUIRED(Variant, _load, String, String, bool, int)
 
 public:
 	virtual Ref<Resource> load(const String &p_path, const String &p_original_path = "", Error *r_error = nullptr, bool p_use_sub_threads = false, float *r_progress = nullptr, CacheMode p_cache_mode = CACHE_MODE_REUSE);
