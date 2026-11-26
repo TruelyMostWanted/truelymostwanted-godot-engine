@@ -34,6 +34,7 @@
 #include "tile_map.h"
 #endif
 #include "tile_map_layer.h"
+#include "tile_map_path_graph.h"
 #include "tile_set.h"
 
 #ifdef TOOLS_ENABLED
@@ -51,6 +52,8 @@ void initialize_tilemap_module(ModuleInitializationLevel p_level) {
 		GDREGISTER_CLASS(TileMapPattern);
 		GDREGISTER_CLASS(TileData);
 		GDREGISTER_CLASS(TileMapLayer);
+		GDREGISTER_CLASS(TileMapPathGraphOptions);
+		GDREGISTER_CLASS(TileMapPathGraph);
 #ifndef DISABLE_DEPRECATED
 		GDREGISTER_CLASS(TileMap);
 #endif
