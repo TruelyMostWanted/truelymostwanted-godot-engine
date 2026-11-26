@@ -8,7 +8,7 @@
 		[b]Node types.[/b] The built-in node types ([FlowStartNode], [FlowEndNode], [FlowBranchNode], [FlowExpressionNode], [FlowGetVariableNode], [FlowSetVariableNode], [FlowEmitEventNode], [FlowSubgraphNode], [FlowWaitNode]) are subclasses. You add your own node types by extending [FlowNode] in GDScript, in C# (with [code][GlobalClass][/code]) or in C++ (GDExtension), and overriding the virtual methods below. Use properties for the settings of the node; they are saved with the graph like those of any resource. If your node needs different ports after a property changed, call [method notify_ports_changed].
 		[b]Ports.[/b] The ports are asked for once and cached. Call [method notify_ports_changed] when the result of [method _get_input_ports] or [method _get_output_ports] changes. A script override takes precedence over the ports of a built-in node type.
 		[b]Ownership.[/b] A node belongs to at most one graph. [method FlowGraph.add_node] refuses a node that is still in another graph (or already in the same one); remove it with [method FlowGraph.remove_node] first, or add a [code]duplicate()[/code] of it.
-		[b]Runtime.[/b] This class only holds data. Its runtime behavior comes with the playback, which is a later feature. The playback's virtual methods will be added to [FlowNode] with that feature.
+		[b]Runtime.[/b] A [FlowGraphPlayback] runs the graph and calls the runtime virtual methods: [method _enter] when the node becomes current, [method _choose_exit] to pick the flow output, [method _exit] when it is left, [method _evaluate_output] when another node reads one of its data outputs, [method _process_waiting] each frame while it waits, and [method _get_available_exits] for choice menus. They are [code]const[/code]: a node resource is shared by every playback of its graph, so keep runtime data in [method FlowGraphPlayback.set_node_memory] or in variables, not in properties. Read data inputs with [method FlowGraphPlayback.get_input_value].
 		[codeblocks]
 		[gdscript]
 		class_name HasItemNode
@@ -56,6 +56,42 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="_choose_exit" qualifiers="virtual const">
+			<return type="StringName" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<description>
+				Returns the flow output to leave through after [method _enter] returned [constant FlowGraphPlayback.ENTER_RESULT_CONTINUE], or when [method FlowGraphPlayback.advance] continues a waiting node. The default is the first flow output. An output without a connection ends the graph.
+			</description>
+		</method>
+		<method name="_enter" qualifiers="virtual const">
+			<return type="int" enum="FlowGraphPlayback.EnterResult" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<description>
+				Called when the node becomes the current node. Do the work of the node here and return whether the playback continues, waits or ends the graph. The default continues.
+			</description>
+		</method>
+		<method name="_evaluate_output" qualifiers="virtual const">
+			<return type="Variant" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<param index="1" name="port" type="StringName" />
+			<description>
+				Returns the value of the data output [param port]. Called when a connected input of another node is read; read your own inputs with [method FlowGraphPlayback.get_input_value]. The default is the port's default value.
+			</description>
+		</method>
+		<method name="_exit" qualifiers="virtual const">
+			<return type="void" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<description>
+				Called when the playback leaves the node.
+			</description>
+		</method>
+		<method name="_get_available_exits" qualifiers="virtual const">
+			<return type="FlowExit[]" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<description>
+				Returns the ways to leave the node, for [method FlowGraphPlayback.get_available_exits] and [method FlowGraphPlayback.choose]. The default is one [FlowExit] per flow output, labeled with the port label or name. Leave [member FlowExit.node_id] at [code]-1[/code]; the playback fills it.
+			</description>
+		</method>
 		<method name="_get_category" qualifiers="virtual const">
 			<return type="String" />
 			<description>
@@ -97,7 +133,15 @@
 		<method name="_get_translatable_strings" qualifiers="virtual const">
 			<return type="PackedStringArray[]" />
 			<description>
-				Override to return the texts of the node that should be translated, for example a dialogue line. Each entry is one string, described as a [PackedStringArray] in the order of the translation extractor: message id, context, plural id, comment (trailing items may be left out). [method FlowGraph.get_translatable_strings] collects the entries of all nodes of a graph. Return an empty array if the node has no texts.
+				Override to return the texts of the node that should be translated, for example a dialogue line. Each entry is one string, described as a [PackedStringArray] in the order of the translation extractor: message id, context, plural id, comment (trailing items may be left out). Built-in node types such as [DialogueLineNode] have their own entries; the entries of an override are added to them. [method FlowGraph.get_translatable_strings] collects the entries of all nodes of a graph, and the POT generation of the project settings collects them from graph files. Return an empty array if the node has no texts.
+			</description>
+		</method>
+		<method name="_process_waiting" qualifiers="virtual const">
+			<return type="bool" />
+			<param index="0" name="playback" type="FlowGraphPlayback" />
+			<param index="1" name="delta" type="float" />
+			<description>
+				Called by [method FlowGraphPlayback.process] while the node waits ([constant FlowGraphPlayback.ENTER_RESULT_WAIT]). Return [code]true[/code] to continue through [method _choose_exit]. Implementing it turns processing of [FlowGraphPlayer] on while the node waits; nodes that wait for the game (a button, a signal) do not implement it and cost nothing per frame.
 			</description>
 		</method>
 		<method name="find_input_port" qualifiers="const">

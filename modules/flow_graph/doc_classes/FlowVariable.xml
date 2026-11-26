@@ -32,7 +32,7 @@
 		<member name="name" type="StringName" setter="set_variable_name" getter="get_variable_name" default="&amp;&quot;&quot;">
 			The name of the variable, used by [member FlowVariableNode.variable_name] and as the key in [member FlowBlackboard.variables].
 		</member>
-		<member name="type" type="int" setter="set_type" getter="get_type" enum="Variant.Type" default="0">
+		<member name="type" type="int" setter="set_variable_type" getter="get_variable_type" enum="Variant.Type" default="0">
 			The [enum Variant.Type] of the variable. [constant @GlobalScope.TYPE_NIL] means any type.
 		</member>
 	</members>

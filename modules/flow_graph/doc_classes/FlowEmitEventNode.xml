@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		The emit event node tells the game that something happened, for example [code]give_item[/code] with the arguments [code]sword[/code] and [code]1[/code]. It has the flow input [code]in[/code] and the flow output [code]out[/code]. The event is delivered through the playback (its [code]event_emitted[/code] signal); the graph itself has no knowledge of the game. An empty [member event_name] is a configuration warning.
-		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		At runtime the node emits [signal FlowGraphPlayback.event_emitted] with [member event_name] and [member arguments] when it is entered, then continues at [code]out[/code] without waiting. [FlowGraphPlayer] forwards the signal.
 		[codeblocks]
 		[gdscript]
 		var event := FlowEmitEventNode.new()
