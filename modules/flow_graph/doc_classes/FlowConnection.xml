@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowConnection" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A read-only view of one connection of a [FlowGraph].
+	</brief_description>
+	<description>
+		A [FlowConnection] names the two ends of a connection: the output port of one node and the input port of another node. The graph creates these objects on demand in [method FlowGraph.get_connections], [method FlowGraph.get_output_connections] and [method FlowGraph.get_input_connections]. They are snapshots: changing one is not possible, and a later change of the graph is not reflected in an object you already hold.
+		Create connections with [method FlowGraph.connect_nodes] and remove them with [method FlowGraph.disconnect_nodes].
+		[codeblocks]
+		[gdscript]
+		for connection in graph.get_output_connections(node_id):
+			print("%d.%s -&gt; %d.%s" % [connection.from_node_id, connection.from_port, connection.to_node_id, connection.to_port])
+		[/gdscript]
+		[csharp]
+		foreach (FlowConnection connection in graph.GetOutputConnections(nodeId))
+		{
+		    GD.Print($"{connection.FromNodeId}.{connection.FromPort} -&gt; {connection.ToNodeId}.{connection.ToPort}");
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="from_node_id" type="int" setter="" getter="get_from_node_id" default="-1">
+			The id of the node whose output port is the source of the connection.
+		</member>
+		<member name="from_port" type="StringName" setter="" getter="get_from_port" default="&amp;&quot;&quot;">
+			The name of the output port on the source node.
+		</member>
+		<member name="kind" type="int" setter="" getter="get_kind" enum="FlowPort.PortKind" default="0">
+			Whether the connection carries the execution ([constant FlowPort.PORT_KIND_FLOW]) or a value ([constant FlowPort.PORT_KIND_DATA]). It is the kind of the source port.
+		</member>
+		<member name="to_node_id" type="int" setter="" getter="get_to_node_id" default="-1">
+			The id of the node whose input port is the target of the connection.
+		</member>
+		<member name="to_port" type="StringName" setter="" getter="get_to_port" default="&amp;&quot;&quot;">
+			The name of the input port on the target node.
+		</member>
+	</members>
+</class>

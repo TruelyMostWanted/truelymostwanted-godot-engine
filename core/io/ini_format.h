@@ -30,37 +30,58 @@
 
 #pragma once
 
-#include "core/io/resource.h"
+#include "core/io/config_file.h"
 #include "core/io/serializer_options.h"
-#include "core/object/ref_counted.h"
+#include "core/io/text_data_format.h"
 #include "core/variant/dictionary.h"
 
-// Reads and writes INI text as a Dictionary of sections (section name -> Dictionary of key -> value), and any
-// Resource as INI (format FORMAT_INI of ResourceTextSerializer). Keys before the first section belong to the
-// section "". Values use Godot Variant syntax (strings quoted), or plain text with SerializerOptions.ini_plain_values.
-class INI : public RefCounted {
-	GDCLASS(INI, RefCounted);
+// An INI file as a Resource: `data` is a Dictionary of sections (section name -> Dictionary of key -> value),
+// with the API of ConfigFile. Keys before the first section belong to the section "". Values use Godot Variant
+// syntax (strings quoted), or plain text with SerializerOptions.ini_value_style. The static functions also read
+// and write any Resource as INI (format FORMAT_INI of ResourceTextSerializer).
+class INI : public TextDataFormat {
+	GDCLASS(INI, TextDataFormat);
 
-	Dictionary data;
-	String error_message;
-	int error_line = 0;
+	Dictionary _get_sections_dictionary() const;
+	Error _load_from_file(Ref<FileAccess> p_file);
+	Error _save_to_file(Ref<FileAccess> p_file);
 
 protected:
 	static void _bind_methods();
+
+	virtual Error _parse_data(const String &p_text, const Ref<SerializerOptions> &p_options, Variant &r_data, String &r_error, int &r_line, int &r_column) override;
+	virtual Error _encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const override;
+	virtual Variant _get_empty_data() const override { return Dictionary(); }
+	virtual Variant::Type _get_data_type() const override { return Variant::DICTIONARY; }
+	virtual void _get_extensions(List<String> *r_extensions) const override;
 
 public:
 	// On error, r_line is the 1-based line of the problem. Repeated sections are merged.
 	static Error parse_text(const String &p_text, Dictionary &r_data, String &r_error, int &r_line);
 	static Error write_text(const Dictionary &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error);
 
-	// Bound API.
-	Error parse(const String &p_text);
-	Dictionary get_data() const { return data; }
-	String get_error_message() const { return error_message; }
-	int get_error_line() const { return error_line; }
+	// ConfigFile API.
+	void set_value(const String &p_section, const String &p_key, const Variant &p_value);
+	Variant get_value(const String &p_section, const String &p_key, const Variant &p_default = Variant()) const;
+	bool has_section(const String &p_section) const;
+	bool has_section_key(const String &p_section, const String &p_key) const;
+	PackedStringArray get_sections() const;
+	PackedStringArray get_section_keys(const String &p_section) const;
+	void erase_section(const String &p_section);
+	void erase_section_key(const String &p_section, const String &p_key);
+
+	Error load_encrypted(const String &p_path, const Vector<uint8_t> &p_key);
+	Error load_encrypted_pass(const String &p_path, const String &p_password);
+	Error save_encrypted(const String &p_path, const Vector<uint8_t> &p_key);
+	Error save_encrypted_pass(const String &p_path, const String &p_password);
+
+	Ref<ConfigFile> to_config_file() const;
+	Error from_config_file(const Ref<ConfigFile> &p_config);
 
 	static Dictionary parse_string(const String &p_text);
 	static String stringify(const Dictionary &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static String serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static Ref<Resource> deserialize(const String &p_text, const StringName &p_type_hint = StringName(), const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+
+	INI();
 };

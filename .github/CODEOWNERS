@@ -559,6 +559,11 @@
 /modules/sqlite/doc_classes/                  @TruelyMostWanted @godotengine/documentation
 /modules/sqlite/editor/                       @TruelyMostWanted @godotengine/editor
 /modules/sqlite/tests/                        @TruelyMostWanted @godotengine/tests
+/modules/flow_graph/                          @TruelyMostWanted
+/modules/flow_graph/**/*.py                   @TruelyMostWanted @godotengine/buildsystem
+/modules/flow_graph/**/SCsub                  @TruelyMostWanted @godotengine/buildsystem
+/modules/flow_graph/doc_classes/              @TruelyMostWanted @godotengine/documentation
+/modules/flow_graph/tests/                    @TruelyMostWanted @godotengine/tests
 /thirdparty/sqlite/                           @TruelyMostWanted @godotengine/buildsystem
 /servers/settings/                            @TruelyMostWanted
 /servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem

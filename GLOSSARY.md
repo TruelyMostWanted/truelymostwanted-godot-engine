@@ -62,6 +62,10 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **File manifest** (`FilesManifest`): data description of a set of files (folders, extensions, single files, a type) that `ResourceLoader` lists or loads in one call, in the editor, in exports and in packs. `FilesManifestServer` holds named manifests, `FilesManifestValidation` reports problems. In code: `core/io/files_manifest*.*`. Issues: #8. Wiki: [`File-Manifests`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/File-Manifests).
 
+**FlowGraph**: resource that holds `FlowNode`s under ids the graph owns (never reused) and the connections between their named ports (`FlowPort`, `FlowConnection`), plus `FlowFrame`s and declared `FlowVariable`s; `validate()` returns a `FlowGraphValidation`. Storage is hidden in the inspector and edited through methods. Base of quests, dialogs and other node graphs; the module can be disabled (`module_flow_graph_enabled=no`). In code: `modules/flow_graph/`. Issues: #253, #254, #255. Wiki: [`255-feature-flow-graph`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/255-feature-flow-graph), [`Class-FlowGraph`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Class-FlowGraph). Not to confuse with `GraphEdit`/`GraphNode` (UI controls) or `FlowContainer`.
+
+**FlowNode**: base resource of the node types of a `FlowGraph`, in C++ (`FlowStartNode`, `FlowEndNode`, `FlowBranchNode`, `FlowExpressionNode`, `FlowGetVariableNode`, `FlowSetVariableNode`, `FlowEmitEventNode`, `FlowSubgraphNode`, `FlowWaitNode`) or as GDScript/C# scripts that override `_get_input_ports()`/`_get_output_ports()`. Ports are cached; `notify_ports_changed()` refreshes them. In code: `modules/flow_graph/flow_node.*`, `flow_nodes.*`. Issues: #255. Wiki: [`Class-FlowNode`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Class-FlowNode).
+
 ### G
 
 **Glue** (C# glue): C# wrapper code generated from the built engine with `--generate-mono-glue modules/mono/glue`. It must be regenerated after every change of bound classes, otherwise new classes are missing in C#. Singletons get a static `Foo` and an instance wrapper `FooInstance`. In code: `modules/mono/`. See `truely/FEATURE-WORKFLOW.md` (section 3).
@@ -150,6 +154,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **Subtitle** (`Subtitle`, `SubtitleSegment`, `SubtitleServer`, `SubtitleValidation`): timed text with SRT and other formats, handled by a server. In code: `servers/subtitle/`. Wiki: [`Subtitles`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Subtitles).
 
+**SubtitlePlayer** (`SubtitlePlayer`, `SubtitlePlayback`): plays a `Subtitle` in sync with an audio, video or animation player (or an own clock) and signals segment changes; the node is a thin front end (owner exception to "no nodes"), the logic is in the `RefCounted` playback. In code: `scene/main/subtitle_player.*`, `servers/subtitle/subtitle_playback.*`. Wiki: [`260-feature-subtitle-player`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/260-feature-subtitle-player).
+
 ### T
 
 **Test project**: separate public repository `godot-custom-build-project` with one folder per feature and checks in GDScript and C#; `new-feature.ps1 -Name <feature-branch>` creates the folder. See `truely/FEATURE-WORKFLOW.md` (section 4).
@@ -202,8 +208,9 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Packs and streaming assets | `PCKPackage*`, `PCKBuildPlan`, `StreamingAssets*` | `core/io/pck_*.*`, `core/io/resource_format_pck.*`, `core/io/streaming_assets_server.*`, `editor/export/`, `editor/inspector/pck_package_editor_plugin.*` | `tests/core/io/test_pck_package_server.cpp`, `test_resource_format_pck.cpp`, `test_streaming_assets_server.cpp` |
 | Runtime file formats | image, audio, video, scene and font loaders and savers | `scene/resources/*_resource_format.*`, `modules/{mp3,vorbis,theora,opus,webm,gltf,fbx}/` | `modules/*/tests/` |
 | Databases | `SQLiteDatabase`, `SQLiteStatement`, `SQLiteColumn` | `modules/sqlite/` | `modules/sqlite/tests/` |
+| Flow graphs | `FlowGraph`, `FlowNode`, `FlowPort`, `FlowConnection`, `FlowFrame`, `FlowVariable`, `FlowBlackboard`, `FlowGraphValidation`, built-in `Flow*Node`s | `modules/flow_graph/` | `modules/flow_graph/tests/` |
 | Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommandList` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
-| Subtitles, TTS | `SubtitleServer`, `Subtitle`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `test_tts_server.cpp` |
+| Subtitles, TTS | `SubtitleServer`, `Subtitle`, `SubtitlePlayback`, `SubtitlePlayer`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `scene/main/subtitle_player.*`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `tests/scene/test_subtitle_player.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |
 | 2D | `SpriteSheet`, `TileSet`, `TileMapLayer` | `scene/resources/sprite_sheet.*`, `scene/resources/2d/tile_set.*`, `modules/tilemap/` | `modules/tilemap/tests/` |
 | Random | `SeedServer` | `core/math/seed_server.*` | `tests/core/math/test_seed_server.cpp` |

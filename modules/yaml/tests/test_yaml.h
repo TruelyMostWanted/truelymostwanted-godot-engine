@@ -33,6 +33,7 @@
 #include "../yaml.h"
 
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/math/math_defs.h"
@@ -623,6 +624,35 @@ TEST_CASE("[YAML] Through ResourceSaver and ResourceLoader") {
 
 		check_yaml_settings(ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE));
 		check_yaml_settings(ResourceLoader::load(path, "YAMLTestSettings", ResourceFormatLoader::CACHE_MODE_IGNORE));
+		DirAccess::remove_absolute(path);
+	}
+}
+
+TEST_CASE("[YAML] Resource API: slash paths and plain files") {
+	Ref<YAML> yaml;
+	yaml.instantiate();
+	CHECK(yaml->get_recognized_extensions() == PackedStringArray({ "yaml", "yml" }));
+	REQUIRE(yaml->parse("enemies:\n  - name: Orc\n    hp: 10\n  - name: Elf\n") == OK);
+	CHECK(yaml->get_value("enemies/0/name") == "Orc");
+	CHECK(yaml->get_value("enemies/1/hp", -1) == Variant(-1));
+	CHECK(yaml->has_value("enemies/1"));
+	CHECK_FALSE(yaml->has_value("enemies/2"));
+	yaml->set_value("enemies/1/hp", 5);
+	yaml->set_value("enemies/2", "Troll"); // Index == size appends.
+	yaml->set_value("meta/" + YAML::escape_key("a/b"), true);
+	CHECK(bool(yaml->get_value("meta/a~1b")) == true);
+	CHECK(YAML::split_path("x/a~1b~0c") == Vector<String>({ "x", "a/b~c" }));
+	yaml->erase_value("enemies/0");
+	CHECK(yaml->get_value("enemies/0/name") == "Elf");
+
+	for (const String extension : { "yaml", "yml" }) {
+		const String path = TestUtils::get_temp_path("yaml_plain." + extension);
+		REQUIRE(ResourceSaver::save(yaml, path) == OK);
+		CHECK_FALSE(FileAccess::get_file_as_string(path).contains("$type"));
+		CHECK(ResourceLoader::get_resource_type(path) == "YAML");
+		const Ref<YAML> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+		REQUIRE(loaded.is_valid());
+		CHECK(int(loaded->get_value("enemies/0/hp")) == 5);
 		DirAccess::remove_absolute(path);
 	}
 }

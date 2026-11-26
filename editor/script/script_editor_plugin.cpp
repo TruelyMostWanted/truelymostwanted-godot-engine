@@ -36,6 +36,7 @@
 #include "core/io/json.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/editor_language.h"
@@ -2902,6 +2903,13 @@ void DocumentEditorContainer::_reload_scripts(bool p_refresh_only) {
 				json->parse(rel_json->get_parsed_text(), true);
 			}
 
+			Ref<TextDataFormat> data_file = edited_res;
+			if (data_file.is_valid()) {
+				Ref<TextDataFormat> rel_data_file = ResourceLoader::load(data_file->get_path(), data_file->get_class(), ResourceFormatLoader::CACHE_MODE_IGNORE);
+				ERR_CONTINUE(rel_data_file.is_null());
+				data_file->parse(rel_data_file->get_parsed_text(), true);
+			}
+
 			Ref<TextFile> text_file = edited_res;
 			if (text_file.is_valid()) {
 				text_file->reload_from_file();
@@ -4428,7 +4436,8 @@ void ScriptEditor::_on_find_in_files_result_selected(const String &fpath, int li
 		} else {
 			Ref<Script> scr = res;
 			Ref<JSON> json = res;
-			if (scr.is_valid() || json.is_valid()) {
+			Ref<TextDataFormat> data_file = res;
+			if (scr.is_valid() || json.is_valid() || data_file.is_valid()) {
 				edit(scr);
 
 				ScriptTextEditor *ste = Object::cast_to<ScriptTextEditor>(get_current_editor());
@@ -4546,7 +4555,7 @@ ScriptEditor::ScriptEditor() {
 	script_editor = this;
 
 	script_container = memnew(DocumentEditorContainer(true, "ScriptEditor", "script_editor_cache.cfg"));
-	script_container->set_handled_resource_types({ "GDScript", "Script", "JSON" });
+	script_container->set_handled_resource_types({ "GDScript", "Script", "JSON", "TextDataFormat" });
 	add_child(script_container);
 	connect("_focused", callable_mp(script_container, &DocumentEditorContainer::focus_active_editor));
 
@@ -4648,7 +4657,7 @@ void ScriptEditorPlugin::edit(Object *p_object) {
 			EditorNode::get_singleton()->load_scene_or_resource(res_path, false, false);
 		}
 		script_editor->edit(p_script);
-	} else if (Object::cast_to<JSON>(p_object) || Object::cast_to<TextFile>(p_object)) {
+	} else if (Object::cast_to<JSON>(p_object) || Object::cast_to<TextFile>(p_object) || Object::cast_to<TextDataFormat>(p_object)) {
 		script_editor->edit(Object::cast_to<Resource>(p_object));
 	}
 }
@@ -4664,6 +4673,10 @@ bool ScriptEditorPlugin::handles(Object *p_object) const {
 		}
 	} else if (Object::cast_to<TextFile>(p_object)) {
 		return true;
+	} else if (TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_object)) {
+		// Like JSON: only plain data files open as text; a format resource embedded in a scene or
+		// saved as `.tres` stays in the inspector.
+		return data_file->is_recognized_path(data_file->get_path());
 	}
 
 	return p_object->is_class("Script");
