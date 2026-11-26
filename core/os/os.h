@@ -126,6 +126,8 @@ protected:
 	friend class Main;
 	// Needed by tests to setup command-line args.
 	friend int test_main(int p_argc, char *p_argv[]);
+	// Needed by tests to make the test SceneTree the main loop.
+	friend struct GodotTestCaseListener;
 
 	HasServerFeatureCallback has_server_feature_callback = nullptr;
 	bool _separate_thread_render = false;

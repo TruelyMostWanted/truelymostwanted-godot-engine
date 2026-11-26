@@ -372,9 +372,8 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(LocalizationCatalog);
 	GDREGISTER_CLASS(TextLocalizationCatalog);
 	GDREGISTER_CLASS(ResourceLocalizationCatalog);
-	GDREGISTER_CLASS(LocalizationCatalogList);
 	resource_loader_localization_catalog.instantiate();
-	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog);
+	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog, true); // Before the text resource loaders (#357).
 	resource_saver_localization_catalog.instantiate();
 	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog);
 	GDREGISTER_ABSTRACT_CLASS(LocalizationServer);
@@ -530,7 +529,6 @@ void register_core_settings() {
 	StreamingAssetsServer::register_settings();
 	TextInsertionServer::register_settings();
 	LocalizationServer::register_settings();
-	ResourceLocalizationServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -661,6 +659,7 @@ void unregister_core_types() {
 	resource_loader_localization_catalog.unref();
 	ResourceSaver::remove_resource_format_saver(resource_saver_localization_catalog);
 	resource_saver_localization_catalog.unref();
+	LocalizationCatalog::finish_plural_rules();
 
 	if constexpr (GD_IS_CLASS_ENABLED(Crypto)) {
 		ResourceSaver::remove_resource_format_saver(resource_format_saver_crypto);

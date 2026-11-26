@@ -236,6 +236,8 @@ struct GodotTestCaseListener : public doctest::IReporter {
 
 			memnew(SceneTree);
 			SceneTree::get_singleton()->initialize();
+			// Like at runtime: notifications sent to the main loop (e.g. NOTIFICATION_TRANSLATION_CHANGED) reach the tree.
+			OS::get_singleton()->set_main_loop(SceneTree::get_singleton());
 			if (!DisplayServer::get_singleton()->has_feature(DisplayServerEnums::FEATURE_SUBWINDOWS)) {
 				SceneTree::get_singleton()->get_root()->set_embedding_subwindows(true);
 			}
@@ -302,6 +304,9 @@ struct GodotTestCaseListener : public doctest::IReporter {
 			MessageQueue::get_singleton()->flush();
 		}
 
+		if (OS::get_singleton()->get_main_loop() == SceneTree::get_singleton()) {
+			OS::get_singleton()->set_main_loop(nullptr);
+		}
 		memdelete(SceneTree::get_singleton());
 
 #ifndef NAVIGATION_3D_DISABLED

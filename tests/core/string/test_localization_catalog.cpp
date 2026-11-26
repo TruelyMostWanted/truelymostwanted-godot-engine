@@ -38,7 +38,9 @@ TEST_FORCE_LINK(test_localization_catalog)
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
 #include "core/string/localization_catalog.h"
+#include "core/string/plural_rules.h"
 #include "core/string/translation.h"
+#include "core/string/translation_server.h"
 #include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
@@ -249,33 +251,40 @@ TEST_CASE("[LocalizationCatalog] Resource catalog resolves the expected type on 
 	DirAccess::remove_absolute(path);
 }
 
-TEST_CASE("[LocalizationCatalog] List with priorities and wildcards") {
-	const String folder = TestUtils::get_temp_path("localization_catalog_list");
+TEST_CASE("[LocalizationCatalog] Channel, plural rules and text formats through ResourceLoader") {
+	Ref<TextLocalizationCatalog> text;
+	text.instantiate();
+	CHECK(text->get_channel() == StringName("interface"));
+	text->set_channel("subtitles");
+	text->set_text("HELLO", "de", "Hallo");
+	text->set_plural_texts("APPLE", "pl", PackedStringArray({ "jablko", "jablka", "jablek" }));
+
+	// One shared compiled rule per rule text; the locale's default rule without one.
+	const PluralRules *polish = LocalizationCatalog::get_plural_rules(String(), "pl");
+	CHECK(polish == LocalizationCatalog::get_plural_rules(TranslationServer::get_singleton()->get_plural_rules("pl"), "pl"));
+	CHECK(LocalizationCatalog::evaluate_plural_rules(polish, 5) == 2);
+	CHECK(text->get_plural_form("pl", 2) == 1);
+
+	const String folder = TestUtils::get_temp_path("localization_catalog_loader");
 	REQUIRE(DirAccess::make_dir_recursive_absolute(folder) == OK);
-	for (const char *file_name : { "b.json", "a.lcat", "a.lcat.uid", "notes.txt" }) {
-		Ref<FileAccess> file = FileAccess::open(folder.path_join(file_name), FileAccess::WRITE);
-		REQUIRE(file.is_valid());
-		file->store_string("{}");
-	}
-	Ref<LocalizationCatalogList> list;
-	list.instantiate();
-	list->add_entry(folder.path_join("*"), 10);
-	list->add_entry("res://base.csv");
-	list->add_entry(folder.path_join("*.json"), 10);
-	list->add_entry(folder.path_join("missing/*"));
-	CHECK(list->get_catalog_paths() == PackedStringArray({ "res://base.csv", folder.path_join("a.lcat"), folder.path_join("b.json"), folder.path_join("b.json") }));
+	const String json_path = folder.path_join("texts.json");
+	const String lcat_path = folder.path_join("texts.lcat");
+	REQUIRE(text->save_to_file(json_path) == OK);
+	REQUIRE(text->save_to_file(lcat_path) == OK);
 
-	// Inspector properties.
-	CHECK(list->get("entry_1/path") == "res://base.csv");
-	list->set("entry_0/priority", -1);
-	CHECK(list->get_entry_priority(0) == -1);
-	CHECK(list->get_catalog_paths()[0] == folder.path_join("a.lcat"));
-	list->remove_entry(0);
-	CHECK(list->get_entry_count() == 3);
+	// Text formats only with a catalog type hint, cached under their path; the channel is kept in both formats.
+	const Ref<TextLocalizationCatalog> loaded = ResourceLoader::load(json_path, "TextLocalizationCatalog");
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_channel() == StringName("subtitles"));
+	CHECK(loaded->get_text("HELLO", "de") == "Hallo");
+	CHECK(ResourceLoader::load(json_path, "TextLocalizationCatalog") == loaded);
+	const Ref<TextLocalizationCatalog> binary = ResourceLoader::load(lcat_path);
+	REQUIRE(binary.is_valid());
+	CHECK(binary->get_channel() == StringName("subtitles"));
+	CHECK(LocalizationCatalog::get_file_extensions().has("yaml"));
 
-	for (const char *file_name : { "b.json", "a.lcat", "a.lcat.uid", "notes.txt" }) {
-		DirAccess::remove_absolute(folder.path_join(file_name));
-	}
+	DirAccess::remove_absolute(json_path);
+	DirAccess::remove_absolute(lcat_path);
 	DirAccess::remove_absolute(folder);
 }
 

@@ -6,9 +6,10 @@
 	<description>
 		[ResourceLocalizationServer] is the resource server of the localization system. It replaces the project setting [code]internationalization/locale/translation_remaps[/code] (the Remaps tab of the Localization settings), which is [b]deprecated[/b] for game code. It reads [ResourceLocalizationCatalog]s; their keys are the original resource paths (see [LocalizationServer] for layers, priorities and the locale chain).
 		[b]load() follows the locale:[/b] [method @GDScript.load], [method ResourceLoader.load], [code]preload()[/code]ed scenes and threaded loading load the localized file of the active locale and cache it under the original path. Nothing has to change in scenes or scripts.
-		[b]Which path is used:[/b] for each original path, the locale with the best match to the active locale ([method TranslationServer.compare_locales]: [code]de_DE[/code] takes [code]de_DE[/code], then [code]de[/code], then another country such as [code]de_AT[/code]), then the fallback locale. When two layers match equally, the higher priority wins. This gives the same results as [code]translation_remaps[/code]. If the localized file does not exist, the original is loaded with a warning.
+		[b]Which path is used:[/b] for each original path, the locale chain of its channel (see [method LocalizationServer.get_locale_chain]: [code]de_DE[/code] takes [code]de_DE[/code], then [code]de[/code], then the closest other country such as [code]de_AT[/code], then the fallback locale). When two layers have the same locale, the higher priority wins. This gives the results of [code]translation_remaps[/code] for the usual cases. If the localized file does not exist, the original is loaded with a warning.
+		[b]Channels:[/b] a resource follows the [member LocalizationCatalog.channel] of its catalog; by default the channel of its type: [AudioStream]s follow [code]audio[/code], subtitles follow [code]subtitles[/code], everything else [code]interface[/code]. [code]TranslationServer.set_locale_for(&amp;"audio", "ja")[/code] loads only the voice files again.
 		[b]Locale changes without a hitch:[/b] after a locale or catalog change, every cached resource whose localized path changed is loaded again on worker threads and then updated in place on the main thread, like [constant ResourceLoader.CACHE_MODE_REPLACE]: nodes that use it show the new data. Until then, [method @GDScript.load] of the original path returns the cached resource without waiting. When all are done, [signal resources_relocalized] is emitted. Without worker threads (single-threaded Web export), the resources are loaded during the locale change, as before.
-		[b]Old remaps and mods:[/b] [method LocalizationServer.load_project_catalogs] imports [code]translation_remaps[/code] as the first layer of priority 0, then adds [member ProjectSettings.internationalization/localization/resource_catalogs] and, with a higher priority, [member ProjectSettings.internationalization/localization/resource_external_catalogs] (for example [code]user://mods/*/voice/*.lcat[/code]). Mods can also be added with [method LocalizationServer.add_catalog_list].
+		[b]Old remaps and mods:[/b] [method LocalizationServer.load_project_catalogs] imports [code]translation_remaps[/code] as the first layer of priority 0, then the resource catalog manifests of [member ProjectSettings.internationalization/localization/catalog_manifests] (for example [code]user://mods/*/voice[/code]). Mods can also be added with [method LocalizationServer.add_catalog_manifest].
 		[b]Editor:[/b] like [code]translation_remaps[/code], [method @GDScript.load] in the editor loads the original resources, so scenes are edited with them. The methods of this class work in the editor too.
 		[codeblocks]
 		[gdscript]
@@ -17,12 +18,12 @@
 		catalog.set_localized_path(&amp;"res://voice/intro.ogg", "de", "res://voice/de/intro.ogg")
 		ResourceLocalizationServer.add_catalog(catalog)
 
-		LocalizationServer.set_locale("de")
+		TranslationServer.set_locale("de")
 		$Voice.stream = load("res://voice/intro.ogg") # Loads res://voice/de/intro.ogg.
 		print(ResourceLocalizationServer.get_localized_path("res://voice/intro.ogg", "fr")) # res://voice/intro.ogg
 
 		# Wait until cached resources follow a locale change.
-		LocalizationServer.set_locale("en")
+		TranslationServer.set_locale("en")
 		await ResourceLocalizationServer.resources_relocalized
 		[/gdscript]
 		[csharp]
@@ -32,11 +33,11 @@
 		// Inherited methods and signals are reached through the singleton instance.
 		ResourceLocalizationServer.Singleton.AddCatalog(catalog);
 
-		LocalizationServer.SetLocale("de");
+		TranslationServer.SetLocale("de");
 		GetNode&lt;AudioStreamPlayer&gt;("Voice").Stream = GD.Load&lt;AudioStream&gt;("res://voice/intro.ogg");
 		GD.Print(ResourceLocalizationServer.GetLocalizedPath("res://voice/intro.ogg", "fr"));
 
-		LocalizationServer.SetLocale("en");
+		TranslationServer.SetLocale("en");
 		await ToSignal(ResourceLocalizationServer.Singleton, "resources_relocalized");
 		[/csharp]
 		[/codeblocks]

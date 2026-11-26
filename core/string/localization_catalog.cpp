@@ -31,7 +31,6 @@
 #include "localization_catalog.h"
 
 #include "core/io/csv_format.h"
-#include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/io/serializer_options.h"
@@ -47,7 +46,7 @@
 // locale table (locale, plural rule, translated count, block offset); one block per locale (cells, plural forms).
 // Cells are stored as raw `uint32` offsets + UTF-8 bytes, the same layout as in memory.
 static constexpr uint32_t LCAT_MAGIC = 0x5441434c; // "LCAT".
-static constexpr uint32_t LCAT_VERSION = 1;
+static constexpr uint32_t LCAT_VERSION = 2; // 2: the channel after the kind (#357).
 static constexpr const char *CATALOG_ENTRY = "?catalog";
 
 /////////////////////////////////////////////////////////////////////////////
@@ -171,10 +170,61 @@ static void _split_id(const String &p_id, String &r_key, String &r_context) {
 /////////////////////////////////////////////////////////////////////////////
 // LocalizationCatalog.
 
-LocalizationCatalog::LocaleColumn::~LocaleColumn() {
-	if (compiled_rule) {
-		memdelete(compiled_rule);
+static Mutex plural_rules_mutex;
+static HashMap<String, PluralRules *> plural_rules_cache; // Rule text -> compiled rule.
+
+PackedStringArray LocalizationCatalog::get_file_extensions() {
+	return PackedStringArray({ BINARY_EXTENSION, "csv", "json", "yaml", "yml", "toml", "ini", "xml" });
+}
+
+const PluralRules *LocalizationCatalog::get_plural_rules(const String &p_rule, const String &p_locale) {
+	String rule = p_rule;
+	if (rule.is_empty() && TranslationServer::get_singleton()) {
+		rule = TranslationServer::get_singleton()->get_plural_rules(p_locale);
 	}
+	if (rule.is_empty()) {
+		rule = "nplurals=2; plural=(n != 1);";
+	}
+	{
+		MutexLock lock(plural_rules_mutex);
+		PluralRules **known = plural_rules_cache.getptr(rule);
+		if (known) {
+			return *known;
+		}
+	}
+	// Parsed outside of the lock: parse() may print.
+	PluralRules *parsed = PluralRules::parse(rule);
+	if (!parsed) {
+		parsed = PluralRules::parse("nplurals=2; plural=(n != 1);");
+	}
+	MutexLock lock(plural_rules_mutex);
+	PluralRules **known = plural_rules_cache.getptr(rule);
+	if (known) {
+		if (parsed) {
+			memdelete(parsed);
+		}
+		return *known;
+	}
+	plural_rules_cache.insert(rule, parsed);
+	return parsed;
+}
+
+int LocalizationCatalog::evaluate_plural_rules(const PluralRules *p_rules, int p_n) {
+	if (!p_rules) {
+		return p_n == 1 ? 0 : 1;
+	}
+	MutexLock lock(plural_rules_mutex);
+	return p_rules->evaluate(p_n);
+}
+
+void LocalizationCatalog::finish_plural_rules() {
+	MutexLock lock(plural_rules_mutex);
+	for (const KeyValue<String, PluralRules *> &E : plural_rules_cache) {
+		if (E.value) {
+			memdelete(E.value);
+		}
+	}
+	plural_rules_cache.clear();
 }
 
 CharString LocalizationCatalog::_make_id(const StringName &p_key, const StringName &p_context) {
@@ -356,6 +406,31 @@ const LocalizationCatalog::LocaleColumn *LocalizationCatalog::get_locale_column(
 	return _load_column(p_index) == OK ? columns[p_index] : nullptr;
 }
 
+bool LocalizationCatalog::read_cell(int p_column, uint32_t p_row, String &r_text, Vector<String> *r_forms) const {
+	if (p_column < 0 || p_column >= (int)columns.size() || _load_column(p_column) != OK) {
+		return false;
+	}
+	MutexLock lock(load_mutex);
+	const LocaleColumn *column = columns[p_column];
+	if (!column->loaded || p_row >= column->cells.size() || column->cells.get_length(p_row) == 0) {
+		return false; // Unloaded by the main thread in between: treated as missing.
+	}
+	r_text = column->cells.get(p_row);
+	if (r_forms) {
+		const Vector<String> *forms = column->plural_forms.getptr(p_row);
+		*r_forms = forms ? *forms : Vector<String>();
+	}
+	return true;
+}
+
+void LocalizationCatalog::set_channel(const StringName &p_channel) {
+	if (channel == p_channel) {
+		return;
+	}
+	channel = p_channel;
+	emit_changed();
+}
+
 int LocalizationCatalog::add_key(const StringName &p_key, const StringName &p_context) {
 	const CharString id = _make_id(p_key, p_context);
 	int row = _find_row(id);
@@ -514,6 +589,7 @@ Dictionary LocalizationCatalog::_get_data() const {
 	if (!rules.is_empty()) {
 		meta["plural_rules"] = rules;
 	}
+	meta["channel"] = channel;
 	data[CATALOG_ENTRY] = meta;
 
 	for (uint32_t row = 0; row < ids.size(); row++) {
@@ -563,6 +639,9 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 	};
 
 	const Dictionary meta = p_data.get(CATALOG_ENTRY, Dictionary());
+	if (meta.has("channel")) {
+		channel = meta["channel"];
+	}
 	const Array locales = meta.get("locales", Array());
 	for (const Variant &locale : locales) {
 		column_for(locale);
@@ -966,6 +1045,7 @@ Error LocalizationCatalog::_read_binary(const Ref<FileAccess> &p_file, const Str
 	clear();
 	ERR_FAIL_COND_V_MSG(p_file->get_32() != LCAT_MAGIC || p_file->get_32() != LCAT_VERSION, ERR_FILE_UNRECOGNIZED, vformat("'%s' is not a localization catalog of version %d.", p_path, LCAT_VERSION));
 	ERR_FAIL_COND_V_MSG(p_file->get_32() != _get_kind(), ERR_INVALID_DATA, vformat("'%s' holds another kind of localization catalog than %s.", p_path, get_class()));
+	channel = p_file->get_pascal_string();
 	const uint32_t row_count = p_file->get_32();
 	const uint32_t locale_count = p_file->get_32();
 	String error = _read_cells(p_file, row_count, ids);
@@ -1005,6 +1085,7 @@ Error LocalizationCatalog::_write_binary(const Ref<FileAccess> &p_file) {
 	p_file->store_32(LCAT_MAGIC);
 	p_file->store_32(LCAT_VERSION);
 	p_file->store_32(_get_kind());
+	p_file->store_pascal_string(channel);
 	p_file->store_32(ids.size());
 	p_file->store_32(columns.size());
 	_write_cells(p_file, ids);
@@ -1053,7 +1134,7 @@ Error LocalizationCatalog::load_from_file(const String &p_path) {
 		return _read_binary(file, p_path);
 	}
 	const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(extension);
-	ERR_FAIL_COND_V_MSG(format == ResourceTextSerializer::FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("'%s' has no localization catalog extension (lcat, csv, json, yaml, yml, toml, ini, xml).", p_path));
+	ERR_FAIL_COND_V_MSG(format == ResourceTextSerializer::FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("'%s' has no localization catalog extension (%s).", p_path, String(", ").join(get_file_extensions())));
 	const String text = FileAccess::get_file_as_string(p_path, &err);
 	ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Can't read the localization catalog '%s'.", p_path));
 	return load_from_text(text, format);
@@ -1067,7 +1148,7 @@ Error LocalizationCatalog::save_to_file(const String &p_path) {
 	String text;
 	if (extension != BINARY_EXTENSION) {
 		const ResourceTextSerializer::Format format = ResourceTextSerializer::get_format_for_extension(extension);
-		ERR_FAIL_COND_V_MSG(format == ResourceTextSerializer::FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("'%s' has no localization catalog extension (lcat, csv, json, yaml, yml, toml, ini, xml).", p_path));
+		ERR_FAIL_COND_V_MSG(format == ResourceTextSerializer::FORMAT_MAX, ERR_FILE_UNRECOGNIZED, vformat("'%s' has no localization catalog extension (%s).", p_path, String(", ").join(get_file_extensions())));
 		text = to_text(format);
 		ERR_FAIL_COND_V(text.is_empty(), ERR_INVALID_DATA);
 	}
@@ -1129,6 +1210,11 @@ void LocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_set_data", "data"), &LocalizationCatalog::_set_data);
 	ClassDB::bind_method(D_METHOD("_get_data"), &LocalizationCatalog::_get_data);
 
+	ClassDB::bind_method(D_METHOD("set_channel", "channel"), &LocalizationCatalog::set_channel);
+	ClassDB::bind_method(D_METHOD("get_channel"), &LocalizationCatalog::get_channel);
+	ClassDB::bind_static_method("LocalizationCatalog", D_METHOD("get_file_extensions"), &LocalizationCatalog::get_file_extensions);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "channel"), "set_channel", "get_channel");
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL), "_set_data", "_get_data");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "key_count", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_key_count");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "locales", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_locales");
@@ -1203,10 +1289,6 @@ void TextLocalizationCatalog::set_plural_rule(const String &p_locale, const Stri
 	LocaleColumn *column = _get_or_add_column(p_locale);
 	ERR_FAIL_NULL(column);
 	column->plural_rule = p_rule;
-	if (column->compiled_rule) {
-		memdelete(column->compiled_rule);
-		column->compiled_rule = nullptr;
-	}
 	emit_changed();
 }
 
@@ -1217,29 +1299,12 @@ String TextLocalizationCatalog::get_plural_rule(const String &p_locale) const {
 
 int TextLocalizationCatalog::get_plural_form(const String &p_locale, int p_n) const {
 	// Same rule order as Translation: the catalog's rule, the locale's default rule, English.
-	LocaleColumn *column = _get_column(p_locale);
-	if (column && column->compiled_rule) {
-		return column->compiled_rule->evaluate(p_n);
-	}
-	PluralRules *rules = nullptr;
-	if (column && !column->plural_rule.is_empty()) {
-		rules = PluralRules::parse(column->plural_rule);
-	}
-	const String default_rule = TranslationServer::get_singleton()->get_plural_rules(p_locale);
-	if (!rules && !default_rule.is_empty()) {
-		rules = PluralRules::parse(default_rule);
-	}
-	if (!rules) {
-		rules = PluralRules::parse("nplurals=2; plural=(n != 1);");
-	}
-	ERR_FAIL_NULL_V(rules, 0);
-	const int form = rules->evaluate(p_n);
-	if (column) {
-		column->compiled_rule = rules;
-	} else {
-		memdelete(rules);
-	}
-	return form;
+	const LocaleColumn *column = _get_column(p_locale);
+	return evaluate_plural_rules(get_plural_rules(column ? column->plural_rule : String(), p_locale), p_n);
+}
+
+TextLocalizationCatalog::TextLocalizationCatalog() {
+	set_channel(SNAME("interface"));
 }
 
 void TextLocalizationCatalog::add_translation(const Ref<Translation> &p_translation) {
@@ -1381,6 +1446,25 @@ Dictionary ResourceLocalizationCatalog::to_translation_remaps() {
 	return remaps;
 }
 
+StringName ResourceLocalizationCatalog::get_row_channel(int p_row) const {
+	if (!get_channel().is_empty()) {
+		return get_channel();
+	}
+	String type = _get_row_extra(p_row);
+	if (type.is_empty()) {
+		String key, context;
+		_split_id(get_id_cells().get(p_row), key, context);
+		type = ResourceLoader::get_resource_type(key); // Once per key and key table, like add_translation_remaps().
+	}
+	if (!type.is_empty() && ClassDB::is_parent_class(type, SNAME("AudioStream"))) {
+		return SNAME("audio");
+	}
+	if (!type.is_empty() && ClassDB::is_parent_class(type, SNAME("Subtitle"))) {
+		return SNAME("subtitles");
+	}
+	return SNAME("interface");
+}
+
 void ResourceLocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_localized_path", "key", "locale", "path"), &ResourceLocalizationCatalog::set_localized_path);
 	ClassDB::bind_method(D_METHOD("get_localized_path", "key", "locale"), &ResourceLocalizationCatalog::get_localized_path);
@@ -1391,202 +1475,21 @@ void ResourceLocalizationCatalog::_bind_methods() {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// LocalizationCatalogList.
-
-void LocalizationCatalogList::add_entry(const String &p_path, int p_priority) {
-	Entry entry;
-	entry.path = p_path;
-	entry.priority = p_priority;
-	entries.push_back(entry);
-	notify_property_list_changed();
-	emit_changed();
-}
-
-void LocalizationCatalogList::remove_entry(int p_index) {
-	ERR_FAIL_INDEX(p_index, (int)entries.size());
-	entries.remove_at(p_index);
-	notify_property_list_changed();
-	emit_changed();
-}
-
-void LocalizationCatalogList::set_entry_count(int p_count) {
-	ERR_FAIL_COND(p_count < 0);
-	entries.resize(p_count);
-	notify_property_list_changed();
-	emit_changed();
-}
-
-void LocalizationCatalogList::set_entry_path(int p_index, const String &p_path) {
-	ERR_FAIL_INDEX(p_index, (int)entries.size());
-	entries[p_index].path = p_path;
-	emit_changed();
-}
-
-String LocalizationCatalogList::get_entry_path(int p_index) const {
-	ERR_FAIL_INDEX_V(p_index, (int)entries.size(), String());
-	return entries[p_index].path;
-}
-
-void LocalizationCatalogList::set_entry_priority(int p_index, int p_priority) {
-	ERR_FAIL_INDEX(p_index, (int)entries.size());
-	entries[p_index].priority = p_priority;
-	emit_changed();
-}
-
-int LocalizationCatalogList::get_entry_priority(int p_index) const {
-	ERR_FAIL_INDEX_V(p_index, (int)entries.size(), 0);
-	return entries[p_index].priority;
-}
-
-void LocalizationCatalogList::clear() {
-	set_entry_count(0);
-}
-
-// Folders matching `p_folder`, which may hold wildcards in any folder name. Missing folders are skipped.
-static PackedStringArray _expand_folders(const String &p_folder) {
-	const String name = p_folder.get_file();
-	if (!p_folder.contains_char('*') && !p_folder.contains_char('?')) {
-		return PackedStringArray({ p_folder });
-	}
-	PackedStringArray folders;
-	for (const String &parent : _expand_folders(p_folder.get_base_dir())) {
-		if (!name.contains_char('*') && !name.contains_char('?')) {
-			folders.push_back(parent.path_join(name));
-			continue;
-		}
-		Ref<DirAccess> dir = DirAccess::open(parent);
-		if (dir.is_null()) {
-			continue;
-		}
-		PackedStringArray directories = dir->get_directories();
-		directories.sort();
-		for (const String &directory : directories) {
-			if (directory.matchn(name)) {
-				folders.push_back(parent.path_join(directory));
-			}
-		}
-	}
-	return folders;
-}
-
-PackedStringArray LocalizationCatalogList::get_entry_catalog_paths(int p_index) const {
-	ERR_FAIL_INDEX_V(p_index, (int)entries.size(), PackedStringArray());
-	const String &path = entries[p_index].path;
-	const String pattern = path.get_file();
-	PackedStringArray paths;
-	for (const String &folder : _expand_folders(path.get_base_dir())) {
-		if (!pattern.contains_char('*') && !pattern.contains_char('?')) {
-			if (!pattern.is_empty()) {
-				paths.push_back(folder.path_join(pattern));
-			}
-			continue;
-		}
-		Ref<DirAccess> dir = DirAccess::open(folder);
-		if (dir.is_null()) {
-			continue; // A missing folder (for example no mods installed) is not an error.
-		}
-		PackedStringArray files = dir->get_files();
-		files.sort();
-		for (const String &file : files) {
-			const String extension = file.get_extension().to_lower();
-			const bool catalog_file = extension == LocalizationCatalog::BINARY_EXTENSION || ResourceTextSerializer::get_format_for_extension(extension) != ResourceTextSerializer::FORMAT_MAX;
-			if (catalog_file && file.matchn(pattern)) {
-				paths.push_back(folder.path_join(file));
-			}
-		}
-	}
-	return paths;
-}
-
-PackedStringArray LocalizationCatalogList::get_catalog_paths() const {
-	// Stable sort by priority: equal priorities keep the list order, a higher priority comes later (and wins).
-	LocalVector<uint32_t> order;
-	for (uint32_t i = 0; i < entries.size(); i++) {
-		uint32_t position = order.size();
-		order.push_back(i);
-		while (position > 0 && entries[order[position - 1]].priority > entries[i].priority) {
-			order[position] = order[position - 1];
-			position--;
-		}
-		order[position] = i;
-	}
-	PackedStringArray paths;
-	for (const uint32_t entry_index : order) {
-		paths.append_array(get_entry_catalog_paths(entry_index));
-	}
-	return paths;
-}
-
-bool LocalizationCatalogList::_set(const StringName &p_name, const Variant &p_value) {
-	const String property = p_name;
-	if (!property.begins_with("entry_")) {
-		return false;
-	}
-	const int entry_index = property.get_slicec('/', 0).trim_prefix("entry_").to_int();
-	const String field = property.get_slicec('/', 1);
-	if (entry_index < 0 || entry_index >= (int)entries.size()) {
-		return false;
-	}
-	if (field == "path") {
-		set_entry_path(entry_index, p_value);
-	} else if (field == "priority") {
-		set_entry_priority(entry_index, p_value);
-	} else {
-		return false;
-	}
-	return true;
-}
-
-bool LocalizationCatalogList::_get(const StringName &p_name, Variant &r_ret) const {
-	const String property = p_name;
-	if (!property.begins_with("entry_")) {
-		return false;
-	}
-	const int entry_index = property.get_slicec('/', 0).trim_prefix("entry_").to_int();
-	const String field = property.get_slicec('/', 1);
-	if (entry_index < 0 || entry_index >= (int)entries.size()) {
-		return false;
-	}
-	if (field == "path") {
-		r_ret = entries[entry_index].path;
-	} else if (field == "priority") {
-		r_ret = entries[entry_index].priority;
-	} else {
-		return false;
-	}
-	return true;
-}
-
-void LocalizationCatalogList::_get_property_list(List<PropertyInfo> *p_list) const {
-	for (uint32_t i = 0; i < entries.size(); i++) {
-		p_list->push_back(PropertyInfo(Variant::STRING, vformat("entry_%d/path", i), PROPERTY_HINT_FILE_PATH, "*.lcat,*.csv,*.json,*.yaml,*.yml,*.toml,*.ini,*.xml"));
-		p_list->push_back(PropertyInfo(Variant::INT, vformat("entry_%d/priority", i)));
-	}
-}
-
-void LocalizationCatalogList::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("add_entry", "path", "priority"), &LocalizationCatalogList::add_entry, DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("remove_entry", "index"), &LocalizationCatalogList::remove_entry);
-	ClassDB::bind_method(D_METHOD("set_entry_count", "count"), &LocalizationCatalogList::set_entry_count);
-	ClassDB::bind_method(D_METHOD("get_entry_count"), &LocalizationCatalogList::get_entry_count);
-	ClassDB::bind_method(D_METHOD("set_entry_path", "index", "path"), &LocalizationCatalogList::set_entry_path);
-	ClassDB::bind_method(D_METHOD("get_entry_path", "index"), &LocalizationCatalogList::get_entry_path);
-	ClassDB::bind_method(D_METHOD("set_entry_priority", "index", "priority"), &LocalizationCatalogList::set_entry_priority);
-	ClassDB::bind_method(D_METHOD("get_entry_priority", "index"), &LocalizationCatalogList::get_entry_priority);
-	ClassDB::bind_method(D_METHOD("clear"), &LocalizationCatalogList::clear);
-	ClassDB::bind_method(D_METHOD("get_catalog_paths"), &LocalizationCatalogList::get_catalog_paths);
-
-	ADD_ARRAY_COUNT("Entries", "entry_count", "set_entry_count", "get_entry_count", "entry_");
-}
-
-/////////////////////////////////////////////////////////////////////////////
 // Loader and saver of `.lcat` files.
+
+// Like ResourceFormatLoaderTextTree: the type hint of recognize_path() for the following load() on this thread.
+static thread_local String text_catalog_hint_path;
+static thread_local String text_catalog_hint_type;
 
 Ref<Resource> ResourceFormatLoaderLocalizationCatalog::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
 	if (r_error) {
 		*r_error = ERR_FILE_UNRECOGNIZED;
 	}
-	const String type = get_resource_type(p_path);
+	String type = get_resource_type(p_path);
+	if (type.is_empty() && p_path == text_catalog_hint_path) {
+		type = text_catalog_hint_type; // A text format: its kind comes from the type hint.
+	}
+	text_catalog_hint_path = String();
 	if (type.is_empty()) {
 		return Ref<Resource>();
 	}
@@ -1603,7 +1506,24 @@ Ref<Resource> ResourceFormatLoaderLocalizationCatalog::load(const String &p_path
 }
 
 void ResourceFormatLoaderLocalizationCatalog::get_recognized_extensions(List<String> *p_extensions) const {
-	p_extensions->push_back(LocalizationCatalog::BINARY_EXTENSION);
+	// All of them, so the loader is asked for these paths; recognize_path() takes text formats only for catalogs.
+	for (const String &extension : LocalizationCatalog::get_file_extensions()) {
+		p_extensions->push_back(extension);
+	}
+}
+
+bool ResourceFormatLoaderLocalizationCatalog::recognize_path(const String &p_path, const String &p_for_type) const {
+	const String extension = p_path.get_extension().to_lower();
+	if (extension == LocalizationCatalog::BINARY_EXTENSION) {
+		return p_for_type.is_empty() || handles_type(p_for_type);
+	}
+	if (p_for_type.is_empty() || p_for_type == "Resource" || !handles_type(p_for_type) || !LocalizationCatalog::get_file_extensions().has(extension)) {
+		return false;
+	}
+	// ResourceLoader calls load() right after this on the same thread, without the hint.
+	text_catalog_hint_path = p_path;
+	text_catalog_hint_type = p_for_type;
+	return true;
 }
 
 bool ResourceFormatLoaderLocalizationCatalog::handles_type(const String &p_type) const {

@@ -9,7 +9,7 @@
 		[b]Files:[/b] [method load_from_file] and [method save_to_file] choose the format by the file extension. The binary [code].lcat[/code] format stores one block per locale: a catalog loaded from it (also with [method @GDScript.load]) reads only the keys and the locale table; the text of a locale is read when it is first used, or with [method load_locale]. This keeps unused locales out of memory and works from the PCK and [code]user://[/code] on every platform, including the Web.
 		[b]Text formats[/b] ([method load_from_text], [method to_text], [enum ResourceTextSerializer.Format]):
 		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are ignored, a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not.
-		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs). The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order) and [code]plural_rules[/code]. In INI, every key is a [code][section][/code].
+		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs). The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code] and [code skip-lint]channel[/code]. In INI, every key is a [code][section][/code].
 		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules.
 		Saved as [code].tres[/code] or [code].res[/code], a catalog stores all locales in one block (no loading per locale).
 		[codeblocks]
@@ -66,6 +66,12 @@
 			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
 				Returns the row number of [param key] with [param context], or [code]-1[/code] if the catalog has no such row.
+			</description>
+		</method>
+		<method name="get_file_extensions" qualifiers="static">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the file extensions of catalogs: [code]lcat[/code] and the text formats ([code]csv[/code], [code]json[/code], [code]yaml[/code], [code]yml[/code], [code]toml[/code], [code]ini[/code], [code]xml[/code]). Text formats are loaded by [ResourceLoader] only with a catalog type hint, for example [code]ResourceLoader.load("res://texts.json", "TextLocalizationCatalog")[/code], because they do not name their kind and other loaders own these extensions otherwise. A [code].csv[/code] file that Godot imports as [Translation] is not a catalog: set its import to "Keep File".
 			</description>
 		</method>
 		<method name="get_key" qualifiers="const">
@@ -178,6 +184,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="channel" type="StringName" setter="set_channel" getter="get_channel" default="&amp;&quot;interface&quot;">
+			The locale channel the keys of this catalog follow (see [method TranslationServer.set_locale_for]): [code]&amp;"interface"[/code], [code]&amp;"audio"[/code], [code]&amp;"subtitles"[/code] or a custom one. [TextLocalizationCatalog]s use [code]&amp;"interface"[/code] by default; for [ResourceLocalizationCatalog]s an empty channel means the channel of each key's type. Stored in [code].tres[/code], [code].lcat[/code], JSON, YAML, TOML and INI (not in CSV and XML).
+		</member>
 		<member name="key_count" type="int" setter="" getter="get_key_count" default="0">
 			The number of rows (keys with their context).
 		</member>

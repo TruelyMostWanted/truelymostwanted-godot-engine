@@ -97,7 +97,7 @@ TEST_CASE("[ResourceLocalizationServer] Paths, layers and locale matching") {
 	CHECK_FALSE(server->has_localization("res://voice/other.ogg"));
 	CHECK(server->get_localized_path("res://voice/other.ogg", "de") == "res://voice/other.ogg");
 
-	// The best compare_locales() score, like translation_remaps: `de` (5) beats `de_AT` (4) for `de_DE`.
+	// The locale chain: `de_DE` -> `de` -> the closest other locale (`de_AT`) -> fallback.
 	CHECK(server->get_localized_path(voice, "de_DE") == "res://voice/de/intro.ogg");
 	CHECK(server->get_localized_path(voice, "de_AT") == "res://voice/de_AT/intro.ogg");
 	CHECK(server->get_localized_path(voice, "pl") == "user://mods/polish/voice/intro.ogg");
@@ -109,9 +109,9 @@ TEST_CASE("[ResourceLocalizationServer] Paths, layers and locale matching") {
 	CHECK(server->get_localized_path(voice, "de_DE") == "res://voice/de_DE/intro.ogg");
 
 	// The active locale comes from the snapshot.
-	LocalizationServer::set_locale("pl");
+	TranslationServer::get_singleton()->set_locale("pl");
 	CHECK(server->get_localized_path(voice) == "user://mods/polish/voice/intro.ogg");
-	LocalizationServer::set_locale("de_CH");
+	TranslationServer::get_singleton()->set_locale("de_CH");
 	CHECK(server->get_localized_path(voice) == "res://voice/de/intro.ogg");
 
 	const Dictionary paths = server->get_localized_paths(voice);
@@ -127,6 +127,37 @@ TEST_CASE("[ResourceLocalizationServer] Paths, layers and locale matching") {
 	CHECK(missing.size() == 4);
 	CHECK_FALSE(missing.has("de"));
 	CHECK(server->get_missing_locales(voice).is_empty());
+}
+
+TEST_CASE("[ResourceLocalizationServer] Channels by type and a channel change") {
+	ServerState state;
+	ResourceLocalizationServer *server = state.server;
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	translation_server->set_locale("en");
+
+	Ref<ResourceLocalizationCatalog> catalog;
+	catalog.instantiate();
+	catalog->set_localized_path("res://voice/intro.ogg", "ja", "res://voice/ja/intro.ogg");
+	catalog->set_expected_type("res://voice/intro.ogg", "AudioStreamOggVorbis");
+	catalog->set_localized_path("res://ui/logo.png", "ja", "res://ui/logo_ja.png");
+	catalog->set_expected_type("res://ui/logo.png", "Texture2D");
+	CHECK(catalog->get_channel() == StringName()); // By type.
+	server->add_catalog(catalog);
+
+	// Only the audio channel in Japanese: the voice follows it, the logo stays with the general locale.
+	translation_server->set_locale_for("audio", "ja");
+	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/ja/intro.ogg");
+	CHECK(server->get_localized_path("res://ui/logo.png") == "res://ui/logo.png");
+	translation_server->clear_locale_for("audio");
+	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/intro.ogg");
+
+	// A fixed channel overrides the type.
+	catalog->set_channel("interface");
+	MessageQueue::get_singleton()->flush();
+	translation_server->set_locale_for("interface", "ja");
+	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/ja/intro.ogg");
+	CHECK(server->get_localized_path("res://ui/logo.png") == "res://ui/logo_ja.png");
+	translation_server->clear_locale_for("interface");
 }
 
 TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
@@ -153,7 +184,7 @@ TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
 
 	const PackedStringArray locales = { "en", "de", "de_DE", "de_AT", "de_CH", "pt_BR", "fr", "fr_CA", "ja", "zh_TW" };
 	for (const String &locale : locales) {
-		LocalizationServer::set_locale(locale);
+		TranslationServer::get_singleton()->set_locale(locale);
 		for (const String &path : PackedStringArray({ logo, intro })) {
 			const ResourceLoader::PathLocalizer localizer = ResourceLoader::path_localizer;
 			ResourceLoader::path_localizer = nullptr;
@@ -168,7 +199,7 @@ TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
 		}
 	}
 	// `ja` points to a missing file: both fall back to the original path.
-	LocalizationServer::set_locale("ja");
+	TranslationServer::get_singleton()->set_locale("ja");
 	ERR_PRINT_OFF;
 	CHECK(ResourceLoader::path_remap(intro) == intro);
 	ERR_PRINT_ON;
@@ -187,7 +218,7 @@ TEST_CASE("[ResourceLocalizationServer] Same results as translation_remaps") {
 TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	ServerState state;
 	ResourceLocalizationServer *server = state.server;
-	LocalizationServer::set_locale("en");
+	TranslationServer::get_singleton()->set_locale("en");
 	const String folder = make_folder("resource_localization_load");
 	for (const String &locale : PackedStringArray({ "en", "de", "pl" })) {
 		Ref<Resource> resource;
@@ -208,7 +239,7 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	CHECK(loaded->get_path() == voice); // Cached under the original path.
 
 	SIGNAL_WATCH(server, SNAME("resources_relocalized"));
-	LocalizationServer::set_locale("de");
+	TranslationServer::get_singleton()->set_locale("de");
 	wait_for_relocalization(server);
 	CHECK(loaded->get_name() == "de"); // Updated in place.
 	CHECK(ResourceLoader::load(voice) == loaded);
@@ -221,7 +252,7 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	mod.instantiate();
 	mod->set_localized_path(voice, "pl", folder.path_join("voice_pl.tres"));
 	server->add_catalog(mod, 100);
-	LocalizationServer::set_locale("pl");
+	TranslationServer::get_singleton()->set_locale("pl");
 	wait_for_relocalization(server);
 	CHECK(loaded->get_name() == "pl");
 	SIGNAL_CHECK("resources_relocalized", relocalized);
@@ -231,7 +262,7 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 	wait_for_relocalization(server);
 	CHECK(loaded->get_name() == "en");
 	SIGNAL_DISCARD("resources_relocalized");
-	LocalizationServer::set_locale("fr");
+	TranslationServer::get_singleton()->set_locale("fr");
 	wait_for_relocalization(server);
 	SIGNAL_CHECK_FALSE("resources_relocalized");
 	SIGNAL_UNWATCH(server, SNAME("resources_relocalized"));
@@ -242,7 +273,7 @@ TEST_CASE("[ResourceLocalizationServer] load() and background relocalization") {
 TEST_CASE("[SceneTree][ResourceLocalizationServer] load() on the main thread during a relocalization") {
 	ServerState state;
 	ResourceLocalizationServer *server = state.server;
-	LocalizationServer::set_locale("en");
+	TranslationServer::get_singleton()->set_locale("en");
 	const String folder = make_folder("resource_localization_textures");
 	Ref<ResourceLocalizationCatalog> catalog;
 	catalog.instantiate();
@@ -264,7 +295,7 @@ TEST_CASE("[SceneTree][ResourceLocalizationServer] load() on the main thread dur
 		REQUIRE(cached[cached.size() - 1].is_valid());
 	}
 
-	LocalizationServer::set_locale("de");
+	TranslationServer::get_singleton()->set_locale("de");
 	CHECK(server->is_relocalizing());
 	for (int index = 0; index < originals.size(); index++) {
 		CHECK(ResourceLoader::load(originals[index]).ptr() == cached[index].ptr()); // Hung here before (#344).
@@ -305,7 +336,7 @@ TEST_CASE("[ResourceLocalizationServer] Remap cost") {
 	catalog.instantiate();
 	catalog->add_translation_remaps(remaps);
 	server->add_catalog(catalog);
-	LocalizationServer::set_locale("pl_PL");
+	TranslationServer::get_singleton()->set_locale("pl_PL");
 
 	constexpr int calls = 2000;
 	int64_t length = 0; // Keeps the calls from being optimized away.
