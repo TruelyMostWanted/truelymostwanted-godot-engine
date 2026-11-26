@@ -40,56 +40,6 @@ TEST_FORCE_LINK(test_resource_format_virtuals)
 
 namespace TestResourceFormatVirtuals {
 
-// Gives the tests access to the method info of the protected virtual methods.
-class LoaderVirtuals : public ResourceFormatLoader {
-public:
-	static MethodInfo get_load_info() { return _gdvirtual__load_get_method_info(); }
-};
-
-class SaverVirtuals : public ResourceFormatSaver {
-public:
-	static MethodInfo get_save_info() { return _gdvirtual__save_get_method_info(); }
-};
-
-// Hash of the method as it was bound with a plain integer argument (what compiled GDExtensions look up).
-static uint32_t get_int_argument_hash(const MethodInfo &p_info, int p_argument) {
-	MethodInfo old_info = p_info;
-	old_info.arguments.write[p_argument] = PropertyInfo(Variant::INT, p_info.arguments[p_argument].name);
-	return old_info.get_compatibility_hash();
-}
-
-TEST_CASE("[ResourceFormatLoader] _load takes a typed cache mode, the int signature stays compatible") {
-	const MethodInfo info = LoaderVirtuals::get_load_info();
-	REQUIRE(info.arguments.size() == 4);
-	const PropertyInfo &cache_mode = info.arguments[3];
-	CHECK(cache_mode.type == Variant::INT);
-	CHECK(cache_mode.class_name == StringName("ResourceFormatLoader.CacheMode"));
-	CHECK((cache_mode.usage & PROPERTY_USAGE_CLASS_IS_ENUM) != 0);
-	CHECK(ClassDB::has_enum(ResourceFormatLoader::get_class_static(), "CacheMode", true));
-
-	const uint32_t old_hash = get_int_argument_hash(info, 3);
-	CHECK(old_hash != info.get_compatibility_hash());
-#ifndef DISABLE_DEPRECATED
-	CHECK(ClassDB::get_virtual_method_compatibility_hashes(ResourceFormatLoader::get_class_static(), "_load").has(old_hash));
-#endif
-}
-
-TEST_CASE("[ResourceFormatSaver] _save takes typed saver flags, the int signature stays compatible") {
-	const MethodInfo info = SaverVirtuals::get_save_info();
-	REQUIRE(info.arguments.size() == 3);
-	const PropertyInfo &flags = info.arguments[2];
-	CHECK(flags.type == Variant::INT);
-	CHECK(flags.class_name == StringName("ResourceSaver.SaverFlags"));
-	CHECK((flags.usage & PROPERTY_USAGE_CLASS_IS_BITFIELD) != 0);
-	CHECK(ClassDB::has_enum("ResourceSaver", "SaverFlags", true));
-
-	const uint32_t old_hash = get_int_argument_hash(info, 2);
-	CHECK(old_hash != info.get_compatibility_hash());
-#ifndef DISABLE_DEPRECATED
-	CHECK(ClassDB::get_virtual_method_compatibility_hashes(ResourceFormatSaver::get_class_static(), "_save").has(old_hash));
-#endif
-}
-
 TEST_CASE("[ResourceLoader] resource_path and the cache per cache mode") {
 	const String path = TestUtils::get_temp_path("cache_mode_path.tres");
 	const String local_path = ProjectSettings::get_singleton()->localize_path(path);

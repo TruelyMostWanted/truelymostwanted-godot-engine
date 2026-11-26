@@ -1,7 +1,0 @@
-Validate extension JSON: Error: Field 'classes/ResourceFormatLoader/methods/_load/arguments': meta was removed.
-Validate extension JSON: Error: Field 'classes/ResourceFormatLoader/methods/_load/arguments/3': type changed value in new API, from "int" to "enum::ResourceFormatLoader.CacheMode".
-Validate extension JSON: Error: Field 'classes/ResourceFormatSaver/methods/_save/arguments': meta was removed.
-Validate extension JSON: Error: Field 'classes/ResourceFormatSaver/methods/_save/arguments/2': type changed value in new API, from "int" to "bitfield::ResourceSaver.SaverFlags".
-
-The `cache_mode` argument of `ResourceFormatLoader._load()` and the `flags` argument of `ResourceFormatSaver._save()` are typed as `ResourceFormatLoader.CacheMode` and `BitField[ResourceSaver.SaverFlags]`.
-Compatibility virtual methods with the old integer arguments are registered, so compiled extensions keep working.
