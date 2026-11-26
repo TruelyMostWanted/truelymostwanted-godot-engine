@@ -265,7 +265,9 @@ Error TileMapPathGraph::update_all() {
 			astar.instantiate();
 		}
 		astar->clear();
-		astar->reserve_space(int64_t(region.size.x) * region.size.y);
+		if (region.has_area()) {
+			astar->reserve_space(int64_t(region.size.x) * region.size.y);
+		}
 
 		// Even CellNeighbor values are sides, odd values are corners.
 		LocalVector<TileSet::CellNeighbor> neighbors;
