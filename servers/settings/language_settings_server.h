@@ -81,7 +81,7 @@ public:
 	static String get_project_locale();
 	// The locale passed with `--language` or `-l`, or an empty string.
 	static String get_command_line_locale();
-	// The locales of the loaded translations (TranslationServer.get_loaded_locales()), sorted.
+	// The locales of the localization catalogs and of the loaded translations, sorted.
 	static PackedStringArray get_available_locales();
 
 	virtual StringName get_domain() const override;

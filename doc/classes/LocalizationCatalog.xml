@@ -36,7 +36,7 @@
 		[b]Note:[/b] Reading the same catalog from several threads is safe (loading a locale is guarded by a lock); changing it while other threads read it is not.
 	</description>
 	<tutorials>
-		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/341-feature-localization-catalog</link>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Localization-Catalogs</link>
 	</tutorials>
 	<methods>
 		<method name="add_key">

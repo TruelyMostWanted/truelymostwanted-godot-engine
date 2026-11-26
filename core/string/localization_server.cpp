@@ -52,6 +52,9 @@ public:
 	}
 };
 
+// All live servers (created and freed on the main thread), for get_all_available_locales().
+static LocalVector<LocalizationServer *> live_servers;
+
 static String _standardize_locale(const String &p_locale) {
 	const TranslationServer *translation_server = TranslationServer::get_singleton();
 	return translation_server ? translation_server->standardize_locale(p_locale) : p_locale;
@@ -348,6 +351,20 @@ PackedStringArray LocalizationServer::get_available_locales() const {
 	return locales;
 }
 
+PackedStringArray LocalizationServer::get_all_available_locales() {
+	PackedStringArray locales;
+	for (const LocalizationServer *server : live_servers) {
+		for (const String &locale : server->get_available_locales()) {
+			const String standardized = _standardize_locale(locale);
+			if (!locales.has(standardized)) {
+				locales.push_back(standardized);
+			}
+		}
+	}
+	locales.sort();
+	return locales;
+}
+
 int LocalizationServer::get_key_count() const {
 	return _get_data()->keys->keys.size();
 }
@@ -377,9 +394,11 @@ LocalizationServer::LocalizationServer() {
 	locale_hook.instantiate();
 	locale_hook->server = this;
 	locale_hook->set_as_translation_remapped(true);
+	live_servers.push_back(this);
 }
 
 LocalizationServer::~LocalizationServer() {
+	live_servers.erase(this);
 	locale_hook->server = nullptr;
 	locale_hook->set_as_translation_remapped(false);
 	_free_retired();

@@ -36,6 +36,9 @@ TEST_FORCE_LINK(test_language_settings_server)
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/object/message_queue.h"
+#include "core/string/localization_catalog.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
 #include "scene/main/scene_tree.h"
@@ -165,6 +168,40 @@ TEST_CASE("[LanguageSettingsServer] A saved locale without a loaded translation 
 	server->set_locale("fr_CA");
 	CHECK(translation_server->get_locale() == "fr_CA");
 	memdelete(server);
+}
+
+TEST_CASE("[LanguageSettingsServer] Locales of localization catalogs are selectable without translations") {
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	TextLocalizationServer *text_server = TextLocalizationServer::get_singleton();
+	REQUIRE(text_server != nullptr);
+	const String original_locale = translation_server->get_locale();
+	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
+
+	Ref<TextLocalizationCatalog> catalog;
+	catalog.instantiate();
+	catalog->set_text("HELLO", "en", "Hello");
+	catalog->set_text("HELLO", "fr", "Bonjour");
+	text_server->add_catalog(catalog);
+	translation_server->set_locale("en_US");
+
+	// TranslationServer only knows the tr() adapter, whose locale is the active one.
+	CHECK_FALSE(translation_server->get_loaded_locales().has("fr"));
+	const PackedStringArray locales = LanguageSettingsServer::get_available_locales();
+	CHECK(locales.has("en"));
+	CHECK(locales.has("fr"));
+	CHECK_FALSE(locales.has("en_US"));
+	CHECK(locales.find("en") < locales.find("fr"));
+
+	LanguageSettingsServer *server = memnew(LanguageSettingsServer);
+	server->set_locale("fr");
+	CHECK(translation_server->get_locale() == "fr");
+	CHECK(text_server->translate("HELLO") == "Bonjour");
+	memdelete(server);
+
+	text_server->clear_catalogs();
+	translation_server->set_locale(original_locale);
+	MessageQueue::get_singleton()->flush();
+	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
 }
 
 TEST_CASE("[LanguageSettingsServer] The test locale wins at startup, a runtime change wins over it") {

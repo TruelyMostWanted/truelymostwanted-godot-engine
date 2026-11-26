@@ -152,6 +152,8 @@ public:
 	int load_project_catalogs();
 
 	PackedStringArray get_available_locales() const;
+	// The locales of the catalogs of all localization servers, standardized and sorted (for LanguageSettingsServer).
+	static PackedStringArray get_all_available_locales();
 	int get_key_count() const;
 
 	// Called on every TranslationServer::set_locale() through the locale hook.

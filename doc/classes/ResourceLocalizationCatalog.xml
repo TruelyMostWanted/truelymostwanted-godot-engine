@@ -22,7 +22,7 @@
 		[/codeblocks]
 	</description>
 	<tutorials>
-		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/341-feature-localization-catalog</link>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Localization-Catalogs</link>
 	</tutorials>
 	<methods>
 		<method name="add_translation_remaps">

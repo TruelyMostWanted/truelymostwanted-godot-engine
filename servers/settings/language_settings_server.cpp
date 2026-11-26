@@ -34,6 +34,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
@@ -75,7 +76,14 @@ PackedStringArray LanguageSettingsServer::get_available_locales() {
 	if (translation_server == nullptr) {
 		return PackedStringArray();
 	}
-	Vector<String> locales = translation_server->get_loaded_locales();
+	PackedStringArray locales = LocalizationServer::get_all_available_locales();
+	// Skips the tr() adapter of the localization catalogs: its locale is always the active one.
+	const TextLocalizationServer *text_server = TextLocalizationServer::get_singleton();
+	for (const Ref<Translation> &translation : translation_server->get_main_domain()->get_translations()) {
+		if ((text_server == nullptr || !text_server->is_adapter(translation)) && !locales.has(translation->get_locale())) {
+			locales.push_back(translation->get_locale());
+		}
+	}
 	locales.sort();
 	return locales;
 }
@@ -92,12 +100,12 @@ bool LanguageSettingsServer::_is_developer_locale(const String &p_locale) {
 
 String LanguageSettingsServer::_resolve_locale(const String &p_locale) {
 	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	const PackedStringArray loaded = translation_server->get_loaded_locales();
-	if (loaded.is_empty()) {
+	const PackedStringArray available = get_available_locales();
+	if (available.is_empty()) {
 		// No translations: the game may still use the locale for its own texts.
 		return p_locale;
 	}
-	for (const String &locale : loaded) {
+	for (const String &locale : available) {
 		if (translation_server->compare_locales(p_locale, locale) > 0) {
 			return p_locale;
 		}
