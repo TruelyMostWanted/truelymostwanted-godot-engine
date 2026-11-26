@@ -212,7 +212,7 @@ void LocalizationServer::_rebuild(bool p_keys) {
 		free_queued = true;
 		callable_mp(this, &LocalizationServer::_free_retired).call_deferred();
 	}
-	_data_published(new_data);
+	_data_published(new_data, old_data);
 
 	// On-demand locales: unload file-backed columns outside of the chain, report the newly loaded locales.
 	PackedStringArray present;

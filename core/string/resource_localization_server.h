@@ -62,7 +62,6 @@ class ResourceLocalizationServer : public LocalizationServer {
 		SafeNumeric<uint32_t> remaining;
 	};
 
-	const ResourceData *published = nullptr;
 	Relocalization *relocalization = nullptr;
 	PackedStringArray pending_paths;
 	Ref<ResourceLocalizationCatalog> remaps_catalog;
@@ -81,7 +80,7 @@ protected:
 	virtual StringName _get_catalog_class() const override { return SNAME("ResourceLocalizationCatalog"); }
 	virtual Data *_create_data() const override { return memnew(ResourceData); }
 	virtual void _resolve(Data *p_data) const override;
-	virtual void _data_published(const Data *p_data) override;
+	virtual void _data_published(const Data *p_data, const Data *p_previous) override;
 	virtual const char *_get_catalogs_setting() const override { return SETTING_RESOURCE_CATALOGS; }
 	virtual const char *_get_external_catalogs_setting() const override { return SETTING_RESOURCE_EXTERNAL_CATALOGS; }
 	virtual Ref<LocalizationCatalog> _get_project_catalog() override;

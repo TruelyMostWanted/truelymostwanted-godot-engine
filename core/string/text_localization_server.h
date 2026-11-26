@@ -80,7 +80,7 @@ protected:
 	virtual StringName _get_catalog_class() const override { return SNAME("TextLocalizationCatalog"); }
 	virtual Data *_create_data() const override;
 	virtual void _resolve(Data *p_data) const override;
-	virtual void _data_published(const Data *p_data) override;
+	virtual void _data_published(const Data *p_data, const Data *p_previous) override;
 
 public:
 	static TextLocalizationServer *get_singleton() { return singleton; }

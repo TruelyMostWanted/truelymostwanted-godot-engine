@@ -1674,11 +1674,14 @@ String ResourceLoader::_path_remap(const String &p_path, bool *r_translation_rem
 		if (r_translation_remapped) {
 			*r_translation_remapped = true;
 		}
+	}
 
-		// Fallback to p_path if new_path does not exist.
-		if (!FileAccess::exists(new_path + ".import") &&
-				!FileAccess::exists(new_path + ".remap") &&
-				!FileAccess::exists(new_path)) {
+	// Fallback to p_path if new_path does not exist.
+	if (new_path != p_path) {
+		const String file = ResourceUID::ensure_path(new_path);
+		if (!FileAccess::exists(file + ".import") &&
+				!FileAccess::exists(file + ".remap") &&
+				!FileAccess::exists(file)) {
 			WARN_PRINT(vformat("Translation remap '%s' does not exist. Falling back to '%s'.", new_path, p_path));
 			new_path = p_path;
 		}

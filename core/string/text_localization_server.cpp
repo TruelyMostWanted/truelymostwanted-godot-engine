@@ -120,7 +120,7 @@ void TextLocalizationServer::_resolve(Data *p_data) const {
 	}
 }
 
-void TextLocalizationServer::_data_published(const Data *p_data) {
+void TextLocalizationServer::_data_published(const Data *p_data, const Data *p_previous) {
 	TranslationServer *translation_server = TranslationServer::get_singleton();
 	if (!translation_server) {
 		return;

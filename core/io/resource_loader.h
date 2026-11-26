@@ -390,7 +390,8 @@ public:
 
 	static String path_remap(const String &p_path);
 	// Asked before translation_remaps (ResourceLocalizationServer, #344). Returns true if it handles `p_path`; its
-	// resources are not flagged as translation-remapped, it relocalizes them itself.
+	// resources are not flagged as translation-remapped, it relocalizes them itself. A missing file falls back to
+	// `p_path` like a translation remap.
 	typedef bool (*PathLocalizer)(const String &p_path, String &r_path);
 	static PathLocalizer path_localizer;
 	static String import_remap(const String &p_path);

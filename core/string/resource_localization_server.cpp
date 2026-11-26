@@ -32,9 +32,7 @@
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
-#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
-#include "core/io/resource_uid.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
@@ -106,20 +104,13 @@ bool ResourceLocalizationServer::_localize_path(const String &p_path, String &r_
 	if (!path) {
 		return false;
 	}
-	r_path = *path;
-	if (r_path != p_path) {
-		const String file = ResourceUID::ensure_path(r_path);
-		if (!FileAccess::exists(file + ".import") && !FileAccess::exists(file + ".remap") && !FileAccess::exists(file)) {
-			WARN_PRINT(vformat("Localized resource '%s' does not exist. Falling back to '%s'.", r_path, p_path));
-			r_path = p_path;
-		}
-	}
+	r_path = *path; // ResourceLoader falls back to p_path if the file does not exist.
 	return true;
 }
 
-void ResourceLocalizationServer::_data_published(const Data *p_data) {
-	const ResourceData *previous = published; // Retired, freed on the next idle frame.
-	published = static_cast<const ResourceData *>(p_data);
+void ResourceLocalizationServer::_data_published(const Data *p_data, const Data *p_previous) {
+	const ResourceData *published = static_cast<const ResourceData *>(p_data);
+	const ResourceData *previous = static_cast<const ResourceData *>(p_previous);
 	if (Engine::get_singleton()->is_editor_hint()) {
 		return;
 	}
@@ -149,12 +140,7 @@ void ResourceLocalizationServer::_data_published(const Data *p_data) {
 // back from the RenderingServer, which waits for the main thread).
 void ResourceLocalizationServer::_relocalize_resource(void *p_userdata, uint32_t p_index) {
 	Relocalization *job = static_cast<Relocalization *>(p_userdata);
-	const String &key = job->paths[p_index];
-	String path;
-	if (!_localize_path(key, path)) {
-		path = key;
-	}
-	job->resources[p_index] = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	job->resources[p_index] = ResourceLoader::load(ResourceLoader::path_remap(job->paths[p_index]), "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 	if (job->remaining.decrement() == 0) {
 		MessageQueue::get_main_singleton()->push_callable(callable_mp(singleton, &ResourceLocalizationServer::_relocalization_done));
 	}
