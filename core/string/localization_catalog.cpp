@@ -602,16 +602,19 @@ void LocalizationCatalog::_set_note(uint32_t p_row, NoteColumn *p_column, const 
 }
 
 void LocalizationCatalog::set_note(const StringName &p_key, const String &p_note, const StringName &p_context, const StringName &p_column) {
-	NoteColumn *note_column = _get_note_column("_" + String(p_column));
-	ERR_FAIL_NULL_MSG(note_column, vformat("\"%s\" is not a note column: \"key\", \"context\" and \"%s\" are reserved.", p_column, _get_extra_name()));
+	// An empty column is "notes": C# passes the default of a StringName parameter as empty.
+	const StringName column = p_column == StringName() ? StringName("notes") : p_column;
+	NoteColumn *note_column = _get_note_column("_" + String(column));
+	ERR_FAIL_NULL_MSG(note_column, vformat("\"%s\" is not a note column: \"key\", \"context\" and \"%s\" are reserved.", column, _get_extra_name()));
 	_set_note(add_key(p_key, p_context), note_column, p_note);
 	emit_changed();
 }
 
 String LocalizationCatalog::get_note(const StringName &p_key, const StringName &p_context, const StringName &p_column) const {
+	const StringName column = p_column == StringName() ? StringName("notes") : p_column;
 	const int row = find_key(p_key, p_context);
 	for (const NoteColumn &note_column : note_columns) {
-		if (note_column.name == p_column) {
+		if (note_column.name == column) {
 			const String *note = row < 0 ? nullptr : note_column.notes.getptr(row);
 			return note ? *note : String();
 		}
