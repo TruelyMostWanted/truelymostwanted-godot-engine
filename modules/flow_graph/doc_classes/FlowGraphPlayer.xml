@@ -61,13 +61,13 @@
 		<member name="autostart" type="bool" setter="set_autostart" getter="is_autostart" default="false">
 			If [code]true[/code], the player plays [member graph] when it is ready (not in the editor).
 		</member>
-		<member name="blackboard" type="FlowBlackboard" setter="set_blackboard" getter="get_blackboard" default="null">
+		<member name="blackboard" type="FlowBlackboard" setter="set_blackboard" getter="get_blackboard">
 			An optional blackboard for the variables, for example one shared by several players. If [code]null[/code], the playback uses its own blackboard.
 		</member>
 		<member name="callback_mode_process" type="int" setter="set_callback_mode_process" getter="get_callback_mode_process" enum="FlowGraphPlayer.CallbackModeProcess" default="1">
 			When waiting nodes are processed.
 		</member>
-		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph" default="null">
+		<member name="graph" type="FlowGraph" setter="set_graph" getter="get_graph">
 			The graph to play.
 		</member>
 	</members>

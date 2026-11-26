@@ -11,6 +11,7 @@
 		[b]Subgraphs.[/b] A [FlowSubgraphNode] pushes its graph and starts it; when that graph ends, the playback returns to the subgraph node and continues through the output named like the end name (see [member FlowSubgraphNode.exit_names]) or [code]out[/code]. Node ids in signals and methods belong to the graph on top of the stack ([method get_current_graph]).
 		[b]Control from signal handlers.[/b] Signal handlers and nodes may call [method stop], [method start], [method advance] or [method travel]; the step that emitted the signal then returns without touching the state.
 		[b]Guards.[/b] [member max_steps_per_advance], [member max_data_depth] and [member max_subgraph_depth] stop endless loops and runaway recursion (the Web build has a small stack): the playback prints an error, stops and returns [constant ERR_CYCLIC_LINK].
+		[b]Debugging.[/b] When the game runs from the editor with a debugger attached (debug builds only), every playback reports its current node to the editor, and the FlowGraph dock highlights that node. Pick the playback in the dock's menu bar when several run; [b]Follow[/b] opens subgraphs and centers the view. Release exports send nothing. Graphs are matched by resource path, so graphs created in code or made local to a scene cannot be shown.
 		[codeblocks]
 		[gdscript]
 		var playback := FlowGraphPlayback.new()

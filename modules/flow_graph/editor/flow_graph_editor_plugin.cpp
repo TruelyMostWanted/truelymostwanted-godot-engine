@@ -30,12 +30,16 @@
 
 #include "flow_graph_editor_plugin.h"
 
+#include "../flow_graph_debugger.h"
+
+#include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/templates/hash_set.h"
 #include "editor/docks/editor_dock_manager.h"
 #include "editor/editor_node.h"
+#include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/settings/editor_command_palette.h"
 #include "editor/themes/editor_scale.h"
@@ -47,9 +51,11 @@
 #include "scene/gui/graph_node.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
+#include "scene/gui/option_button.h"
 #include "scene/gui/popup_menu.h"
 #include "scene/gui/texture_rect.h"
 #include "scene/gui/tree.h"
+#include "scene/resources/style_box_flat.h"
 
 enum {
 	MENU_ADD_NODE,
@@ -164,8 +170,10 @@ void FlowGraphEditor::_rebuild() {
 		}
 	}
 	graph_edit->clear_connections();
+	debug_highlighted = StringName();
 	status->set_text(String());
 	if (graph.is_null()) {
+		_debug_update();
 		return;
 	}
 
@@ -282,6 +290,7 @@ void FlowGraphEditor::_rebuild() {
 			graph_edit->connect_node("n" + itos(c->get_from_node_id()), from_port, "n" + itos(c->get_to_node_id()), to_port);
 		}
 	}
+	_debug_update();
 }
 
 void FlowGraphEditor::_add_inline_properties(GraphNode *p_graph_node, const Ref<FlowNode> &p_node, int p_id) {
@@ -783,6 +792,21 @@ FlowGraphEditor::FlowGraphEditor() {
 	add_button->connect(SceneStringName(pressed), callable_mp(this, &FlowGraphEditor::_context_menu_id_pressed).bind(MENU_ADD_NODE_AT_CENTER));
 	graph_edit->get_menu_hbox()->add_child(add_button);
 
+	debug_selector = memnew(OptionButton);
+	debug_selector->set_tooltip_text(TTR("Running playback to show. The game must run from the editor with a debug export or build."));
+	debug_selector->set_accessibility_name(TTRC("Running Playback"));
+	debug_selector->hide();
+	debug_selector->connect(SceneStringName(item_selected), callable_mp(this, &FlowGraphEditor::_debug_selected));
+	graph_edit->get_menu_hbox()->add_child(debug_selector);
+	debug_follow = memnew(Button);
+	debug_follow->set_text(TTR("Follow"));
+	debug_follow->set_tooltip_text(TTR("Follow the running playback: open the graph its current node is in (also subgraphs) and center the view on that node."));
+	debug_follow->set_toggle_mode(true);
+	debug_follow->set_flat(true);
+	debug_follow->hide();
+	debug_follow->connect(SceneStringName(toggled), callable_mp(this, &FlowGraphEditor::_debug_update).unbind(1));
+	graph_edit->get_menu_hbox()->add_child(debug_follow);
+
 	status = memnew(Label);
 	status->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	vbox->add_child(status);
@@ -813,6 +837,144 @@ FlowGraphEditor::FlowGraphEditor() {
 	add_child(add_dialog);
 }
 
+// Debugger: highlights the current node of a playback in the running game.
+
+void FlowGraphEditor::_debug_selected(int p_item) {
+	const DebugPlayback &playback = debug_playbacks[debug_selector->get_item_id(p_item)];
+	debug_selected_session = playback.session;
+	debug_selected_id = playback.id;
+	_debug_update();
+}
+
+void FlowGraphEditor::_debug_update() {
+	const DebugPlayback *selected = nullptr;
+	for (const DebugPlayback &playback : debug_playbacks) {
+		if (playback.session == debug_selected_session && playback.id == debug_selected_id) {
+			selected = &playback;
+		}
+	}
+
+	// Follow the selected playback into subgraphs and back. Built-in graphs ("::" paths) only resolve while their scene is open.
+	const bool follow = debug_follow->is_pressed();
+	if (selected != nullptr && follow && !selected->current_graph_path.is_empty() && (graph.is_null() || graph->get_path() != selected->current_graph_path)) {
+		Ref<FlowGraph> target = ResourceCache::get_ref(selected->current_graph_path);
+		if (target.is_null() && !selected->current_graph_path.contains("::")) {
+			target = ResourceLoader::load(selected->current_graph_path);
+		}
+		if (target.is_valid()) {
+			edit(target); // Rebuilds, then comes back here.
+			return;
+		}
+	}
+
+	// List the playbacks that run in the edited graph (and the selected one), to pick one when several run.
+	const String path = graph.is_valid() ? graph->get_path() : String();
+	debug_selector->clear();
+	for (uint32_t i = 0; i < debug_playbacks.size(); i++) {
+		const DebugPlayback &playback = debug_playbacks[i];
+		if (&playback != selected && (path.is_empty() || (playback.graph_path != path && playback.current_graph_path != path))) {
+			continue;
+		}
+		debug_selector->add_item(vformat(playback.waiting ? TTR("Playback %d (waiting)") : TTR("Playback %d"), playback.id), i);
+		if (&playback == selected) {
+			debug_selector->select(debug_selector->get_item_count() - 1);
+		}
+	}
+	if (selected == nullptr && debug_selector->get_item_count() > 0) {
+		selected = &debug_playbacks[debug_selector->get_item_id(0)];
+		debug_selected_session = selected->session;
+		debug_selected_id = selected->id;
+		debug_selector->select(0);
+	}
+	debug_selector->set_visible(debug_selector->get_item_count() > 0);
+	debug_follow->set_visible(debug_selector->get_item_count() > 0);
+
+	StringName active;
+	if (selected != nullptr && !path.is_empty() && selected->current_graph_path == path && selected->node_id != FlowGraph::NODE_ID_NONE) {
+		active = "n" + itos(selected->node_id);
+	}
+	if (active == debug_highlighted) {
+		return;
+	}
+	if (GraphNode *previous = Object::cast_to<GraphNode>(graph_edit->get_node_or_null(NodePath(debug_highlighted)))) {
+		previous->remove_theme_style_override(SNAME("titlebar"));
+		previous->remove_theme_style_override(SNAME("titlebar_selected"));
+	}
+	debug_highlighted = active;
+	GraphNode *current = Object::cast_to<GraphNode>(graph_edit->get_node_or_null(NodePath(active)));
+	if (current == nullptr) {
+		return;
+	}
+	const Ref<StyleBox> titlebar = current->get_theme_stylebox(SNAME("titlebar"));
+	Ref<StyleBoxFlat> style;
+	if (titlebar.is_valid()) {
+		style = titlebar->duplicate();
+	}
+	if (style.is_null()) {
+		style.instantiate();
+	}
+	style->set_bg_color(get_theme_color(SNAME("accent_color"), EditorStringName(Editor)));
+	current->add_theme_style_override(SNAME("titlebar"), style);
+	current->add_theme_style_override(SNAME("titlebar_selected"), style);
+	if (follow) {
+		graph_edit->set_scroll_offset((current->get_position_offset() + current->get_size() * 0.5) * graph_edit->get_zoom() - graph_edit->get_size() * 0.5);
+	}
+}
+
+void FlowGraphEditor::debug_playback_changed(int p_session, const Array &p_data) {
+	ERR_FAIL_COND(p_data.size() != FlowGraphDebugger::FIELD_MAX);
+	const int64_t id = p_data[FlowGraphDebugger::FIELD_ID];
+	int index = -1;
+	for (uint32_t i = 0; i < debug_playbacks.size(); i++) {
+		if (debug_playbacks[i].session == p_session && debug_playbacks[i].id == id) {
+			index = i;
+		}
+	}
+	if (!(bool)p_data[FlowGraphDebugger::FIELD_PLAYING]) {
+		if (index >= 0) {
+			debug_playbacks.remove_at(index);
+		}
+	} else {
+		if (index < 0) {
+			index = debug_playbacks.size();
+			debug_playbacks.push_back(DebugPlayback());
+		}
+		DebugPlayback &playback = debug_playbacks[index];
+		playback.session = p_session;
+		playback.id = id;
+		playback.graph_path = p_data[FlowGraphDebugger::FIELD_GRAPH_PATH];
+		playback.current_graph_path = p_data[FlowGraphDebugger::FIELD_CURRENT_GRAPH_PATH];
+		playback.node_id = p_data[FlowGraphDebugger::FIELD_NODE_ID];
+		playback.waiting = p_data[FlowGraphDebugger::FIELD_WAITING];
+	}
+	_debug_update();
+}
+
+void FlowGraphEditor::debug_session_stopped(int p_session) {
+	for (int i = (int)debug_playbacks.size() - 1; i >= 0; i--) {
+		if (debug_playbacks[i].session == p_session) {
+			debug_playbacks.remove_at(i);
+		}
+	}
+	_debug_update();
+}
+
+void FlowGraphDebuggerPlugin::setup_session(int p_session) {
+	get_session(p_session)->connect("stopped", callable_mp(editor, &FlowGraphEditor::debug_session_stopped).bind(p_session));
+}
+
+bool FlowGraphDebuggerPlugin::capture(const String &p_message, const Array &p_data, int p_session) {
+	if (p_message != FlowGraphDebugger::MESSAGE) {
+		return false;
+	}
+	editor->debug_playback_changed(p_session, p_data);
+	return true;
+}
+
+bool FlowGraphDebuggerPlugin::has_capture(const String &p_capture) const {
+	return p_capture == FlowGraphDebugger::CAPTURE;
+}
+
 // Inspector button.
 
 void EditorInspectorPluginFlowGraph::_open(const Ref<FlowGraph> &p_graph) {
@@ -841,6 +1003,17 @@ bool FlowGraphEditorPlugin::handles(Object *p_object) const {
 	return Object::cast_to<FlowGraph>(p_object) != nullptr;
 }
 
+void FlowGraphEditorPlugin::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_ENTER_TREE: {
+			add_debugger_plugin(debugger_plugin);
+		} break;
+		case NOTIFICATION_EXIT_TREE: {
+			remove_debugger_plugin(debugger_plugin);
+		} break;
+	}
+}
+
 void FlowGraphEditorPlugin::make_visible(bool p_visible) {
 	if (p_visible) {
 		editor->make_visible();
@@ -858,4 +1031,6 @@ FlowGraphEditorPlugin::FlowGraphEditorPlugin() {
 	Ref<EditorInspectorPluginFlowGraph> inspector_plugin;
 	inspector_plugin.instantiate(editor);
 	add_inspector_plugin(inspector_plugin);
+
+	debugger_plugin.instantiate(editor);
 }
