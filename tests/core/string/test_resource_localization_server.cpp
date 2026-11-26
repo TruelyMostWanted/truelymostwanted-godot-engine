@@ -249,8 +249,8 @@ TEST_CASE("[SceneTree][ResourceLocalizationServer] load() on the main thread dur
 	PackedStringArray originals;
 	for (int index = 0; index < 32; index++) {
 		for (const String &locale : PackedStringArray({ "en", "de" })) {
-			Ref<Image> image = Image::create_empty(64, 64, false, Image::FORMAT_RGBA8);
-			image->fill(locale == "en" ? Color(1, 0, 0) : Color(0, 0, 1));
+			const int size = locale == "en" ? 64 : 32; // The dummy RenderingServer keeps no replaced image data.
+			Ref<Image> image = Image::create_empty(size, size, false, Image::FORMAT_RGBA8);
 			REQUIRE(ResourceSaver::save(ImageTexture::create_from_image(image), folder.path_join(vformat("%s_%d.res", locale, index))) == OK);
 		}
 		originals.push_back(folder.path_join(vformat("en_%d.res", index)));
@@ -272,7 +272,7 @@ TEST_CASE("[SceneTree][ResourceLocalizationServer] load() on the main thread dur
 	wait_for_relocalization(server);
 	REQUIRE_FALSE(server->is_relocalizing());
 	for (const Ref<ImageTexture> &texture : cached) {
-		CHECK(texture->get_image()->get_pixel(0, 0) == Color(0, 0, 1));
+		CHECK(texture->get_width() == 32);
 	}
 }
 
