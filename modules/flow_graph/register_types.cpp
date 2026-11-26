@@ -32,6 +32,7 @@
 
 #include "flow_graph.h"
 #include "flow_graph_data.h"
+#include "flow_graph_editor_formats.h"
 #include "flow_graph_mermaid.h"
 #include "flow_node.h"
 #include "flow_nodes.h"
@@ -44,6 +45,11 @@ static Ref<ResourceFormatLoaderFlowGraphMermaid> resource_loader_mermaid;
 static Ref<ResourceFormatSaverFlowGraphMermaid> resource_saver_mermaid;
 
 void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
+#ifdef TOOLS_ENABLED
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::add_by_type<FlowGraphFormatsEditorPlugin>();
+	}
+#endif
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
