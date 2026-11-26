@@ -413,6 +413,10 @@ double AudioStreamPlayer2D::get_track_position() {
 	return internal->get_track_position();
 }
 
+double AudioStreamPlayer2D::get_position_in_playlist() {
+	return internal->get_position_in_playlist();
+}
+
 void AudioStreamPlayer2D::set_position_signal_interval(float p_interval) {
 	internal->position_signal_interval = MAX(p_interval, 0.0f);
 }
@@ -481,6 +485,7 @@ void AudioStreamPlayer2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_current_track_index"), &AudioStreamPlayer2D::get_current_track_index);
 	ClassDB::bind_method(D_METHOD("get_current_track_stream"), &AudioStreamPlayer2D::get_current_track_stream);
 	ClassDB::bind_method(D_METHOD("get_track_position"), &AudioStreamPlayer2D::get_track_position);
+	ClassDB::bind_method(D_METHOD("get_position_in_playlist"), &AudioStreamPlayer2D::get_position_in_playlist);
 	ClassDB::bind_method(D_METHOD("set_position_signal_interval", "interval"), &AudioStreamPlayer2D::set_position_signal_interval);
 	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer2D::get_position_signal_interval);
 

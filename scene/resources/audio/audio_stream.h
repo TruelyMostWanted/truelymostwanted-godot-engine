@@ -119,6 +119,7 @@ public:
 		int index = -1; // List index of the current track, -1 when stopped.
 		uint32_t serial = 0; // Counts started tracks, also repeats of the same index.
 		double position = 0.0; // Seconds inside the current track.
+		double list_position = 0.0; // Seconds since the start of the list, in play order.
 		Ref<AudioStream> stream;
 	};
 	virtual bool get_track_info(TrackInfo &r_info) const { return false; }

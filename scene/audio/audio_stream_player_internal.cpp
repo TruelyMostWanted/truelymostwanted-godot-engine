@@ -508,6 +508,14 @@ double AudioStreamPlayerInternal::get_track_position() {
 	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.position : (double)get_playback_position();
 }
 
+double AudioStreamPlayerInternal::get_position_in_playlist() {
+	if (stream_playbacks.is_empty()) {
+		return 0.0;
+	}
+	AudioStreamPlayback::TrackInfo info;
+	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.list_position : (double)get_playback_position();
+}
+
 StringName AudioStreamPlayerInternal::get_bus() const {
 	const String bus_name = bus;
 	for (int i = 0; i < AudioServer::get_singleton()->get_bus_count(); i++) {

@@ -168,4 +168,59 @@ TEST_CASE("[Audio][AudioStreamPlaylist] Playback publishes the current track") {
 	CHECK(playback->get_current_index() == -1);
 }
 
+TEST_CASE("[Audio][AudioStreamPlaylist] Start times and indices round trip, with loop and fade time") {
+	Ref<AudioStreamPlaylist> playlist;
+	playlist.instantiate();
+	playlist->add_stream(make_track(1.0));
+	playlist->add_stream(Ref<AudioStream>()); // Null entries take no time.
+	playlist->add_stream(make_track(2.0));
+	playlist->add_stream(make_track(0.5));
+
+	CHECK(playlist->get_length() == doctest::Approx(3.5));
+	CHECK(playlist->get_stream_length(1) == doctest::Approx(0.0));
+	CHECK(playlist->get_stream_start_time(0) == doctest::Approx(0.0));
+	CHECK(playlist->get_stream_start_time(2) == doctest::Approx(1.0));
+	CHECK(playlist->get_stream_start_time(3) == doctest::Approx(3.0));
+	for (int index : { 0, 2, 3 }) {
+		const double start = playlist->get_stream_start_time(index);
+		CHECK(playlist->get_stream_index_at(start) == index);
+		CHECK(playlist->get_stream_index_at(start + playlist->get_stream_length(index) * 0.5) == index);
+	}
+
+	// The fade time does not change the timeline.
+	playlist->set_fade_time(0.5f);
+	CHECK(playlist->get_stream_start_time(3) == doctest::Approx(3.0));
+	CHECK(playlist->get_stream_index_at(2.9) == 2);
+
+	// Past the end: wraps with loop, -1 without.
+	playlist->set_loop(true);
+	CHECK(playlist->get_stream_index_at(3.5 + 1.5) == 2);
+	playlist->set_loop(false);
+	CHECK(playlist->get_stream_index_at(3.6) == -1);
+	CHECK(playlist->get_stream_index_at(-0.1) == -1);
+}
+
+TEST_CASE("[Audio][AudioStreamPlaylist] Position in the playlist follows the play order") {
+	Ref<AudioStreamPlaylist> playlist;
+	playlist.instantiate();
+	playlist->add_stream(make_track(0.05));
+	playlist->add_stream(make_track(0.05));
+	Ref<AudioStreamPlaybackPlaylist> playback = playlist->instantiate_playback();
+	REQUIRE(playback.is_valid());
+
+	// A start in the middle of the second track (what seek() does).
+	playback->start(0.07);
+	CHECK(playback->get_current_index() == 1);
+	CHECK(playback->get_position_in_stream() == doctest::Approx(0.02).epsilon(0.01));
+	CHECK(playback->get_position_in_playlist() == doctest::Approx(0.07).epsilon(0.01));
+
+	const int rate = int(AudioServer::get_singleton()->get_mix_rate());
+	Vector<AudioFrame> buffer;
+	buffer.resize(rate);
+	playback->mix(buffer.ptrw(), 1.0f, int(rate * 0.04)); // Loops back into the first track at 0.01.
+	CHECK(playback->get_current_index() == 0);
+	CHECK(playback->get_position_in_playlist() == doctest::Approx(0.01).epsilon(0.05));
+	playback->stop();
+}
+
 } // namespace TestAudioStreamPlaylist

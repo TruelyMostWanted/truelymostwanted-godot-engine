@@ -80,6 +80,11 @@ public:
 	int find_stream(const Ref<AudioStream> &p_stream) const;
 	String get_stream_name(int p_index) const;
 
+	// Time helpers in list order; tracks follow each other without overlap (see fade_time).
+	double get_stream_length(int p_index) const;
+	double get_stream_start_time(int p_index) const;
+	int get_stream_index_at(double p_time) const;
+
 	virtual Ref<AudioStreamPlayback> instantiate_playback() override;
 	virtual double get_length() const override;
 	virtual bool is_meta_stream() const override { return true; }
@@ -118,9 +123,12 @@ private:
 
 	// Track info written by start() and mix(), read on the main thread without a lock.
 	double track_length = 0.0;
+	double track_start = 0.0; // Start of the current track in the playlist, in play order.
 	SafeNumeric<int> current_index{ -1 };
 	SafeNumeric<uint32_t> track_serial;
 	SafeNumeric<float> track_position;
+	SafeNumeric<float> playlist_position;
+	void _update_track_start();
 	void _publish_track();
 
 	void _update_order();
@@ -144,6 +152,7 @@ public:
 	int get_current_index() const;
 	Ref<AudioStream> get_current_stream() const;
 	double get_position_in_stream() const;
+	double get_position_in_playlist() const;
 	virtual bool get_track_info(TrackInfo &r_info) const override;
 
 	~AudioStreamPlaybackPlaylist();

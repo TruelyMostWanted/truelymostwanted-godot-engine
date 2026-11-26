@@ -168,17 +168,51 @@ double AudioStreamPlaylist::get_bpm() const {
 double AudioStreamPlaylist::get_length() const {
 	double total_length = 0.0;
 	for (int i = 0; i < stream_count; i++) {
-		if (audio_streams[i].is_valid()) {
-			double bpm = audio_streams[i]->get_bpm();
-			int beat_count = audio_streams[i]->get_beat_count();
-			if (bpm > 0.0 && beat_count > 0) {
-				total_length += beat_count * 60.0 / bpm;
-			} else {
-				total_length += audio_streams[i]->get_length();
-			}
-		}
+		total_length += get_stream_length(i);
 	}
 	return total_length;
+}
+
+double AudioStreamPlaylist::get_stream_length(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, stream_count, 0.0);
+	const Ref<AudioStream> &stream = audio_streams[p_index];
+	if (stream.is_null()) {
+		return 0.0;
+	}
+	// Same rule as the playback: beats when the stream has a BPM, else its length.
+	const double bpm = stream->get_bpm();
+	const int beat_count = stream->get_beat_count();
+	return bpm > 0.0 && beat_count > 0 ? beat_count * 60.0 / bpm : stream->get_length();
+}
+
+double AudioStreamPlaylist::get_stream_start_time(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, stream_count, 0.0);
+	double start = 0.0;
+	for (int i = 0; i < p_index; i++) {
+		start += get_stream_length(i);
+	}
+	return start;
+}
+
+int AudioStreamPlaylist::get_stream_index_at(double p_time) const {
+	const double length = get_length();
+	if (p_time < 0.0 || length <= 0.0) {
+		return -1;
+	}
+	if (p_time >= length) {
+		if (!loop) {
+			return -1;
+		}
+		p_time = Math::fmod(p_time, length); // Like start() of the playback.
+	}
+	for (int i = 0; i < stream_count; i++) {
+		const double stream_length = get_stream_length(i);
+		if (p_time < stream_length) {
+			return i;
+		}
+		p_time -= stream_length;
+	}
+	return -1;
 }
 
 void AudioStreamPlaylist::set_stream_count(int p_count) {
@@ -234,6 +268,9 @@ void AudioStreamPlaylist::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("move_stream", "from", "to"), &AudioStreamPlaylist::move_stream);
 	ClassDB::bind_method(D_METHOD("find_stream", "stream"), &AudioStreamPlaylist::find_stream);
 	ClassDB::bind_method(D_METHOD("get_stream_name", "index"), &AudioStreamPlaylist::get_stream_name);
+	ClassDB::bind_method(D_METHOD("get_stream_length", "index"), &AudioStreamPlaylist::get_stream_length);
+	ClassDB::bind_method(D_METHOD("get_stream_start_time", "index"), &AudioStreamPlaylist::get_stream_start_time);
+	ClassDB::bind_method(D_METHOD("get_stream_index_at", "time"), &AudioStreamPlaylist::get_stream_index_at);
 
 	ClassDB::bind_method(D_METHOD("set_shuffle", "shuffle"), &AudioStreamPlaylist::set_shuffle);
 	ClassDB::bind_method(D_METHOD("get_shuffle"), &AudioStreamPlaylist::get_shuffle);
@@ -345,6 +382,7 @@ void AudioStreamPlaybackPlaylist::start(double p_from_pos) {
 
 	active = true;
 	track_serial.increment();
+	_update_track_start();
 	_publish_track();
 }
 
@@ -450,6 +488,7 @@ int AudioStreamPlaybackPlaylist::mix(AudioFrame *p_buffer, float p_rate_scale, i
 				}
 				track_length = stream_todo;
 				track_serial.increment();
+				_update_track_start();
 			}
 
 			if (fade_index != -1) {
@@ -494,6 +533,19 @@ bool AudioStreamPlaybackPlaylist::is_playing() const {
 void AudioStreamPlaybackPlaylist::_publish_track() {
 	current_index.set(active ? play_order[play_index] : -1);
 	track_position.set(active ? (float)MAX(0.0, track_length - stream_todo) : 0.0f);
+	playlist_position.set(active ? (float)(track_start + MAX(0.0, track_length - stream_todo)) : 0.0f);
+}
+
+void AudioStreamPlaybackPlaylist::_update_track_start() {
+	// Runs when a track starts (at most once per track), not per mix block.
+	track_start = 0.0;
+	for (int i = 0; i < play_index; i++) {
+		track_start += playlist->get_stream_length(play_order[i]);
+	}
+}
+
+double AudioStreamPlaybackPlaylist::get_position_in_playlist() const {
+	return playlist_position.get();
 }
 
 int AudioStreamPlaybackPlaylist::get_current_index() const {
@@ -516,6 +568,7 @@ bool AudioStreamPlaybackPlaylist::get_track_info(TrackInfo &r_info) const {
 	r_info.index = current_index.get();
 	r_info.serial = track_serial.get();
 	r_info.position = track_position.get();
+	r_info.list_position = playlist_position.get();
 	r_info.stream = get_current_stream();
 	return true;
 }
@@ -524,6 +577,7 @@ void AudioStreamPlaybackPlaylist::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_current_index"), &AudioStreamPlaybackPlaylist::get_current_index);
 	ClassDB::bind_method(D_METHOD("get_current_stream"), &AudioStreamPlaybackPlaylist::get_current_stream);
 	ClassDB::bind_method(D_METHOD("get_position_in_stream"), &AudioStreamPlaybackPlaylist::get_position_in_stream);
+	ClassDB::bind_method(D_METHOD("get_position_in_playlist"), &AudioStreamPlaybackPlaylist::get_position_in_playlist);
 }
 
 void AudioStreamPlaybackPlaylist::_update_playback_instances() {

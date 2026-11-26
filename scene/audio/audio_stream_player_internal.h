@@ -143,6 +143,7 @@ public:
 	int get_current_track_index();
 	Ref<AudioStream> get_current_track_stream();
 	double get_track_position();
+	double get_position_in_playlist();
 
 	AudioStreamPlayerInternal(Node *p_node, const Callable &p_play_callable, const Callable &p_stop_callable, bool p_physical);
 };

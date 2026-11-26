@@ -17,6 +17,64 @@
 		<link title="Audio Spectrum Visualizer Demo">https://godotengine.org/asset-library/asset/2762</link>
 	</tutorials>
 	<methods>
+		<method name="crossfade_to">
+			<return type="void" />
+			<param index="0" name="stream" type="AudioStream" />
+			<param index="1" name="duration" type="float" />
+			<param index="2" name="curve" type="int" enum="AudioMixerServer.FadeCurve" default="3" />
+			<description>
+				Replaces [member stream] with [param stream] and crossfades to it over [param duration] seconds: the playbacks of the current stream fade out from their gain and stop at the end, while [param stream] starts at gain [code]0.0[/code] and fades in. Emits [signal stream_changed] at once and [signal fade_finished] when the new stream has faded in. If the player is not playing, this sets the stream and calls [method fade_in].
+				The fading-out playbacks do not count for [member max_polyphony], do not emit [signal finished], and stop together with [method stop] or when the new stream ends first. [param stream] must not be [code]null[/code]; use [method fade_out] to fade to silence.
+				[codeblocks]
+				[gdscript]
+				func _on_level_started(level_music):
+					$Music.crossfade_to(level_music, 2.0)
+				[/gdscript]
+				[csharp]
+				private void OnLevelStarted(AudioStream levelMusic)
+				{
+					GetNode&lt;AudioStreamPlayer&gt;("Music").CrossfadeTo(levelMusic, 2.0f);
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="fade_in">
+			<return type="void" />
+			<param index="0" name="duration" type="float" />
+			<param index="1" name="curve" type="int" enum="AudioMixerServer.FadeCurve" default="0" />
+			<description>
+				Raises the fade gain to [code]1.0[/code] over [param duration] seconds and emits [signal fade_finished] at the end. If the player is not playing, playback starts from the beginning at gain [code]0.0[/code], so the first audio block is silent.
+				The fade gain multiplies the volume of the playbacks on top of [member volume_db], which keeps its value. The gain is updated once per frame and [AudioServer] ramps it over each mix block, so fades do not click. A [param duration] of [code]0.0[/code] applies the gain in the next frame.
+			</description>
+		</method>
+		<method name="fade_out">
+			<return type="void" />
+			<param index="0" name="duration" type="float" />
+			<param index="1" name="curve" type="int" enum="AudioMixerServer.FadeCurve" default="0" />
+			<param index="2" name="stop_at_end" type="bool" default="true" />
+			<description>
+				Lowers the fade gain to [code]0.0[/code] over [param duration] seconds and emits [signal fade_finished] at the end. If [param stop_at_end] is [code]true[/code], playback stops when the fade ends; otherwise it keeps playing muted until [method fade_in] or [method play]. Does nothing if the player has no playback.
+			</description>
+		</method>
+		<method name="get_current_track_index">
+			<return type="int" />
+			<description>
+				Returns the index of the track that is playing in the list of an [AudioStreamPlaylist] (as in [member AudioStreamPlaylist.streams]), [code]0[/code] for other streams, or [code]-1[/code] if the player has no playback or the playlist has ended.
+			</description>
+		</method>
+		<method name="get_current_track_stream">
+			<return type="AudioStream" />
+			<description>
+				Returns the stream of the track that is playing: an entry of an [AudioStreamPlaylist], or [member stream] itself for other streams. Returns [code]null[/code] if the player has no playback.
+			</description>
+		</method>
+		<method name="get_fade_gain" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current fade gain, from [code]0.0[/code] to [code]1.0[/code]. It is [code]1.0[/code] unless [method fade_in], [method fade_out] or [method crossfade_to] changed it, and [method play] resets it to [code]1.0[/code].
+			</description>
+		</method>
 		<method name="get_playback_position">
 			<return type="float" />
 			<description>
@@ -25,16 +83,35 @@
 				[b]Note:[/b] This method always returns [code]0.0[/code] if the [member stream] is an [AudioStreamInteractive], since it can have multiple clips playing at once.
 			</description>
 		</method>
+		<method name="get_position_in_playlist">
+			<return type="float" />
+			<description>
+				Returns the position in seconds since the start of an [AudioStreamPlaylist], in the current play order (with [member AudioStreamPlaylist.shuffle], the shuffled order), or [method get_playback_position] for other streams. Returns [code]0.0[/code] if the player has no playback.
+				To jump to a time in the playlist, use [method seek]: the playlist finds the track at that time and starts it at the offset. A seek reshuffles a shuffled playlist. To start a given track (without shuffle), seek to [method AudioStreamPlaylist.get_stream_start_time].
+			</description>
+		</method>
 		<method name="get_stream_playback">
 			<return type="AudioStreamPlayback" />
 			<description>
 				Returns the latest [AudioStreamPlayback] of this node, usually the most recently created by [method play]. If no sounds are playing, this method fails and returns an empty playback.
 			</description>
 		</method>
+		<method name="get_track_position">
+			<return type="float" />
+			<description>
+				Returns the position in seconds inside the current track of an [AudioStreamPlaylist], or [method get_playback_position] for other streams. Returns [code]0.0[/code] if the player has no playback.
+			</description>
+		</method>
 		<method name="has_stream_playback">
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] if any sound is active, even if [member stream_paused] is set to [code]true[/code]. See also [member playing] and [method get_stream_playback].
+			</description>
+		</method>
+		<method name="is_fading" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while a fade or the fade-out part of a crossfade is running.
 			</description>
 		</method>
 		<method name="play">
@@ -81,6 +158,9 @@
 		<member name="playing" type="bool" setter="set_playing" getter="is_playing" default="false">
 			If [code]true[/code], this node is playing sounds. Setting this property has the same effect as [method play] and [method stop].
 		</member>
+		<member name="position_signal_interval" type="float" setter="set_position_signal_interval" getter="get_position_signal_interval" default="0.0">
+			Interval in seconds at which [signal position_changed] is emitted while playing. [code]0.0[/code] turns the signal off and costs nothing per frame.
+		</member>
 		<member name="stream" type="AudioStream" setter="set_stream" getter="get_stream">
 			The [AudioStream] resource to be played. Setting this property stops all currently playing sounds. If left empty, the [AudioStreamPlayer] does not work.
 		</member>
@@ -98,9 +178,45 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="fade_finished">
+			<description>
+				Emitted when a fade started by [method fade_in], [method fade_out] or [method crossfade_to] has reached its target gain.
+			</description>
+		</signal>
 		<signal name="finished">
 			<description>
 				Emitted when a sound finishes playing without interruptions. This signal is [i]not[/i] emitted when calling [method stop], or when exiting the tree while sounds are playing.
+			</description>
+		</signal>
+		<signal name="position_changed">
+			<param index="0" name="position" type="float" />
+			<description>
+				Emitted every [member position_signal_interval] seconds while playing, with the value of [method get_track_position]. Off by default.
+			</description>
+		</signal>
+		<signal name="stream_changed">
+			<param index="0" name="stream" type="AudioStream" />
+			<description>
+				Emitted when [member stream] is set to a different stream, also by [method crossfade_to].
+			</description>
+		</signal>
+		<signal name="track_changed">
+			<param index="0" name="index" type="int" />
+			<param index="1" name="stream" type="AudioStream" />
+			<description>
+				Emitted when an [AudioStreamPlaylist] starts a track, also when the same track repeats (loop, shuffle). [param index] is the index in [member AudioStreamPlaylist.streams]. Not emitted for streams without tracks. The signal is emitted on the main thread, at most once per frame.
+				[codeblocks]
+				[gdscript]
+				func _ready():
+					$Music.track_changed.connect(func(index, stream): $NowPlaying.text = stream.resource_name)
+				[/gdscript]
+				[csharp]
+				public override void _Ready()
+				{
+					GetNode&lt;AudioStreamPlayer&gt;("Music").TrackChanged += (index, stream) =&gt; GetNode&lt;Label&gt;("NowPlaying").Text = stream.ResourceName;
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</signal>
 	</signals>

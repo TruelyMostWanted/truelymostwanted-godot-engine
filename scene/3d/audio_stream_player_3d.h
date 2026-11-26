@@ -225,6 +225,7 @@ public:
 	int get_current_track_index();
 	Ref<AudioStream> get_current_track_stream();
 	double get_track_position();
+	double get_position_in_playlist();
 	void set_position_signal_interval(float p_interval);
 	float get_position_signal_interval() const;
 
