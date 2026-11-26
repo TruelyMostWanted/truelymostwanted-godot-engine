@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGetVariableNode" inherits="FlowVariableNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Outputs the value of a variable.
+	</brief_description>
+	<description>
+		The get variable node has no flow ports and one data output, [code]value[/code] (any type). It reads the variable [member FlowVariableNode.variable_name] from the blackboard when another node reads its [code]value[/code].
+		Its runtime behavior comes with the playback, which is a later feature; until then the node only has its properties and ports.
+		[codeblocks]
+		[gdscript]
+		var get_gold := FlowGetVariableNode.new()
+		get_gold.variable_name = &amp;"gold"
+		var get_id := graph.add_node(get_gold)
+		[/gdscript]
+		[csharp]
+		var getGold = new FlowGetVariableNode { VariableName = "gold" };
+		int getId = graph.AddNode(getGold);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

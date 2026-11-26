@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraph" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A graph of [FlowNode]s with typed ports and connections.
+	</brief_description>
+	<description>
+		A [FlowGraph] is a resource that describes a flow: nodes ([FlowNode]) with named input and output ports ([FlowPort]), and connections between them. [b]Flow[/b] connections carry the execution from node to node, [b]data[/b] connections carry values. Typical uses are dialogs, quests, tutorials and scripted sequences. The graph is plain data: it needs no scene tree and no threads, and works on every platform including Web. The built-in node types and their ports are listed at [FlowNode]; running a graph is the job of the playback, which is a later feature.
+		[b]Node ids.[/b] The graph owns the node ids. [method add_node] returns the id of the new node, and ids are never reused, not even after [method remove_node]; saved ids stay valid for the lifetime of the graph. A node belongs to one graph at a time. The first [FlowStartNode] that is added becomes the start of the graph ([member start_node_id]).
+		[b]Connections.[/b] Create them with [method connect_nodes], which checks the nodes, the ports, the kinds and the types (see there). A flow output has one connection at most; a data input has one connection at most. A data output can feed many inputs, and a flow input can have many incoming connections. [method validate] checks a whole graph again, which also catches hand-edited files.
+		[b]Storage.[/b] The properties [member node_ids], [member nodes], [member connections], [member frames] and [member next_node_id] are the saved form of the graph. They are hidden in the inspector and are not meant to be set directly; edit the graph with the methods of this class. Only [member variables] and [member start_node_id] are shown in the inspector.
+		[b]Saving and copying.[/b] A graph is saved like any resource, for example as [code].tres[/code] or [code].res[/code], and also as JSON with the resource text serializer. When a graph is loaded or duplicated, it only claims the nodes that do not belong to a graph yet. A shallow [code]duplicate()[/code] therefore shares the node objects with the original and leaves them in the original. To copy a graph, use [code]duplicate(true)[/code], which duplicates the nodes too.
+		[codeblocks]
+		[gdscript]
+		var graph := FlowGraph.new()
+		var start := graph.add_node(FlowStartNode.new(), Vector2(0, 0))
+		var wait := FlowWaitNode.new()
+		wait.seconds = 2.0
+		var wait_id := graph.add_node(wait, Vector2(200, 0))
+		var end := graph.add_node(FlowEndNode.new(), Vector2(400, 0))
+		graph.connect_nodes(start, "out", wait_id, "in")
+		graph.connect_nodes(wait_id, "out", end, "in")
+		print(graph.validate().is_valid()) # true
+		[/gdscript]
+		[csharp]
+		var graph = new FlowGraph();
+		int start = graph.AddNode(new FlowStartNode(), new Vector2(0, 0));
+		var wait = new FlowWaitNode { Seconds = 2.0 };
+		int waitId = graph.AddNode(wait, new Vector2(200, 0));
+		int end = graph.AddNode(new FlowEndNode(), new Vector2(400, 0));
+		graph.ConnectNodes(start, "out", waitId, "in");
+		graph.ConnectNodes(waitId, "out", end, "in");
+		GD.Print(graph.Validate().IsValid()); // True
+		[/csharp]
+		[/codeblocks]
+		[codeblocks]
+		[gdscript]
+		var copy: FlowGraph = graph.duplicate(true)
+		[/gdscript]
+		[csharp]
+		var copy = (FlowGraph)graph.Duplicate(true);
+		[/csharp]
+		[/codeblocks]
+		[codeblocks]
+		[gdscript]
+		ResourceSaver.save(graph, "res://graphs/intro.tres")
+		var loaded := load("res://graphs/intro.tres") as FlowGraph
+		[/gdscript]
+		[csharp]
+		ResourceSaver.Save(graph, "res://graphs/intro.tres");
+		var loaded = GD.Load&lt;FlowGraph&gt;("res://graphs/intro.tres");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_node">
+			<return type="int" />
+			<param index="0" name="node" type="FlowNode" />
+			<param index="1" name="position" type="Vector2" default="Vector2(0, 0)" />
+			<description>
+				Adds [param node] to the graph at [param position] (stored in [member FlowNode.editor_position]) and returns its new node id. Emits [signal node_added].
+				Returns [constant NODE_ID_NONE] and prints an error if [param node] is [code]null[/code] or already belongs to a graph, this one included (the error text mentions [constant @GlobalScope.ERR_ALREADY_IN_USE]). Remove the node from its graph first, or add a [code]duplicate()[/code] of it. If [member start_node_id] is [constant NODE_ID_NONE] and [param node] is a [FlowStartNode], it becomes the start node.
+			</description>
+		</method>
+		<method name="can_connect_nodes" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="from_id" type="int" />
+			<param index="1" name="from_port" type="StringName" />
+			<param index="2" name="to_id" type="int" />
+			<param index="3" name="to_port" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [method connect_nodes] would succeed with these arguments. Does not print errors, so it is the right call to highlight valid targets while a user drags a connection.
+			</description>
+		</method>
+		<method name="connect_nodes">
+			<return type="int" enum="Error" />
+			<param index="0" name="from_id" type="int" />
+			<param index="1" name="from_port" type="StringName" />
+			<param index="2" name="to_id" type="int" />
+			<param index="3" name="to_port" type="StringName" />
+			<description>
+				Connects the output port [param from_port] of the node [param from_id] with the input port [param to_port] of the node [param to_id]. Emits [signal connections_changed] and returns [constant @GlobalScope.OK] on success. On failure nothing changes, an error is printed and one of these is returned:
+				[constant @GlobalScope.ERR_DOES_NOT_EXIST] if one of the nodes does not exist, or the output port does not exist on the source node, or the input port does not exist on the target node.
+				[constant @GlobalScope.ERR_INVALID_PARAMETER] if both ends are the same node, if a flow port would be connected to a data port (or the other way round), or if both are data ports and the type of the output does not fit the type of the input. Types fit if they are equal, if either is [constant @GlobalScope.TYPE_NIL] (any), or if an [int] output goes into a [float] input.
+				[constant @GlobalScope.ERR_ALREADY_IN_USE] if the flow output already has a connection, or if the data input already has a connection. Disconnect the old one first. This also applies to connecting the same two ports twice.
+			</description>
+		</method>
+		<method name="disconnect_nodes">
+			<return type="void" />
+			<param index="0" name="from_id" type="int" />
+			<param index="1" name="from_port" type="StringName" />
+			<param index="2" name="to_id" type="int" />
+			<param index="3" name="to_port" type="StringName" />
+			<description>
+				Removes the connection between the given ports and emits [signal connections_changed]. Does nothing if there is no such connection.
+			</description>
+		</method>
+		<method name="find_flow_path" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="from_id" type="int" />
+			<param index="1" name="to_id" type="int" />
+			<description>
+				Returns the ids of the nodes on the shortest path of flow connections from [param from_id] to [param to_id], including both. Data connections are not followed. Returns an empty array if there is no path, and prints an error and returns an empty array if one of the nodes does not exist. If both ids are the same, the result is that single id.
+			</description>
+		</method>
+		<method name="find_node_id" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="node" type="FlowNode" />
+			<description>
+				Returns the id of [param node] in this graph, or [constant NODE_ID_NONE] if the node is not part of the graph.
+			</description>
+		</method>
+		<method name="get_connections" qualifiers="const">
+			<return type="FlowConnection[]" />
+			<description>
+				Returns all connections of the graph as [FlowConnection] snapshots, in the order they were made.
+			</description>
+		</method>
+		<method name="get_input_connections" qualifiers="const">
+			<return type="FlowConnection[]" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Returns the connections that end at the node [param id]. The array is empty if there are none or the node does not exist.
+			</description>
+		</method>
+		<method name="get_node" qualifiers="const">
+			<return type="FlowNode" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Returns the node with the id [param id]. Prints an error and returns [code]null[/code] if there is no such node; use [method has_node] to check first.
+			</description>
+		</method>
+		<method name="get_output_connections" qualifiers="const">
+			<return type="FlowConnection[]" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Returns the connections that start at the node [param id]. The array is empty if there are none or the node does not exist.
+			</description>
+		</method>
+		<method name="get_translatable_strings" qualifiers="const">
+			<return type="PackedStringArray[]" />
+			<description>
+				Returns the translatable strings of all nodes, see [method FlowNode.get_translatable_strings]. Use it to extract the texts of a graph for translation.
+			</description>
+		</method>
+		<method name="has_node" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Returns [code]true[/code] if the graph has a node with the id [param id].
+			</description>
+		</method>
+		<method name="is_nodes_connected" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="from_id" type="int" />
+			<param index="1" name="from_port" type="StringName" />
+			<param index="2" name="to_id" type="int" />
+			<param index="3" name="to_port" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the given output port is connected to the given input port.
+			</description>
+		</method>
+		<method name="remove_node">
+			<return type="void" />
+			<param index="0" name="id" type="int" />
+			<description>
+				Removes the node [param id] together with all of its connections, removes its id from all [FlowFrame]s, and clears [member start_node_id] if it was the start node. The node is then free to be added to a graph again. The id is not reused. Emits [signal node_removed], and also [signal connections_changed] if connections were removed. Prints an error if the node does not exist.
+			</description>
+		</method>
+		<method name="validate" qualifiers="const">
+			<return type="FlowGraphValidation" />
+			<description>
+				Checks the graph and returns a [FlowGraphValidation] with all issues found: a missing start node, unreachable nodes, unknown ports, type mismatches, flow outputs with more than one connection, undeclared variables, cycles of data connections and warnings of nodes (see [enum FlowGraphValidation.IssueKind]). [method FlowGraphValidation.is_valid] is [code]true[/code] if there is nothing to report.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="connections" type="Array" setter="_set_connections" getter="_get_connections" default="[]">
+			[b]Storage, do not set directly.[/b] The connections as one flat array of four values per connection: from node id, from port, to node id, to port. Hidden in the inspector. Use [method connect_nodes] and [method disconnect_nodes]. The array must have a multiple of four entries.
+		</member>
+		<member name="frames" type="FlowFrame[]" setter="set_frames" getter="get_frames" default="[]">
+			The [FlowFrame]s of the graph editor. Hidden in the inspector. Frames are ignored at runtime.
+		</member>
+		<member name="next_node_id" type="int" setter="_set_next_node_id" getter="_get_next_node_id" default="0">
+			[b]Storage, do not set directly.[/b] The id the next node gets, which is what makes ids unique over time. Hidden in the inspector. It is saved, so ids stay unique after loading. Negative values are set to [code]0[/code], and [method add_node] skips ids that are in use.
+		</member>
+		<member name="node_ids" type="PackedInt32Array" setter="_set_node_ids" getter="get_node_ids" default="PackedInt32Array()">
+			[b]Storage, do not set directly.[/b] The ids of the nodes, in the same order as [member nodes]. Hidden in the inspector. Read it to iterate over all nodes; use [method add_node] and [method remove_node] to change the graph.
+		</member>
+		<member name="nodes" type="FlowNode[]" setter="_set_nodes" getter="_get_nodes" default="[]">
+			[b]Storage, do not set directly.[/b] The nodes, in the same order as [member node_ids]. Hidden in the inspector. Use [method get_node] to get a node by id.
+		</member>
+		<member name="start_node_id" type="int" setter="set_start_node_id" getter="get_start_node_id" default="-1">
+			The id of the node where the execution starts, or [constant NODE_ID_NONE]. [method add_node] sets it to the first [FlowStartNode] if it is not set. [method remove_node] clears it when that node is removed. [method validate] reports an id that is not a node of the graph as [constant FlowGraphValidation.ISSUE_KIND_MISSING_START]; this is not checked when the property is set.
+		</member>
+		<member name="variables" type="FlowVariable[]" setter="set_variables" getter="get_variables" default="[]">
+			The [FlowVariable]s that the graph declares. Variable nodes ([FlowVariableNode]) may only use names declared here.
+		</member>
+	</members>
+	<signals>
+		<signal name="connections_changed">
+			<description>
+				Emitted when a connection was added or removed, including connections removed together with a node by [method remove_node].
+			</description>
+		</signal>
+		<signal name="node_added">
+			<param index="0" name="id" type="int" />
+			<description>
+				Emitted when [method add_node] added a node. [param id] is its new id.
+			</description>
+		</signal>
+		<signal name="node_removed">
+			<param index="0" name="id" type="int" />
+			<description>
+				Emitted when [method remove_node] removed a node. [param id] is the id it had.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="NODE_ID_NONE" value="-1">
+			The id that means no node. Returned by [method add_node] and [method find_node_id] on failure, and the value of [member start_node_id] when there is no start node.
+		</constant>
+	</constants>
+</class>
