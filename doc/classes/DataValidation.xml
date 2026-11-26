@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DataValidation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The issues found by a data validation, with their positions.
+	</brief_description>
+	<description>
+		Returned by [method DataSchema.validate] and [method TextDataFormat.validate]. Each issue has a kind ([enum IssueKind]), a message and its position:
+		- the field name ([method get_issue_field]),
+		- the path of keys and indices joined with [code]/[/code] ([method get_issue_path], such as [code]"enemies/3/hp"[/code]; [code]~[/code] and [code]/[/code] in keys are written [code]~0[/code] and [code]~1[/code]),
+		- the 0-based row (the entry of the root list, or the CSV data row without the header) and the 0-based CSV column,
+		- the 1-based line in the text, only with [member DataValidationOptions.keep_positions] or after [method resolve_lines].
+		Positions that do not apply are [constant POSITION_NONE].
+		[codeblocks]
+		[gdscript]
+		var result = schema.validate(data)
+		if not result.is_valid():
+			for i in result.get_issue_count():
+				if result.get_issue_kind(i) == DataValidation.ISSUE_KIND_MISSING_FIELD:
+					print("Missing: ", result.get_issue_field(i))
+		[/gdscript]
+		[csharp]
+		DataValidation result = schema.Validate(data);
+		if (!result.IsValid())
+		{
+			for (int i = 0; i &lt; result.GetIssueCount(); i++)
+			{
+				if (result.GetIssueKind(i) == DataValidation.IssueKind.MissingField)
+				{
+					GD.Print("Missing: ", result.GetIssueField(i));
+				}
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+		Own checks can add issues with [method add_issue], so one result type serves all checks of a file.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_issue">
+			<return type="void" />
+			<param index="0" name="kind" type="int" enum="DataValidation.IssueKind" />
+			<param index="1" name="message" type="String" />
+			<param index="2" name="field" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="path" type="String" default="&quot;&quot;" />
+			<param index="4" name="row" type="int" default="-1" />
+			<param index="5" name="column" type="int" default="-1" />
+			<param index="6" name="line" type="int" default="-1" />
+			<description>
+				Adds an issue, for checks of your own. Ignored when the result already holds [member DataValidationOptions.max_issues] issues.
+			</description>
+		</method>
+		<method name="get_invalid_rows" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<description>
+				Returns the rows that have at least one issue, sorted, each once.
+			</description>
+		</method>
+		<method name="get_issue_column" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the 0-based CSV column of the issue at [param index], or [constant POSITION_NONE].
+			</description>
+		</method>
+		<method name="get_issue_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of issues.
+			</description>
+		</method>
+		<method name="get_issue_field" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the name of the field (key, column or attribute) of the issue at [param index], or an empty [StringName].
+			</description>
+		</method>
+		<method name="get_issue_kind" qualifiers="const">
+			<return type="int" enum="DataValidation.IssueKind" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the kind of the issue at [param index].
+			</description>
+		</method>
+		<method name="get_issue_line" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the 1-based text line of the issue at [param index], or [constant POSITION_NONE]. Lines are set only with [member DataValidationOptions.keep_positions] or by [method resolve_lines].
+			</description>
+		</method>
+		<method name="get_issue_message" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the message of the issue at [param index], in English.
+			</description>
+		</method>
+		<method name="get_issue_path" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the path of the value of the issue at [param index]: keys and indices joined with [code]/[/code], such as [code]"enemies/3/hp"[/code]. For a missing field, the path of the entry that misses it. Empty for issues of the whole data or of a CSV header.
+			</description>
+		</method>
+		<method name="get_issue_row" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the 0-based row of the issue at [param index] (the entry of the root list, or the CSV data row without the header), or [constant POSITION_NONE].
+			</description>
+		</method>
+		<method name="is_valid" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if there are no issues.
+			</description>
+		</method>
+		<method name="resolve_lines">
+			<return type="void" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Sets the line of every issue that has a path and no line by searching the keys of its path in [param text], in order; an index [code]n[/code] picks the [code](n + 1)[/code]-th following occurrence of the next key. Use it for [JSON] data validated with [method DataSchema.validate]. Best effort: exact for files with one key per line, approximate for keys on one line.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="ISSUE_KIND_MISSING_FIELD" value="0" enum="IssueKind">
+			A [member DataField.required] key or column is missing.
+		</constant>
+		<constant name="ISSUE_KIND_UNKNOWN_FIELD" value="1" enum="IssueKind">
+			A key or column is not in the schema (see [member DataSchema.extra_fields]).
+		</constant>
+		<constant name="ISSUE_KIND_TYPE_MISMATCH" value="2" enum="IssueKind">
+			A value does not have, or does not convert to, the type of its field.
+		</constant>
+		<constant name="ISSUE_KIND_OUT_OF_RANGE" value="3" enum="IssueKind">
+			A number is outside the range of [constant PROPERTY_HINT_RANGE].
+		</constant>
+		<constant name="ISSUE_KIND_NOT_IN_ENUM" value="4" enum="IssueKind">
+			A value is not one of [constant PROPERTY_HINT_ENUM].
+		</constant>
+		<constant name="ISSUE_KIND_PATTERN_MISMATCH" value="5" enum="IssueKind">
+			A value does not match [member DataField.pattern].
+		</constant>
+		<constant name="ISSUE_KIND_EMPTY_REQUIRED" value="6" enum="IssueKind">
+			A value is empty, but [member DataField.allow_empty] is [code]false[/code].
+		</constant>
+		<constant name="ISSUE_KIND_DUPLICATE_KEY" value="7" enum="IssueKind">
+			A value of a [member DataField.unique] field repeats.
+		</constant>
+		<constant name="ISSUE_KIND_PARSE_ERROR" value="8" enum="IssueKind">
+			The text could not be parsed (see [method TextDataFormat.get_error_message]).
+		</constant>
+		<constant name="ISSUE_KIND_INVALID_LOCALE" value="9" enum="IssueKind">
+			A locale is not valid (used by translation checks).
+		</constant>
+		<constant name="ISSUE_KIND_MAX" value="10" enum="IssueKind">
+			Represents the size of the [enum IssueKind] enum.
+		</constant>
+		<constant name="POSITION_NONE" value="-1">
+			The value of a position (row, column, line) that does not apply.
+		</constant>
+	</constants>
+</class>

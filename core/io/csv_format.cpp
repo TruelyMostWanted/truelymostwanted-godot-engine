@@ -30,9 +30,11 @@
 
 #include "csv_format.h"
 
+#include "core/io/data_schema.h"
 #include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
 #include "core/templates/hash_set.h"
+#include "core/variant/variant_utility.h"
 
 static String _csv_format_cell_text(const Variant &p_value) {
 	return p_value.get_type() == Variant::NIL ? String() : String(p_value);
@@ -361,6 +363,164 @@ Ref<Resource> CSV::deserialize(const String &p_text, const StringName &p_type_hi
 	return serializer->deserialize(p_text, ResourceTextSerializer::FORMAT_CSV, p_type_hint, p_options);
 }
 
+Ref<DataValidation> CSV::_validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const {
+	Ref<DataValidation> result;
+	result.instantiate();
+	result->apply_options(p_options);
+	p_schema->validate_table(_get_rows(), header, result.ptr());
+	return result;
+}
+
+void CSV::_resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const {
+	// The line on which each record starts, with the quote and line break rules of parse_csv_rows():
+	// a quoted cell can span lines, empty lines are no records.
+	const char32_t delimiter = ResourceTextSerializer::get_csv_delimiter(ResourceTextSerializer::get_options(get_options()));
+	LocalVector<int> record_lines;
+	bool in_quotes = false;
+	bool in_record = false;
+	bool cell_start = true;
+	int line = 1;
+	const int length = p_text.length();
+	for (int i = (length > 0 && p_text[0] == 0xFEFF) ? 1 : 0; i < length; i++) {
+		const char32_t c = p_text[i];
+		if (in_quotes) {
+			if (c == '"') {
+				if (i + 1 < length && p_text[i + 1] == '"') {
+					i++;
+				} else {
+					in_quotes = false;
+				}
+			} else if (c == '\n') {
+				line++;
+			}
+			continue;
+		}
+		if (c == '\n' || c == '\r') {
+			if (c == '\r' && i + 1 < length && p_text[i + 1] == '\n') {
+				i++;
+			}
+			if (c == '\n' || p_text[i] == '\n') {
+				line++;
+			}
+			in_record = false;
+			cell_start = true;
+			continue;
+		}
+		if (!in_record) {
+			in_record = true;
+			record_lines.push_back(line);
+		}
+		in_quotes = c == '"' && cell_start;
+		cell_start = c == delimiter;
+	}
+
+	// Data row n is record n + 1 when the first record is the header; issues without a row belong to the header.
+	const int offset = header.is_empty() ? 0 : 1;
+	for (int i = 0; i < p_validation->get_issue_count(); i++) {
+		const int row = p_validation->get_issue_row(i);
+		if (p_validation->get_issue_line(i) != DataValidation::POSITION_NONE || (row == DataValidation::POSITION_NONE && offset == 0)) {
+			continue;
+		}
+		const int record = row == DataValidation::POSITION_NONE ? 0 : row + offset;
+		if (record < (int)record_lines.size()) {
+			p_validation->set_issue_line(i, record_lines[record]);
+		}
+	}
+}
+
+Dictionary CSV::get_typed_row(int p_row, const Ref<DataSchema> &p_schema) const {
+	ERR_FAIL_COND_V(p_schema.is_null(), Dictionary());
+	const PackedStringArray cells = get_row(p_row);
+	const DataField *extra_template = p_schema->get_extra_field_template().ptr();
+	Dictionary result;
+	const int count = header.is_empty() ? cells.size() : header.size();
+	for (int column = 0; column < count; column++) {
+		const DataField *field = p_schema->get_column_field(header, column);
+		Variant key = column;
+		if (!header.is_empty()) {
+			key = header[column];
+		} else if (field && field != extra_template) {
+			key = field->get_field_name();
+		}
+		const String cell = column < cells.size() ? cells[column] : String();
+		Variant value = cell;
+		if (field && !field->convert_text(cell, value)) {
+			value = field->get_default_value();
+		}
+		result[key] = value;
+	}
+	return result;
+}
+
+Error CSV::append_typed_row(const Dictionary &p_values, const Ref<DataSchema> &p_schema) {
+	ERR_FAIL_COND_V(p_schema.is_null(), ERR_INVALID_PARAMETER);
+	PackedStringArray cells;
+	const int count = header.is_empty() ? p_schema->get_fields().size() : header.size();
+	for (int column = 0; column < count; column++) {
+		const DataField *field = p_schema->get_column_field(header, column);
+		const StringName key = !header.is_empty() ? StringName(header[column]) : (field ? field->get_field_name() : StringName());
+		const Variant *value = p_values.getptr(String(key));
+		Variant typed;
+		if (!value) {
+			typed = field ? field->get_default_value() : Variant();
+		} else if (!field) {
+			typed = *value;
+		} else if (!DataField::coerce(field->get_value_type(), *value, typed)) {
+			return ERR_INVALID_DATA;
+		}
+		cells.push_back(DataField::value_to_text(typed));
+	}
+	append_row(cells);
+	return OK;
+}
+
+Variant CSV::get_typed_column(int p_column, const Ref<DataSchema> &p_schema) const {
+	ERR_FAIL_COND_V(p_schema.is_null(), Variant());
+	const DataField *field = p_schema->get_column_field(header, p_column);
+	const Array rows = _get_rows();
+	Array values;
+	values.resize(rows.size());
+	for (int i = 0; i < rows.size(); i++) {
+		const PackedStringArray cells = rows[i];
+		const String cell = p_column < cells.size() ? cells[p_column] : String();
+		Variant value = cell;
+		if (field && !field->convert_text(cell, value)) {
+			value = field->get_default_value();
+		}
+		values[i] = value;
+	}
+	// Packed arrays by field type (one allocation, no Variant per value), an Array for other types.
+	Variant::Type packed_type = Variant::ARRAY;
+	switch (field ? field->get_value_type() : Variant::STRING) {
+		case Variant::INT:
+			packed_type = Variant::PACKED_INT64_ARRAY;
+			break;
+		case Variant::FLOAT:
+			packed_type = Variant::PACKED_FLOAT64_ARRAY;
+			break;
+		case Variant::STRING:
+		case Variant::STRING_NAME:
+		case Variant::NODE_PATH:
+			packed_type = Variant::PACKED_STRING_ARRAY;
+			break;
+		case Variant::VECTOR2:
+			packed_type = Variant::PACKED_VECTOR2_ARRAY;
+			break;
+		case Variant::VECTOR3:
+			packed_type = Variant::PACKED_VECTOR3_ARRAY;
+			break;
+		case Variant::VECTOR4:
+			packed_type = Variant::PACKED_VECTOR4_ARRAY;
+			break;
+		case Variant::COLOR:
+			packed_type = Variant::PACKED_COLOR_ARRAY;
+			break;
+		default:
+			return values;
+	}
+	return VariantUtilityFunctions::type_convert(values, packed_type);
+}
+
 CSV::CSV() {
 	_get_data_ref() = Array();
 }
@@ -381,6 +541,9 @@ void CSV::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("find_column", "name"), &CSV::find_column);
 	ClassDB::bind_method(D_METHOD("get_column", "column"), &CSV::get_column);
 	ClassDB::bind_method(D_METHOD("find_rows", "column", "value"), &CSV::find_rows);
+	ClassDB::bind_method(D_METHOD("get_typed_row", "row", "schema"), &CSV::get_typed_row);
+	ClassDB::bind_method(D_METHOD("append_typed_row", "values", "schema"), &CSV::append_typed_row);
+	ClassDB::bind_method(D_METHOD("get_typed_column", "column", "schema"), &CSV::get_typed_column);
 
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "header"), "set_header", "get_header");
 

@@ -100,6 +100,34 @@
 				Writes the file at [param path], like [method ConfigFile.save]. If text was kept by [method parse] and [member data] has not changed since, the kept text is written, so comments and formatting survive; otherwise [member data] is written with [member options]. Returns [constant OK] or an error code. In exported games [code]res://[/code] is read-only: save to [code]user://[/code].
 			</description>
 		</method>
+		<method name="validate" qualifiers="const">
+			<return type="DataValidation" />
+			<param index="0" name="schema" type="DataSchema" />
+			<param index="1" name="options" type="DataValidationOptions" default="null" />
+			<description>
+				Validates [member data] against [param schema] and returns the issues (see [method DataSchema.validate]). If the last [method parse] failed, the result holds one [constant DataValidation.ISSUE_KIND_PARSE_ERROR] with the line of [method get_error_line].
+				With [member DataValidationOptions.keep_positions] and the text kept by [method parse] (the editor keeps it), every issue gets its 1-based line: exact for [CSV] rows (also with quoted cells over several lines), searched by the keys of the issue path for the other formats.
+				[codeblocks]
+				[gdscript]
+				var items = CSV.new()
+				items.parse(FileAccess.get_file_as_string("res://data/items.csv"))
+				var result = items.validate(load("res://data/items_schema.tres"))
+				for i in result.get_issue_count():
+					print("Row %d: %s" % [result.get_issue_row(i), result.get_issue_message(i)])
+				[/gdscript]
+				[csharp]
+				var items = new Csv();
+				items.Parse(FileAccess.GetFileAsString("res://data/items.csv"));
+				DataValidation result = items.Validate(GD.Load&lt;DataSchema&gt;("res://data/items_schema.tres"));
+				for (int i = 0; i &lt; result.GetIssueCount(); i++)
+				{
+					GD.Print($"Row {result.GetIssueRow(i)}: {result.GetIssueMessage(i)}");
+				}
+				[/csharp]
+				[/codeblocks]
+				Validation is never done on load or when [member data] changes; call this method when needed.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="data" type="Variant" setter="set_data" getter="get_data" default="{}">

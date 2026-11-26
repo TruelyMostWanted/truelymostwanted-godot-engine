@@ -44,6 +44,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 ### D
 
+**Data schema** (`DataSchema`, `DataField`, `DataValidation`, `DataValidationOptions`): format-independent description of the keys, columns and attributes of a data file (CSV, INI, JSON, TOML, YAML, XML). `DataField` is shaped like `PropertyInfo` (type, hint, hint string) plus required, unique, allow empty, default value, pattern and nested schemas; `DataSchema.validate()` and `TextDataFormat.validate()` return a `DataValidation` with every issue and its field, path, row, column and line. In code: `core/io/data_schema.*`, `core/io/data_field.*`, `core/io/data_validation.*`. Issues: #277 (decision #270). Wiki: [`277-feature-data-schema`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/277-feature-data-schema), [`Class-DataSchema`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Class-DataSchema).
+
 **Decision (comment)**: open questions of an issue are decided by the orchestrator and posted as a comment headed "Decision". See `.agents/project.md`.
 
 **Design decisions**: wiki page with the concept decisions and their follow-up work. Wiki: [`Design-Decisions`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Design-Decisions).
@@ -216,6 +218,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Resource loading, formats, results | `ResourceLoader`, `ResourceSaver`, `ResourceFormatLoader`, `ResourceLoadResult`, `ResourceSaveResult` | `core/io/resource_loader.*`, `core/io/resource_result.*`, `core/io/resource_format_callable.*` | `tests/core/io/test_resource_formats.cpp`, `test_resource_result.cpp`, `test_resource_format_callable.cpp` |
 | File manifests, resource database | `FilesManifest`, `FilesManifestServer`, `ResourceDatabase`, `PreloadList` | `core/io/files_manifest*.*`, `core/io/resource_database.*`, `core/io/preload_list.*` | `tests/core/io/test_files_manifest*.cpp`, `test_resource_database.cpp` |
 | Text serialization | `ResourceTextSerializer`, `SerializerOptions`, `JSON`, `INI`, `CSV`, `XML`, `XMLWriter`, `TOML`, `YAML` | `core/io/resource_text_serializer.*`, `core/io/*_format.*`, `core/io/xml_writer.*`, `modules/toml/`, `modules/yaml/` | `tests/core/io/test_resource_text_serializer*.cpp`, `test_xml_writer.cpp`, `modules/toml/tests/`, `modules/yaml/tests/` |
+| Data schemas and validation | `DataSchema`, `DataField`, `DataValidation`, `DataValidationOptions`, typed `CSV` access | `core/io/data_schema.*`, `core/io/data_field.*`, `core/io/data_validation.*` | `tests/core/io/test_data_schema.cpp` |
 | Packs and streaming assets | `PCKPackage*`, `PCKBuildPlan`, `StreamingAssets*` | `core/io/pck_*.*`, `core/io/resource_format_pck.*`, `core/io/streaming_assets_server.*`, `editor/export/`, `editor/inspector/pck_package_editor_plugin.*` | `tests/core/io/test_pck_package_server.cpp`, `test_resource_format_pck.cpp`, `test_streaming_assets_server.cpp` |
 | Runtime file formats | image, audio, video, scene and font loaders and savers | `scene/resources/*_resource_format.*`, `modules/{mp3,vorbis,theora,opus,webm,gltf,fbx}/` | `modules/*/tests/` |
 | Databases | `SQLiteDatabase`, `SQLiteStatement` | `modules/sqlite/` | `modules/sqlite/tests/` |

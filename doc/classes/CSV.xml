@@ -54,6 +54,14 @@
 				Adds [param values] as a new row at the end. Drops the kept parsed text.
 			</description>
 		</method>
+		<method name="append_typed_row">
+			<return type="int" enum="Error" />
+			<param index="0" name="values" type="Dictionary" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Adds a row from typed [param values], keyed by the column names of [member header] (by the field names of [param schema] in order if there is no header). Numbers, booleans and strings are written plainly, other types with [method @GlobalScope.var_to_str]. A missing key writes the field's [member DataField.default_value]. Returns [constant ERR_INVALID_DATA] and adds nothing if a value does not convert to the type of its field.
+			</description>
+		</method>
 		<method name="deserialize" qualifiers="static">
 			<return type="Resource" />
 			<param index="0" name="text" type="String" />
@@ -117,6 +125,22 @@
 			<return type="int" />
 			<description>
 				Returns the number of data rows, not counting the header.
+			</description>
+		</method>
+		<method name="get_typed_column" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="column" type="int" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Returns the cells of [param column] converted to the type of its field in [param schema]: a [PackedInt64Array] for [int], [PackedFloat64Array] for [float], [PackedStringArray] for strings, [PackedVector2Array], [PackedVector3Array], [PackedVector4Array] or [PackedColorArray] for those types, an [Array] for other types. Empty and unconvertible cells give the field's [member DataField.default_value] (0 in packed number arrays).
+			</description>
+		</method>
+		<method name="get_typed_row" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Returns the row at index [param row] as a [Dictionary] of typed values, keyed by the column names of [member header] (by field name, or column index, if there is no header). Each cell is converted to the type of its field in [param schema] (by header name, or by position without a header); empty and unconvertible cells give the field's [member DataField.default_value], cells without a field stay strings.
 			</description>
 		</method>
 		<method name="insert_row">

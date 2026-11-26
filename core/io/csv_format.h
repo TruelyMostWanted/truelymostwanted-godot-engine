@@ -54,6 +54,8 @@ protected:
 	virtual Variant::Type _get_data_type() const override { return Variant::ARRAY; }
 	virtual void _get_extensions(List<String> *r_extensions) const override;
 	virtual void _cleared() override { header = PackedStringArray(); }
+	virtual Ref<DataValidation> _validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const override;
+	virtual void _resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const override;
 
 public:
 	// On error, r_line is the 1-based line of the problem.
@@ -77,6 +79,12 @@ public:
 	int find_column(const String &p_name) const;
 	PackedStringArray get_column(int p_column) const;
 	PackedInt32Array find_rows(int p_column, const String &p_value) const;
+
+	// Typed access through a schema: cells converted to the type of their field (by header name, or by
+	// position without a header); empty or unconvertible cells give the field's default_value.
+	Dictionary get_typed_row(int p_row, const Ref<DataSchema> &p_schema) const;
+	Error append_typed_row(const Dictionary &p_values, const Ref<DataSchema> &p_schema);
+	Variant get_typed_column(int p_column, const Ref<DataSchema> &p_schema) const;
 
 	static Array parse_string(const String &p_text, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static String stringify(const Array &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
