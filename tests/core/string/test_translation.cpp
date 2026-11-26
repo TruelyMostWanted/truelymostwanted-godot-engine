@@ -32,6 +32,8 @@
 
 TEST_FORCE_LINK(test_translation)
 
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/plural_rules.h"
@@ -263,6 +265,103 @@ TEST_CASE("[TranslationCSV] CSV import") {
 	*/
 
 	TranslationServer::get_singleton()->remove_domain("godot.test");
+}
+
+// Counts errors and warnings printed while it is alive.
+struct CSVImportMessageCounter {
+	ErrorHandlerList handler;
+	int errors = 0;
+	int warnings = 0;
+
+	static void _count(void *p_self, const char *p_func, const char *p_file, int p_line, const char *p_error, const char *p_errorexp, bool p_editor_notify, ErrorHandlerType p_type) {
+		CSVImportMessageCounter *self = static_cast<CSVImportMessageCounter *>(p_self);
+		if (p_type == ERR_HANDLER_WARNING) {
+			self->warnings++;
+		} else {
+			self->errors++;
+		}
+	}
+
+	CSVImportMessageCounter() {
+		handler.errfunc = _count;
+		handler.userdata = this;
+		add_error_handler(&handler);
+	}
+
+	~CSVImportMessageCounter() {
+		remove_error_handler(&handler);
+	}
+};
+
+static String write_temp_csv(const String &p_name, const String &p_content) {
+	const String path = TestUtils::get_temp_path(p_name);
+	Ref<FileAccess> f = FileAccess::open(path, FileAccess::WRITE);
+	if (f.is_valid()) {
+		f->store_string(p_content);
+	}
+	return path;
+}
+
+TEST_CASE("[TranslationCSV] Data CSV logs one warning, not one error per column") {
+	Ref<ResourceImporterCSVTranslation> import_csv_translation = memnew(ResourceImporterCSVTranslation);
+	HashMap<StringName, Variant> options;
+	options["compress"] = 0;
+	options["delimiter"] = 0;
+
+	const String path = write_temp_csv("data_units.csv", "name,health,speed,armor
+knight,100,4,20
+archer,60,6,5
+");
+	List<String> gen_files;
+	Error result;
+	int errors;
+	int warnings;
+	{
+		CSVImportMessageCounter counter;
+		result = import_csv_translation->import(2810001, path, "", options, nullptr, &gen_files);
+		errors = counter.errors;
+		warnings = counter.warnings;
+	}
+
+	CHECK(result == OK);
+	CHECK(gen_files.is_empty());
+	CHECK_MESSAGE(errors == 0, "A data CSV must not log an error per column.");
+	CHECK_MESSAGE(warnings == 1, "A data CSV must log exactly one warning for the file.");
+
+	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[TranslationCSV] Header problems are reported once per file") {
+	Ref<ResourceImporterCSVTranslation> import_csv_translation = memnew(ResourceImporterCSVTranslation);
+	HashMap<StringName, Variant> options;
+	options["compress"] = 0;
+	options["delimiter"] = 0;
+
+	// Column 3 is empty (invalid locale), 'comment' and 'remark' have unknown language codes, '_notes' is ignored.
+	const String path = write_temp_csv("mixed_columns.csv", "keys,en,,comment,remark,_notes
+HELLO,Hello,x,greeting,first,ignored
+");
+	List<String> gen_files;
+	Error result;
+	int errors;
+	int warnings;
+	{
+		CSVImportMessageCounter counter;
+		result = import_csv_translation->import(2810002, path, "", options, nullptr, &gen_files);
+		errors = counter.errors;
+		warnings = counter.warnings;
+	}
+
+	CHECK(result == OK);
+	// 'en' and the unknown codes 'comment' and 'remark' are imported (custom locales stay possible).
+	CHECK(gen_files.size() == 3);
+	CHECK_MESSAGE(errors == 1, "The invalid column must be reported in one error.");
+	CHECK_MESSAGE(warnings == 1, "Both unknown language codes must be reported in one warning.");
+
+	for (const String &file : gen_files) {
+		DirAccess::remove_absolute(file);
+	}
+	DirAccess::remove_absolute(path);
 }
 
 #endif // TOOLS_ENABLED
