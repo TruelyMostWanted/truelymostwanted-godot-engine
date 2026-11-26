@@ -117,7 +117,7 @@ Color FlowGraphEditor::_slot_color(const Ref<FlowPort> &p_port) {
 	if (p_port->get_port_type() == Variant::NIL) {
 		return Color(0.6, 0.6, 0.6);
 	}
-	return Color::from_hsv(float(p_port->get_port_type()) / Variant::VARIANT_MAX, 0.55, 0.95);
+	return Color::from_hsv(float(p_port->get_port_type()) / float(Variant::VARIANT_MAX), 0.55, 0.95);
 }
 
 // Graph elements are named "n<node id>" and "f<frame index>".

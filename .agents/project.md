@@ -159,6 +159,10 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 - **Offen danach:** #12/#8 manuelle Prüfungen (Besitzer), #212 Screenshots, Release `Truely-v0.1.0` per `truely/release.ps1` erst wenn alles durch + CI grün; Release-Seite/Changelog aktualisieren, alte Release-Dateien entfernen.
 - **Werkzeuge:** `P:/wt/integrate.sh` (zählt jetzt C#-Glue-Warnungen, löst GLOSSARY-Konflikte), `P:/wt/merge.sh` (holt vor dem Push `origin/truely-godot-engine` herein, wartet auf MERGEABLE, kommentiert nur einmal), To-dos `P:/wt/todo.txt`, Wiki-Queue `P:/wt/wiki-queue.txt`. Brief `P:/wt/brief-common.md` (neue Regeln: wenig Code, C#-Namenskonflikte).
 
+
+**Stand (2026-11-27, Vormittag):** Zusätzlich gemergt: #255-Rename (C# GetType), #256, #257 (+CI-Fix float/enum), #276, #259, #258, #277, #278, #279+#280, Nacharbeiten #283 (Warnung einmal), #260 (Subtitle leitet Segment-`changed` weiter). Geschlossen: Tracker #253, Konzepte #262/#263/#270. Neu: #322–#325 (Untertitel-Tracker #230, nach Release 0.1.0). Wiki: alle Guides bis #280, alle `Class-*`-Seiten aus der XML neu erzeugt (`P:/wt/tools/classref_md.py`). CI-Lauf 45794131388 auf `2d62e3fa17`.
+- **Nächster Schritt:** CI grün → `truely/release.ps1` (Release `Truely-v0.1.0`), danach Release-Notes prüfen/ergänzen, alten Entwurf und Assets des alten Pre-Releases `truely-godot4.8-beta5-3bd081f` entfernen (Notes auf neues Release verweisen). #212 Screenshots per Agent (editor-shots-Tool im alten Scratchpad).
+
 ## Übergabe
 
 **Warten auf den Besitzer:** Concepts #65 (PCK als Ressource + Editor-Importer/Extract) und #66 (Streaming Assets): Empfehlungen im Issue, Umsetzung erst nach Zustimmung.
