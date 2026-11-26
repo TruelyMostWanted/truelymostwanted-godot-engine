@@ -335,27 +335,8 @@ void RenderQualitySettingsServer::_deliver(const StringName &p_name, const Varia
 		return;
 	}
 
-	Viewport *root = _get_root();
-	if (root != nullptr) {
-		_apply_to_viewport(root, p_name, effective);
-	}
-	for (uint32_t i = 0; i < extra_viewports.size();) {
-		Viewport *viewport = ObjectDB::get_instance<Viewport>(extra_viewports[i]);
-		if (viewport == nullptr) {
-			extra_viewports.remove_at_unordered(i); // Freed without remove_viewport().
-			continue;
-		}
+	for (Viewport *viewport : _get_target_viewports(viewport_target, get_viewport_group(), extra_viewports)) {
 		_apply_to_viewport(viewport, p_name, effective);
-		i++;
-	}
-	SceneTree *tree = SceneTree::get_singleton();
-	if (tree != nullptr) {
-		for (Node *node : tree->get_nodes_in_group(get_viewport_group())) {
-			Viewport *viewport = Object::cast_to<Viewport>(node);
-			if (viewport != nullptr && viewport != root && !has_viewport(viewport)) {
-				_apply_to_viewport(viewport, p_name, effective);
-			}
-		}
 	}
 }
 
@@ -447,7 +428,7 @@ void RenderQualitySettingsServer::_connect_tree() {
 
 void RenderQualitySettingsServer::_on_node_added(Node *p_node) {
 	Viewport *viewport = Object::cast_to<Viewport>(p_node);
-	if (viewport == nullptr || viewport == _get_root() || has_viewport(viewport) || !viewport->is_in_group(get_viewport_group())) {
+	if (viewport == nullptr || viewport == _get_root() || has_viewport(viewport) || !_is_viewport_targeted(viewport_target, get_viewport_group(), viewport)) {
 		return;
 	}
 	_apply_all_to_viewport(viewport);
@@ -557,6 +538,23 @@ void RenderQualitySettingsServer::remove_viewport(Viewport *p_viewport) {
 
 bool RenderQualitySettingsServer::has_viewport(Viewport *p_viewport) const {
 	return p_viewport != nullptr && extra_viewports.has(p_viewport->get_instance_id());
+}
+
+void RenderQualitySettingsServer::set_viewport_target(ViewportTargetMode p_target) {
+	ERR_FAIL_INDEX(int(p_target), int(VIEWPORT_TARGET_ALL_VIEWPORTS) + 1);
+	viewport_target = p_target;
+	// The viewports that are targets now get the current values; the root has them already.
+	const Viewport *root = _get_root();
+	for (Viewport *viewport : _get_target_viewports(viewport_target, get_viewport_group(), extra_viewports)) {
+		if (viewport != root) {
+			_apply_all_to_viewport(viewport);
+		}
+	}
+	_connect_tree();
+}
+
+SettingsServer::ViewportTargetMode RenderQualitySettingsServer::get_viewport_target() const {
+	return viewport_target;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -730,6 +728,9 @@ void RenderQualitySettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_viewport", "viewport"), &RenderQualitySettingsServer::add_viewport);
 	ClassDB::bind_method(D_METHOD("remove_viewport", "viewport"), &RenderQualitySettingsServer::remove_viewport);
 	ClassDB::bind_method(D_METHOD("has_viewport", "viewport"), &RenderQualitySettingsServer::has_viewport);
+	ClassDB::bind_method(D_METHOD("set_viewport_target", "target"), &RenderQualitySettingsServer::set_viewport_target);
+	ClassDB::bind_method(D_METHOD("get_viewport_target"), &RenderQualitySettingsServer::get_viewport_target);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "viewport_target", PROPERTY_HINT_ENUM, "Root Only,Group,All Viewports"), "set_viewport_target", "get_viewport_target");
 
 	ClassDB::bind_static_method("RenderQualitySettingsServer", D_METHOD("get_viewport_group"), &RenderQualitySettingsServer::get_viewport_group);
 	ClassDB::bind_static_method("RenderQualitySettingsServer", D_METHOD("is_scaling_3d_mode_supported", "mode"), &RenderQualitySettingsServer::is_scaling_3d_mode_supported);
