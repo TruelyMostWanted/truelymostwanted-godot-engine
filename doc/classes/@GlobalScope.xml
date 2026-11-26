@@ -1761,6 +1761,9 @@
 		<member name="WindowSettingsServer" type="WindowSettingsServer" setter="" getter="">
 			The [WindowSettingsServer] singleton.
 		</member>
+		<member name="ViewportServer" type="ViewportServer" setter="" getter="">
+			The [ViewportServer] singleton.
+		</member>
 		<member name="WorkerThreadPool" type="WorkerThreadPool" setter="" getter="">
 			The [WorkerThreadPool] singleton.
 		</member>

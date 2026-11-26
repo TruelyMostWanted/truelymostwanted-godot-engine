@@ -5,7 +5,7 @@ name: 🔗 GHA
 # Feature branches are tested locally.
 on:
   push:
-    branches: [truely-godot-engine, truely-godot-engine-releases]
+    branches: [truely-godot-engine-releases] # truely-godot-engine and feature branches: by hand (workflow_dispatch)
   workflow_dispatch:
 
 concurrency:
