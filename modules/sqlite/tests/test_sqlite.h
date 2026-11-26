@@ -39,6 +39,10 @@
 #include "tests/test_macros.h"
 #include "tests/test_utils.h"
 
+#ifdef TOOLS_ENABLED
+#include "../editor/sqlite_table_editor.h"
+#endif
+
 namespace TestSQLite {
 
 [[maybe_unused]] static String _fresh_db_path(const String &p_name) {
@@ -433,5 +437,92 @@ TEST_CASE("[SQLite] Database files as resources") {
 	db.unref();
 	DirAccess::remove_absolute(db_path);
 }
+
+#ifdef TOOLS_ENABLED
+TEST_CASE("[SQLite] Table editor saves pending edits in one transaction") {
+	const String db_path = _fresh_db_path("sqlite_table_editor.db");
+	Ref<SQLiteDatabase> db;
+	db.instantiate();
+	REQUIRE(db->open(db_path) == OK);
+	REQUIRE(db->execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL, price REAL DEFAULT 1.5);"
+						"INSERT INTO items VALUES (1, 'a', 2.0), (2, 'b', 3.0), (3, 'c', 4.0);") == OK);
+	const Vector<String> id_key = { "id" };
+	Variant failed;
+	String message;
+
+	// Update, delete and insert; the new row gets the column default.
+	Dictionary changed_values;
+	changed_values["name"] = "apple";
+	changed_values["price"] = 9.5;
+	Dictionary changed_rows;
+	changed_rows[Array{ 1 }] = changed_values;
+	Dictionary deleted_rows;
+	deleted_rows[Array{ 2 }] = true;
+	Dictionary new_row;
+	new_row["name"] = "d";
+	CHECK(SQLiteTableEditor::apply_changes(db, "items", id_key, Array{ changed_rows, deleted_rows, Array{ new_row } }, failed, message) == OK);
+	CHECK(failed.get_type() == Variant::NIL);
+	TypedArray<Dictionary> rows = db->query("SELECT id, name, price FROM items ORDER BY id;");
+	REQUIRE(rows.size() == 3);
+	CHECK(Dictionary(rows[0])["name"] == Variant("apple"));
+	CHECK(double(Dictionary(rows[0])["price"]) == doctest::Approx(9.5));
+	CHECK(int64_t(Dictionary(rows[1])["id"]) == 3);
+	CHECK(Dictionary(rows[2])["name"] == Variant("d"));
+	CHECK(double(Dictionary(rows[2])["price"]) == doctest::Approx(1.5));
+
+	// A failing row rolls back the whole save and is reported.
+	Dictionary rename;
+	rename["name"] = "changed";
+	Dictionary rename_rows;
+	rename_rows[Array{ 3 }] = rename;
+	Dictionary null_row;
+	null_row["name"] = Variant();
+	CHECK(SQLiteTableEditor::apply_changes(db, "items", id_key, Array{ rename_rows, Dictionary(), Array{ null_row } }, failed, message) != OK);
+	CHECK(failed == Variant(0));
+	CHECK(message.contains("NOT NULL"));
+	CHECK_FALSE(db->is_in_transaction());
+	rows = db->query("SELECT name FROM items WHERE id = 3;");
+	CHECK(Dictionary(rows[0])["name"] == Variant("c"));
+
+	// Without a primary key, the rowid is the key.
+	REQUIRE(db->execute("CREATE TABLE notes (text TEXT); INSERT INTO notes VALUES ('x'), ('y');") == OK);
+	const Vector<String> rowid_key = { "rowid" };
+	Dictionary deleted_note;
+	deleted_note[Array{ 2 }] = true;
+	CHECK(SQLiteTableEditor::apply_changes(db, "notes", rowid_key, Array{ Dictionary(), deleted_note, Array() }, failed, message) == OK);
+	CHECK(db->get_row_count("notes") == 1);
+
+	// WITHOUT ROWID tables use their primary key; a duplicate key fails.
+	REQUIRE(db->execute("CREATE TABLE pairs (a TEXT, b INTEGER, value TEXT, PRIMARY KEY (a, b)) WITHOUT ROWID;"
+						"INSERT INTO pairs VALUES ('k', 1, 'old');") == OK);
+	const Vector<String> pair_key = { "a", "b" };
+	Dictionary new_value;
+	new_value["value"] = "new";
+	Dictionary pair_rows;
+	pair_rows[Array{ "k", 1 }] = new_value;
+	CHECK(SQLiteTableEditor::apply_changes(db, "pairs", pair_key, Array{ pair_rows, Dictionary(), Array() }, failed, message) == OK);
+	rows = db->query("SELECT value FROM pairs;");
+	CHECK(Dictionary(rows[0])["value"] == Variant("new"));
+	Dictionary duplicate;
+	duplicate["a"] = "k";
+	duplicate["b"] = 1;
+	CHECK(SQLiteTableEditor::apply_changes(db, "pairs", pair_key, Array{ Dictionary(), Dictionary(), Array{ duplicate } }, failed, message) != OK);
+	CHECK(message.contains("UNIQUE"));
+
+	// Rowid tables allow NULL in a primary key; the key still matches.
+	REQUIRE(db->execute("CREATE TABLE tags (name TEXT PRIMARY KEY, n INTEGER); INSERT INTO tags VALUES (NULL, 1);") == OK);
+	const Vector<String> name_key = { "name" };
+	Dictionary count_value;
+	count_value["n"] = 2;
+	Dictionary tag_rows;
+	tag_rows[Array{ Variant() }] = count_value;
+	CHECK(SQLiteTableEditor::apply_changes(db, "tags", name_key, Array{ tag_rows, Dictionary(), Array() }, failed, message) == OK);
+	rows = db->query("SELECT n FROM tags;");
+	CHECK(int64_t(Dictionary(rows[0])["n"]) == 2);
+
+	db->close();
+	DirAccess::remove_absolute(db_path);
+}
+#endif // TOOLS_ENABLED
 
 } // namespace TestSQLite

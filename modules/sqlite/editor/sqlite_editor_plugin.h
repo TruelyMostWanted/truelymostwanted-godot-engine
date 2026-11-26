@@ -37,8 +37,9 @@
 class Button;
 class Label;
 class Tree;
+class TreeItem;
 
-// The tables of a database file in the Inspector: name, column count and row count, read-only.
+// The tables of a database file in the Inspector: name, column count and row count. Edit opens SQLiteTableEditor.
 class SQLiteTableOverview : public VBoxContainer {
 	GDCLASS(SQLiteTableOverview, VBoxContainer);
 
@@ -49,6 +50,7 @@ class SQLiteTableOverview : public VBoxContainer {
 
 	void _update();
 	void _count_rows();
+	void _edit_table(TreeItem *p_item, int p_column, int p_id, MouseButton p_button);
 
 protected:
 	void _notification(int p_what);
