@@ -364,60 +364,82 @@ TileSet::TileLayout TileSet::get_tile_layout() const {
 	return tile_layout;
 }
 
-void TileSet::set_coordinate_axes(CoordinateAxes p_axes) {
-	ERR_FAIL_INDEX(p_axes, COORDINATE_AXES_MAX);
-	coordinate_axes = p_axes;
+void TileSet::set_swap_x_and_y_axis(bool p_swap) {
+	coordinate_system.swap_x_and_y_axis = p_swap;
 	emit_changed();
 }
 
-TileSet::CoordinateAxes TileSet::get_coordinate_axes() const {
-	return coordinate_axes;
+bool TileSet::is_swap_x_and_y_axis() const {
+	return coordinate_system.swap_x_and_y_axis;
 }
 
-static bool _axes_swap(TileSet::CoordinateAxes p_axes) {
-	return p_axes >= TileSet::COORDINATE_AXES_SWAP;
+void TileSet::set_flip_x(bool p_flip) {
+	coordinate_system.flip_x = p_flip;
+	emit_changed();
 }
 
-static bool _axes_flip_x(TileSet::CoordinateAxes p_axes) {
-	return p_axes == TileSet::COORDINATE_AXES_FLIP_X || p_axes == TileSet::COORDINATE_AXES_FLIP_XY || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_X || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_XY;
+bool TileSet::is_flip_x() const {
+	return coordinate_system.flip_x;
 }
 
-static bool _axes_flip_y(TileSet::CoordinateAxes p_axes) {
-	return p_axes == TileSet::COORDINATE_AXES_FLIP_Y || p_axes == TileSet::COORDINATE_AXES_FLIP_XY || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_Y || p_axes == TileSet::COORDINATE_AXES_SWAP_FLIP_XY;
+void TileSet::set_flip_y(bool p_flip) {
+	coordinate_system.flip_y = p_flip;
+	emit_changed();
 }
 
-Vector2i TileSet::layout_to_map_coords_with_axes(const Vector2i &p_layout_coords, CoordinateAxes p_axes) {
-	Vector2i result = _axes_swap(p_axes) ? Vector2i(p_layout_coords.y, p_layout_coords.x) : p_layout_coords;
-	if (_axes_flip_x(p_axes)) {
+bool TileSet::is_flip_y() const {
+	return coordinate_system.flip_y;
+}
+
+void TileSet::set_coordinate_system(const CoordinateSystem &p_system) {
+	coordinate_system = p_system;
+	emit_changed();
+}
+
+TileSet::CoordinateSystem TileSet::get_coordinate_system() const {
+	return coordinate_system;
+}
+
+Vector2i TileSet::layout_to_map_coords_with_system(const Vector2i &p_layout_coords, const CoordinateSystem &p_system) {
+	Vector2i result = p_system.swap_x_and_y_axis ? Vector2i(p_layout_coords.y, p_layout_coords.x) : p_layout_coords;
+	if (p_system.flip_x) {
 		result.x = -result.x;
 	}
-	if (_axes_flip_y(p_axes)) {
+	if (p_system.flip_y) {
 		result.y = -result.y;
 	}
 	return result;
 }
 
-Vector2i TileSet::map_to_layout_coords_with_axes(const Vector2i &p_map_coords, CoordinateAxes p_axes) {
+Vector2i TileSet::map_to_layout_coords_with_system(const Vector2i &p_map_coords, const CoordinateSystem &p_system) {
 	Vector2i result = p_map_coords;
-	if (_axes_flip_x(p_axes)) {
+	if (p_system.flip_x) {
 		result.x = -result.x;
 	}
-	if (_axes_flip_y(p_axes)) {
+	if (p_system.flip_y) {
 		result.y = -result.y;
 	}
-	return _axes_swap(p_axes) ? Vector2i(result.y, result.x) : result;
+	return p_system.swap_x_and_y_axis ? Vector2i(result.y, result.x) : result;
 }
 
 Vector2i TileSet::map_to_layout_coords(const Vector2i &p_map_coords) const {
-	return coordinate_axes == COORDINATE_AXES_DEFAULT ? p_map_coords : map_to_layout_coords_with_axes(p_map_coords, coordinate_axes);
+	return coordinate_system.is_default() ? p_map_coords : map_to_layout_coords_with_system(p_map_coords, coordinate_system);
 }
 
 Vector2i TileSet::layout_to_map_coords(const Vector2i &p_layout_coords) const {
-	return coordinate_axes == COORDINATE_AXES_DEFAULT ? p_layout_coords : layout_to_map_coords_with_axes(p_layout_coords, coordinate_axes);
+	return coordinate_system.is_default() ? p_layout_coords : layout_to_map_coords_with_system(p_layout_coords, coordinate_system);
 }
 
-Vector2i TileSet::convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, CoordinateAxes p_from_axes) const {
-	const Vector2i old_layout_coords = map_to_layout_coords_with_axes(p_coords, p_from_axes);
+Vector2i TileSet::convert_map_coords(const Vector2i &p_coords, TileLayout p_from_layout, bool p_from_swap_x_and_y_axis, bool p_from_flip_x, bool p_from_flip_y) const {
+	CoordinateSystem from_system;
+	from_system.swap_x_and_y_axis = p_from_swap_x_and_y_axis;
+	from_system.flip_x = p_from_flip_x;
+	from_system.flip_y = p_from_flip_y;
+	return convert_map_coords_from_system(p_coords, p_from_layout, from_system);
+}
+
+Vector2i TileSet::convert_map_coords_from_system(const Vector2i &p_coords, TileLayout p_from_layout, const CoordinateSystem &p_from_system) const {
+	const Vector2i old_layout_coords = map_to_layout_coords_with_system(p_coords, p_from_system);
 	Vector2i layout_coords = old_layout_coords;
 	if (tile_shape != TILE_SHAPE_SQUARE && p_from_layout != tile_layout) {
 		layout_coords = transform_coords_layout(old_layout_coords, tile_offset_axis, p_from_layout, tile_layout);
@@ -3316,7 +3338,7 @@ void TileSet::reset_state() {
 	tile_shape = TILE_SHAPE_SQUARE;
 	tile_layout = TILE_LAYOUT_STACKED;
 	tile_offset_axis = TILE_OFFSET_AXIS_HORIZONTAL;
-	coordinate_axes = COORDINATE_AXES_DEFAULT;
+	coordinate_system = CoordinateSystem();
 	tile_size = Size2i(16, 16);
 }
 
@@ -4088,6 +4110,20 @@ bool TileSet::_set(const StringName &p_name, const Variant &p_value) {
 	}
 #endif // DISABLE_DEPRECATED
 
+	// truely-godot-engine: `coordinate_axes`, one value of eight, was replaced by `swap_x_and_y_axis`, `flip_x`
+	// and `flip_y`. Bit 0 was flip X, bit 1 flip Y, bit 2 the swap. The value is read once and saved as the three bools.
+	if (p_name == SNAME("coordinate_axes")) {
+		ERR_FAIL_COND_V(p_value.get_type() != Variant::INT, false);
+		const int axes = p_value;
+		ERR_FAIL_INDEX_V(axes, 8, false);
+		CoordinateSystem system;
+		system.swap_x_and_y_axis = (axes & 4) != 0;
+		system.flip_x = (axes & 1) != 0;
+		system.flip_y = (axes & 2) != 0;
+		set_coordinate_system(system);
+		return true;
+	}
+
 	return false;
 }
 
@@ -4348,19 +4384,27 @@ void TileSet::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_layout"), &TileSet::get_tile_layout);
 	ClassDB::bind_method(D_METHOD("set_tile_offset_axis", "alignment"), &TileSet::set_tile_offset_axis);
 	ClassDB::bind_method(D_METHOD("get_tile_offset_axis"), &TileSet::get_tile_offset_axis);
-	ClassDB::bind_method(D_METHOD("set_coordinate_axes", "axes"), &TileSet::set_coordinate_axes);
-	ClassDB::bind_method(D_METHOD("get_coordinate_axes"), &TileSet::get_coordinate_axes);
+	ClassDB::bind_method(D_METHOD("set_swap_x_and_y_axis", "swap"), &TileSet::set_swap_x_and_y_axis);
+	ClassDB::bind_method(D_METHOD("is_swap_x_and_y_axis"), &TileSet::is_swap_x_and_y_axis);
+	ClassDB::bind_method(D_METHOD("set_flip_x", "flip"), &TileSet::set_flip_x);
+	ClassDB::bind_method(D_METHOD("is_flip_x"), &TileSet::is_flip_x);
+	ClassDB::bind_method(D_METHOD("set_flip_y", "flip"), &TileSet::set_flip_y);
+	ClassDB::bind_method(D_METHOD("is_flip_y"), &TileSet::is_flip_y);
 	ClassDB::bind_method(D_METHOD("map_to_layout_coords", "map_coords"), &TileSet::map_to_layout_coords);
 	ClassDB::bind_method(D_METHOD("layout_to_map_coords", "layout_coords"), &TileSet::layout_to_map_coords);
-	ClassDB::bind_method(D_METHOD("convert_map_coords", "coords", "from_layout", "from_axes"), &TileSet::convert_map_coords);
+	ClassDB::bind_method(D_METHOD("convert_map_coords", "coords", "from_layout", "from_swap_x_and_y_axis", "from_flip_x", "from_flip_y"), &TileSet::convert_map_coords, DEFVAL(false), DEFVAL(false), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("set_tile_size", "size"), &TileSet::set_tile_size);
 	ClassDB::bind_method(D_METHOD("get_tile_size"), &TileSet::get_tile_size);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_shape", PROPERTY_HINT_ENUM, "Square,Isometric,Half-Offset Square,Hexagon"), "set_tile_shape", "get_tile_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_layout", PROPERTY_HINT_ENUM, "Stacked,Stacked Offset,Stairs Right,Stairs Down,Diamond Right,Diamond Down"), "set_tile_layout", "get_tile_layout");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_offset_axis", PROPERTY_HINT_ENUM, "Horizontal Offset,Vertical Offset"), "set_tile_offset_axis", "get_tile_offset_axis");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "coordinate_axes", PROPERTY_HINT_ENUM, "Default,Flip X,Flip Y,Flip X and Y,Swap,Swap and Flip X,Swap and Flip Y,Swap and Flip X and Y"), "set_coordinate_axes", "get_coordinate_axes");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "tile_size", PROPERTY_HINT_NONE, "suffix:px"), "set_tile_size", "get_tile_size");
+	ADD_GROUP("Coordinate System", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "swap_x_and_y_axis"), "set_swap_x_and_y_axis", "is_swap_x_and_y_axis");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_x"), "set_flip_x", "is_flip_x");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_y"), "set_flip_y", "is_flip_y");
+	ADD_GROUP("", "");
 
 	// Rendering.
 	ClassDB::bind_method(D_METHOD("set_uv_clipping", "uv_clipping"), &TileSet::set_uv_clipping);
@@ -4484,16 +4528,6 @@ void TileSet::_bind_methods() {
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_STAIRS_DOWN);
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_DIAMOND_RIGHT);
 	BIND_ENUM_CONSTANT(TILE_LAYOUT_DIAMOND_DOWN);
-
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_DEFAULT);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_X);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_Y);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_FLIP_XY);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_X);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_Y);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_SWAP_FLIP_XY);
-	BIND_ENUM_CONSTANT(COORDINATE_AXES_MAX);
 
 	BIND_ENUM_CONSTANT(TILE_OFFSET_AXIS_HORIZONTAL);
 	BIND_ENUM_CONSTANT(TILE_OFFSET_AXIS_VERTICAL);
