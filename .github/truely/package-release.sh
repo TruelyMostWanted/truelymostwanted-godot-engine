@@ -9,6 +9,7 @@
 #
 # Editor zips hold one folder with the editor and ._sc_ (self-contained mode).
 # The .tpz files hold templates/ with version.txt, named like the official Godot templates.
+# PARTIAL=1: macOS builds that are missing are left out (published later by truely_release_update.yml).
 set -euo pipefail
 
 A="$(cd "$1" && pwd)"
@@ -67,6 +68,10 @@ for m in "" ".mono"; do
 	zipdir "$STAGE/$f" "$OUT/$f.zip"
 
 	# macOS: Godot.app with ._sc_ next to it (the editor looks outside the bundle)
+	if [ -n "${PARTIAL:-}" ] && [ ! -e "$A/godot.macos.editor.universal$m" ]; then
+		echo "  (skipped: no macOS editor$m build, PARTIAL)"
+		continue
+	fi
 	f="${NAME}_${p}macos.universal"
 	d="$STAGE/$f/$f"
 	mkdir -p "$d"
@@ -97,6 +102,11 @@ for m in "" ".mono"; do
 	done
 
 	# macOS: macos.zip with macos_template.app
+	if [ -n "${PARTIAL:-}" ] && [ ! -e "$A/godot.macos.template_release.universal$m" ]; then
+		echo "  (no macOS templates$m, PARTIAL)"
+		zipdir "$STAGE/${p}tpz" "$OUT/${NAME}_${p}export_templates.tpz"
+		continue
+	fi
 	app="$STAGE/${p}macos/macos_template.app"
 	mkdir -p "$(dirname "$app")"
 	cp -R "$DIST/macos_template.app" "$app"
