@@ -241,7 +241,8 @@ void SettingsServer::snap_resource_floats(const Ref<Resource> &p_resource) {
 // Project settings.
 
 void SettingsServer::register_settings() {
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_GENERAL_FOLDER, PROPERTY_HINT_DIR), "user://settings");
+	// No folder picker: PROPERTY_HINT_DIR browses only `res://`, and the folder belongs in `user://` (#404).
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_GENERAL_FOLDER, PROPERTY_HINT_PLACEHOLDER_TEXT, "user://settings"), "user://settings");
 	// Values of ResourceTextSerializer::Format.
 	GLOBAL_DEF(PropertyInfo(Variant::INT, SETTING_GENERAL_DEFAULT_FORMAT, PROPERTY_HINT_ENUM, "JSON,INI,CSV,XML,TOML,YAML"), ResourceTextSerializer::FORMAT_INI);
 	GLOBAL_DEF(SETTING_ONLY_CHANGED, true);
@@ -276,6 +277,8 @@ void SettingsServer::register_domain_settings(const StringName &p_domain, bool p
 	// Values of ResourceTextSerializer::Format. CSV only for list domains.
 	const String formats = p_csv ? "JSON:0,INI:1,CSV:2,XML:3,TOML:4,YAML:5" : "JSON:0,INI:1,XML:3,TOML:4,YAML:5";
 	GLOBAL_DEF(PropertyInfo(Variant::INT, get_domain_setting_name(p_domain, SETTING_KEY_FORMAT), PROPERTY_HINT_ENUM, formats), ResourceTextSerializer::FORMAT_INI);
+	// The optional project defaults of the domain (read by _initialize()), with a file picker (#404).
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_DEFAULTS_PREFIX + String(p_domain), PROPERTY_HINT_FILE), String());
 }
 
 // A format value of the project settings: a Format value, or a format name written by hand into project.godot ("json", "ini", ...).
