@@ -406,4 +406,15 @@ jobs:
           flags="--prerelease --latest=false"
           if [ "$(tr -d '[:space:]' < truely/godot-status.txt)" = "stable" ]; then flags="--latest"; fi
           if [ "${{ inputs.draft }}" = "true" ]; then flags="$flags --draft"; fi
-          gh release create "$TAG" release/* --target "$SHA" --title "$TITLE" --notes-file notes.md $flags
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # The release post already exists (e.g. an older post moved to this tag with
+            # `gh release edit <old> --tag <new> --target <sha>`): replace the files, keep its curated notes.
+            echo "Updating the existing release $TAG"
+            for asset in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+              gh release delete-asset "$TAG" "$asset" --yes
+            done
+            gh release upload "$TAG" release/* --clobber
+            gh release edit "$TAG" --title "$TITLE" --draft=false
+          else
+            gh release create "$TAG" release/* --target "$SHA" --title "$TITLE" --notes-file notes.md $flags
+          fi
