@@ -137,6 +137,7 @@ class FlowGraphEditor : public EditorDock {
 	void _commit_drag();
 	void _element_selected(Node *p_element);
 	void _element_deselected(Node *p_element);
+	void _show_graph_if_nothing_selected();
 	void _inline_property_changed(const String &p_property, const Variant &p_value, const String &p_field, bool p_changing, int p_id);
 
 	void _copy(bool p_cut);

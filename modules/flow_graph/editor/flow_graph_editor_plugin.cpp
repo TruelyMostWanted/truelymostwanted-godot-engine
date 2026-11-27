@@ -546,10 +546,21 @@ void FlowGraphEditor::_element_selected(Node *p_element) {
 }
 
 void FlowGraphEditor::_element_deselected(Node *p_element) {
-	if (graph.is_valid()) {
-		// Back to the graph in the inspector; a following node_selected shows the new element.
-		EditorNode::get_singleton()->push_item(graph.ptr(), "", true);
+	// GraphEdit may emit node_deselected after node_selected of the new element: decide once both are done.
+	callable_mp(this, &FlowGraphEditor::_show_graph_if_nothing_selected).call_deferred();
+}
+
+void FlowGraphEditor::_show_graph_if_nothing_selected() {
+	if (graph.is_null()) {
+		return;
 	}
+	for (int i = 0; i < graph_edit->get_child_count(); i++) {
+		GraphElement *element = Object::cast_to<GraphElement>(graph_edit->get_child(i));
+		if (element != nullptr && element->is_selected()) {
+			return;
+		}
+	}
+	EditorNode::get_singleton()->push_item(graph.ptr(), "", true);
 }
 
 void FlowGraphEditor::_inline_property_changed(const String &p_property, const Variant &p_value, const String &p_field, bool p_changing, int p_id) {
