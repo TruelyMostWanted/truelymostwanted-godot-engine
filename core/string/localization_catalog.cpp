@@ -472,6 +472,21 @@ void LocalizationCatalog::remove_key(const StringName &p_key, const StringName &
 	emit_changed();
 }
 
+void LocalizationCatalog::rename_key(const StringName &p_key, const StringName &p_new_key, const StringName &p_context, const StringName &p_new_context) {
+	const int row = find_key(p_key, p_context);
+	ERR_FAIL_COND_MSG(row < 0, vformat("The localization catalog has no key \"%s\" with the context \"%s\".", p_key, p_context));
+	ERR_FAIL_COND_MSG(p_new_key == StringName(), "A key can't be empty.");
+	if (p_new_key == p_key && p_new_context == p_context) {
+		return;
+	}
+	ERR_FAIL_COND_MSG(has_key(p_new_key, p_new_context), vformat("The localization catalog has the key \"%s\" with the context \"%s\" already.", p_new_key, p_new_context));
+	// Only the id changes: the rows of the locale columns (also unloaded ones) stay the same.
+	const CharString id = _make_id(p_new_key, p_new_context);
+	ids.set(row, id.get_data(), id.length());
+	_rebuild_index();
+	emit_changed();
+}
+
 bool LocalizationCatalog::has_key(const StringName &p_key, const StringName &p_context) const {
 	return find_key(p_key, p_context) >= 0;
 }
@@ -1456,6 +1471,7 @@ void LocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_key_count"), &LocalizationCatalog::get_key_count);
 	ClassDB::bind_method(D_METHOD("add_key", "key", "context"), &LocalizationCatalog::add_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("remove_key", "key", "context"), &LocalizationCatalog::remove_key, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("rename_key", "key", "new_key", "context", "new_context"), &LocalizationCatalog::rename_key, DEFVAL(StringName()), DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("has_key", "key", "context"), &LocalizationCatalog::has_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("find_key", "key", "context"), &LocalizationCatalog::find_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("get_key", "row"), &LocalizationCatalog::get_key);

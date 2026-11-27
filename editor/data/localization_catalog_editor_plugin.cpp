@@ -44,17 +44,20 @@
 #include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
 #include "core/variant/variant_parser.h"
+#include "editor/data/csv_table_editor.h"
 #include "editor/editor_node.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/gui/editor_toaster.h"
+#include "editor/inspector/editor_properties.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/label.h"
 #include "scene/gui/tree.h"
+#include "scene/resources/localized_text.h"
 
 static const char *SETTING_TRANSLATIONS = "internationalization/locale/translations";
 static const char *SETTING_TRANSLATION_REMAPS = "internationalization/locale/translation_remaps";
@@ -113,11 +116,25 @@ void EditorInspectorPluginLocalizationCatalog::_save_pot(const String &p_path, c
 	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE);
 	ERR_FAIL_COND_MSG(file.is_null(), vformat("Cannot write \"%s\".", p_path));
 	file->store_string(catalog->to_po());
+	file.unref();
+	EditorFileSystem::get_singleton()->update_file(p_path); // Listed in the FileSystem dock right away.
+}
+
+void EditorInspectorPluginLocalizationCatalog::_open_in_table(const Ref<LocalizationCatalog> &p_catalog) {
+	CSVTableEditor *table = CSVTableEditor::get_singleton();
+	ERR_FAIL_NULL(table);
+	table->edit(p_catalog);
+	table->make_visible();
 }
 
 void EditorInspectorPluginLocalizationCatalog::parse_begin(Object *p_object) {
 	const Ref<LocalizationCatalog> catalog(Object::cast_to<LocalizationCatalog>(p_object));
 	VBoxContainer *box = memnew(VBoxContainer);
+
+	Button *table_button = memnew(Button(TTR("Open in Table")));
+	table_button->set_tooltip_text(TTR("Edit the keys, locales and notes in the CSV Table dock."));
+	table_button->connect(SceneStringName(pressed), callable_mp_static(&EditorInspectorPluginLocalizationCatalog::_open_in_table).bind(catalog));
+	box->add_child(table_button);
 
 	const Ref<DataValidation> result = catalog->validate();
 	Label *status = memnew(Label);
@@ -164,6 +181,62 @@ void EditorInspectorPluginLocalizationCatalog::parse_begin(Object *p_object) {
 		box->add_child(pot_button);
 	}
 	add_custom_control(box);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// LocalizedText inspector.
+
+void LocalizedTextPreview::_update() {
+	set_text(localized_text.is_valid() ? vformat(TTR("Preview: %s"), localized_text->get_text()) : String());
+}
+
+void LocalizedTextPreview::_notification(int p_what) {
+	if (p_what == NOTIFICATION_ENTER_TREE) {
+		_update();
+	}
+}
+
+LocalizedTextPreview::LocalizedTextPreview(const Ref<LocalizedText> &p_localized_text) {
+	localized_text = p_localized_text;
+	set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	set_tooltip_text(TTR("The text in the current editor locale, with the values TextInsertionServer has in the editor."));
+	if (localized_text.is_valid()) {
+		localized_text->connect_changed(callable_mp(this, &LocalizedTextPreview::_update));
+	}
+}
+
+bool EditorInspectorPluginLocalizedText::can_handle(Object *p_object) {
+	return Object::cast_to<LocalizedText>(p_object) != nullptr;
+}
+
+void EditorInspectorPluginLocalizedText::parse_begin(Object *p_object) {
+	add_custom_control(memnew(LocalizedTextPreview(Ref<LocalizedText>(Object::cast_to<LocalizedText>(p_object)))));
+}
+
+bool EditorInspectorPluginLocalizedText::parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const BitField<PropertyUsageFlags> p_usage, const bool p_wide) {
+	const TextLocalizationServer *server = TextLocalizationServer::get_singleton();
+	if (p_path != "key" || !server) {
+		return false;
+	}
+	// Suggestions from the loaded catalogs; any other key can still be typed (#391).
+	HashSet<String> seen;
+	Vector<String> keys;
+	const TypedArray<LocalizationCatalog> catalogs = server->get_catalogs();
+	for (int i = 0; i < catalogs.size() && keys.size() < MAX_SUGGESTED_KEYS; i++) {
+		const Ref<LocalizationCatalog> catalog = catalogs[i];
+		for (int row = 0; catalog.is_valid() && row < catalog->get_key_count() && keys.size() < MAX_SUGGESTED_KEYS; row++) {
+			const String key = catalog->get_key(row);
+			if (!seen.has(key)) {
+				seen.insert(key);
+				keys.push_back(key);
+			}
+		}
+	}
+	keys.sort();
+	EditorPropertyTextEnum *editor = memnew(EditorPropertyTextEnum);
+	editor->setup(keys, Vector<String>(), true, true);
+	add_property_editor(p_path, editor);
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -403,12 +476,37 @@ void LocalizationCatalogEditorPlugin::_convert_project_translations() {
 	EditorToaster::get_singleton()->popup_str(vformat(TTR("Converted %d CSV file(s), %d other translated key(s) and %d remapped resource(s) to localization catalogs. %d translation(s) could not be converted."), csv_count, texts->get_key_count() - previous_keys, remaps.size() - kept_remaps.size(), kept.size()));
 }
 
+void LocalizationCatalogEditorPlugin::_popup_convert_dialog() {
+	// The files the conversion changes, so nothing happens unseen (#391).
+	const PackedStringArray translations = GLOBAL_GET(SETTING_TRANSLATIONS);
+	const Dictionary remaps = GLOBAL_GET(SETTING_TRANSLATION_REMAPS);
+	PackedStringArray lines;
+	for (const String &path : translations) {
+		const String csv_path = path.get_basename().get_basename() + ".csv";
+		const String line = path.get_extension().to_lower() == "translation" && FileAccess::exists(csv_path) ? vformat(TTR("%s: Keep File, text catalog"), csv_path) : vformat(TTR("%s: into res://localization/translations.csv"), path);
+		if (!lines.has(line)) {
+			lines.push_back(line);
+		}
+	}
+	if (!remaps.is_empty()) {
+		lines.push_back(vformat(TTR("%d translation remap(s): into res://localization/resource_remaps.csv"), remaps.size()));
+	}
+	constexpr int MAX_LINES = 20;
+	String files = lines.is_empty() ? TTR("Nothing to convert.") : String("\n").join(lines.slice(0, MAX_LINES));
+	if (lines.size() > MAX_LINES) {
+		files += "\n" + vformat(TTR("... and %d more"), lines.size() - MAX_LINES);
+	}
+	convert_dialog->set_text(convert_text + "\n\n" + files);
+	convert_dialog->get_ok_button()->set_disabled(lines.is_empty());
+	convert_dialog->popup_centered();
+}
+
 void LocalizationCatalogEditorPlugin::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			VariantWriter::write_to_string(GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS), loaded_manifests);
 			ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
-			add_tool_menu_item(TTR("Convert Project Translations to Catalogs..."), callable_mp((Window *)convert_dialog, &Window::popup_centered).bind(Size2i()));
+			add_tool_menu_item(TTR("Convert Project Translations to Catalogs..."), callable_mp(this, &LocalizationCatalogEditorPlugin::_popup_convert_dialog));
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 			ProjectSettings::get_singleton()->disconnect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
@@ -421,6 +519,9 @@ LocalizationCatalogEditorPlugin::LocalizationCatalogEditorPlugin() {
 	Ref<EditorInspectorPluginLocalizationCatalog> inspector_plugin;
 	inspector_plugin.instantiate();
 	add_inspector_plugin(inspector_plugin);
+	Ref<EditorInspectorPluginLocalizedText> localized_text_plugin;
+	localized_text_plugin.instantiate();
+	add_inspector_plugin(localized_text_plugin);
 
 	Ref<LocalizationCatalogExportPlugin> export_plugin;
 	export_plugin.instantiate();
@@ -432,7 +533,7 @@ LocalizationCatalogEditorPlugin::LocalizationCatalogEditorPlugin() {
 
 	convert_dialog = memnew(ConfirmationDialog);
 	convert_dialog->set_title(TTR("Convert Project Translations"));
-	convert_dialog->set_text(TTR("Moves the project's translations to localization catalogs:\n- CSV files imported as translations are switched to \"Keep File\" and used as text catalogs.\n- Other translations (PO, MO, .translation) are merged into res://localization/translations.csv.\n- Translation remaps are written to res://localization/resource_remaps.csv.\nThe files are added to \"internationalization/localization/catalog_manifests\" and removed from \"internationalization/locale/translations\" and \"translation_remaps\". This can't be undone."));
+	convert_text = TTR("Moves the project's translations to localization catalogs:\n- CSV files imported as translations are switched to \"Keep File\" and used as text catalogs.\n- Other translations (PO, MO, .translation) are merged into res://localization/translations.csv.\n- Translation remaps are written to res://localization/resource_remaps.csv.\nThe files are added to \"internationalization/localization/catalog_manifests\" and removed from \"internationalization/locale/translations\" and \"translation_remaps\". This can't be undone.");
 	convert_dialog->connect(SceneStringName(confirmed), callable_mp(this, &LocalizationCatalogEditorPlugin::_convert_project_translations));
 	add_child(convert_dialog);
 }

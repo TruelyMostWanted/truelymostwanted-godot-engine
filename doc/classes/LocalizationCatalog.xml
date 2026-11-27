@@ -189,6 +189,16 @@
 				Removes the column of [param locale].
 			</description>
 		</method>
+		<method name="rename_key">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="new_key" type="StringName" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="new_context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Renames the row of [param key] with [param context] to [param new_key] with [param new_context]. The row keeps its position, texts, plural forms, plural key and notes. Fails if [param key] is missing or [param new_key] with [param new_context] exists already.
+			</description>
+		</method>
 		<method name="save_to_file">
 			<return type="int" enum="Error" />
 			<param index="0" name="path" type="String" />
