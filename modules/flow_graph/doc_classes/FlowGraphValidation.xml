@@ -94,7 +94,13 @@
 		<constant name="ISSUE_KIND_NODE_WARNING" value="7" enum="IssueKind">
 			A node reports a configuration warning, see [method FlowNode.get_configuration_warnings].
 		</constant>
-		<constant name="ISSUE_KIND_MAX" value="8" enum="IssueKind">
+		<constant name="ISSUE_KIND_MULTIPLE_START" value="8" enum="IssueKind">
+			The node is a [FlowStartNode] but not the start node ([member FlowGraph.start_node_id]). A graph should have one start node; the others are never entered from the start.
+		</constant>
+		<constant name="ISSUE_KIND_INVALID_START" value="9" enum="IssueKind">
+			[member FlowGraph.start_node_id] is a node of the graph, but not a [FlowStartNode].
+		</constant>
+		<constant name="ISSUE_KIND_MAX" value="10" enum="IssueKind">
 			Represents the size of the [enum IssueKind] enum.
 		</constant>
 	</constants>

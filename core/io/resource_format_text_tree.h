@@ -82,6 +82,10 @@ protected:
 	virtual bool _can_save(const Ref<Resource> &p_resource) const { return true; }
 
 public:
+	// The text formats are not offered in save dialogs for this class and its subclasses, for example parts of a
+	// graph that only make sense in the graph's own formats. Saving to a path with such an extension still works.
+	static void exclude_from_save_dialogs(const String &p_class);
+
 	virtual Error save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags = 0) override;
 	virtual void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const override;
 	virtual bool recognize(const Ref<Resource> &p_resource) const override;

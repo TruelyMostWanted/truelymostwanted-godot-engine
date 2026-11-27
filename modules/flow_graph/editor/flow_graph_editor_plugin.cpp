@@ -30,6 +30,7 @@
 
 #include "flow_graph_editor_plugin.h"
 
+#include "../dialogue/dialogue_nodes.h"
 #include "../flow_graph_debugger.h"
 
 #include "core/io/resource_loader.h"
@@ -61,6 +62,7 @@ enum {
 	MENU_ADD_NODE,
 	MENU_ADD_FRAME,
 	MENU_ADD_NODE_AT_CENTER,
+	MENU_DETACH_FROM_FRAME,
 };
 
 // Helpers.
@@ -247,6 +249,12 @@ void FlowGraphEditor::_rebuild() {
 			graph_node->set_slot(row, input.is_valid(), _slot_type(input), _slot_color(input), output.is_valid(), _slot_type(output), _slot_color(output));
 		}
 		_add_inline_properties(graph_node, node, id);
+		if (Object::cast_to<DialogueChoiceNode>(node.ptr()) != nullptr) {
+			Button *add_option = memnew(Button);
+			add_option->set_text(TTR("Add Option"));
+			add_option->connect(SceneStringName(pressed), callable_mp(this, &FlowGraphEditor::_add_option).bind(id));
+			graph_node->add_child(add_option);
+		}
 
 		PackedStringArray warnings;
 		if (const PackedStringArray *issues = node_issues.getptr(id)) {
@@ -290,7 +298,51 @@ void FlowGraphEditor::_rebuild() {
 			graph_edit->connect_node("n" + itos(c->get_from_node_id()), from_port, "n" + itos(c->get_to_node_id()), to_port);
 		}
 	}
+	if (frame_view_pending) {
+		frame_view_pending = false;
+		// After the new elements have their sizes.
+		callable_mp(this, &FlowGraphEditor::_frame_view).call_deferred();
+	}
 	_debug_update();
+}
+
+void FlowGraphEditor::_frame_view() {
+	if (debug_follow->is_pressed()) {
+		return; // Following a playback centers on its node instead.
+	}
+	Rect2 bounds;
+	bool empty = true;
+	for (int i = 0; i < graph_edit->get_child_count(); i++) {
+		const GraphElement *element = Object::cast_to<GraphElement>(graph_edit->get_child(i));
+		if (element != nullptr) {
+			const Rect2 rect(element->get_position_offset(), element->get_size());
+			bounds = empty ? rect : bounds.merge(rect);
+			empty = false;
+		}
+	}
+	if (!empty) {
+		// The top left of the contents just below the toolbar, which lies over the graph.
+		const Vector2 margin = Vector2(20 * EDSCALE, graph_edit->get_menu_hbox()->get_size().y + 30 * EDSCALE);
+		graph_edit->set_scroll_offset(bounds.position * graph_edit->get_zoom() - margin);
+	}
+}
+
+void FlowGraphEditor::_add_option(int p_id) {
+	ERR_FAIL_COND(graph.is_null());
+	const Ref<DialogueChoiceNode> choice = graph->get_node(p_id);
+	ERR_FAIL_COND(choice.is_null());
+	const TypedArray<DialogueOption> options = choice->get_options();
+	Ref<DialogueOption> option;
+	option.instantiate();
+	option->set_text("Option " + itos(options.size() + 1));
+	TypedArray<DialogueOption> new_options = options.duplicate();
+	new_options.push_back(option);
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Add Option"), UndoRedo::MERGE_DISABLE, graph.ptr());
+	undo_redo->force_fixed_history();
+	undo_redo->add_do_method(choice.ptr(), "set_options", new_options);
+	undo_redo->add_undo_method(choice.ptr(), "set_options", options);
+	undo_redo->commit_action();
 }
 
 void FlowGraphEditor::_add_inline_properties(GraphNode *p_graph_node, const Ref<FlowNode> &p_node, int p_id) {
@@ -503,10 +555,19 @@ void FlowGraphEditor::_commit_drag() {
 				const Ref<FlowNode> node = graph->get_node(id);
 				undo_redo->add_do_property(node.ptr(), "editor_position", op.to);
 				undo_redo->add_undo_property(node.ptr(), "editor_position", op.from);
-			} else if (!is_node && id < frames.size()) {
-				const Ref<FlowFrame> frame = frames[id];
-				undo_redo->add_do_property(frame.ptr(), "rect", Rect2(op.to, frame->get_rect().size));
-				undo_redo->add_undo_property(frame.ptr(), "rect", Rect2(op.from, frame->get_rect().size));
+			}
+		}
+		// Frames keep what GraphEdit shows: moved, or shrunk and grown around their moved nodes.
+		for (int i = 0; i < frames.size(); i++) {
+			const Ref<FlowFrame> frame = frames[i];
+			const GraphFrame *graph_frame = Object::cast_to<GraphFrame>(graph_edit->get_node_or_null(NodePath("f" + itos(i))));
+			if (frame.is_null() || graph_frame == nullptr) {
+				continue;
+			}
+			const Rect2 shown(graph_frame->get_position_offset(), graph_frame->get_size());
+			if (shown != frame->get_rect()) {
+				undo_redo->add_do_property(frame.ptr(), "rect", shown);
+				undo_redo->add_undo_property(frame.ptr(), "rect", frame->get_rect());
 			}
 		}
 		if (link_frame >= 0 && link_frame < frames.size()) {
@@ -609,12 +670,29 @@ void FlowGraphEditor::_paste() {
 	if (graph.is_null() || clipboard.nodes.is_empty()) {
 		return;
 	}
+	// The copied nodes keep their layout; their top left goes to the mouse, or next to the originals.
+	Vector2 origin = clipboard.nodes[0]->get_editor_position();
+	for (const Ref<FlowNode> &node : clipboard.nodes) {
+		origin = origin.min(node->get_editor_position());
+	}
+	const Vector2 step = Vector2(40, 40) * EDSCALE;
+	const Vector2 mouse = graph_edit->get_local_mouse_position();
+	const Vector2 target = Rect2(Vector2(), graph_edit->get_size()).has_point(mouse) ? _to_graph_position(mouse) : origin + step;
+	// Pasting again at the same place shifts each copy, so the copies do not hide each other.
+	if (target.is_equal_approx(paste_target)) {
+		paste_shift += step;
+	} else {
+		paste_target = target;
+		paste_shift = Vector2();
+	}
+	const Vector2 offset = target + paste_shift - origin;
+
 	const Dictionary before = _snapshot();
 	HashMap<int, int> new_ids;
 	for (uint32_t i = 0; i < clipboard.nodes.size(); i++) {
 		// Copy again, so the clipboard can be pasted more than once.
 		const Ref<FlowNode> node = clipboard.nodes[i]->duplicate(true);
-		new_ids.insert(clipboard.ids[i], graph->add_node(node, node->get_editor_position() + Vector2(40, 40) * EDSCALE));
+		new_ids.insert(clipboard.ids[i], graph->add_node(node, node->get_editor_position() + offset));
 	}
 	for (int i = 0; i + 3 < clipboard.connections.size(); i += 4) {
 		graph->connect_nodes(new_ids[(int)clipboard.connections[i]], (StringName)clipboard.connections[i + 1], new_ids[(int)clipboard.connections[i + 2]], (StringName)clipboard.connections[i + 3]);
@@ -643,13 +721,53 @@ void FlowGraphEditor::_context_menu_id_pressed(int p_id) {
 	if (graph.is_null()) {
 		return;
 	}
+	if (p_id == MENU_DETACH_FROM_FRAME) {
+		const PackedInt32Array ids = _get_selected_ids();
+		const Dictionary before = _snapshot();
+		bool detached = false;
+		const TypedArray<FlowFrame> frames = graph->get_frames();
+		for (int i = 0; i < frames.size(); i++) {
+			const Ref<FlowFrame> frame = frames[i];
+			if (frame.is_null()) {
+				continue;
+			}
+			PackedInt32Array kept = frame->get_node_ids();
+			for (const int id : ids) {
+				kept.erase(id);
+			}
+			if (kept.size() != frame->get_node_ids().size()) {
+				frame->set_node_ids(kept);
+				detached = true;
+			}
+		}
+		if (detached) {
+			graph->emit_changed(); // Frames are not watched; this rebuilds the view.
+			_commit_snapshot(TTR("Detach from Frame"), before);
+		}
+		return;
+	}
 	if (p_id == MENU_ADD_FRAME) {
+		// Around the selected nodes, with room for the title; at the click without a selection.
+		Rect2 rect(_to_graph_position(menu_position), Size2(200, 120) * EDSCALE);
+		bool first = true;
+		for (int i = 0; i < graph_edit->get_child_count(); i++) {
+			const GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
+			if (graph_node != nullptr && graph_node->is_selected()) {
+				const Rect2 node_rect(graph_node->get_position_offset(), graph_node->get_size());
+				rect = first ? node_rect : rect.merge(node_rect);
+				first = false;
+			}
+		}
+		if (!first) {
+			const real_t margin = 40 * EDSCALE;
+			rect = rect.grow_individual(margin, margin + 30 * EDSCALE, margin, margin);
+		}
 		const Dictionary before = _snapshot();
 		Ref<FlowFrame> frame;
 		frame.instantiate();
 		frame->set_title(TTR("Frame"));
 		frame->set_node_ids(_get_selected_ids());
-		frame->set_rect(Rect2(_to_graph_position(menu_position), Size2(200, 120) * EDSCALE));
+		frame->set_rect(rect);
 		TypedArray<FlowFrame> frames;
 		frames.append_array(graph->get_frames());
 		frames.push_back(frame);
@@ -659,6 +777,32 @@ void FlowGraphEditor::_context_menu_id_pressed(int p_id) {
 	}
 	pending_port.unref();
 	_open_add_dialog(p_id == MENU_ADD_NODE ? menu_position : graph_edit->get_size() / 2);
+	if (p_id == MENU_ADD_NODE_AT_CENTER) {
+		add_position = _free_position(add_position);
+	}
+}
+
+// Moves the position down below the nodes that would cover a new node there.
+Vector2 FlowGraphEditor::_free_position(Vector2 p_position) const {
+	const Size2 new_size = Size2(160, 80) * EDSCALE;
+	for (int pass = 0; pass < graph_edit->get_child_count(); pass++) {
+		bool moved = false;
+		for (int i = 0; i < graph_edit->get_child_count(); i++) {
+			const GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
+			if (graph_node == nullptr) {
+				continue;
+			}
+			const Rect2 rect(graph_node->get_position_offset(), graph_node->get_size());
+			if (rect.intersects(Rect2(p_position, new_size))) {
+				p_position.y = rect.get_end().y + 20 * EDSCALE;
+				moved = true;
+			}
+		}
+		if (!moved) {
+			break;
+		}
+	}
+	return p_position;
 }
 
 void FlowGraphEditor::_open_add_dialog(const Vector2 &p_position) {
@@ -766,6 +910,8 @@ void FlowGraphEditor::edit(const Ref<FlowGraph> &p_graph) {
 	if (graph.is_valid()) {
 		graph->connect_changed(changed);
 	}
+	frame_view_pending = graph.is_valid();
+	paste_target = Vector2(Math::INF, Math::INF);
 	_queue_rebuild();
 }
 
@@ -835,6 +981,7 @@ FlowGraphEditor::FlowGraphEditor() {
 	context_menu = memnew(PopupMenu);
 	context_menu->add_item(TTR("Add Node..."), MENU_ADD_NODE);
 	context_menu->add_item(TTR("Add Frame Around Selection"), MENU_ADD_FRAME);
+	context_menu->add_item(TTR("Detach from Frame"), MENU_DETACH_FROM_FRAME);
 	context_menu->connect(SceneStringName(id_pressed), callable_mp(this, &FlowGraphEditor::_context_menu_id_pressed));
 	add_child(context_menu);
 
