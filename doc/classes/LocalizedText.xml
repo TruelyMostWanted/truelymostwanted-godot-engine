@@ -86,7 +86,7 @@
 			The translation context of [member key].
 		</member>
 		<member name="count_argument" type="StringName" setter="set_count_argument" getter="get_count_argument" default="&amp;&quot;&quot;">
-			The name of the value that selects the plural form, for example [code]enemy.count[/code]. It is read from [member args], then from [method TextInsertionServer.get_value]; a change of that value refreshes the text. Empty: no plural.
+			The name of the value that selects the plural form, for example [code]enemy.count[/code]. It is resolved like a placeholder: from [member args], then from the [TextInsertionServer] providers, values and [TextInsertionValues]; a change of that value refreshes the text. Empty: no plural.
 		</member>
 		<member name="key" type="StringName" setter="set_key" getter="get_key" default="&amp;&quot;&quot;">
 			The translation key, looked up with [method TextLocalizationServer.translate]. A key without a translation is used as the text (its placeholders are filled too).

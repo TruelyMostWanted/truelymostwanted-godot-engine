@@ -335,10 +335,12 @@ int LocalizedText::_get_count() const {
 	if (count_argument == StringName()) {
 		return -1;
 	}
-	// The arguments first (String and StringName keys are the same key), then the server's values.
-	Variant value = args.get(count_argument, Variant());
-	if (value.get_type() == Variant::NIL && TextInsertionServer::get_singleton()) {
-		value = TextInsertionServer::get_singleton()->get_value(count_argument);
+	// Resolved like the placeholders (#385): the arguments, then providers, values and values resources.
+	Variant value;
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->resolve_value(count_argument, args, value);
+	} else {
+		value = args.get(count_argument, Variant());
 	}
 	return value.get_type() == Variant::INT || value.get_type() == Variant::FLOAT ? (int)(int64_t)value : -1;
 }
