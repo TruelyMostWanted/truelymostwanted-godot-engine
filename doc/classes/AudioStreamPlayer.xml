@@ -169,7 +169,7 @@
 			[b]Note:[/b] This property is automatically changed when exiting or entering the tree, or this node is paused (see [member Node.process_mode]).
 		</member>
 		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
-			Overrides [member AudioStreamPlayer.subtitle_path] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
+			Overrides [member AudioStream.subtitle_path] of the [member stream] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
 			Volume of sound, in decibels. This is an offset of the [member stream]'s volume.

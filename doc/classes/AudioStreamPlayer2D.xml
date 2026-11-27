@@ -171,7 +171,7 @@
 			If [code]true[/code], the playback is paused. You can resume it by setting [member stream_paused] to [code]false[/code].
 		</member>
 		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
-			Overrides [member AudioStreamPlayer2D.subtitle_path] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
+			Overrides [member AudioStream.subtitle_path] of the [member stream] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
 			Base volume before attenuation, in decibels.
