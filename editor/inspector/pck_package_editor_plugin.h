@@ -38,6 +38,7 @@
 class Button;
 class ConfirmationDialog;
 class EditorFileDialog;
+struct EditorProgress;
 class Label;
 class LineEdit;
 class Tree;
@@ -65,6 +66,8 @@ public:
 	// Fails with ERR_INVALID_PARAMETER (invalid target), ERR_DOES_NOT_EXIST or ERR_ALREADY_EXISTS; the array is then unchanged.
 	static Array rename_file(const Array &p_files, const String &p_from, const String &p_to, Error *r_error = nullptr);
 	static Array set_encrypt(const Array &p_files, const String &p_target, bool p_encrypt);
+	// Replaces moved `source` paths: `p_moves` maps old to new paths. `r_moved` counts the changed entries.
+	static Array move_sources(const Array &p_files, const Dictionary &p_moves, int *r_moved = nullptr);
 	static PackedStringArray add_removals(const PackedStringArray &p_removals, const PackedStringArray &p_paths);
 	static PackedStringArray remove_removals(const PackedStringArray &p_removals, const PackedStringArray &p_targets);
 };
@@ -85,6 +88,7 @@ class PCKPackageEditor : public VBoxContainer {
 	Ref<PCKPackage> package;
 	bool read_only = false;
 	bool update_queued = false;
+	Dictionary moved_sources; // Files moved in the FileSystem dock, old to new path, applied deferred as one undo step.
 
 	Label *summary_label = nullptr;
 	Button *add_files_button = nullptr;
@@ -102,11 +106,14 @@ class PCKPackageEditor : public VBoxContainer {
 	LineEdit *build_path_edit = nullptr;
 	LineEdit *build_key_edit = nullptr;
 	Label *build_status_label = nullptr;
+	EditorProgress *build_progress = nullptr;
 
 	void _queue_update();
 	void _update_tree();
 	void _commit(const String &p_action, const Array &p_files, const PackedStringArray &p_removals);
 	void _add_sources(const PackedStringArray &p_sources);
+	void _file_moved(const String &p_old_path, const String &p_new_path);
+	void _follow_moved_sources();
 
 	void _popup_file_dialog(int p_action);
 	void _files_selected(const PackedStringArray &p_paths);
@@ -117,6 +124,7 @@ class PCKPackageEditor : public VBoxContainer {
 
 	void _popup_build_dialog();
 	void _use_preset_key();
+	void _build_progress(const String &p_path, int p_done, int p_total);
 	void _build();
 	void _create_description(const String &p_path);
 

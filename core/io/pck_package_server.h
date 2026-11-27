@@ -51,7 +51,8 @@ private:
 	static PCKPackageServer *singleton;
 
 	void _emit_deferred(const StringName &p_signal, const String &p_path);
-	void _emit_extract_progress(const String &p_path, int p_done, int p_total);
+	// Emits a progress signal on the main thread; deferred from other threads.
+	void _emit_progress(const StringName &p_signal, const String &p_path, int p_done, int p_total);
 
 protected:
 	static void _bind_methods();

@@ -182,15 +182,22 @@ SQLiteTableOverview::SQLiteTableOverview(const String &p_path) {
 // EditorInspectorPluginSQLite
 
 bool EditorInspectorPluginSQLite::can_handle(Object *p_object) {
-	const SQLiteDatabase *database = Object::cast_to<SQLiteDatabase>(p_object);
-	// Only databases loaded from a file; is_built_in() is also true without a path.
-	return database != nullptr && !database->is_built_in();
+	return Object::cast_to<SQLiteDatabase>(p_object) != nullptr;
 }
 
 void EditorInspectorPluginSQLite::parse_begin(Object *p_object) {
 	const SQLiteDatabase *database = Object::cast_to<SQLiteDatabase>(p_object);
 	ERR_FAIL_NULL(database);
-	add_custom_control(memnew(SQLiteTableOverview(database->get_path())));
+	// The tables live in a database file; is_built_in() is also true without a path.
+	if (!database->is_built_in() && ResourceFormatLoaderSQLite::is_database_path(database->get_path())) {
+		add_custom_control(memnew(SQLiteTableOverview(database->get_path())));
+		return;
+	}
+	Label *hint = memnew(Label);
+	hint->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	hint->set_custom_minimum_size(Size2(100, 0) * EDSCALE);
+	hint->set_text(TTR("This database has no database file yet. Save it as .db, .sqlite, .sqlite3 or .db3 to create an empty database, then select the file to see and edit its tables."));
+	add_custom_control(hint);
 }
 
 // SQLiteEditorPlugin

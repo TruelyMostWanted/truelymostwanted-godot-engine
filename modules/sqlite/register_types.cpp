@@ -43,6 +43,7 @@
 #endif
 
 static Ref<ResourceFormatLoaderSQLite> resource_loader_sqlite;
+static Ref<ResourceFormatSaverSQLite> resource_saver_sqlite;
 
 void initialize_sqlite_module(ModuleInitializationLevel p_level) {
 #ifdef TOOLS_ENABLED
@@ -65,6 +66,8 @@ void initialize_sqlite_module(ModuleInitializationLevel p_level) {
 
 	resource_loader_sqlite.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_loader_sqlite);
+	resource_saver_sqlite.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_sqlite);
 }
 
 void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
@@ -74,6 +77,8 @@ void uninitialize_sqlite_module(ModuleInitializationLevel p_level) {
 
 	ResourceLoader::remove_resource_format_loader(resource_loader_sqlite);
 	resource_loader_sqlite.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_sqlite);
+	resource_saver_sqlite.unref();
 
 	SQLiteVFS::finalize();
 }
