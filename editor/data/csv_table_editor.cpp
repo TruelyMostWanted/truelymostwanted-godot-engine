@@ -160,7 +160,7 @@ void CSVTableEditor::_commit_cells(const String &p_action, int p_row, int p_colu
 	}
 
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(p_action, EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(p_action);
 	undo_redo->add_do_method(csv.ptr(), "set_cells", p_row, p_column, p_cells);
 	undo_redo->add_undo_method(csv.ptr(), "set_cells", p_row, p_column, csv->get_cells(p_row, p_column, p_cells.size(), width));
 	for (int i = row_count; i < p_row + p_cells.size(); i++) {
@@ -271,7 +271,7 @@ void CSVTableEditor::_commit_catalog_cells(const String &p_action, int p_row, in
 		return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(p_action, EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(p_action);
 	for (const Change &change : changes) {
 		if (change.key == change.old_key && change.context == change.old_context) {
 			undo_redo->add_do_method(catalog.ptr(), "set_entry", change.key, change.entry, change.context);
@@ -414,7 +414,7 @@ void CSVTableEditor::_add_catalog_column() {
 		return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(TTR("Add Note Column"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(TTR("Add Note Column"));
 	undo_redo->add_do_method(catalog.ptr(), "set_note", catalog->get_key(0), String(), catalog->get_key_context(0), name);
 	undo_redo->add_undo_property(catalog.ptr(), "data", catalog->get("data"));
 	undo_redo->commit_action();
@@ -430,7 +430,7 @@ void CSVTableEditor::_add_catalog_locale(const String &p_locale) {
 		return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(TTR("Add Locale"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(TTR("Add Locale"));
 	undo_redo->add_do_method(catalog.ptr(), "add_locale", p_locale);
 	undo_redo->add_undo_method(catalog.ptr(), "remove_locale", p_locale);
 	undo_redo->commit_action();
@@ -441,7 +441,7 @@ void CSVTableEditor::_remove_catalog_locale(const String &p_locale) {
 		return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(vformat(TTR("Remove Locale %s"), p_locale), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(vformat(TTR("Remove Locale %s"), p_locale));
 	undo_redo->add_do_method(catalog.ptr(), "remove_locale", p_locale);
 	// The whole catalog: its texts and plural forms of the locale come back in their place.
 	undo_redo->add_undo_property(catalog.ptr(), "data", catalog->get("data"));
@@ -519,6 +519,8 @@ void CSVTableEditor::_drop_resource(const Point2 &p_point, const Variant &p_data
 }
 
 void CSVTableEditor::_csv_changed() {
+	// A message of an earlier action is stale now; the validation that follows writes the status again (#346).
+	status_label->set_text(String());
 	if (!update_queued) {
 		update_queued = true;
 		callable_mp(this, &CSVTableEditor::_update).call_deferred();
@@ -746,7 +748,7 @@ void CSVTableEditor::_add_row(bool p_insert) {
 			key = vformat("new_key_%d", i);
 		}
 		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-		undo_redo->create_action_for_history(TTR("Add Localization Key"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		undo_redo->create_action(TTR("Add Localization Key"));
 		undo_redo->add_do_method(catalog.ptr(), "add_key", key);
 		undo_redo->add_undo_method(catalog.ptr(), "remove_key", key);
 		undo_redo->commit_action();
@@ -761,7 +763,7 @@ void CSVTableEditor::_add_row(bool p_insert) {
 	PackedStringArray cells;
 	cells.resize(csv->get_column_count());
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(TTR("Add CSV Row"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(TTR("Add CSV Row"));
 	undo_redo->add_do_method(csv.ptr(), "insert_row", row, cells);
 	undo_redo->add_undo_method(csv.ptr(), "remove_row", row);
 	undo_redo->commit_action();
@@ -785,7 +787,7 @@ void CSVTableEditor::_remove_rows() {
 	if (catalog.is_valid()) {
 		// Undo adds the keys again at the end.
 		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-		undo_redo->create_action_for_history(TTR("Remove Localization Keys"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		undo_redo->create_action(TTR("Remove Localization Keys"));
 		for (int row : rows) {
 			const StringName key = catalog->get_key(row);
 			const StringName context = catalog->get_key_context(row);
@@ -796,7 +798,7 @@ void CSVTableEditor::_remove_rows() {
 		return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(TTR("Remove CSV Rows"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->create_action(TTR("Remove CSV Rows"));
 	for (int i = rows.size() - 1; i >= 0; i--) {
 		undo_redo->add_do_method(csv.ptr(), "remove_row", rows[i]);
 	}
