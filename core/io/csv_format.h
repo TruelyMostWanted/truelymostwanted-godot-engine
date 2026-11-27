@@ -54,6 +54,7 @@ protected:
 	virtual Variant _get_empty_data() const override { return Array(); }
 	virtual Variant::Type _get_data_type() const override { return Variant::ARRAY; }
 	virtual void _get_extensions(List<String> *r_extensions) const override;
+	virtual Ref<SerializerOptions> _get_path_options(const String &p_path) const override;
 	virtual void _cleared() override { header = PackedStringArray(); }
 	virtual Ref<DataValidation> _validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const override;
 	virtual void _resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const override;

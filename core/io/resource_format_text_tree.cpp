@@ -235,8 +235,28 @@ Error ResourceFormatSaverTextTree::save(const Ref<Resource> &p_resource, const S
 	return OK;
 }
 
+// True if the property tree of the resource reads back to the same tree, so a file of a text format loads
+// as the same resource. Only these resources are offered the text formats (the save dialog).
+static bool _round_trips(const Ref<Resource> &p_resource) {
+	const ResourceTextSerializer::Options options = ResourceTextSerializer::get_default_options();
+	Dictionary tree;
+	String error;
+	if (ResourceTextSerializer::encode_resource(p_resource, options, true, tree, error) != OK) {
+		return false;
+	}
+	Ref<Resource> decoded;
+	if (ResourceTextSerializer::decode_resource(tree, ResourceTextSerializer::get_type_name(p_resource.ptr()), decoded, error) != OK) {
+		return false;
+	}
+	Dictionary decoded_tree;
+	if (ResourceTextSerializer::encode_resource(decoded, options, true, decoded_tree, error) != OK) {
+		return false;
+	}
+	return decoded_tree == tree;
+}
+
 void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (recognize(p_resource) && _can_save(p_resource)) {
+	if (recognize(p_resource) && _can_save(p_resource) && _round_trips(p_resource)) {
 		p_extensions->push_back(_get_extension());
 	}
 }

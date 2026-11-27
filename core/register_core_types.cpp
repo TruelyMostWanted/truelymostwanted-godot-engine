@@ -342,11 +342,11 @@ void register_core_types() {
 	ResourceSaver::add_resource_format_saver(resource_saver_resource_xml);
 
 	// Plain data files (no type marker) as INI, CSV and XML resources, after the text-tree loaders above.
-	resource_loader_text_data_ini.instantiate("INI", Vector<String>{ "ini" });
+	resource_loader_text_data_ini.instantiate("INI", Vector<String>{ "ini", "cfg" });
 	ResourceLoader::add_resource_format_loader(resource_loader_text_data_ini);
 	resource_saver_text_data_ini.instantiate("INI");
 	ResourceSaver::add_resource_format_saver(resource_saver_text_data_ini);
-	resource_loader_text_data_csv.instantiate("CSV", Vector<String>{ "csv" });
+	resource_loader_text_data_csv.instantiate("CSV", Vector<String>{ "csv", "tsv" });
 	ResourceLoader::add_resource_format_loader(resource_loader_text_data_csv);
 	resource_saver_text_data_csv.instantiate("CSV");
 	ResourceSaver::add_resource_format_saver(resource_saver_text_data_csv);

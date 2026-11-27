@@ -37,10 +37,12 @@
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/io/image.h"
+#include "core/io/json.h"
 #include "core/io/missing_resource.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
@@ -1926,6 +1928,20 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 	List<String> extensions;
 	ResourceSaver::get_recognized_extensions(p_resource, &extensions);
 	file->clear_filters();
+
+	// Truely: data files (JSON, CSV, INI, XML, TOML, YAML) list their own extensions first, the first one preselected.
+	PackedStringArray own_extensions;
+	if (const TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_resource.ptr())) {
+		own_extensions = data_file->get_recognized_extensions();
+	} else if (p_resource->get_class_name() == JSON::get_class_static()) {
+		own_extensions.push_back("json");
+	}
+	for (int i = own_extensions.size() - 1; i >= 0; i--) {
+		List<String>::Element *own_element = extensions.find(own_extensions[i]);
+		if (own_element) {
+			extensions.move_to_front(own_element);
+		}
+	}
 
 	List<String> preferred;
 	for (const String &E : extensions) {
