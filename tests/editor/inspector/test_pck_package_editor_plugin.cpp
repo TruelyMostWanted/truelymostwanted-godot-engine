@@ -197,6 +197,25 @@ TEST_CASE("[PCKPackageEditorHelper] remove, rename and encrypt") {
 	CHECK_FALSE(decrypted_entry.has("encrypt"));
 }
 
+TEST_CASE("[PCKPackageEditorHelper] move_sources follows moved files") {
+	Array files;
+	files.push_back(file_entry("a.txt", "res://a.txt"));
+	files.push_back(file_entry("b.txt", "res://b.txt"));
+	Dictionary moves;
+	moves["res://a.txt"] = "res://moved/a.txt";
+	moves["res://other.txt"] = "res://x.txt";
+	int moved = 0;
+	const Array result = Helper::move_sources(files, moves, &moved);
+	CHECK(moved == 1);
+	const Dictionary first = result[0];
+	const Dictionary second = result[1];
+	CHECK(String(first["source"]) == "res://moved/a.txt");
+	CHECK(String(first["path"]) == "a.txt");
+	CHECK(String(second["source"]) == "res://b.txt");
+	const Dictionary original = files[0];
+	CHECK(String(original["source"]) == "res://a.txt");
+}
+
 TEST_CASE("[PCKPackageEditorHelper] removals") {
 	PackedStringArray removals = Helper::add_removals(PackedStringArray(), PackedStringArray({ "res://old/a.txt", "old/a.txt", "res://old/b.txt", "res://" }));
 	REQUIRE(removals.size() == 2);

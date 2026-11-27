@@ -731,7 +731,8 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	// FileSystem
 	EDITOR_SETTING(Variant::INT, PROPERTY_HINT_RANGE, "docks/filesystem/thumbnail_size", 64, "32,224,16")
 	_initial_set("docks/filesystem/always_show_folders", true);
-	_initial_set("docks/filesystem/textfile_extensions", "txt,md,cfg,ini,log,json,yml,yaml,toml,xml");
+	// Truely (#391): "pot", so gettext templates saved by the localization catalog inspector are listed.
+	_initial_set("docks/filesystem/textfile_extensions", "txt,md,cfg,ini,log,json,yml,yaml,toml,xml,pot");
 	_initial_set("docks/filesystem/other_file_extensions", "ico,icns");
 	_initial_set("docks/filesystem/automatically_open_created_scripts", true);
 	_initial_set("docks/filesystem/ask_before_moving_files", true);

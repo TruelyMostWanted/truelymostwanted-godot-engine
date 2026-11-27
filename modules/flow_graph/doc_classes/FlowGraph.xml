@@ -165,7 +165,7 @@
 			<return type="void" />
 			<param index="0" name="id" type="int" />
 			<description>
-				Removes the node [param id] together with all of its connections, removes its id from all [FlowFrame]s, and clears [member start_node_id] if it was the start node. The node is then free to be added to a graph again. The id is not reused. Emits [signal node_removed], and also [signal connections_changed] if connections were removed. Prints an error if the node does not exist.
+				Removes the node [param id] together with all of its connections, removes its id from all [FlowFrame]s, and, if it was the start node, sets [member start_node_id] to the first remaining [FlowStartNode] ([constant NODE_ID_NONE] if there is none). The node is then free to be added to a graph again. The id is not reused. Emits [signal node_removed], and also [signal connections_changed] if connections were removed. Prints an error if the node does not exist.
 			</description>
 		</method>
 		<method name="validate" qualifiers="const">
@@ -192,7 +192,7 @@
 			[b]Storage, do not set directly.[/b] The nodes, in the same order as [member node_ids]. Hidden in the inspector. Use [method get_node] to get a node by id.
 		</member>
 		<member name="start_node_id" type="int" setter="set_start_node_id" getter="get_start_node_id" default="-1">
-			The id of the node where the execution starts, or [constant NODE_ID_NONE]. [method add_node] sets it to the first [FlowStartNode] if it is not set. [method remove_node] clears it when that node is removed. [method validate] reports an id that is not a node of the graph as [constant FlowGraphValidation.ISSUE_KIND_MISSING_START]; this is not checked when the property is set.
+			The id of the node where the execution starts, or [constant NODE_ID_NONE]. [method add_node] sets it to the first [FlowStartNode] if it is not set. [method remove_node] moves it to the next [FlowStartNode] when that node is removed. [method validate] reports an id that is not a node of the graph as [constant FlowGraphValidation.ISSUE_KIND_MISSING_START] and a node that is not a [FlowStartNode] as [constant FlowGraphValidation.ISSUE_KIND_INVALID_START]; this is not checked when the property is set.
 		</member>
 		<member name="variables" type="FlowVariable[]" setter="set_variables" getter="get_variables" default="[]">
 			The [FlowVariable]s that the graph declares. Variable nodes ([FlowVariableNode]) may only use names declared here.

@@ -35,11 +35,14 @@
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
 #include "editor/editor_undo_redo_manager.h"
+#include "editor/file_system/editor_file_system.h"
 #include "editor/themes/editor_scale.h"
+#include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/slider.h"
+#include "scene/scene_string_names.h"
 #include "servers/audio/audio_bus_layout.h"
 
 void AudioBusListSettingsMixer::_read_layout(LocalVector<LayoutBus> &r_buses, String &r_source) {
@@ -48,7 +51,8 @@ void AudioBusListSettingsMixer::_read_layout(LocalVector<LayoutBus> &r_buses, St
 	const String path = GLOBAL_GET("audio/buses/default_bus_layout");
 	Ref<AudioBusLayout> layout;
 	if (!path.is_empty() && ResourceLoader::exists(path)) {
-		layout = ResourceLoader::load(path);
+		// From the file: a layout saved by the Audio panel since the last read is seen.
+		layout = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 	}
 	if (layout.is_valid()) {
 		for (int i = 0;; i++) {
@@ -109,7 +113,7 @@ static TypedArray<AudioBusSettings> _copy_buses(const TypedArray<AudioBusSetting
 }
 
 void AudioBusListSettingsMixer::_update_rows() {
-	if (settings.is_null()) {
+	if (settings.is_null() || other_buses == nullptr) {
 		return;
 	}
 	updating = true;
@@ -135,8 +139,13 @@ void AudioBusListSettingsMixer::_update_rows() {
 		}
 	}
 
-	// Entries the mixer does not show (buses that are not player buses of the project layout) stay in the resource.
-	PackedStringArray others;
+	// Entries the mixer does not show (buses that are not player buses of the project layout) stay in the resource
+	// until they are removed here.
+	for (int i = other_buses->get_child_count() - 1; i >= 0; i--) {
+		Node *child = other_buses->get_child(i);
+		other_buses->remove_child(child);
+		child->queue_free();
+	}
 	for (int i = 0; i < buses.size(); i++) {
 		const Ref<AudioBusSettings> entry = buses[i];
 		if (entry.is_null()) {
@@ -146,12 +155,30 @@ void AudioBusListSettingsMixer::_update_rows() {
 		for (const Row &row : rows) {
 			shown = shown || row.bus.name == entry->get_bus_name();
 		}
-		if (!shown) {
-			others.push_back(entry->get_bus_name());
+		if (shown) {
+			continue;
 		}
+		if (other_buses->get_child_count() == 0) {
+			Label *other_title = memnew(Label);
+			other_title->set_text(TTR("Also listed, but not a player bus of the project's bus layout:"));
+			other_title->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+			other_title->set_custom_minimum_size(Size2(100 * EDSCALE, 0));
+			other_buses->add_child(other_title);
+		}
+		HBoxContainer *other_row = memnew(HBoxContainer);
+		Label *other_name = memnew(Label);
+		other_name->set_text(entry->get_bus_name());
+		other_name->set_h_size_flags(SIZE_EXPAND_FILL);
+		other_row->add_child(other_name);
+		Button *remove = memnew(Button);
+		remove->set_text(TTR("Remove"));
+		remove->set_tooltip_text(TTR("Removes the bus from this resource."));
+		// Deferred: the button is freed by the update that the removal causes.
+		remove->connect(SceneStringName(pressed), callable_mp(this, &AudioBusListSettingsMixer::_remove_other_bus).bind(entry->get_bus_name()), CONNECT_DEFERRED);
+		other_row->add_child(remove);
+		other_buses->add_child(other_row);
 	}
-	other_buses->set_visible(!others.is_empty());
-	other_buses->set_text(vformat(TTR("Also lists buses that are not player buses of the project's bus layout: %s."), String(", ").join(others)));
+	other_buses->set_visible(other_buses->get_child_count() > 0);
 	updating = false;
 }
 
@@ -200,6 +227,18 @@ void AudioBusListSettingsMixer::_listed_toggled(bool p_listed, int p_row) {
 	}
 }
 
+void AudioBusListSettingsMixer::_remove_other_bus(const String &p_bus) {
+	if (settings.is_null()) {
+		return;
+	}
+	TypedArray<AudioBusSettings> buses = _copy_buses(settings->get_buses());
+	const int index = _find_entry(buses, p_bus);
+	if (index >= 0) {
+		buses.remove_at(index);
+		_commit(buses, vformat(TTR("Remove Bus \"%s\" from Audio Bus Settings"), p_bus), false);
+	}
+}
+
 void AudioBusListSettingsMixer::_volume_changed(double p_value, int p_row) {
 	if (p_row >= 0 && p_row < int(rows.size()) && rows[p_row].volume_value != nullptr) {
 		rows[p_row].volume_value->set_text(vformat("%.1f dB", p_value));
@@ -223,7 +262,11 @@ void AudioBusListSettingsMixer::_notification(int p_what) {
 			if (settings.is_valid() && !settings->is_connected(CoreStringName(changed), callback)) {
 				settings->connect(CoreStringName(changed), callback);
 			}
-			_update_rows();
+			// The project settings (layout path, player buses, store_*) and the layout file can change while it is shown.
+			const Callable rebuild = callable_mp(this, &AudioBusListSettingsMixer::_build);
+			ProjectSettings::get_singleton()->connect(SNAME("settings_changed"), rebuild, CONNECT_DEFERRED);
+			EditorFileSystem::get_singleton()->connect(SNAME("filesystem_changed"), rebuild, CONNECT_DEFERRED);
+			_build();
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
@@ -231,19 +274,36 @@ void AudioBusListSettingsMixer::_notification(int p_what) {
 			if (settings.is_valid() && settings->is_connected(CoreStringName(changed), callback)) {
 				settings->disconnect(CoreStringName(changed), callback);
 			}
+			const Callable rebuild = callable_mp(this, &AudioBusListSettingsMixer::_build);
+			ProjectSettings::get_singleton()->disconnect(SNAME("settings_changed"), rebuild);
+			EditorFileSystem::get_singleton()->disconnect(SNAME("filesystem_changed"), rebuild);
 		} break;
 	}
 }
 
-AudioBusListSettingsMixer::AudioBusListSettingsMixer(const Ref<AudioBusListSettings> &p_settings) {
-	settings = p_settings;
-
+void AudioBusListSettingsMixer::_build() {
 	LocalVector<LayoutBus> layout;
 	String source;
 	_read_layout(layout, source);
 	const bool store_volume = GLOBAL_GET("settings/audio_bus/store_volume");
 	const bool store_mute = GLOBAL_GET("settings/audio_bus/store_mute");
 	const bool store_solo = GLOBAL_GET("settings/audio_bus/store_solo");
+
+	String key = vformat("%s|%d%d%d", source, int(store_volume), int(store_mute), int(store_solo));
+	for (const LayoutBus &bus : layout) {
+		key += vformat("|%s:%f:%d:%d", bus.name, bus.volume_db, int(bus.mute), int(bus.solo));
+	}
+	if (key == layout_key) {
+		_update_rows();
+		return;
+	}
+	layout_key = key;
+	rows.clear();
+	for (int i = get_child_count() - 1; i >= 0; i--) {
+		Node *child = get_child(i);
+		remove_child(child);
+		child->queue_free();
+	}
 
 	Label *title = memnew(Label);
 	title->set_text(source.is_empty() ? TTR("Player Buses (no bus layout: Master only)") : vformat(TTR("Player Buses of %s"), source.get_file()));
@@ -254,6 +314,14 @@ AudioBusListSettingsMixer::AudioBusListSettingsMixer(const Ref<AudioBusListSetti
 	GridContainer *grid = memnew(GridContainer);
 	grid->set_columns(1 + (store_volume ? 2 : 0) + (store_mute ? 1 : 0) + (store_solo ? 1 : 0));
 	add_child(grid);
+
+	if (layout.is_empty()) {
+		Label *none = memnew(Label);
+		none->set_text(TTR("No bus of the bus layout is a player bus: \"settings/audio_bus/player_buses\" names none of them."));
+		none->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		none->set_custom_minimum_size(Size2(100 * EDSCALE, 0));
+		add_child(none);
+	}
 
 	for (uint32_t i = 0; i < layout.size(); i++) {
 		Row row;
@@ -303,11 +371,14 @@ AudioBusListSettingsMixer::AudioBusListSettingsMixer(const Ref<AudioBusListSetti
 		add_child(nothing);
 	}
 
-	other_buses = memnew(Label);
-	other_buses->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	other_buses->set_custom_minimum_size(Size2(100 * EDSCALE, 0));
+	other_buses = memnew(VBoxContainer);
 	other_buses->hide();
 	add_child(other_buses);
+	_update_rows();
+}
+
+AudioBusListSettingsMixer::AudioBusListSettingsMixer(const Ref<AudioBusListSettings> &p_settings) {
+	settings = p_settings;
 }
 
 bool EditorInspectorPluginAudioBusListSettings::can_handle(Object *p_object) {

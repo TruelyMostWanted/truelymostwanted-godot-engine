@@ -139,6 +139,8 @@ Error PCKPackageServer::build(const Ref<PCKPackage> &p_package, const String &p_
 	if (err != OK) {
 		return err;
 	}
+	const int total = p_package->get_entry_map().size();
+	int done = 0;
 	for (const KeyValue<String, PCKPackage::Entry> &kv : p_package->get_entry_map()) {
 		if (kv.value.removal) {
 			err = packer->add_file_removal(kv.key);
@@ -152,6 +154,7 @@ Error PCKPackageServer::build(const Ref<PCKPackage> &p_package, const String &p_
 		if (err != OK) {
 			break;
 		}
+		_emit_progress(SNAME("build_progress"), "res://" + kv.key, ++done, total);
 	}
 	const Error flush_err = packer->flush();
 	packer.unref();
@@ -271,11 +274,11 @@ static String _extract_find_uid(const String &p_text, bool p_import_file, int &r
 	return p_text.substr(pos + 6, end - pos - 6);
 }
 
-void PCKPackageServer::_emit_extract_progress(const String &p_path, int p_done, int p_total) {
+void PCKPackageServer::_emit_progress(const StringName &p_signal, const String &p_path, int p_done, int p_total) {
 	if (Thread::is_main_thread()) {
-		emit_signal(SNAME("extract_progress"), p_path, p_done, p_total);
+		emit_signal(p_signal, p_path, p_done, p_total);
 	} else {
-		call_deferred(SNAME("emit_signal"), SNAME("extract_progress"), p_path, p_done, p_total);
+		call_deferred(SNAME("emit_signal"), p_signal, p_path, p_done, p_total);
 	}
 }
 
@@ -428,7 +431,7 @@ Ref<PCKExtractResult> PCKPackageServer::extract(const Ref<PCKPackage> &p_package
 			if (err != OK) {
 				result->_add_error(err, vformat("Can't read \"%s\" from the pack.", pack_path));
 				done++;
-				_emit_extract_progress(pack_path, done, total);
+				_emit_progress(SNAME("extract_progress"), pack_path, done, total);
 				continue;
 			}
 
@@ -516,7 +519,7 @@ Ref<PCKExtractResult> PCKPackageServer::extract(const Ref<PCKPackage> &p_package
 			}
 		}
 		done++;
-		_emit_extract_progress(pack_path, done, total);
+		_emit_progress(SNAME("extract_progress"), pack_path, done, total);
 	}
 	return result;
 }
@@ -660,6 +663,7 @@ void PCKPackageServer::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("pack_mounted", PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("pack_unmounted", PropertyInfo(Variant::STRING, "path")));
+	ADD_SIGNAL(MethodInfo("build_progress", PropertyInfo(Variant::STRING, "path"), PropertyInfo(Variant::INT, "done"), PropertyInfo(Variant::INT, "total")));
 	ADD_SIGNAL(MethodInfo("extract_progress", PropertyInfo(Variant::STRING, "path"), PropertyInfo(Variant::INT, "done"), PropertyInfo(Variant::INT, "total")));
 
 	BIND_ENUM_CONSTANT(EXTRACT_SKIP);

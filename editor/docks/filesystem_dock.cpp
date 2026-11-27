@@ -1349,7 +1349,8 @@ void FileSystemDock::_select_file(const String &p_path, bool p_select_in_favorit
 			if (err == OK) {
 				if (config->has_section_key("remap", "importer")) {
 					String importer = config->get_value("remap", "importer");
-					if (importer == "keep" || importer == "skip") {
+					// Truely: kept files that a resource loader reads (CSV, JSON, ...) open like other resources.
+					if ((importer == "keep" && ResourceLoader::get_resource_type(fpath).is_empty()) || importer == "skip") {
 						EditorNode::get_singleton()->show_warning(TTRC("Importing has been disabled for this file, so it can't be opened for editing."));
 						return;
 					}
@@ -3458,6 +3459,16 @@ Vector<String> FileSystemDock::_get_selected_paths_for_folder_color() const {
 }
 
 void FileSystemDock::_set_folder_color(const Vector<String> &p_paths, const Variant &p_color_value) {
+	// Custom colors go to the front of the recent list of this project, also when no folder uses them anymore.
+	const String color_value = p_color_value;
+	if (color_value.begins_with("#")) {
+		PackedStringArray recent = EditorSettings::get_singleton()->get_project_metadata("filesystem_dock", "recent_folder_colors", PackedStringArray());
+		recent.erase(color_value);
+		recent.insert(0, color_value);
+		recent.resize(MIN(recent.size(), MAX_RECENT_FOLDER_COLORS));
+		EditorSettings::get_singleton()->set_project_metadata("filesystem_dock", "recent_folder_colors", recent);
+	}
+
 	// Update project settings with new folder colors.
 	for (const String &fpath : p_paths) {
 		if (p_color_value) {
@@ -3621,10 +3632,9 @@ void FileSystemDock::_file_and_folders_fill_popup(PopupMenu *p_popup, const Vect
 
 			// Recent custom colors of this project (most recently assigned first).
 			Vector<String> recent_colors;
-			const Array assigned_values = assigned_folder_colors.values();
-			for (int i = assigned_values.size() - 1; i >= 0 && recent_colors.size() < MAX_RECENT_FOLDER_COLORS; i--) {
-				const String value = assigned_values[i];
-				if (value.begins_with("#") && Color::html_is_valid(value) && !recent_colors.has(value)) {
+			const PackedStringArray recent_values = EditorSettings::get_singleton()->get_project_metadata("filesystem_dock", "recent_folder_colors", PackedStringArray());
+			for (const String &value : recent_values) {
+				if (Color::html_is_valid(value) && recent_colors.size() < MAX_RECENT_FOLDER_COLORS) {
 					recent_colors.push_back(value);
 				}
 			}

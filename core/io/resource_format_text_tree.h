@@ -79,7 +79,6 @@ class ResourceFormatSaverTextTree : public ResourceFormatSaver {
 protected:
 	virtual String _get_extension() const = 0;
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const = 0;
-	virtual bool _can_save(const Ref<Resource> &p_resource) const { return true; }
 
 public:
 	virtual Error save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags = 0) override;
@@ -144,7 +143,6 @@ class ResourceFormatSaverResourceCSV : public ResourceFormatSaverTextTree {
 protected:
 	virtual String _get_extension() const override { return "csv"; }
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const override;
-	virtual bool _can_save(const Ref<Resource> &p_resource) const override;
 };
 
 // XML: root element <resource type="..."> with one child element per property. Files without that root are left to other loaders.

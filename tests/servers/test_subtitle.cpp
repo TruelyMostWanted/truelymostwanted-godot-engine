@@ -266,6 +266,17 @@ TEST_CASE("[Subtitle][SRT] Writing puts decorations back and applies the offset"
 	CHECK(loaded->get_segment(3)->get_text() == "Who is there?");
 }
 
+TEST_CASE("[Subtitle][SRT] Writing leaves out segments without text") {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	subtitle->add_segment(make_segment(1.0, 2.0, "One"));
+	subtitle->add_segment(make_segment(3.0, 4.0, ""));
+	subtitle->add_segment(make_segment(5.0, 6.0, "Two"));
+
+	const String text = subtitle->to_text(Subtitle::FORMAT_SRT);
+	CHECK(text == "1\n00:00:01,000 --> 00:00:02,000\nOne\n\n2\n00:00:05,000 --> 00:00:06,000\nTwo\n");
+}
+
 TEST_CASE("[Subtitle][SRT] ResourceLoader and ResourceSaver") {
 	Ref<Subtitle> subtitle;
 	subtitle.instantiate();

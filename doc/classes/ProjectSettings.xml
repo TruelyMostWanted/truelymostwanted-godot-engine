@@ -3821,6 +3821,57 @@
 		<member name="settings/camera_3d/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]) stores its file in [member settings/camera_3d/format] instead of [member settings/general/default_format].
 		</member>
+		<member name="settings/defaults/accessibility" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/audio_bus" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings]. Not used by this domain: its defaults are the project's bus layout.
+		</member>
+		<member name="settings/defaults/audio_device" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/camera_3d" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/engine" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"engine"[/code] domain ([EngineSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/graphics_preset" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input"[/code] domain ([InputSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input_map" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input_map"[/code] domain ([InputMapSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/language" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"language"[/code] domain ([LanguageSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_effect" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_quality" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/shadow" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"shadow"[/code] domain ([ShadowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture"[/code] domain ([TextureSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture_streaming" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/tts_personas" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/window" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"window"[/code] domain ([WindowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/xr" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"xr"[/code] domain ([XRSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>

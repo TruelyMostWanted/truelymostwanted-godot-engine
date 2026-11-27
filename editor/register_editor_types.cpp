@@ -67,6 +67,7 @@
 #include "editor/import/editor_import_plugin.h"
 #include "editor/import/resource_importer_bitmask.h"
 #include "editor/import/resource_importer_bmfont.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_dynamic_font.h"
 #include "editor/import/resource_importer_image.h"
@@ -86,6 +87,7 @@
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
 #include "editor/inspector/files_manifest_editor_plugin.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
+#include "editor/inspector/input_action_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
 #include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
@@ -227,6 +229,7 @@ void register_editor_types() {
 	// Required to document import options in the class reference.
 	GDREGISTER_CLASS(ResourceImporterBitMap);
 	GDREGISTER_CLASS(ResourceImporterBMFont);
+	GDREGISTER_CLASS(ResourceImporterCSVDataset);
 	GDREGISTER_CLASS(ResourceImporterCSVTranslation);
 	GDREGISTER_CLASS(ResourceImporterDynamicFont);
 	GDREGISTER_CLASS(ResourceImporterImage);
@@ -246,6 +249,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<CSVTableEditorPlugin>();
 	EditorPlugins::add_by_type<LocalizationCatalogEditorPlugin>();
 	EditorPlugins::add_by_type<AudioBusListSettingsEditorPlugin>();
+	EditorPlugins::add_by_type<InputActionEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
 	EditorPlugins::add_by_type<BitMapEditorPlugin>();
 	EditorPlugins::add_by_type<ControlEditorPlugin>();

@@ -553,6 +553,12 @@ Error JSON::_parse_string(const String &p_json, Variant &r_ret, String &r_err_st
 	Token token;
 	r_err_line = 0;
 
+	// Truely: a clear message instead of "Unknown error getting token".
+	if (len == 0) {
+		r_err_str = "The text is empty: a JSON document needs a value, such as {} for an empty object.";
+		return ERR_PARSE_ERROR;
+	}
+
 	RETURN_IF_ERROR(_get_token(str, idx, len, token, r_err_line, r_err_str));
 
 	Error err = _parse_value(r_ret, token, str, idx, len, r_err_line, 0, r_err_str);

@@ -1105,7 +1105,7 @@ struct TOMLWriter {
 bool TOMLWriter::write_value(const Variant &p_value, const String &p_where, String &r_text) {
 	switch (p_value.get_type()) {
 		case Variant::NIL:
-			// TOML has no null.
+			// TOML has no null (null keys of tables are left out; in arrays, null is written as "").
 			r_text += "\"\"";
 			return true;
 		case Variant::BOOL:
@@ -1182,7 +1182,8 @@ bool TOMLWriter::write_table(const Dictionary &p_table, const String &p_path, St
 	}
 	// Plain keys first: TOML does not allow keys of a table after the header of one of its sub-tables.
 	for (const KeyValue<Variant, Variant> &kv : p_table) {
-		if (is_table(kv.value) || is_table_array(kv.value)) {
+		// TOML has no null: a null key is left out, so it reads back as missing (not as "").
+		if (is_table(kv.value) || is_table_array(kv.value) || kv.value.get_type() == Variant::NIL) {
 			continue;
 		}
 		r_text += key(kv.key) + " = ";

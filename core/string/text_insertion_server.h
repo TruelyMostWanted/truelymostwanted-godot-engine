@@ -100,6 +100,12 @@ protected:
 public:
 	static TextInsertionServer *get_singleton() { return singleton; }
 	static void register_settings();
+	// Releases the providers, modifiers and values before the script languages finish (#386): their Callables and
+	// script objects must not outlive the languages.
+	void finish();
+
+	// A placeholder value as insert() finds it: `p_args`, then providers (main thread), values and values resources.
+	bool resolve_value(const StringName &p_name, const Dictionary &p_args, Variant &r_value) const { return _resolve(p_name, p_args, r_value); }
 
 	// Inserting.
 	String insert(const String &p_text, const Dictionary &p_args = Dictionary(), Escape p_escape = ESCAPE_DEFAULT);

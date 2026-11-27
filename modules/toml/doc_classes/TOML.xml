@@ -53,7 +53,7 @@
 		[/codeblock]
 		[b]Reading:[/b] all of TOML 1.0 is supported: tables, dotted keys, arrays of tables, inline tables, basic, literal and multi-line strings, integers in decimal, hexadecimal ([code]0x[/code]), octal ([code]0o[/code]) and binary ([code]0b[/code]), floats including [code]inf[/code] and [code]nan[/code], booleans and comments. Dates and times have no [Variant] type and are returned as [String]s, as written in the file. Errors stop the parsing and are reported with line and column.
 		[b]Writing:[/b] keys keep their order. In each table the plain keys come first, then its sub-tables and arrays of tables, because TOML does not allow a key of a table after the header of one of its sub-tables. Strings with line breaks are written as multi-line strings. Arrays that contain tables together with other values are written with inline tables.
-		[b]Note:[/b] TOML has no [code]null[/code]. [code]null[/code] is written as an empty string [code]""[/code]; when a resource is loaded, an empty string sets an object property to [code]null[/code] and keeps the default value of a number or [bool] property.
+		[b]Note:[/b] TOML has no [code]null[/code]. A key whose value is [code]null[/code] is left out, so it reads back as missing (a resource property keeps its default value); inside an array, [code]null[/code] is written as an empty string [code]""[/code]. When a resource is loaded, an empty string sets an object property to [code]null[/code] and keeps the default value of a number or [bool] property.
 		[b]Resource and files:[/b] [TOML] is a [Resource] (see [TextDataFormat]). [code]load("res://x.toml")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
 		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_table] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
 		[b]Paths:[/b] a table path is dotted ([code]"window.size"[/code]); the empty path [code]""[/code] is the root table. A table name that contains [code].[/code] or [code]\[/code] is escaped with [code]\[/code] in the path ([code]"a\.b"[/code] is the one table [code]a.b[/code]).
@@ -168,7 +168,7 @@
 			<return type="String" />
 			<param index="0" name="data" type="Dictionary" />
 			<description>
-				Returns [param data] as a TOML document. Values can be [bool], [int], [float], [String], [StringName], [NodePath], [Array], packed arrays and [Dictionary]; [code]null[/code] is written as [code]""[/code]. Returns an empty string and prints an error for other types (for example [Vector2] or [Object]) and for containers that contain themselves.
+				Returns [param data] as a TOML document. Values can be [bool], [int], [float], [String], [StringName], [NodePath], [Array], packed arrays and [Dictionary]; keys with a [code]null[/code] value are left out, [code]null[/code] in an array is written as [code]""[/code]. Returns an empty string and prints an error for other types (for example [Vector2] or [Object]) and for containers that contain themselves.
 				[codeblocks]
 				[gdscript]
 				var text = TOML.stringify({ "name": "Game", "window": { "width": 1280 } })
@@ -184,4 +184,7 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="{}" />
+	</members>
 </class>

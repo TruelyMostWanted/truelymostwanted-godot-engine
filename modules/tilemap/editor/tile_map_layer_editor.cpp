@@ -4626,16 +4626,45 @@ void TileMapLayerEditor::_check_coordinate_settings() {
 }
 
 void TileMapLayerEditor::_convert_cells_confirmed() {
-	const TileMapLayer *edited_layer = _get_edited_layer();
+	TileMapLayer *edited_layer = _get_edited_layer();
 	ERR_FAIL_NULL(edited_layer);
-	const Vector<TileMapLayer *> layers = _get_layers_with_tile_set(edited_layer->get_tile_set());
+	const Ref<TileSet> tile_set = edited_layer->get_tile_set();
+	ERR_FAIL_COND(tile_set.is_null());
+	const Vector<TileMapLayer *> layers = _get_layers_with_tile_set(tile_set);
+	const TileSet::CoordinateSystem new_system = tile_set->get_coordinate_system();
+	// One action in the scene's history with the TileSet settings, so one undo restores the settings and the cells
+	// together, whichever history has the focus.
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(TTR("Convert Tile Coordinates"));
+	undo_redo->create_action(TTR("Convert Tile Coordinates"), UndoRedo::MERGE_DISABLE, edited_layer);
+	undo_redo->add_do_property(tile_set.ptr(), "tile_layout", tile_set->get_tile_layout());
+	undo_redo->add_do_property(tile_set.ptr(), "swap_x_and_y_axis", new_system.swap_x_and_y_axis);
+	undo_redo->add_do_property(tile_set.ptr(), "flip_x", new_system.flip_x);
+	undo_redo->add_do_property(tile_set.ptr(), "flip_y", new_system.flip_y);
 	for (TileMapLayer *layer : layers) {
 		undo_redo->add_do_method(layer, "convert_cell_coordinates", convert_from_layout, convert_from_system.swap_x_and_y_axis, convert_from_system.flip_x, convert_from_system.flip_y);
 		undo_redo->add_undo_property(layer, "tile_map_data", layer->get("tile_map_data"));
 	}
+	undo_redo->add_undo_property(tile_set.ptr(), "tile_layout", convert_from_layout);
+	undo_redo->add_undo_property(tile_set.ptr(), "swap_x_and_y_axis", convert_from_system.swap_x_and_y_axis);
+	undo_redo->add_undo_property(tile_set.ptr(), "flip_x", convert_from_system.flip_x);
+	undo_redo->add_undo_property(tile_set.ptr(), "flip_y", convert_from_system.flip_y);
+	undo_redo->add_do_method(this, "_sync_coordinate_settings");
+	undo_redo->add_undo_method(this, "_sync_coordinate_settings");
 	undo_redo->commit_action();
+}
+
+void TileMapLayerEditor::_sync_coordinate_settings() {
+	// After undo or redo of a conversion, the cells match the settings: no dialog.
+	const TileMapLayer *edited_layer = _get_edited_layer();
+	const Ref<TileSet> tile_set = edited_layer ? edited_layer->get_tile_set() : Ref<TileSet>();
+	if (tile_set.is_valid() && tile_set->get_instance_id() == known_tile_set_id) {
+		known_tile_layout = tile_set->get_tile_layout();
+		known_coordinate_system = tile_set->get_coordinate_system();
+	}
+}
+
+void TileMapLayerEditor::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_sync_coordinate_settings"), &TileMapLayerEditor::_sync_coordinate_settings);
 }
 
 TileMapLayerEditor::TileMapLayerEditor() {

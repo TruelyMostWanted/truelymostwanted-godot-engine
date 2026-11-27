@@ -289,11 +289,12 @@ void EditorInspectorPluginAudioStream::parse_begin(Object *p_object) {
 	add_custom_control(editor);
 
 	// Format of the audio data, read-only (from the decoder): "MP3 · 44100 Hz · Stereo · 320 kbit/s".
+	// A new stream without data has no sample rate: then its codec says nothing either.
 	PackedStringArray format;
-	if (!stream->get_codec().is_empty()) {
-		format.push_back(stream->get_codec());
-	}
 	if (stream->get_sample_rate() > 0) {
+		if (!stream->get_codec().is_empty()) {
+			format.push_back(stream->get_codec());
+		}
 		format.push_back(vformat(TTR("%d Hz"), stream->get_sample_rate()));
 	}
 	const int channels = stream->get_channel_count();

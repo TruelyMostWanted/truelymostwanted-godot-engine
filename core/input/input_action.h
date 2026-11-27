@@ -55,7 +55,10 @@ public:
 private:
 	StringName action;
 	float deadzone = DEFAULT_DEADZONE;
-	Vector<Ref<InputEvent>> events;
+	Vector<Ref<InputEvent>> events; // The valid events: InputMap and the settings servers read only these.
+	// `events` with its empty (null) slots, as the Inspector sets it ("Add Element" adds a null slot first);
+	// only while it has one. Changing the events through a method drops the empty slots.
+	Vector<Ref<InputEvent>> event_slots;
 
 protected:
 	static void _bind_methods();

@@ -67,9 +67,15 @@ private:
 	String texture_path;
 	bool filter_clip = false;
 	HashMap<StringName, Region> regions;
+	// Textures handed out for regions that are gone. A region that comes back under the same name (undo of a delete,
+	// an import) gets its texture again, so the nodes that use it follow the region.
+	HashMap<StringName, Ref<AtlasTexture>> detached_textures;
 
 	void _update_cached_texture(Region &r_region) const;
 	void _update_all_cached_textures();
+	void _detach_texture(const StringName &p_name, const Region &p_region);
+	Ref<AtlasTexture> _take_detached_texture(const StringName &p_name);
+	void _replace_regions(HashMap<StringName, Region> &p_regions);
 	static Error _check_rect(const String &p_name, const Rect2i &p_rect, const Ref<Texture2D> &p_texture, String &r_error);
 	static Error _check_margin(const String &p_name, const Rect2i &p_margin, String &r_error);
 	String _get_written_texture_path() const;

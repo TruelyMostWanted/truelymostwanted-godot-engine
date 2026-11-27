@@ -213,6 +213,18 @@ Error CSV::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 
 void CSV::_get_extensions(List<String> *r_extensions) const {
 	r_extensions->push_back("csv");
+	r_extensions->push_back("tsv");
+}
+
+Ref<SerializerOptions> CSV::_get_path_options(const String &p_path) const {
+	if (p_path.get_extension().nocasecmp_to("tsv") != 0) {
+		return Ref<SerializerOptions>();
+	}
+	// Tab-separated values: the other options keep their defaults.
+	Ref<SerializerOptions> options;
+	options.instantiate();
+	options->set_csv_delimiter("\t");
+	return options;
 }
 
 Array CSV::_get_rows() const {

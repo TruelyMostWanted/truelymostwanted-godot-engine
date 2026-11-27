@@ -483,9 +483,10 @@ void DataFileInspectorView::_validate(bool p_force) {
 		const int line = format.is_valid() ? format->get_error_line() : json->get_error_line() + 1;
 		const int column = format.is_valid() ? format->get_error_column() : 0;
 		const String at = column > 0 ? vformat(TTR("line %d, column %d"), line, column) : vformat(TTR("line %d"), line);
-		status_label->set_text(line > 0 ? vformat(TTR("Parse error at %s: %s"), at, error) : vformat(TTR("Parse error: %s"), error));
+		// The message once, in the list (activating it opens the line); the status only says what failed.
+		status_label->set_text(TTR("The text can't be parsed."));
 		status_label->add_theme_color_override(SceneStringName(font_color), error_color);
-		issue_list->add_item(status_label->get_text());
+		issue_list->add_item(line > 0 ? vformat(TTR("Parse error at %s: %s"), at, error) : vformat(TTR("Parse error: %s"), error));
 		issue_list->set_item_metadata(0, line);
 		issue_list->show();
 		return;

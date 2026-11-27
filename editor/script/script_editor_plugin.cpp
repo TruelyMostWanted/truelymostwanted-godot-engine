@@ -1724,6 +1724,14 @@ void DocumentEditorContainer::_file_dialog_action(const String &p_file) {
 					EditorNode::get_singleton()->show_warning(TTR("Error writing TextFile:") + "\n" + p_file, TTR("Error!"));
 					break;
 				}
+				// Truely: a new data file starts as a valid empty document ("{}" for JSON, "<root/>" for XML).
+				const String type = ResourceLoader::get_resource_type(p_file);
+				if (type == "JSON") {
+					file->store_string("{}\n");
+				} else if (ClassDB::is_parent_class(type, "TextDataFormat") && ClassDB::can_instantiate(type)) {
+					const Ref<TextDataFormat> data_file = Object::cast_to<TextDataFormat>(ClassDB::instantiate(type));
+					file->store_string(data_file->encode_to_text());
+				}
 			}
 
 			if (EditorFileSystem::get_singleton()) {

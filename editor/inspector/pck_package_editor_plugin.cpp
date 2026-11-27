@@ -38,6 +38,7 @@
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/object/callable_mp.h"
+#include "editor/docks/filesystem_dock.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
@@ -228,6 +229,23 @@ Array PCKPackageEditorHelper::rename_file(const Array &p_files, const String &p_
 	return result;
 }
 
+Array PCKPackageEditorHelper::move_sources(const Array &p_files, const Dictionary &p_moves, int *r_moved) {
+	Array result = p_files.duplicate(true);
+	int moved = 0;
+	for (int i = 0; i < result.size(); i++) {
+		Dictionary entry = result[i];
+		const Variant *new_source = entry.has("source") ? p_moves.getptr(entry["source"]) : nullptr;
+		if (new_source) {
+			entry["source"] = *new_source;
+			moved++;
+		}
+	}
+	if (r_moved) {
+		*r_moved = moved;
+	}
+	return result;
+}
+
 Array PCKPackageEditorHelper::set_encrypt(const Array &p_files, const String &p_target, bool p_encrypt) {
 	Array result = p_files.duplicate(true);
 	const int index = find_file(result, to_target_path(p_target));
@@ -343,6 +361,9 @@ void PCKPackageEditor::_update_tree() {
 			source = String::hex_encode_buffer(entry.md5, 16);
 		}
 		item->set_text(COLUMN_SOURCE, source);
+		if (item->get_tooltip_text(COLUMN_SOURCE).is_empty()) {
+			item->set_tooltip_text(COLUMN_SOURCE, source);
+		}
 		if (size >= 0) {
 			item->set_text(COLUMN_SIZE, String::humanize_size((uint64_t)size));
 			total_size += (uint64_t)size;
@@ -404,6 +425,23 @@ void PCKPackageEditor::_add_sources(const PackedStringArray &p_sources) {
 		}
 	}
 	_commit(TTR("Add Files to Pack"), files, PCKPackageEditorHelper::remove_removals(removals, replaced));
+}
+
+void PCKPackageEditor::_file_moved(const String &p_old_path, const String &p_new_path) {
+	// A folder move reports every file: follow them all in one undo step.
+	if (moved_sources.is_empty()) {
+		callable_mp(this, &PCKPackageEditor::_follow_moved_sources).call_deferred();
+	}
+	moved_sources[p_old_path] = p_new_path;
+}
+
+void PCKPackageEditor::_follow_moved_sources() {
+	int moved = 0;
+	const Array files = PCKPackageEditorHelper::move_sources(package->get("files"), moved_sources, &moved);
+	moved_sources.clear();
+	if (moved > 0) {
+		_commit(TTR("Follow Moved Pack Sources"), files, package->get("removals"));
+	}
 }
 
 void PCKPackageEditor::_popup_file_dialog(int p_action) {
@@ -554,6 +592,12 @@ void PCKPackageEditor::_use_preset_key() {
 	build_status_label->set_text(TTR("No export preset has an encryption key."));
 }
 
+void PCKPackageEditor::_build_progress(const String &p_path, int p_done, int p_total) {
+	if (build_progress) {
+		build_progress->step(p_path, p_done);
+	}
+}
+
 void PCKPackageEditor::_build() {
 	const String target = build_path_edit->get_text().strip_edges();
 	// The key is used once and never kept.
@@ -563,7 +607,14 @@ void PCKPackageEditor::_build() {
 		EditorNode::get_singleton()->show_warning(TTR("Choose the path of the pack to build."));
 		return;
 	}
-	const Error err = PCKPackageServer::get_singleton()->build(package, target, key_text);
+	PCKPackageServer *server = PCKPackageServer::get_singleton();
+	const Callable progress_callable = callable_mp(this, &PCKPackageEditor::_build_progress);
+	build_progress = memnew(EditorProgress("build_pck", TTR("Building Pack"), package->get_entry_map().size()));
+	server->connect(SNAME("build_progress"), progress_callable);
+	const Error err = server->build(package, target, key_text);
+	server->disconnect(SNAME("build_progress"), progress_callable);
+	memdelete(build_progress);
+	build_progress = nullptr;
 	if (err != OK) {
 		EditorNode::get_singleton()->show_warning(vformat(TTR("Building the pack \"%s\" failed: %s.\nSee the Output panel for details."), target, error_names[err]));
 		return;
@@ -618,6 +669,25 @@ void PCKPackageEditor::_drop_data_fw(const Point2 &p_point, const Variant &p_dat
 
 void PCKPackageEditor::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_ENTER_TREE: {
+			// Sources moved, renamed, added or deleted outside of the Inspector.
+			if (EditorFileSystem::get_singleton()) {
+				EditorFileSystem::get_singleton()->connect("filesystem_changed", callable_mp(this, &PCKPackageEditor::_queue_update));
+			}
+			if (!read_only && FileSystemDock::get_singleton()) {
+				FileSystemDock::get_singleton()->connect("files_moved", callable_mp(this, &PCKPackageEditor::_file_moved));
+			}
+		} break;
+
+		case NOTIFICATION_EXIT_TREE: {
+			if (EditorFileSystem::get_singleton()) {
+				EditorFileSystem::get_singleton()->disconnect("filesystem_changed", callable_mp(this, &PCKPackageEditor::_queue_update));
+			}
+			if (!read_only && FileSystemDock::get_singleton()) {
+				FileSystemDock::get_singleton()->disconnect("files_moved", callable_mp(this, &PCKPackageEditor::_file_moved));
+			}
+		} break;
+
 		case NOTIFICATION_THEME_CHANGED: {
 			add_files_button->set_button_icon(get_editor_theme_icon(SNAME("Add")));
 			add_folder_button->set_button_icon(get_editor_theme_icon(SNAME("Folder")));
@@ -681,10 +751,13 @@ PCKPackageEditor::PCKPackageEditor(const Ref<PCKPackage> &p_package) {
 	tree->set_column_expand_ratio(COLUMN_SOURCE, 2);
 	tree->set_column_clip_content(COLUMN_TARGET, true);
 	tree->set_column_clip_content(COLUMN_SOURCE, true);
+	// Narrow fixed columns: Target and Source get the rest of the dock width.
 	tree->set_column_expand(COLUMN_SIZE, false);
-	tree->set_column_custom_minimum_width(COLUMN_SIZE, 80 * EDSCALE);
+	tree->set_column_custom_minimum_width(COLUMN_SIZE, 60 * EDSCALE);
+	tree->set_column_clip_content(COLUMN_SIZE, true);
 	tree->set_column_expand(COLUMN_ENCRYPT, false);
-	tree->set_column_custom_minimum_width(COLUMN_ENCRYPT, 70 * EDSCALE);
+	tree->set_column_custom_minimum_width(COLUMN_ENCRYPT, 56 * EDSCALE);
+	tree->set_column_clip_content(COLUMN_ENCRYPT, true);
 	tree->set_custom_minimum_size(Size2(0, 300) * EDSCALE);
 	tree->set_v_size_flags(SIZE_EXPAND_FILL);
 	tree->connect("item_edited", callable_mp(this, &PCKPackageEditor::_tree_item_edited));

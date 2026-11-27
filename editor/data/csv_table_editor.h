@@ -37,9 +37,11 @@
 #include "editor/plugins/editor_plugin.h"
 
 class Button;
+class EditorLocaleDialog;
 class EditorResourcePicker;
 class Label;
 class LineEdit;
+class PopupMenu;
 class TextEditorBase;
 class TextFile;
 class Timer;
@@ -64,10 +66,12 @@ class CSVTableEditor : public EditorDock {
 	bool translation_mode = false;
 	Ref<LocalizationCatalog> catalog;
 	PackedStringArray catalog_fields; // Tree column - 1 -> entry field (`_key`, `_context`, `_plural`, locale, `_<note>`).
+	uint64_t catalog_modified_time = 0; // Of the catalog file when loaded or saved by the table.
 	HashMap<int64_t, String> cell_issues; // (row << 32) | tree column -> messages.
 	int page = 0;
 	bool updating = false;
 	bool update_queued = false;
+	String edited_path; // Path of the edited file, followed when it is moved.
 
 	Label *file_label = nullptr;
 	EditorResourcePicker *schema_picker = nullptr;
@@ -75,7 +79,14 @@ class CSVTableEditor : public EditorDock {
 	Button *next_button = nullptr;
 	Label *page_label = nullptr;
 	Label *status_label = nullptr;
-	LineEdit *column_edit = nullptr;
+	Button *add_button = nullptr;
+	Button *insert_button = nullptr;
+	Button *remove_button = nullptr;
+	Button *add_locale_button = nullptr;
+	Button *remove_locale_button = nullptr;
+	EditorLocaleDialog *locale_dialog = nullptr;
+	PopupMenu *header_menu = nullptr; // Locale column header context menu.
+	LineEdit *column_edit = nullptr; // Name of a note column.
 	Button *add_column_button = nullptr;
 	Tree *tree = nullptr;
 	Timer *validate_timer = nullptr;
@@ -92,6 +103,15 @@ class CSVTableEditor : public EditorDock {
 	void _commit_catalog_cells(const String &p_action, int p_row, int p_field, const Array &p_cells, int p_form);
 	void _render_catalog();
 	void _add_catalog_column();
+	void _add_catalog_locale(const String &p_locale);
+	void _remove_catalog_locale(const String &p_locale);
+	String _get_locale_of_column(int p_tree_column) const;
+	void _remove_selected_locale();
+	void _column_title_clicked(int p_column, int p_mouse_button);
+	void _header_menu_id_pressed(int p_id);
+	bool _can_drop_resource(const Point2 &p_point, const Variant &p_data) const;
+	void _drop_resource(const Point2 &p_point, const Variant &p_data);
+	void _filesystem_changed();
 
 	void _csv_changed();
 	void _update();
@@ -106,11 +126,20 @@ class CSVTableEditor : public EditorDock {
 	void _change_page(int p_delta);
 	void _schema_changed(const Ref<Resource> &p_schema);
 	void _tree_gui_input(const Ref<InputEvent> &p_event);
+	void _inspector_object_changed();
+	void _file_moved(const String &p_old_file, const String &p_new_file);
+	void _file_removed(const String &p_file);
+
+protected:
+	void _notification(int p_what);
 
 public:
 	static CSVTableEditor *get_singleton() { return singleton; }
+	// CSV and LocalizationCatalog resources, and translation CSVs opened as TextFile.
+	static bool can_edit(const Object *p_object);
 
 	void edit(const Ref<Resource> &p_resource);
+	bool is_editing_catalog() const { return catalog.is_valid(); }
 
 	CSVTableEditor();
 	~CSVTableEditor();
@@ -125,6 +154,7 @@ public:
 	virtual String get_plugin_name() const override { return "CSVTable"; }
 	virtual void edit(Object *p_object) override;
 	virtual bool handles(Object *p_object) const override;
+	virtual bool can_auto_hide() const override;
 	virtual void make_visible(bool p_visible) override;
 
 	CSVTableEditorPlugin();

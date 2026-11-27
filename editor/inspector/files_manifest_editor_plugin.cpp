@@ -33,6 +33,7 @@
 #include "core/core_string_names.h"
 #include "core/object/callable_mp.h"
 #include "editor/editor_string_names.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/button.h"
@@ -46,8 +47,19 @@ PackedStringArray EditorPropertyFilesManifestPaths::_get_paths() const {
 }
 
 void EditorPropertyFilesManifestPaths::_set_paths(const PackedStringArray &p_paths) {
-	// The Inspector applies the value as one undo step.
-	emit_changed(get_edited_property(), p_paths);
+	// An own undo action: the Inspector merges quick edits of the same property into one step.
+	Object *edited_object = get_edited_object();
+	const StringName edited_property = get_edited_property();
+	EditorInspector *inspector = get_parent_inspector();
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(vformat(TTR("Set %s"), edited_property), UndoRedo::MERGE_DISABLE, edited_object);
+	undo_redo->add_do_property(edited_object, edited_property, p_paths);
+	undo_redo->add_undo_property(edited_object, edited_property, _get_paths());
+	if (inspector != nullptr) {
+		undo_redo->add_do_method(inspector, "_edit_request_change", edited_object, String(edited_property));
+		undo_redo->add_undo_method(inspector, "_edit_request_change", edited_object, String(edited_property));
+	}
+	undo_redo->commit_action();
 }
 
 void EditorPropertyFilesManifestPaths::_browse(int p_index) {
@@ -116,50 +128,63 @@ void EditorPropertyFilesManifestPaths::_remove(int p_index) {
 	}
 }
 
+void EditorPropertyFilesManifestPaths::_add_row(int p_index) {
+	HBoxContainer *row = memnew(HBoxContainer);
+	rows->add_child(row);
+
+	LineEdit *edit = memnew(LineEdit);
+	edit->set_h_size_flags(SIZE_EXPAND_FILL);
+	edit->connect(SceneStringName(text_submitted), callable_mp(this, &EditorPropertyFilesManifestPaths::_path_edited).bind(p_index).unbind(1));
+	edit->connect(SceneStringName(focus_exited), callable_mp(this, &EditorPropertyFilesManifestPaths::_path_edited).bind(p_index));
+	row->add_child(edit);
+
+	struct RowButton {
+		const char *icon;
+		String tooltip;
+		Callable callback;
+	};
+	const RowButton buttons[] = {
+		{ folders ? "Folder" : "File", folders ? TTR("Choose a folder.") : TTR("Choose a file."), callable_mp(this, &EditorPropertyFilesManifestPaths::_browse).bind(p_index) },
+		{ "MoveUp", TTR("Move up: loaded earlier."), callable_mp(this, &EditorPropertyFilesManifestPaths::_move).bind(p_index, -1) },
+		{ "MoveDown", TTR("Move down: loaded later."), callable_mp(this, &EditorPropertyFilesManifestPaths::_move).bind(p_index, 1) },
+		{ "Remove", TTR("Remove."), callable_mp(this, &EditorPropertyFilesManifestPaths::_remove).bind(p_index) },
+	};
+	for (const RowButton &info : buttons) {
+		Button *button = memnew(Button);
+		button->set_flat(true);
+		button->set_button_icon(get_editor_theme_icon(info.icon));
+		button->set_tooltip_text(info.tooltip);
+		button->connect(SceneStringName(pressed), info.callback);
+		row->add_child(button);
+	}
+}
+
 void EditorPropertyFilesManifestPaths::update_property() {
-	// Rows are rebuilt; the old ones may still be handling the signal that changed the value.
+	// Rows are updated in place and only added or removed at the end: a commit on `focus_exited` must not
+	// free the field or button that is about to get the click.
 	updating = true;
-	for (int i = rows->get_child_count() - 1; i >= 0; i--) {
+	const PackedStringArray paths = _get_paths();
+	for (int i = rows->get_child_count() - 1; i >= paths.size(); i--) {
 		Node *row = rows->get_child(i);
 		rows->remove_child(row);
 		row->queue_free();
 	}
+	for (int i = rows->get_child_count(); i < paths.size(); i++) {
+		_add_row(i);
+	}
 
-	const PackedStringArray paths = _get_paths();
 	const bool locked = is_read_only();
 	for (int i = 0; i < paths.size(); i++) {
-		HBoxContainer *row = memnew(HBoxContainer);
-		rows->add_child(row);
-
-		LineEdit *edit = memnew(LineEdit);
-		edit->set_text(paths[i]);
+		Node *row = rows->get_child(i);
+		LineEdit *edit = Object::cast_to<LineEdit>(row->get_child(0));
+		if (edit->get_text() != paths[i]) {
+			edit->set_text(paths[i]);
+		}
 		edit->set_tooltip_text(paths[i]);
-		edit->set_h_size_flags(SIZE_EXPAND_FILL);
 		edit->set_editable(!locked);
-		edit->connect(SceneStringName(text_submitted), callable_mp(this, &EditorPropertyFilesManifestPaths::_path_edited).bind(i).unbind(1));
-		edit->connect(SceneStringName(focus_exited), callable_mp(this, &EditorPropertyFilesManifestPaths::_path_edited).bind(i));
-		row->add_child(edit);
-
-		struct RowButton {
-			const char *icon;
-			String tooltip;
-			Callable callback;
-			bool disabled;
-		};
-		const RowButton buttons[] = {
-			{ folders ? "Folder" : "File", folders ? TTR("Choose a folder.") : TTR("Choose a file."), callable_mp(this, &EditorPropertyFilesManifestPaths::_browse).bind(i), false },
-			{ "MoveUp", TTR("Move up: loaded earlier."), callable_mp(this, &EditorPropertyFilesManifestPaths::_move).bind(i, -1), i == 0 },
-			{ "MoveDown", TTR("Move down: loaded later."), callable_mp(this, &EditorPropertyFilesManifestPaths::_move).bind(i, 1), i == paths.size() - 1 },
-			{ "Remove", TTR("Remove."), callable_mp(this, &EditorPropertyFilesManifestPaths::_remove).bind(i), false },
-		};
-		for (const RowButton &info : buttons) {
-			Button *button = memnew(Button);
-			button->set_flat(true);
-			button->set_button_icon(get_editor_theme_icon(info.icon));
-			button->set_tooltip_text(info.tooltip);
-			button->set_disabled(locked || info.disabled);
-			button->connect(SceneStringName(pressed), info.callback);
-			row->add_child(button);
+		const bool disabled[] = { false, i == 0, i == paths.size() - 1, false };
+		for (int j = 0; j < 4; j++) {
+			Object::cast_to<Button>(row->get_child(j + 1))->set_disabled(locked || disabled[j]);
 		}
 	}
 	add_button->set_disabled(locked);
@@ -173,6 +198,12 @@ void EditorPropertyFilesManifestPaths::_set_read_only(bool p_read_only) {
 void EditorPropertyFilesManifestPaths::_notification(int p_what) {
 	if (p_what == NOTIFICATION_THEME_CHANGED) {
 		add_button->set_button_icon(get_editor_theme_icon(SNAME("Add")));
+		// The row icons come from the theme: build the rows again.
+		for (int i = rows->get_child_count() - 1; i >= 0; i--) {
+			Node *row = rows->get_child(i);
+			rows->remove_child(row);
+			row->queue_free();
+		}
 		update_property();
 	}
 }

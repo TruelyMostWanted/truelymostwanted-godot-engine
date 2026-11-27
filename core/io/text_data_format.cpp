@@ -89,6 +89,12 @@ void TextDataFormat::set_options(const Ref<SerializerOptions> &p_options) {
 	emit_changed();
 }
 
+void TextDataFormat::apply_path_options(const String &p_path) {
+	if (serializer_options.is_null()) {
+		serializer_options = _get_path_options(p_path);
+	}
+}
+
 Error TextDataFormat::parse(const String &p_text, bool p_keep_text) {
 	Variant parsed;
 	String parse_error;
@@ -147,10 +153,12 @@ Error TextDataFormat::load(const String &p_path) {
 	if (err != OK) {
 		return err;
 	}
+	apply_path_options(p_path);
 	return parse(file_text);
 }
 
 Error TextDataFormat::save(const String &p_path) {
+	apply_path_options(p_path);
 	String save_text;
 	String save_error;
 	Error err = get_save_text(save_text, save_error);
