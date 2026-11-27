@@ -384,14 +384,20 @@ String SubtitleFormatSRT::write(const Vector<Ref<SubtitleSegment>> &p_segments, 
 	}
 
 	String result;
-	for (int i = 0; i < sorted.size(); i++) {
-		const Ref<SubtitleSegment> &segment = sorted[i];
-		if (i > 0) {
+	int number = 0;
+	for (const Ref<SubtitleSegment> &segment : sorted) {
+		// An empty cue ends its block at the timing line: readers drop it or misread the next cue.
+		const String text = make_cue_text(segment);
+		if (text.strip_edges().is_empty()) {
+			continue;
+		}
+		if (number > 0) {
 			result += "\n";
 		}
-		result += itos(i + 1) + "\n";
+		number++;
+		result += itos(number) + "\n";
 		result += format_time(segment->get_start_time() + p_time_offset) + " --> " + format_time(segment->get_end_time() + p_time_offset) + "\n";
-		result += make_cue_text(segment) + "\n";
+		result += text + "\n";
 	}
 	return result;
 }

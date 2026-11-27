@@ -499,11 +499,9 @@ int LocalizationServer::load_project_catalogs() {
 		manifest_names.push_back(name);
 		PackedStringArray paths;
 		if (manifest_server) {
-			if (manifest_server->has_manifest(name)) {
-				manifest_server->refresh(name);
-			} else {
-				manifest_server->register_manifest(name, files);
-			}
+			// Registered again, not refreshed: the registered copy keeps the file list of the last load, so a changed
+			// setting (marked or converted catalogs) was only seen after a restart (#403). Watching is kept.
+			manifest_server->register_manifest(name, files);
 			paths = manifest_server->get_file_paths(name);
 		} else {
 			paths = files->get_paths();

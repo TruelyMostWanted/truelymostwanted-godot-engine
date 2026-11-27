@@ -2267,6 +2267,12 @@ Error ResourceTextSerializer::check_csv(const Ref<Resource> &p_resource, String 
 	Variant element_script;
 	const PropertyInfo element_info = _get_element_info(list_info, list, element_script);
 	const String element_type = _get_declared_type(element_info, element_script);
+	// write_csv() instantiates the element class for the columns: an abstract one (Array[InputEvent]) can't be written (#404).
+	String element_error;
+	if (_instantiate_element(list, element_error).is_null()) {
+		r_error = vformat("%s can't be saved as CSV: %s", type, element_error);
+		return ERR_INVALID_DATA;
+	}
 	for (int i = 0; i < list.size(); i++) {
 		const Ref<Resource> element = list[i];
 		if (element.is_null()) {

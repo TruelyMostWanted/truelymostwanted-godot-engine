@@ -65,6 +65,8 @@ protected:
 	// Type `data` must have (Variant::NIL = any).
 	virtual Variant::Type _get_data_type() const { return Variant::NIL; }
 	virtual void _get_extensions(List<String> *r_extensions) const {}
+	// Options for files with the extension of `p_path` when `options` is not set (CSV: a tab for `.tsv`), or null.
+	virtual Ref<SerializerOptions> _get_path_options(const String &p_path) const { return Ref<SerializerOptions>(); }
 	// Called after `data` was replaced (parse(), set_data(), clear()), for caches of subclasses.
 	virtual void _data_replaced() {}
 	// Called by clear(), for state of subclasses beside `data`.
@@ -86,6 +88,9 @@ public:
 
 	void set_options(const Ref<SerializerOptions> &p_options);
 	Ref<SerializerOptions> get_options() const { return serializer_options; }
+	// Without `options`, sets the options that the extension of `p_path` needs (a tab for `.tsv`). Called by
+	// load(), save() and the resource loader and saver before reading or writing a file.
+	void apply_path_options(const String &p_path);
 
 	// Parses `p_text` into `data`. With `p_keep_text`, the text is kept for get_parsed_text() (also on error).
 	Error parse(const String &p_text, bool p_keep_text = false);

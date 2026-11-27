@@ -146,6 +146,8 @@ protected:
 public:
 	void set_stream(Ref<AudioStream> p_stream);
 	Ref<AudioStream> get_stream() const;
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
 
 	void set_volume_db(float p_volume);
 	float get_volume_db() const;

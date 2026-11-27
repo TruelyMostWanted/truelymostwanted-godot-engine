@@ -90,7 +90,7 @@ TEST_CASE("[TextDataFormat] Base API through INI") {
 	Ref<INI> ini;
 	ini.instantiate();
 	CHECK(ini->get_data().get_type() == Variant::DICTIONARY);
-	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini" }));
+	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini", "cfg" }));
 
 	const String text = "; comment\n[player]\nname=\"Ann\"\nlevel=3\n";
 	REQUIRE(ini->parse(text, true) == OK);

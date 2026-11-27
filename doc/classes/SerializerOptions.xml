@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		[SerializerOptions] holds the options of [method ResourceTextSerializer.serialize], [method ResourceTextSerializer.deserialize], [method ResourceTextSerializer.resource_to_dictionary] and [method TOML.serialize]. It is a [Resource], so a set of options can be edited in the Inspector and saved as a preset ([code].tres[/code]) that gives the same output when loaded again.
-		[code]SerializerOptions.new()[/code] has the class defaults, which are the same as the defaults of the project settings under [code]filesystem/resources/text_formats/[/code]. Passing [code]null[/code] instead uses the current values of these project settings, like [ResourceSaver] and [ResourceLoader] do. Options that a format does not use are ignored.
+		[code]SerializerOptions.new()[/code] has the class defaults, which are the same as the defaults of the project settings under [code]filesystem/resources/text_formats/[/code]. Passing [code]null[/code] instead uses the current values of these project settings, like [ResourceSaver] and [ResourceLoader] do. Options that a format does not use are ignored. The editor's save dialogs do not offer the text formats (see [ResourceTextSerializer]); write them with [method ResourceSaver.save] and a path with the format's extension.
 		[codeblocks]
 		[gdscript]
 		var options = SerializerOptions.new()

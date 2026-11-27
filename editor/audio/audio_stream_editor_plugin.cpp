@@ -287,6 +287,32 @@ void EditorInspectorPluginAudioStream::parse_begin(Object *p_object) {
 	AudioStreamEditor *editor = memnew(AudioStreamEditor);
 	editor->set_stream(Ref<AudioStream>(stream));
 	add_custom_control(editor);
+
+	// Format of the audio data, read-only (from the decoder): "MP3 · 44100 Hz · Stereo · 320 kbit/s".
+	// A new stream without data has no sample rate: then its codec says nothing either.
+	PackedStringArray format;
+	if (stream->get_sample_rate() > 0) {
+		if (!stream->get_codec().is_empty()) {
+			format.push_back(stream->get_codec());
+		}
+		format.push_back(vformat(TTR("%d Hz"), stream->get_sample_rate()));
+	}
+	const int channels = stream->get_channel_count();
+	if (channels > 0) {
+		format.push_back(channels == 1 ? TTR("Mono") : (channels == 2 ? TTR("Stereo") : vformat(TTR("%d channels"), channels)));
+	}
+	if (stream->get_bitrate() > 0) {
+		format.push_back(vformat(TTR("%d kbit/s"), stream->get_bitrate() / 1000));
+	}
+	if (!format.is_empty()) {
+		Label *format_label = memnew(Label);
+		format_label->set_text(String(U" · ").join(format));
+		format_label->set_tooltip_text(TTR("Format of the audio data (AudioStream.get_codec(), get_sample_rate(), get_channel_count(), get_bitrate())."));
+		format_label->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+		format_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+		format_label->set_modulate(Color(1, 1, 1, 0.7));
+		add_custom_control(format_label);
+	}
 }
 
 // EditorInspectorPluginAudioStream

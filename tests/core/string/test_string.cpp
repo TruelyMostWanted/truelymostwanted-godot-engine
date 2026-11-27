@@ -1879,6 +1879,8 @@ TEST_CASE("[String] Path functions") {
 	CHECK(String("res://texture.png") == String("res://folder/../folder/../texture.png").simplify_path());
 	CHECK(String("res://texture.png") == String("res://folder/sub/../../texture.png").simplify_path());
 	CHECK(String("res://../../texture.png") == String("res://../../texture.png").simplify_path());
+	// Truely: path prefixes with an underscore keep their "://" (#388).
+	CHECK(String("pp_a://r.tres") == String("pp_a://dir/../r.tres").simplify_path());
 }
 
 TEST_CASE("[String] hash") {

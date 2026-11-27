@@ -38,12 +38,28 @@
 #ifdef TOOLS_ENABLED
 #include "resource_importer_opus.h"
 
+#include "editor/audio/audio_stream_editor_plugin.h"
 #include "editor/editor_node.h"
+#include "editor/inspector/editor_inspector.h"
+
+// Waveform, player and format line in the Inspector, like the MP3 and Ogg Vorbis streams.
+class EditorInspectorPluginAudioStreamOpus : public EditorInspectorPluginAudioStream {
+	GDCLASS(EditorInspectorPluginAudioStreamOpus, EditorInspectorPluginAudioStream);
+
+public:
+	virtual bool can_handle(Object *p_object) override {
+		return Object::cast_to<AudioStreamOpus>(p_object) != nullptr;
+	}
+};
 
 static void _editor_init() {
 	Ref<ResourceImporterOpus> opus_importer;
 	opus_importer.instantiate();
 	ResourceFormatImporter::get_singleton()->add_importer(opus_importer);
+
+	Ref<EditorInspectorPluginAudioStreamOpus> plugin;
+	plugin.instantiate();
+	EditorInspector::add_inspector_plugin(plugin);
 }
 #endif
 

@@ -38,6 +38,7 @@
 
 class AudioStream;
 class AudioStreamPlayback;
+class Texture2D;
 
 class AudioSamplePlayback : public RefCounted {
 	GDCLASS(AudioSamplePlayback, RefCounted);
@@ -177,8 +178,15 @@ class AudioStream : public Resource {
 	uint64_t offset_count = 0;
 	float tagged_offsets[MAX_TAGGED_OFFSETS];
 
+	// Track information (title, artist, cover ...) and the format of streams created by `load_info()`.
+	// Allocated on the first non-empty value, so streams without tags only pay this pointer.
+	struct StreamInfo;
+	StreamInfo *stream_info = nullptr;
+	StreamInfo *_stream_info_ptrw();
+
 protected:
 	static void _bind_methods();
+	void _validate_property(PropertyInfo &p_property) const;
 
 	GDVIRTUAL0RC_REQUIRED(Ref<AudioStreamPlayback>, _instantiate_playback)
 #ifndef DISABLE_DEPRECATED
@@ -225,4 +233,50 @@ public:
 	virtual Ref<AudioSample> generate_sample() const;
 
 	virtual bool is_meta_stream() const { return false; }
+
+	// Format (read-only). Streams without audio data (`load_info()`) return the values read from the file header.
+	virtual int get_sample_rate() const;
+	virtual int get_channel_count() const;
+	virtual int get_bitrate() const;
+	virtual String get_codec() const;
+	void set_format_info(double p_length, int p_sample_rate, int p_channel_count, int p_bitrate);
+
+	// Track information.
+	void set_title(const String &p_title);
+	String get_title() const;
+	void set_artist(const String &p_artist);
+	String get_artist() const;
+	void set_album(const String &p_album);
+	String get_album() const;
+	void set_album_artist(const String &p_album_artist);
+	String get_album_artist() const;
+	void set_track_number(int p_track_number);
+	int get_track_number() const;
+	void set_track_count(int p_track_count);
+	int get_track_count() const;
+	void set_disc_number(int p_disc_number);
+	int get_disc_number() const;
+	void set_disc_count(int p_disc_count);
+	int get_disc_count() const;
+	void set_year(int p_year);
+	int get_year() const;
+	void set_genre(const String &p_genre);
+	String get_genre() const;
+	void set_composer(const String &p_composer);
+	String get_composer() const;
+	void set_copyright(const String &p_copyright);
+	String get_copyright() const;
+	void set_comment(const String &p_comment);
+	String get_comment() const;
+	void set_cover(const Ref<Texture2D> &p_cover);
+	Ref<Texture2D> get_cover() const;
+	void set_cover_data(const Vector<uint8_t> &p_cover_data);
+	Vector<uint8_t> get_cover_data() const;
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
+	void clear_track_info();
+
+	static Ref<AudioStream> load_info(const String &p_path);
+
+	~AudioStream();
 };

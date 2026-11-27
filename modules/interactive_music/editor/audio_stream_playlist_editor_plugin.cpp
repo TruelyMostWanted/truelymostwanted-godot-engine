@@ -34,22 +34,32 @@
 
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/inspector/editor_resource_picker.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
 #include "scene/scene_string_names.h"
 
-void EditorPropertyAudioStreamList::_set_streams(const Array &p_streams) {
-	// The Inspector applies the value as one undo step.
-	emit_changed(get_edited_property(), p_streams);
+void EditorPropertyAudioStreamList::_set_streams(const String &p_action, const Array &p_streams) {
+	// One undo step per row action: the Inspector's "Set streams" would merge actions within a second.
+	Object *edited_object = get_edited_object();
+	const StringName edited_property = get_edited_property();
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(p_action, UndoRedo::MERGE_DISABLE, edited_object);
+	undo_redo->add_do_property(edited_object, edited_property, p_streams);
+	undo_redo->add_do_method(this, "update_property");
+	undo_redo->add_undo_property(edited_object, edited_property, get_edited_property_value());
+	undo_redo->add_undo_method(this, "update_property");
+	undo_redo->commit_action();
 }
 
 void EditorPropertyAudioStreamList::_stream_changed(const Ref<Resource> &p_stream, int p_index) {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	if (p_index >= 0 && p_index < streams.size()) {
 		streams.set(p_index, p_stream);
-		_set_streams(streams);
+		_set_streams(TTR("Set Playlist Stream"), streams);
 	}
 }
 
@@ -66,21 +76,21 @@ void EditorPropertyAudioStreamList::_move(int p_index, int p_offset) {
 	const Variant stream = streams.get(p_index);
 	streams.set(p_index, streams.get(target));
 	streams.set(target, stream);
-	_set_streams(streams);
+	_set_streams(TTR("Move Playlist Stream"), streams);
 }
 
 void EditorPropertyAudioStreamList::_remove(int p_index) {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	if (p_index >= 0 && p_index < streams.size()) {
 		streams.remove_at(p_index);
-		_set_streams(streams);
+		_set_streams(TTR("Remove Playlist Stream"), streams);
 	}
 }
 
 void EditorPropertyAudioStreamList::_add() {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	streams.push_back(Variant());
-	_set_streams(streams);
+	_set_streams(TTR("Add Playlist Stream"), streams);
 }
 
 void EditorPropertyAudioStreamList::update_property() {
@@ -104,10 +114,25 @@ void EditorPropertyAudioStreamList::update_property() {
 		picker->set_base_type(AudioStream::get_class_static());
 		picker->set_edited_resource(Ref<Resource>(streams[i]));
 		picker->set_editable(!locked);
-		picker->set_h_size_flags(SIZE_EXPAND_FILL);
+		picker->set_custom_minimum_size(Size2(96 * EDSCALE, 0));
 		picker->connect(SNAME("resource_changed"), callable_mp(this, &EditorPropertyAudioStreamList::_stream_changed).bind(i));
 		picker->connect(SNAME("resource_selected"), callable_mp(this, &EditorPropertyAudioStreamList::_stream_selected));
 		row->add_child(picker);
+
+		// The picker alone shows only a waveform thumbnail: name the track (title from the tags, else the file name).
+		Label *name = memnew(Label);
+		const Ref<AudioStream> stream = streams[i];
+		String track_name = TTR("(empty)");
+		if (stream.is_valid()) {
+			track_name = !stream->get_title().is_empty() ? stream->get_title() : (!stream->get_path().is_empty() ? stream->get_path().get_file() : stream->get_class());
+			name->set_tooltip_text(stream->get_path());
+		}
+		name->set_text(track_name);
+		name->set_mouse_filter(MOUSE_FILTER_PASS);
+		name->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+		name->set_clip_text(true);
+		name->set_h_size_flags(SIZE_EXPAND_FILL);
+		row->add_child(name);
 
 		struct RowButton {
 			const char *icon;

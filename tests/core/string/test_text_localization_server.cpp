@@ -443,15 +443,19 @@ TEST_CASE("[TextLocalizationServer] Catalog manifests, mods and on-demand locale
 	Ref<TextLocalizationCatalog> second_mod;
 	second_mod.instantiate();
 	second_mod->set_text("MOD_B", "de", "Zweiter Mod");
-	REQUIRE(second_mod->save_to_file(folder.path_join("mods/b/translations/mod.yaml")) == OK);
+	REQUIRE(second_mod->save_to_file(folder.path_join("mods/b/translations/mod_b.json")) == OK);
 	manifest_server->poll();
 	MessageQueue::get_singleton()->flush();
 	CHECK(server->get_catalogs().size() == 3);
 	CHECK(server->translate("MOD_B") == "Zweiter Mod");
 	manifest_server->set_watching("localization_catalogs_1", false);
 
+	// A changed manifest is loaded as it is now, not as registered by the last load (#403).
+	base->set_file_paths(PackedStringArray());
+	CHECK(server->load_project_catalogs() == 2);
+
 	ProjectSettings::get_singleton()->set_setting(LocalizationServer::SETTING_CATALOG_MANIFESTS, previous_manifests);
-	for (const String &path : { "game.lcat", "mods/a/translations/mod.json", "mods/b/translations/mod.yaml" }) {
+	for (const char *path : { "game.lcat", "mods/a/translations/mod.json", "mods/b/translations/mod_b.json" }) {
 		DirAccess::remove_absolute(folder.path_join(path));
 	}
 }

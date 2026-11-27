@@ -37,6 +37,7 @@
 #include "scene/resources/audio/audio_stream.h"
 #include "servers/audio/audio_server.h"
 #include "servers/display/accessibility_server.h"
+#include "servers/subtitle/subtitle.h"
 
 void AudioStreamPlayer::_notification(int p_what) {
 	if (p_what == NOTIFICATION_ACCESSIBILITY_UPDATE) {
@@ -70,6 +71,14 @@ void AudioStreamPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
 
 Ref<AudioStream> AudioStreamPlayer::get_stream() const {
 	return internal->stream;
+}
+
+void AudioStreamPlayer::set_subtitle_path(const String &p_subtitle_path) {
+	internal->subtitle_path = p_subtitle_path;
+}
+
+String AudioStreamPlayer::get_subtitle_path() const {
+	return internal->subtitle_path;
 }
 
 void AudioStreamPlayer::set_volume_db(float p_volume) {
@@ -126,6 +135,7 @@ void AudioStreamPlayer::play(float p_from_pos) {
 
 		AudioServer::get_singleton()->start_sample_playback(sample_playback, !can_process());
 	}
+	internal->update_playing_state(); // After the start, so is_playing() is true in handlers.
 }
 
 void AudioStreamPlayer::seek(float p_seconds) {
@@ -283,6 +293,8 @@ float AudioStreamPlayer::get_position_signal_interval() const {
 void AudioStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &AudioStreamPlayer::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &AudioStreamPlayer::get_stream);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &AudioStreamPlayer::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &AudioStreamPlayer::get_subtitle_path);
 
 	ClassDB::bind_method(D_METHOD("set_volume_db", "volume_db"), &AudioStreamPlayer::set_volume_db);
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioStreamPlayer::get_volume_db);
@@ -336,6 +348,7 @@ void AudioStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer::get_position_signal_interval);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static()), "set_stream", "get_stream");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_linear", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_volume_linear", "get_volume_linear");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,4,0.01,or_greater"), "set_pitch_scale", "get_pitch_scale");
@@ -349,6 +362,7 @@ void AudioStreamPlayer::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "position_signal_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_position_signal_interval", "get_position_signal_interval");
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("playing_changed", PropertyInfo(Variant::BOOL, "playing")));
 	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
 	ADD_SIGNAL(MethodInfo("track_changed", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
 	ADD_SIGNAL(MethodInfo("fade_finished"));

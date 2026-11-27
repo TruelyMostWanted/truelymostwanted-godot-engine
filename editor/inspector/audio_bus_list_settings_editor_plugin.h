@@ -43,6 +43,8 @@ class Label;
 // A small mixer for an AudioBusListSettings (#185): one row per player bus of the project's bus layout
 // (`audio/buses/default_bus_layout`, filtered by `settings/audio_bus/player_buses`) with the values the project
 // stores (`settings/audio_bus/store_*`). Shown instead of the `buses` array, so bus names can't be typed freely.
+// Listed buses that are not player buses can only be removed. The rows follow changes of the project settings and of
+// the bus layout file (#404).
 class AudioBusListSettingsMixer : public VBoxContainer {
 	GDCLASS(AudioBusListSettingsMixer, VBoxContainer);
 
@@ -64,12 +66,15 @@ class AudioBusListSettingsMixer : public VBoxContainer {
 
 	Ref<AudioBusListSettings> settings;
 	LocalVector<Row> rows;
-	Label *other_buses = nullptr;
+	VBoxContainer *other_buses = nullptr;
+	String layout_key; // What the rows were built from; _build() rebuilds them only if it changes.
 	bool updating = false;
 
 	static void _read_layout(LocalVector<LayoutBus> &r_buses, String &r_source);
 	int _find_entry(const Array &p_buses, const String &p_bus) const;
+	void _build();
 	void _update_rows();
+	void _remove_other_bus(const String &p_bus);
 	void _commit(const Array &p_buses, const String &p_action, bool p_merge);
 	void _set_value(int p_row, const StringName &p_name, const Variant &p_value, const String &p_action, bool p_merge);
 

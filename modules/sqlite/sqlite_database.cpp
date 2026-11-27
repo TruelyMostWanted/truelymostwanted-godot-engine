@@ -33,6 +33,7 @@
 #include "sqlite_statement.h"
 #include "sqlite_vfs.h"
 
+#include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 
@@ -563,10 +564,47 @@ bool ResourceFormatLoaderSQLite::handles_type(const String &p_type) const {
 	return p_type == "SQLiteDatabase";
 }
 
-String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
+bool ResourceFormatLoaderSQLite::is_database_path(const String &p_path) {
 	const String extension = p_path.get_extension().to_lower();
-	if (extension == "db" || extension == "sqlite" || extension == "sqlite3" || extension == "db3") {
-		return "SQLiteDatabase";
+	return extension == "db" || extension == "sqlite" || extension == "sqlite3" || extension == "db3";
+}
+
+String ResourceFormatLoaderSQLite::get_resource_type(const String &p_path) const {
+	return is_database_path(p_path) ? "SQLiteDatabase" : String();
+}
+
+// ResourceFormatSaverSQLite
+
+Error ResourceFormatSaverSQLite::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
+	const Ref<SQLiteDatabase> database = p_resource;
+	ERR_FAIL_COND_V(database.is_null(), ERR_INVALID_PARAMETER);
+
+	// "Save As" of a database file: copy the file.
+	const String source = database->get_path();
+	if (!source.is_empty() && source != p_path && ResourceFormatLoaderSQLite::is_database_path(source) && FileAccess::exists(source)) {
+		Ref<DirAccess> dir = DirAccess::create_for_path(p_path);
+		ERR_FAIL_COND_V(dir.is_null(), ERR_CANT_CREATE);
+		return dir->copy(source, p_path);
 	}
-	return String();
+	// The tables are already in the file.
+	if (FileAccess::exists(p_path)) {
+		return OK;
+	}
+	// A new database: SQLite treats an empty file as an empty database.
+	Error error = OK;
+	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &error);
+	return error;
+}
+
+void ResourceFormatSaverSQLite::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
+	if (recognize(p_resource)) {
+		p_extensions->push_back("db");
+		p_extensions->push_back("sqlite");
+		p_extensions->push_back("sqlite3");
+		p_extensions->push_back("db3");
+	}
+}
+
+bool ResourceFormatSaverSQLite::recognize(const Ref<Resource> &p_resource) const {
+	return Object::cast_to<SQLiteDatabase>(*p_resource) != nullptr;
 }

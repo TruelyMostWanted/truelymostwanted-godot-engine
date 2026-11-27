@@ -128,7 +128,7 @@
 			<return type="String" />
 			<param index="0" name="format" type="int" enum="Subtitle.Format" />
 			<description>
-				Returns the subtitle as text in [param format]. Every format adds [member time_offset] to the written times and writes the cues sorted by start time. For SubRip, the cues are sorted by start time and numbered from 1; [member time_offset] is added to the written times, because SubRip has no offset field; decorations are written back ([code][Applause][/code], music notes, [code]JOHN: [/code] in capitals, [code]&lt;i&gt;[/code] for [member SubtitleSegment.off_screen]); lines end with [code]\n[/code].
+				Returns the subtitle as text in [param format]. Every format adds [member time_offset] to the written times and writes the cues sorted by start time. For SubRip, the cues are sorted by start time and numbered from 1, and segments without text are left out, because an empty cue cannot be read back; [member time_offset] is added to the written times, because SubRip has no offset field; decorations are written back ([code][Applause][/code], music notes, [code]JOHN: [/code] in capitals, [code]&lt;i&gt;[/code] for [member SubtitleSegment.off_screen]); lines end with [code]\n[/code].
 			</description>
 		</method>
 		<method name="validate" qualifiers="const">
