@@ -36,6 +36,7 @@
 #include "scene/gui/dialogs.h"
 
 class Button;
+class ConfirmationDialog;
 class Label;
 class LineEdit;
 class Tree;
@@ -73,6 +74,7 @@ class SQLiteTableEditor : public AcceptDialog {
 	Label *page_label = nullptr;
 	Label *status_label = nullptr;
 	Tree *tree = nullptr;
+	ConfirmationDialog *close_prompt = nullptr; // Save, Discard or Cancel when closing with pending edits.
 
 	Ref<SQLiteDatabase> _open(SQLiteDatabase::OpenMode p_mode);
 	void _load_page();
@@ -88,9 +90,17 @@ class SQLiteTableEditor : public AcceptDialog {
 	void _set_null();
 	void _save();
 	void _revert();
+	bool _has_changes() const;
+	void _prompt_close();
+	void _close_saving();
+	void _close_discarding();
 	void _filter_changed(const String &p_text);
 	void _change_page(int p_delta);
 	void _sort(int p_column, int p_mouse_button);
+
+protected:
+	virtual void ok_pressed() override;
+	virtual void cancel_pressed() override;
 
 public:
 	static SQLiteTableEditor *get_singleton() { return singleton; }
