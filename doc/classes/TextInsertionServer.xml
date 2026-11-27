@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextInsertionServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Fills [code]{name}[/code] placeholders in texts from call arguments, providers, values and [TextInsertionValues] resources.
+	</brief_description>
+	<description>
+		[TextInsertionServer] replaces placeholders such as [code]{player}[/code] or [code]{gold:number}[/code] in any text, for example in translated texts, dialogue lines and UI labels. A value for a placeholder comes from the first of these sources that has it:
+		1. The [code]args[/code] dictionary of the call ([String] or [StringName] keys).
+		2. A provider registered with [method register_provider]: a [Callable] that is called on every insertion and reads the current state of the game.
+		3. A value set with [method set_value].
+		4. The [TextInsertionValues] resources added with [method add_values], the higher [member TextInsertionValues.priority] first. With equal priority, the resource added later wins. The resources listed in [member ProjectSettings.internationalization/text_insertion/default_values] are added on the first use of the server.
+		[b]Syntax:[/b] [code]{name}[/code] inserts a value. [code]{name:modifier}[/code] passes the value through a modifier, and modifiers can be chained from left to right: [code]{item:t:upper}[/code]. [code]{{[/code] and [code]}}[/code] insert a literal brace. A brace that does not form a placeholder stays as written. If no source has a value, the placeholder stays in the text as written and a warning is printed once per name in debug builds (see [member ProjectSettings.internationalization/text_insertion/warn_missing_values]).
+		[b]Built-in modifiers:[/b]
+		- [code]t[/code]: translates the value as a key with [method TextLocalizationServer.translate] if it has a text for the key, otherwise with [method TranslationServer.translate].
+		- [code]upper[/code], [code]lower[/code]: upper and lower case.
+		- [code]capitalize[/code]: like [method String.capitalize].
+		- [code]number[/code]: groups the digits of a number by thousands with the separators of the current locale ([code]1,234,567.5[/code] in English, [code]1.234.567,5[/code] in German) and uses native digits where [method TranslationServer.format_number] knows them. Text that is not a plain decimal number stays as it is.
+		- [code]f[/code]: inserts placeholders in the value itself, with the same arguments. Values are never expanded without [code]f[/code], and [code]f[/code] stops after 4 levels.
+		Own modifiers are added with [method register_modifier].
+		[codeblocks]
+		[gdscript]
+		# A provider: called on every insertion, so the text always shows the current gold.
+		TextInsertionServer.register_provider(&amp;"gold", func(): return inventory.gold)
+		TextInsertionServer.set_value(&amp;"player", "Mara")
+
+		var line = TextInsertionServer.insert("Welcome back, {player}! You have {gold:number} gold.")
+		var item = TextInsertionServer.insert("You found {item:t}.", { "item": "ITEM_SWORD" })
+
+		# Parse once, insert often.
+		var greeting = TextInsertionServer.parse("Hello {player}, the {npc} greets you.")
+		label.text = TextInsertionServer.insert_template(greeting, { "npc": "smith" })
+		[/gdscript]
+		[csharp]
+		// A provider: called on every insertion, so the text always shows the current gold.
+		TextInsertionServer.RegisterProvider("gold", Callable.From(() =&gt; Inventory.Gold));
+		TextInsertionServer.SetValue("player", "Mara");
+
+		string line = TextInsertionServer.Insert("Welcome back, {player}! You have {gold:number} gold.");
+		string item = TextInsertionServer.Insert("You found {item:t}.", new Godot.Collections.Dictionary { { "item", "ITEM_SWORD" } });
+
+		// Parse once, insert often.
+		TextInsertionTemplate greeting = TextInsertionServer.Parse("Hello {player}, the {npc} greets you.");
+		label.Text = TextInsertionServer.InsertTemplate(greeting, new Godot.Collections.Dictionary { { "npc", "smith" } });
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The methods are thread-safe. Providers read the state of the game and are only called on the main thread; an insertion on another thread skips them and uses the other sources. Signals are always emitted on the main thread.
+		[b]Note:[/b] [method insert] parses a text once and keeps up to 256 parsed texts in a cache. For texts that are inserted very often, keep the [TextInsertionTemplate] from [method parse] and use [method insert_template].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_values">
+			<return type="void" />
+			<param index="0" name="values" type="TextInsertionValues" />
+			<description>
+				Adds a [TextInsertionValues] resource as a source of values, ordered by its [member TextInsertionValues.priority]. Changes to the resource, including its priority, take effect immediately and emit [signal values_changed].
+			</description>
+		</method>
+		<method name="get_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value set with [method set_value] for [param name], or [param default] if there is none. Providers and resources are not considered.
+			</description>
+		</method>
+		<method name="has_modifier" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a custom modifier is registered under [param name]. Built-in modifiers are not included.
+			</description>
+		</method>
+		<method name="has_provider" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a provider is registered for [param name].
+			</description>
+		</method>
+		<method name="has_value" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a value is set with [method set_value] for [param name]. Providers and resources are not considered.
+			</description>
+		</method>
+		<method name="insert">
+			<return type="String" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="args" type="Dictionary" default="{}" />
+			<param index="2" name="escape" type="int" enum="TextInsertionServer.Escape" default="0" />
+			<description>
+				Returns [param text] with its placeholders replaced. [param args] has the values with the highest priority. [param escape] decides if the inserted values are escaped for [RichTextLabel], see [enum Escape].
+				A text without braces is returned unchanged without parsing. Other texts are parsed once and kept in a cache of 256 parsed texts.
+			</description>
+		</method>
+		<method name="insert_template">
+			<return type="String" />
+			<param index="0" name="template" type="TextInsertionTemplate" />
+			<param index="1" name="args" type="Dictionary" default="{}" />
+			<param index="2" name="escape" type="int" enum="TextInsertionServer.Escape" default="0" />
+			<description>
+				Like [method insert], for a text parsed with [method parse]. This is the fastest way to insert the same text many times.
+			</description>
+		</method>
+		<method name="notify_changed">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Emits [signal value_changed] for [param name]. Call it when the value a provider returns has changed, so that texts using [param name] are inserted again.
+			</description>
+		</method>
+		<method name="parse" qualifiers="const">
+			<return type="TextInsertionTemplate" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses [param text] into a [TextInsertionTemplate]. The template can be inserted many times with [method insert_template] and tells which names it uses.
+			</description>
+		</method>
+		<method name="register_modifier">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="modifier" type="Callable" />
+			<description>
+				Registers a custom modifier, used as [code]{value:name}[/code]. [param modifier] receives the value and returns the new value: [code]func(value: Variant) -&gt; Variant[/code]. The built-in modifiers [code]t[/code], [code]upper[/code], [code]lower[/code], [code]capitalize[/code], [code]number[/code] and [code]f[/code] cannot be replaced. Emits [signal values_changed].
+				An unknown modifier leaves the value unchanged and prints a warning once in debug builds.
+			</description>
+		</method>
+		<method name="register_provider">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="provider" type="Callable" />
+			<description>
+				Registers a provider for [param name]: a [Callable] without arguments that returns the value, called on every insertion that uses [param name]. A provider replaces an earlier one for the same name. Emits [signal values_changed].
+				Providers are only called on the main thread. Call [method notify_changed] when the returned value changes.
+			</description>
+		</method>
+		<method name="remove_value">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the value set with [method set_value] for [param name] and emits [signal value_changed].
+			</description>
+		</method>
+		<method name="remove_values">
+			<return type="void" />
+			<param index="0" name="values" type="TextInsertionValues" />
+			<description>
+				Removes a [TextInsertionValues] resource added with [method add_values] and emits [signal values_changed].
+			</description>
+		</method>
+		<method name="set_value">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Sets a value for [param name] and emits [signal value_changed]. It is used when no argument or provider has [param name] and takes priority over all [TextInsertionValues] resources.
+			</description>
+		</method>
+		<method name="unregister_modifier">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the custom modifier [param name] and emits [signal values_changed].
+			</description>
+		</method>
+		<method name="unregister_provider">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the provider for [param name] and emits [signal values_changed].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="value_changed">
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Emitted when the value for [param name] is set or removed with [method set_value] or [method remove_value], and by [method notify_changed]. A text bound to a [TextInsertionTemplate] only needs to be inserted again if [method TextInsertionTemplate.has_name] returns [code]true[/code] for [param name]. Always emitted on the main thread.
+			</description>
+		</signal>
+		<signal name="values_changed">
+			<description>
+				Emitted when any number of values may have changed: a [TextInsertionValues] resource is added, removed or changed, or a provider or modifier is registered or removed. Always emitted on the main thread.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="ESCAPE_DEFAULT" value="0" enum="Escape">
+			Uses [member ProjectSettings.internationalization/text_insertion/escape_bbcode].
+		</constant>
+		<constant name="ESCAPE_NONE" value="1" enum="Escape">
+			Inserts the values as they are.
+		</constant>
+		<constant name="ESCAPE_BBCODE" value="2" enum="Escape">
+			Escapes the opening brackets of the inserted values for [RichTextLabel], so that BBCode tags in values (for example in a player name) are shown as text. The text around the placeholders is not escaped.
+		</constant>
+	</constants>
+</class>

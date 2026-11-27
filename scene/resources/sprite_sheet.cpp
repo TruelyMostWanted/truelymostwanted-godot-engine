@@ -211,6 +211,36 @@ void SpriteSheet::_update_all_cached_textures() {
 	}
 }
 
+void SpriteSheet::_detach_texture(const StringName &p_name, const Region &p_region) {
+	if (p_region.texture.is_valid()) {
+		detached_textures[p_name] = p_region.texture;
+	}
+}
+
+Ref<AtlasTexture> SpriteSheet::_take_detached_texture(const StringName &p_name) {
+	Ref<AtlasTexture> ret;
+	const Ref<AtlasTexture> *detached = detached_textures.getptr(p_name);
+	if (detached != nullptr) {
+		ret = *detached;
+		detached_textures.erase(p_name);
+	}
+	return ret;
+}
+
+void SpriteSheet::_replace_regions(HashMap<StringName, Region> &p_regions) {
+	for (KeyValue<StringName, Region> &E : p_regions) {
+		const Region *old = regions.getptr(E.key);
+		E.value.texture = old != nullptr ? old->texture : _take_detached_texture(E.key);
+	}
+	for (const KeyValue<StringName, Region> &E : regions) {
+		if (!p_regions.has(E.key)) {
+			_detach_texture(E.key, E.value);
+		}
+	}
+	regions = p_regions;
+	_update_all_cached_textures();
+}
+
 Error SpriteSheet::_check_rect(const String &p_name, const Rect2i &p_rect, const Ref<Texture2D> &p_texture, String &r_error) {
 	if (p_rect.size.x <= 0 || p_rect.size.y <= 0) {
 		r_error = vformat("Sprite \"%s\": width and height must be greater than 0 (%s).", p_name, p_rect);
@@ -298,7 +328,8 @@ void SpriteSheet::set_regions(const TypedDictionary<StringName, Rect2i> &p_regio
 			errors.push_back(vformat("\"%s\" is not a valid region name.", region_name));
 			continue;
 		}
-		if (_check_rect(region_name, rect, texture, error) != OK) {
+		// Not checked against the texture: like set_texture(), regions outside it are kept, so undo can restore them.
+		if (_check_rect(region_name, rect, Ref<Texture2D>(), error) != OK) {
 			errors.push_back(error);
 			continue;
 		}
@@ -307,12 +338,10 @@ void SpriteSheet::set_regions(const TypedDictionary<StringName, Rect2i> &p_regio
 		const Region *old = regions.getptr(region_name);
 		if (old != nullptr) {
 			region.margin = old->margin;
-			region.texture = old->texture;
 		}
 		new_regions.insert(region_name, region);
 	}
-	regions = new_regions;
-	_update_all_cached_textures();
+	_replace_regions(new_regions);
 	emit_changed();
 	for (const String &error : errors) {
 		ERR_PRINT("SpriteSheet: " + error);
@@ -374,6 +403,8 @@ Error SpriteSheet::set_region(const StringName &p_name, const Rect2i &p_rect) {
 	if (region == nullptr) {
 		Region new_region;
 		new_region.rect = p_rect;
+		new_region.texture = _take_detached_texture(p_name);
+		_update_cached_texture(new_region);
 		regions.insert(p_name, new_region);
 	} else {
 		if (region->rect == p_rect) {
@@ -387,7 +418,9 @@ Error SpriteSheet::set_region(const StringName &p_name, const Rect2i &p_rect) {
 }
 
 void SpriteSheet::remove_region(const StringName &p_name) {
-	ERR_FAIL_COND_MSG(!regions.has(p_name), vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
+	const Region *region = regions.getptr(p_name);
+	ERR_FAIL_NULL_MSG(region, vformat("SpriteSheet: the region \"%s\" does not exist.", p_name));
+	_detach_texture(p_name, *region);
 	regions.erase(p_name);
 	emit_changed();
 }
@@ -455,6 +488,9 @@ int SpriteSheet::get_region_count() const {
 void SpriteSheet::clear_regions() {
 	if (regions.is_empty()) {
 		return;
+	}
+	for (const KeyValue<StringName, Region> &E : regions) {
+		_detach_texture(E.key, E.value);
 	}
 	regions.clear();
 	emit_changed();
@@ -674,6 +710,8 @@ PackedStringArray SpriteSheet::add_regions(const TypedArray<Rect2i> &p_rects, co
 	for (uint32_t i = 0; i < rects.size(); i++) {
 		Region region;
 		region.rect = rects[i];
+		region.texture = _take_detached_texture(names[i]);
+		_update_cached_texture(region);
 		regions.insert(names[i], region);
 	}
 	emit_changed();
@@ -827,16 +865,11 @@ Error SpriteSheet::apply_entries(const String &p_texture_path, const LocalVector
 		Region region;
 		region.rect = entry.rect;
 		region.margin = entry.margin;
-		const Region *old = regions.getptr(entry.name);
-		if (old != nullptr) {
-			region.texture = old->texture; // Handed-out textures stay linked.
-		}
 		new_regions.insert(entry.name, region);
 	}
 	texture = new_texture;
 	texture_path = p_texture_path;
-	regions = new_regions;
-	_update_all_cached_textures();
+	_replace_regions(new_regions); // Handed-out textures stay linked.
 	emit_changed();
 	return OK;
 }

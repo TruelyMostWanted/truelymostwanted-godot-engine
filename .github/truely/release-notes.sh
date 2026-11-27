@@ -157,7 +157,7 @@ if [ -n "$TRUELY" ]; then
 else
 	printf 'Truely Godot Engine at commit [`%s`](%s/commit/%s), based on Godot %s.\n' "${SHA:0:7}" "$URL" "$SHA" "$NOW"
 fi
-printf 'Version string: `%s.truely.%s` (Mono: `%s.mono.truely.%s`).\n\n' "$CONFIG" "$HASH" "$CONFIG" "$HASH"
+printf 'Version string: `%s.truely.%s` (.NET: `%s.mono.truely.%s`, Godot naming for the .NET build).\n\n' "$CONFIG" "$HASH" "$CONFIG" "$HASH"
 
 printf '## Changes\n\n'
 if [ -n "$PREV" ]; then
@@ -210,11 +210,11 @@ fi
 cat <<EOF
 ## Install
 
-- **Editors:** \`*_win64.zip\`, \`*_linux.x86_64.zip\`, \`*_macos.universal.zip\`, and the same with \`mono_\` for C#. Unzip and keep the folder together.
+- **Editors:** \`*_windows-x86_64.zip\`, \`*_linux-x86_64.zip\`, \`*_macos-universal.zip\`, and the same ending in \`_dotnet\` for C# (.NET). Unzip and keep the folder together.
 - **Self-contained:** every editor folder contains a \`._sc_\` file. Settings, caches and export templates stay in that folder, so this build and the official Godot of the same version never overwrite each other's templates.
-- **Export templates:** \`*_export_templates.tpz\` and \`*_mono_export_templates.tpz\` (Windows, Linux, macOS, Web with and without threads). In the editor: Editor → Manage Export Templates → Install from File.
+- **Export templates:** \`*_export-templates.tpz\` and \`*_export-templates_dotnet.tpz\` (Windows, Linux, macOS, Web with and without threads). In the editor: Editor → Manage Export Templates → Install from File.
 - **macOS:** the builds are not signed or notarized. First start: right-click Godot.app → Open. For the self-contained mode, run \`xattr -dr com.apple.quarantine <folder>\` once, otherwise macOS starts the app from a random path and does not find \`._sc_\`.
-- **Mono (C#):** needs the .NET SDK 10 or newer. The editor brings its own Godot NuGet packages (\`GodotSharp/Tools/nupkgs\`). The Web export has no C# support.
+- **.NET (C#):** needs the .NET SDK 10 or newer. The editor brings its own Godot NuGet packages (\`GodotSharp/Tools/nupkgs\`). The Web export has no C# support.
 
 EOF
 if [ -n "$PREV" ]; then

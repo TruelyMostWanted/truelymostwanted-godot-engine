@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextInsertionTemplate" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A text with placeholders, parsed once by [TextInsertionServer].
+	</brief_description>
+	<description>
+		A [TextInsertionTemplate] is created by [method TextInsertionServer.parse]. It stores the text as a list of literal parts and placeholders, so [method TextInsertionServer.insert_template] only looks up the values and joins the parts. It also tells which names the text uses, so a label can insert its text again only when one of them changes.
+		[codeblocks]
+		[gdscript]
+		var template = TextInsertionServer.parse("{player} has {gold:number} gold.")
+
+		func _ready():
+			TextInsertionServer.value_changed.connect(_on_value_changed)
+			_refresh()
+
+		func _on_value_changed(value_name):
+			if template.has_name(value_name):
+				_refresh()
+
+		func _refresh():
+			text = TextInsertionServer.insert_template(template)
+		[/gdscript]
+		[csharp]
+		private TextInsertionTemplate _template = TextInsertionServer.Parse("{player} has {gold:number} gold.");
+
+		public override void _Ready()
+		{
+			TextInsertionServer.ValueChanged += OnValueChanged;
+			Refresh();
+		}
+
+		private void OnValueChanged(StringName name)
+		{
+			if (_template.HasName(name))
+			{
+				Refresh();
+			}
+		}
+
+		private void Refresh()
+		{
+			Text = TextInsertionServer.InsertTemplate(_template);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] A template does not change after parsing and can be used from several threads.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_names" qualifiers="const">
+			<return type="StringName[]" />
+			<description>
+				Returns the names of the placeholders in the text, each name once, in the order of first use.
+			</description>
+		</method>
+		<method name="get_source" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the text the template was parsed from.
+			</description>
+		</method>
+		<method name="has_name" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the text has a placeholder for [param name].
+			</description>
+		</method>
+	</methods>
+</class>

@@ -97,6 +97,8 @@ class AudioStreamOpus : public AudioStream {
 	int beat_count = 0;
 	int bar_beats = 4;
 	Dictionary tags;
+	int channels = 0;
+	int bitrate = 0; // Average.
 
 protected:
 	static void _bind_methods();
@@ -129,6 +131,10 @@ public:
 	Vector<uint8_t> get_data() const;
 
 	virtual double get_length() const override;
+	virtual int get_sample_rate() const override;
+	virtual int get_channel_count() const override;
+	virtual int get_bitrate() const override;
+	virtual String get_codec() const override { return "Opus"; }
 
 	virtual bool is_monophonic() const override;
 

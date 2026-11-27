@@ -41,6 +41,33 @@ String LanguageSettings::get_locale() const {
 	return locale;
 }
 
+void LanguageSettings::set_interface_locale(const String &p_locale) {
+	interface_locale = p_locale.strip_edges();
+	emit_changed();
+}
+
+String LanguageSettings::get_interface_locale() const {
+	return interface_locale;
+}
+
+void LanguageSettings::set_audio_locale(const String &p_locale) {
+	audio_locale = p_locale.strip_edges();
+	emit_changed();
+}
+
+String LanguageSettings::get_audio_locale() const {
+	return audio_locale;
+}
+
+void LanguageSettings::set_subtitles_locale(const String &p_locale) {
+	subtitles_locale = p_locale.strip_edges();
+	emit_changed();
+}
+
+String LanguageSettings::get_subtitles_locale() const {
+	return subtitles_locale;
+}
+
 void LanguageSettings::set_pseudolocalization_enabled(bool p_enabled) {
 	pseudolocalization_enabled = p_enabled;
 	emit_changed();
@@ -71,6 +98,12 @@ int LanguageSettings::get_root_auto_translate_mode() const {
 void LanguageSettings::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &LanguageSettings::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &LanguageSettings::get_locale);
+	ClassDB::bind_method(D_METHOD("set_interface_locale", "locale"), &LanguageSettings::set_interface_locale);
+	ClassDB::bind_method(D_METHOD("get_interface_locale"), &LanguageSettings::get_interface_locale);
+	ClassDB::bind_method(D_METHOD("set_audio_locale", "locale"), &LanguageSettings::set_audio_locale);
+	ClassDB::bind_method(D_METHOD("get_audio_locale"), &LanguageSettings::get_audio_locale);
+	ClassDB::bind_method(D_METHOD("set_subtitles_locale", "locale"), &LanguageSettings::set_subtitles_locale);
+	ClassDB::bind_method(D_METHOD("get_subtitles_locale"), &LanguageSettings::get_subtitles_locale);
 	ClassDB::bind_method(D_METHOD("set_pseudolocalization_enabled", "enabled"), &LanguageSettings::set_pseudolocalization_enabled);
 	ClassDB::bind_method(D_METHOD("is_pseudolocalization_enabled"), &LanguageSettings::is_pseudolocalization_enabled);
 	ClassDB::bind_method(D_METHOD("set_layout_direction", "direction"), &LanguageSettings::set_layout_direction);
@@ -83,4 +116,10 @@ void LanguageSettings::_bind_methods() {
 	// The values of Window.LayoutDirection and Node.AutoTranslateMode.
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "layout_direction", PROPERTY_HINT_ENUM, "Inherited,Application Locale,Left-to-Right,Right-to-Left,System Locale"), "set_layout_direction", "get_layout_direction");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "root_auto_translate_mode", PROPERTY_HINT_ENUM, "Inherit,Always,Disabled"), "set_root_auto_translate_mode", "get_root_auto_translate_mode");
+
+	// Locale channels (TranslationServer.set_locale_for()); empty: same as `locale`.
+	ADD_GROUP("Channels", "");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "interface_locale", PROPERTY_HINT_LOCALE_ID), "set_interface_locale", "get_interface_locale");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "audio_locale", PROPERTY_HINT_LOCALE_ID), "set_audio_locale", "get_audio_locale");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitles_locale", PROPERTY_HINT_LOCALE_ID), "set_subtitles_locale", "get_subtitles_locale");
 }

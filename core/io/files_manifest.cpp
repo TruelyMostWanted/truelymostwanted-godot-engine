@@ -193,7 +193,32 @@ bool FilesManifest::_type_matches(const String &p_path) const {
 	return type.is_empty() || ClassDB::is_parent_class(type, hint);
 }
 
-void FilesManifest::_collect_folder(const String &p_folder, int p_depth, HashSet<String> &r_seen, PackedStringArray &r_paths) const {
+void FilesManifest::_split_folder_path(const String &p_folder_path, String &r_base, Vector<String> &r_pattern) {
+	const String path = p_folder_path.strip_edges().replace_char('\\', '/');
+	int wildcard = path.find_char('*');
+	const int question = path.find_char('?');
+	if (wildcard < 0 || (question >= 0 && question < wildcard)) {
+		wildcard = question;
+	}
+	r_pattern.clear();
+	if (wildcard < 0) {
+		r_base = path;
+		return;
+	}
+	const int slash = path.rfind_char('/', wildcard);
+	// A relative entry is relative to `res://`.
+	r_base = slash < 0 ? String("res://") : path.substr(0, slash + 1);
+	r_pattern = path.substr(slash + 1).split("/", false);
+}
+
+String FilesManifest::get_folder_base(const String &p_folder_path) {
+	String base;
+	Vector<String> pattern;
+	_split_folder_path(p_folder_path, base, pattern);
+	return base;
+}
+
+void FilesManifest::_collect_folder(const String &p_folder, int p_depth, PackedStringArray &r_paths) const {
 	// `list_directory()` hides `.import`, `.remap` and `.uid` files and returns the original names,
 	// so this works the same in the editor and in exported builds (files inside the PCK).
 	const Vector<String> entries = ResourceLoader::list_directory(p_folder);
@@ -206,11 +231,9 @@ void FilesManifest::_collect_folder(const String &p_folder, int p_depth, HashSet
 			continue;
 		}
 		const String path = p_folder.path_join(entry);
-		if (r_seen.has(path) || !matches_extension(path) || !_type_matches(path)) {
-			continue;
+		if (matches_extension(path) && _type_matches(path)) {
+			r_paths.push_back(path);
 		}
-		r_seen.insert(path);
-		r_paths.push_back(path);
 	}
 
 	for (const String &subfolder : subfolders) {
@@ -218,42 +241,56 @@ void FilesManifest::_collect_folder(const String &p_folder, int p_depth, HashSet
 			WARN_PRINT(vformat("FilesManifest: '%s' is deeper than %d folders and is skipped.", subfolder, MAX_FOLDER_DEPTH));
 			continue;
 		}
-		_collect_folder(subfolder, p_depth + 1, r_seen, r_paths);
+		_collect_folder(subfolder, p_depth + 1, r_paths);
 	}
 }
 
-PackedStringArray FilesManifest::get_paths(Error *r_error) const {
+PackedStringArray FilesManifest::get_paths(Error *r_error, LocalVector<int> *r_entry_counts) const {
+	// The preview neither creates folders nor reports missing paths.
+	const bool preview = r_entry_counts != nullptr;
 	Error first_error = OK;
 	HashSet<String> seen;
 	PackedStringArray paths;
+	if (preview) {
+		r_entry_counts->clear();
+	}
 
 	for (const String &folder_path : folder_paths) {
+		if (preview) {
+			r_entry_counts->push_back(0);
+		}
 		if (folder_path.strip_edges().is_empty()) {
 			continue;
 		}
+		String base_path;
+		Vector<String> pattern;
+		_split_folder_path(folder_path, base_path, pattern);
 		bool read_only = false;
 		Error err = OK;
-		const String folder = normalize_path(folder_path, &read_only, &err);
-		if (folder.is_empty()) {
+		const String base = normalize_path(base_path, &read_only, &err);
+		if (base.is_empty()) {
 			if (first_error == OK) {
 				first_error = err != OK ? err : ERR_FILE_BAD_PATH;
 			}
 			continue;
 		}
 
-		if (!DirAccess::dir_exists_absolute(folder)) {
+		if (!DirAccess::dir_exists_absolute(base)) {
+			if (preview) {
+				continue;
+			}
 			if (!create_missing_folders) {
-				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist.", folder));
+				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist.", base));
 				if (first_error == OK) {
 					first_error = ERR_FILE_NOT_FOUND;
 				}
 			} else if (read_only) {
-				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist and cannot be created, because its path is read-only.", folder));
+				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist and cannot be created, because its path is read-only.", base));
 				if (first_error == OK) {
 					first_error = ERR_FILE_NO_PERMISSION;
 				}
-			} else if (DirAccess::make_dir_recursive_absolute(folder) != OK) {
-				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist and could not be created.", folder));
+			} else if (DirAccess::make_dir_recursive_absolute(base) != OK) {
+				ERR_PRINT(vformat("FilesManifest: the folder '%s' does not exist and could not be created.", base));
 				if (first_error == OK) {
 					first_error = ERR_CANT_CREATE;
 				}
@@ -262,10 +299,48 @@ PackedStringArray FilesManifest::get_paths(Error *r_error) const {
 			continue;
 		}
 
-		_collect_folder(folder, 0, seen, paths);
+		// A wildcard segment matches one folder level, sorted by name. Matches without the rest of
+		// the path are skipped: not every mod has every folder.
+		PackedStringArray folders = { base };
+		for (const String &segment : pattern) {
+			const bool wildcard = segment.contains_char('*') || segment.contains_char('?');
+			PackedStringArray next;
+			for (const String &folder : folders) {
+				if (!wildcard) {
+					if (DirAccess::dir_exists_absolute(folder.path_join(segment))) {
+						next.push_back(folder.path_join(segment));
+					}
+					continue;
+				}
+				for (const String &dir : DirAccess::get_directories_at(folder)) {
+					if (dir.match(segment)) {
+						next.push_back(folder.path_join(dir));
+					}
+				}
+			}
+			folders = next;
+		}
+
+		for (const String &folder : folders) {
+			PackedStringArray found;
+			_collect_folder(folder, 0, found);
+			found.sort();
+			if (preview) {
+				(*r_entry_counts)[r_entry_counts->size() - 1] += int(found.size());
+			}
+			for (const String &path : found) {
+				if (!seen.has(path)) {
+					seen.insert(path);
+					paths.push_back(path);
+				}
+			}
+		}
 	}
 
 	for (const String &file_path : file_paths) {
+		if (preview) {
+			r_entry_counts->push_back(0);
+		}
 		if (file_path.strip_edges().is_empty()) {
 			continue;
 		}
@@ -277,18 +352,22 @@ PackedStringArray FilesManifest::get_paths(Error *r_error) const {
 			}
 			continue;
 		}
-		if (seen.has(path)) {
-			continue;
-		}
 		if (!ResourceLoader::exists(path)) {
-			ERR_PRINT(vformat("FilesManifest: the file '%s' does not exist or is not a resource.", path));
+			if (!preview) {
+				ERR_PRINT(vformat("FilesManifest: the file '%s' does not exist or is not a resource.", path));
+			}
 			if (first_error == OK) {
 				first_error = ERR_FILE_NOT_FOUND;
 			}
 			continue;
 		}
-		seen.insert(path);
-		paths.push_back(path);
+		if (preview) {
+			(*r_entry_counts)[r_entry_counts->size() - 1] = 1;
+		}
+		if (!seen.has(path)) {
+			seen.insert(path);
+			paths.push_back(path);
+		}
 	}
 
 	if (r_error) {

@@ -315,7 +315,13 @@ Error XML::_parse_data(const String &p_text, const Ref<SerializerOptions> &p_opt
 }
 
 Error XML::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_options, String &r_text, String &r_error) const {
-	return write_text(p_data, p_options, r_text, r_error);
+	const Dictionary element = p_data;
+	if (element.is_empty()) {
+		// No document (an empty file, a failed parse() or clear()): empty text, like the file it came from.
+		r_text = String();
+		return OK;
+	}
+	return write_text(element, p_options, r_text, r_error);
 }
 
 void XML::_get_extensions(List<String> *r_extensions) const {
@@ -443,7 +449,10 @@ Ref<Resource> XML::deserialize(const String &p_text, const StringName &p_type_hi
 }
 
 XML::XML() {
-	_get_data_ref() = Dictionary();
+	// A new XML document has an empty root element (<root/>): XML needs exactly one root.
+	Dictionary root;
+	root[KEY_NAME] = "root";
+	_get_data_ref() = root;
 }
 
 void XML::_bind_methods() {

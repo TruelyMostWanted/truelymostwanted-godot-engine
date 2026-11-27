@@ -239,6 +239,7 @@ InputMapSettingsAction::Layer InputMapSettingsAction::get_layer() const {
 
 void InputMapSettingsAction::set_input_events(const TypedArray<InputMapSettingsEvent> &p_input_events) {
 	input_events = p_input_events;
+	emit_changed();
 }
 
 TypedArray<InputMapSettingsEvent> InputMapSettingsAction::get_input_events() const {
@@ -266,6 +267,7 @@ void InputMapSettingsAction::_bind_methods() {
 
 void InputMapSettingsActions::set_actions(const TypedArray<InputMapSettingsAction> &p_actions) {
 	actions = p_actions;
+	emit_changed();
 }
 
 TypedArray<InputMapSettingsAction> InputMapSettingsActions::get_actions() const {
@@ -380,6 +382,7 @@ void InputMapSettingsEventRow::_bind_methods() {
 
 void InputMapSettingsEventRows::set_actions(const TypedArray<InputMapSettingsEventRow> &p_actions) {
 	actions = p_actions;
+	emit_changed();
 }
 
 TypedArray<InputMapSettingsEventRow> InputMapSettingsEventRows::get_actions() const {
@@ -437,6 +440,7 @@ void InputMapSettingsRow::_bind_methods() {
 
 void InputMapSettingsRows::set_actions(const TypedArray<InputMapSettingsRow> &p_actions) {
 	actions = p_actions;
+	emit_changed();
 }
 
 TypedArray<InputMapSettingsRow> InputMapSettingsRows::get_actions() const {

@@ -20,6 +20,7 @@ Branches und Remotes in [`README.md`](README.md).
 | **Textformate** | Daten (`Variant` ↔ Text) wie Godots `JSON`: `parse(text) -> Error` (Instanz), `parse_string(text) -> Variant` (statisch), `stringify(data) -> String` (statisch). Ressourcen (`Resource` ↔ Text): `serialize(resource, options = {}) -> String`, `deserialize(text, type_hint = "") -> Resource`, je Formatklasse (`JSON`, `TOML`, `XML`, `INI`, `CSV`, `YAML`) und zentral `ResourceTextSerializer.serialize(resource, format)`/`deserialize(text, format)`. Keine Namen wie `resource_to_x`/`x_to_resource` (#68, #73). |
 | **Thread-Sicherheit** | Wo Loader-Threads oder OS-Callbacks beteiligt sind: Locks (`Mutex`, `RWLock`), Signale werden auf dem Main-Thread gesendet (`call_deferred`). **Nie** `ERR_*`, `WARN_*` oder `print_*` aufrufen, während ein Lock gehalten wird: Ausgeben nimmt den globalen Lock (TSAN-Fehler #60); Fehler unter dem Lock sammeln, nach dem Freigeben ausgeben. Kein `ResourceLoader::load()` in einem `WorkerThreadPool`-Task, der auf sich selbst wartet (#9: eigener `Thread`). |
 | **Upstream-freundlich** | Eigene Dateien statt großer Änderungen in bestehenden Dateien, wo es geht. Das hält den Sync mit Godot (`sync-upstream.ps1`) konfliktarm. |
+| **Ergänzen statt ersetzen** | Langfristig entsteht eine eigene, verbesserte Engine. Bis zu deren echtem Release gilt: **minimal destruction, additive features**. Neue APIs werden unabhängig von Godots Entwurf gebaut (eigene Namen, eigenes Datenmodell) und über Adapter angebunden. Godot-APIs, die sie ablösen, werden in der Klassenreferenz nur als **deprecated** markiert (mit Verweis auf die neue API), nicht entfernt oder umgebaut, z. B. `TranslationServer` → `TextLocalizationServer` (#339). Aktiver Umzug und Overrides im Godot-Kern erst mit dem Release der eigenen Engine-Version. **Ausnahme:** Godots Datenstruktur unter der Haube darf umgebaut werden, wenn die bestehende API dabei erhalten bleibt und nur ergänzt wird (gleiche Methoden und Signale, neue dazu, Datenmodelle teils als `Resource`), und der Umbau einen klaren Gewinn bringt (Performance, Bearbeitbarkeit im Inspector). Vorbild: `InputMap` mit `InputAction`-Ressourcen und Layern (#172, #191). |
 
 ### 1.2 Namen
 
@@ -106,7 +107,7 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
   - Issue #3 → `03-feature-path-prefix-server`
   - Issue #123 → `123-feature-…`
   - `<art>` folgt dem Typ des Issues: `feature`, `refactoring`, `bug`, `concept`.
-- Derselbe Name gilt für den Feature-Ordner im Testprojekt (`res://03-feature-path-prefix-server/`) und für die Guide-Seite im Wiki.
+- Testprojekt-Ordner und Wiki-Guide tragen den Namen des Themas, nicht den des Branches: Guide `Path-Prefixes`, Ordner `res://path-prefixes/` (Beispiel + Test, siehe `FEATURE-WORKFLOW.md` 4.5).
 - Feature-Branches zweigen von `truely-godot-engine` ab und werden **nie gelöscht**. PR-Branches für Beiträge an Godot zweigen von `master` ab (siehe `README.md`).
 
 ---
@@ -134,8 +135,8 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 - [ ] C#/GDScript bindings created and registered
 - [ ] Documentation written (class reference in `doc/classes/` and wiki page: GDScript, C#, GDExtension)
 - [ ] Test build on the current platform done (no errors or warnings)
-- [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
+- [ ] Tested in the test project (`res://<guide>/`: Example and Test) with a Mono build, in GDScript and in C#
 ```
 
-- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (`<feature-branch>`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
+- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (nach Thema, z. B. `Path-Prefixes`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
 - **Tracker:** Größere Vorhaben bekommen ein `[Task] Tracker: …` mit `flag: tracker`, das die Issues in Reihenfolge und mit Abhängigkeiten auflistet.

@@ -251,7 +251,8 @@ Ref<FilesManifestValidation> FilesManifestServer::validate(const String &p_name)
 	}
 	PackedStringArray &missing_folders = result->missing_folders;
 	for (const String &folder : entry->manifest->get_folder_paths()) {
-		if (!DirAccess::dir_exists_absolute(FilesManifest::normalize_path(folder))) {
+		// A wildcard entry is missing only if the part before its first wildcard is.
+		if (!DirAccess::dir_exists_absolute(FilesManifest::normalize_path(FilesManifest::get_folder_base(folder)))) {
 			missing_folders.push_back(folder);
 		}
 	}
@@ -286,7 +287,7 @@ Error FilesManifestServer::create_missing_folders(const String &p_name) {
 	Error result = OK;
 	for (const String &folder : entry->manifest->get_folder_paths()) {
 		bool read_only = false;
-		const String path = FilesManifest::normalize_path(folder, &read_only);
+		const String path = FilesManifest::normalize_path(FilesManifest::get_folder_base(folder), &read_only);
 		if (DirAccess::dir_exists_absolute(path)) {
 			continue;
 		}

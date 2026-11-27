@@ -33,6 +33,7 @@
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include "core/templates/rb_map.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 #include "servers/audio/audio_server.h"
 
 #include <ogg/ogg.h>
@@ -480,6 +481,8 @@ void AudioStreamOggVorbis::maybe_update_info() {
 	tags = dictionary;
 
 	packet_sequence->set_sampling_rate(info.rate);
+	channels = info.channels;
+	bitrate = MAX(int(info.bitrate_nominal), 0);
 
 	vorbis_comment_clear(&comment);
 	vorbis_info_clear(&info);
@@ -513,8 +516,19 @@ double AudioStreamOggVorbis::get_loop_offset() const {
 }
 
 double AudioStreamOggVorbis::get_length() const {
-	ERR_FAIL_COND_V(packet_sequence.is_null(), 0);
-	return packet_sequence->get_length();
+	return packet_sequence.is_null() ? AudioStream::get_length() : packet_sequence->get_length();
+}
+
+int AudioStreamOggVorbis::get_sample_rate() const {
+	return packet_sequence.is_null() ? AudioStream::get_sample_rate() : int(packet_sequence->get_sampling_rate());
+}
+
+int AudioStreamOggVorbis::get_channel_count() const {
+	return packet_sequence.is_null() ? AudioStream::get_channel_count() : channels;
+}
+
+int AudioStreamOggVorbis::get_bitrate() const {
+	return packet_sequence.is_null() ? AudioStream::get_bitrate() : bitrate;
 }
 
 void AudioStreamOggVorbis::set_bpm(double p_bpm) {
@@ -691,6 +705,7 @@ Ref<AudioStreamOggVorbis> AudioStreamOggVorbis::load_from_buffer(const Vector<ui
 	}
 
 	ogg_vorbis_stream->set_packet_sequence(ogg_packet_sequence);
+	AudioStreamTags::read_file_tags(ogg_vorbis_stream.ptr(), p_stream_data);
 
 	return ogg_vorbis_stream;
 }

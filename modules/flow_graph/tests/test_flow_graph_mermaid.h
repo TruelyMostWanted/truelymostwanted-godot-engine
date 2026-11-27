@@ -138,6 +138,10 @@ TEST_CASE("[FlowGraph][Mermaid] A hand-written flowchart loads") {
 	CHECK(Object::cast_to<FlowEndNode>(graph->get_node(3).ptr()) != nullptr);
 	CHECK(graph->get_node(1)->get_title() == "Door open?");
 	CHECK(graph->get_start_node_id() == 0);
+	// Laid out top down in layers: A, then B, then C and D side by side (D also follows C, but B reaches it first).
+	CHECK(graph->get_node(1)->get_editor_position().y > graph->get_node(0)->get_editor_position().y);
+	CHECK(graph->get_node(2)->get_editor_position().y == graph->get_node(3)->get_editor_position().y);
+	CHECK(graph->get_node(2)->get_editor_position().x != graph->get_node(3)->get_editor_position().x);
 	CHECK(graph->is_nodes_connected(0, "out", 1, "in"));
 	CHECK(graph->is_nodes_connected(1, "true", 2, "in"));
 	CHECK(graph->is_nodes_connected(1, "false", 3, "in"));

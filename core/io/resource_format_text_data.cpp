@@ -81,10 +81,13 @@ Ref<Resource> ResourceFormatLoaderTextData::load(const String &p_path, const Str
 	Ref<TextDataFormat> format = _instantiate_format(format_class);
 	ERR_FAIL_COND_V(format.is_null(), Ref<Resource>());
 	const bool editor = Engine::get_singleton()->is_editor_hint();
+	format->apply_path_options(p_path);
 	// Only the editor keeps the text (comments and formatting survive saving); games do not keep a second copy.
 	err = format->parse(text, editor);
 	if (err != OK) {
-		const String message = vformat("Error parsing %s file at '%s', on line %d: %s", format_class, p_path, format->get_error_line(), format->get_error_message());
+		// The line is 1-based, 0 means unknown.
+		const String line = format->get_error_line() > 0 ? vformat(", on line %d", format->get_error_line()) : String();
+		const String message = vformat("Error parsing %s file at '%s'%s: %s", format_class, p_path, line, format->get_error_message());
 		if (editor) {
 			// Still return the resource, so the text editor can open the file and fix it.
 			WARN_PRINT(message);
@@ -113,6 +116,12 @@ bool ResourceFormatLoaderTextData::handles_type(const String &p_type) const {
 }
 
 String ResourceFormatLoaderTextData::get_resource_type(const String &p_path) const {
+	// Godot's own ConfigFile files are no INI resources in the FileSystem (not exported or opened as INI);
+	// an explicit load() still reads them.
+	const String file = p_path.get_file();
+	if (file == "export_presets.cfg" || file == "override.cfg") {
+		return String();
+	}
 	return _has_extension(p_path) ? String(format_class) : String();
 }
 
@@ -126,6 +135,7 @@ ResourceFormatSaverTextData::ResourceFormatSaverTextData(const StringName &p_cla
 Error ResourceFormatSaverTextData::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
 	const Ref<TextDataFormat> format = p_resource;
 	ERR_FAIL_COND_V(format.is_null(), ERR_INVALID_PARAMETER);
+	format->apply_path_options(p_path);
 	String text;
 	String message;
 	Error err = format->get_save_text(text, message);

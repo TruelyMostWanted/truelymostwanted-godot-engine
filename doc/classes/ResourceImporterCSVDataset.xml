@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ResourceImporterCSVDataset" inherits="ResourceImporter" api_type="editor" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Keeps comma-separated values files as [CSV] data resources.
+	</brief_description>
+	<description>
+		The default importer of [code].csv[/code] files whose header row is not a translation header. It writes no file: the source file is kept (also in exported projects, like [b]Keep File (exported as is)[/b]) and [method @GDScript.load] returns it as a [CSV] resource. Unlike Keep File, the file has the type [CSV] in the FileSystem dock, so it can be selected, inspected and edited in the CSV Table dock.
+		Files whose first row has a column with a known language code (see [method TranslationServer.get_all_languages]) default to [ResourceImporterCSVTranslation] instead. The importer of a file can be changed in the Import dock.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

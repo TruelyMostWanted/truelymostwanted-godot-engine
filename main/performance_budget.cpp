@@ -31,6 +31,8 @@
 #include "performance_budget.h"
 
 #include "core/object/class_db.h"
+#include "main/performance.h"
+#include "main/performance_recorder.h"
 
 /* PerformanceBudgetRule */
 
@@ -95,6 +97,19 @@ void PerformanceBudgetRule::_validate_property(PropertyInfo &p_property) const {
 		p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 	} else if (p_property.name == "column" && statistic == STATISTIC_HITCH_COUNT) {
 		p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+	} else if (p_property.name == "column") {
+		// The builtin and monitor columns as suggestions; custom monitors and metrics are typed in.
+		PackedStringArray names;
+		for (int i = 0; i < PerformanceRecorder::BUILTIN_MAX; i++) {
+			names.push_back(PerformanceRecorder::get_builtin_name(PerformanceRecorder::Builtin(i)));
+		}
+		if (Performance::get_singleton() != nullptr) {
+			for (int i = 0; i < Performance::MONITOR_MAX; i++) {
+				names.push_back(Performance::get_singleton()->get_monitor_name(Performance::Monitor(i)));
+			}
+		}
+		p_property.hint = PROPERTY_HINT_ENUM_SUGGESTION;
+		p_property.hint_string = String(",").join(names);
 	}
 }
 

@@ -46,6 +46,7 @@ class TextEditor : public TextEditorBase {
 	LocalVector<int> issue_lines; // Marked lines (0-based), sorted.
 
 	void _caret_changed();
+	bool _requires_space_indent() const;
 
 protected:
 	class EditMenusTEB : public EditMenus {
@@ -61,6 +62,9 @@ protected:
 
 public:
 	virtual void apply_code() override;
+	virtual void set_edited_resource(const Ref<Resource> &p_res) override;
+	virtual void update_settings() override;
+	virtual void convert_indent() override;
 
 	virtual EditMenusBase *create_edit_menu(DocumentEditorContainer *p_document_editor_container) override { return memnew(EditMenusTEB(p_document_editor_container)); }
 

@@ -40,6 +40,7 @@
 #include "scene/resources/audio/audio_stream.h"
 #include "scene/resources/world_2d.h"
 #include "servers/audio/audio_server.h"
+#include "servers/subtitle/subtitle.h"
 
 #ifndef PHYSICS_2D_DISABLED
 #include "scene/2d/physics/area_2d.h"
@@ -68,7 +69,7 @@ void AudioStreamPlayer2D::_notification(int p_what) {
 
 			if (setplayback.is_valid() && setplay.get() >= 0) {
 				internal->active.set();
-				AudioServer::get_singleton()->start_playback_stream(setplayback, _get_actual_bus(), volume_vector, setplay.get(), internal->pitch_scale);
+				AudioServer::get_singleton()->start_playback_stream(setplayback, _get_actual_bus(), internal->get_faded_volumes(volume_vector), setplay.get(), internal->pitch_scale);
 				setplayback.unref();
 				setplay.set(-1);
 			}
@@ -194,9 +195,9 @@ void AudioStreamPlayer2D::_update_panning() {
 		volume_vector.write[0] = AudioFrame(MAX(prev_sample[0], new_sample[0]), MAX(prev_sample[1], new_sample[1]));
 	}
 
-	for (const Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
-		AudioServer::get_singleton()->set_playback_bus_exclusive(playback, actual_bus, volume_vector);
-	}
+	HashMap<StringName, Vector<AudioFrame>> bus_volumes;
+	bus_volumes[actual_bus] = volume_vector;
+	internal->apply_bus_volumes(bus_volumes);
 
 	for (const Ref<AudioStreamPlayback> &playback : internal->stream_playbacks) {
 		AudioServer::get_singleton()->set_playback_pitch_scale(playback, internal->pitch_scale);
@@ -215,6 +216,14 @@ void AudioStreamPlayer2D::set_stream(Ref<AudioStream> p_stream) {
 
 Ref<AudioStream> AudioStreamPlayer2D::get_stream() const {
 	return internal->stream;
+}
+
+void AudioStreamPlayer2D::set_subtitle_path(const String &p_subtitle_path) {
+	internal->subtitle_path = p_subtitle_path;
+}
+
+String AudioStreamPlayer2D::get_subtitle_path() const {
+	return internal->subtitle_path;
 }
 
 void AudioStreamPlayer2D::set_volume_db(float p_volume) {
@@ -258,6 +267,7 @@ void AudioStreamPlayer2D::play(float p_from_pos) {
 
 		AudioServer::get_singleton()->start_sample_playback(sample_playback, !can_process());
 	}
+	internal->update_playing_state(); // After the start, so is_playing() is true in handlers.
 }
 
 void AudioStreamPlayer2D::seek(float p_seconds) {
@@ -381,9 +391,55 @@ void AudioStreamPlayer2D::_get_property_list(List<PropertyInfo> *p_list) const {
 	internal->get_property_list(p_list);
 }
 
+void AudioStreamPlayer2D::fade_in(float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->fade_in(p_duration, p_curve);
+}
+
+void AudioStreamPlayer2D::fade_out(float p_duration, AudioMixerServer::FadeCurve p_curve, bool p_stop_at_end) {
+	internal->fade_out(p_duration, p_curve, p_stop_at_end);
+}
+
+void AudioStreamPlayer2D::crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, AudioMixerServer::FadeCurve p_curve) {
+	internal->crossfade_to(p_stream, p_duration, p_curve);
+}
+
+bool AudioStreamPlayer2D::is_fading() const {
+	return internal->is_fading();
+}
+
+float AudioStreamPlayer2D::get_fade_gain() const {
+	return internal->fade_gain;
+}
+
+int AudioStreamPlayer2D::get_current_track_index() {
+	return internal->get_current_track_index();
+}
+
+Ref<AudioStream> AudioStreamPlayer2D::get_current_track_stream() {
+	return internal->get_current_track_stream();
+}
+
+double AudioStreamPlayer2D::get_track_position() {
+	return internal->get_track_position();
+}
+
+double AudioStreamPlayer2D::get_position_in_playlist() {
+	return internal->get_position_in_playlist();
+}
+
+void AudioStreamPlayer2D::set_position_signal_interval(float p_interval) {
+	internal->position_signal_interval = MAX(p_interval, 0.0f);
+}
+
+float AudioStreamPlayer2D::get_position_signal_interval() const {
+	return internal->position_signal_interval;
+}
+
 void AudioStreamPlayer2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &AudioStreamPlayer2D::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &AudioStreamPlayer2D::get_stream);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &AudioStreamPlayer2D::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &AudioStreamPlayer2D::get_subtitle_path);
 
 	ClassDB::bind_method(D_METHOD("set_volume_db", "volume_db"), &AudioStreamPlayer2D::set_volume_db);
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioStreamPlayer2D::get_volume_db);
@@ -433,7 +489,20 @@ void AudioStreamPlayer2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_playback_type", "playback_type"), &AudioStreamPlayer2D::set_playback_type);
 	ClassDB::bind_method(D_METHOD("get_playback_type"), &AudioStreamPlayer2D::get_playback_type);
 
+	ClassDB::bind_method(D_METHOD("fade_in", "duration", "curve"), &AudioStreamPlayer2D::fade_in, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR));
+	ClassDB::bind_method(D_METHOD("fade_out", "duration", "curve", "stop_at_end"), &AudioStreamPlayer2D::fade_out, DEFVAL(AudioMixerServer::FADE_CURVE_LINEAR), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("crossfade_to", "stream", "duration", "curve"), &AudioStreamPlayer2D::crossfade_to, DEFVAL(AudioMixerServer::FADE_CURVE_EQUAL_POWER));
+	ClassDB::bind_method(D_METHOD("is_fading"), &AudioStreamPlayer2D::is_fading);
+	ClassDB::bind_method(D_METHOD("get_fade_gain"), &AudioStreamPlayer2D::get_fade_gain);
+	ClassDB::bind_method(D_METHOD("get_current_track_index"), &AudioStreamPlayer2D::get_current_track_index);
+	ClassDB::bind_method(D_METHOD("get_current_track_stream"), &AudioStreamPlayer2D::get_current_track_stream);
+	ClassDB::bind_method(D_METHOD("get_track_position"), &AudioStreamPlayer2D::get_track_position);
+	ClassDB::bind_method(D_METHOD("get_position_in_playlist"), &AudioStreamPlayer2D::get_position_in_playlist);
+	ClassDB::bind_method(D_METHOD("set_position_signal_interval", "interval"), &AudioStreamPlayer2D::set_position_signal_interval);
+	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer2D::get_position_signal_interval);
+
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static()), "set_stream", "get_stream");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_linear", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_volume_linear", "get_volume_linear");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch_scale", PROPERTY_HINT_RANGE, "0.01,4,0.01,or_greater"), "set_pitch_scale", "get_pitch_scale");
@@ -447,8 +516,14 @@ void AudioStreamPlayer2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "bus", PROPERTY_HINT_AUDIO_BUS), "set_bus", "get_bus");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "area_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_area_mask", "get_area_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "playback_type", PROPERTY_HINT_ENUM, "Default,Stream,Sample"), "set_playback_type", "get_playback_type");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "position_signal_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_position_signal_interval", "get_position_signal_interval");
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("playing_changed", PropertyInfo(Variant::BOOL, "playing")));
+	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("track_changed", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("fade_finished"));
+	ADD_SIGNAL(MethodInfo("position_changed", PropertyInfo(Variant::FLOAT, "position")));
 }
 
 AudioStreamPlayer2D::AudioStreamPlayer2D() {

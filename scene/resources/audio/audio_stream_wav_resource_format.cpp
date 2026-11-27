@@ -122,6 +122,8 @@ Error ResourceFormatSaverAudioStreamWAV::save(const Ref<Resource> &p_resource, c
 	ERR_FAIL_COND_V(stream.is_null(), ERR_INVALID_PARAMETER);
 	ERR_FAIL_COND_V_MSG(p_path.get_extension().to_lower() != "wav", ERR_FILE_UNRECOGNIZED, vformat("Cannot save AudioStreamWAV to %s: only .wav files are supported.", p_path));
 	ERR_FAIL_COND_V_MSG(!_can_save_format(stream.ptr()), ERR_UNAVAILABLE, vformat("Cannot save AudioStreamWAV to %s: only 8-bit and 16-bit PCM data can be written (not IMA ADPCM or QOA).", p_path));
+	// A WAV file without samples cannot be loaded again.
+	ERR_FAIL_COND_V_MSG(stream->get_data().is_empty(), ERR_INVALID_DATA, vformat("Cannot save an empty AudioStreamWAV to %s.", p_path));
 
 	return stream->save_to_wav(p_path);
 }

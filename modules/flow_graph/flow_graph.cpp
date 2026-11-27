@@ -86,6 +86,8 @@ void FlowGraphValidation::_bind_methods() {
 	BIND_ENUM_CONSTANT(ISSUE_KIND_UNDECLARED_VARIABLE);
 	BIND_ENUM_CONSTANT(ISSUE_KIND_DATA_CYCLE);
 	BIND_ENUM_CONSTANT(ISSUE_KIND_NODE_WARNING);
+	BIND_ENUM_CONSTANT(ISSUE_KIND_MULTIPLE_START);
+	BIND_ENUM_CONSTANT(ISSUE_KIND_INVALID_START);
 	BIND_ENUM_CONSTANT(ISSUE_KIND_MAX);
 }
 
@@ -295,7 +297,14 @@ void FlowGraph::remove_node(int p_id) {
 		}
 	}
 	if (start_node_id == p_id) {
+		// Another start node, if any, takes over.
 		start_node_id = NODE_ID_NONE;
+		for (uint32_t i = 0; i < nodes.size(); i++) {
+			if (Object::cast_to<FlowStartNode>(nodes[i].ptr()) != nullptr) {
+				start_node_id = node_ids[i];
+				break;
+			}
+		}
 	}
 	for (int i = 0; i < frames.size(); i++) {
 		const Ref<FlowFrame> frame = frames[i];
@@ -474,6 +483,8 @@ Ref<FlowGraphValidation> FlowGraph::validate() const {
 
 	if (!node_index.has(start_node_id)) {
 		result->add_issue(FlowGraphValidation::ISSUE_KIND_MISSING_START, NODE_ID_NONE, RTR("The graph has no start node (start_node_id is not a node of the graph)."));
+	} else if (Object::cast_to<FlowStartNode>(nodes[node_index[start_node_id]].ptr()) == nullptr) {
+		result->add_issue(FlowGraphValidation::ISSUE_KIND_INVALID_START, start_node_id, vformat(RTR("The start node %d is not a FlowStartNode."), start_node_id));
 	}
 
 	HashSet<StringName> declared;
@@ -486,6 +497,9 @@ Ref<FlowGraphValidation> FlowGraph::validate() const {
 
 	for (const KeyValue<int, int> &kv : node_index) {
 		const Ref<FlowNode> &node = nodes[kv.value];
+		if (kv.key != start_node_id && Object::cast_to<FlowStartNode>(node.ptr()) != nullptr) {
+			result->add_issue(FlowGraphValidation::ISSUE_KIND_MULTIPLE_START, kv.key, vformat(RTR("Node %d is a second start node; only the start node %d starts the graph."), kv.key, start_node_id));
+		}
 		for (const String &warning : node->get_configuration_warnings()) {
 			result->add_issue(FlowGraphValidation::ISSUE_KIND_NODE_WARNING, kv.key, warning);
 		}

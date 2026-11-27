@@ -4,7 +4,7 @@
 		A collection of [InputAction]s with lookup by action name.
 	</brief_description>
 	<description>
-		An [InputActions] resource holds a list of [InputAction]s whose names are unique. The [InputMap] references two of them as its layers ([method InputMap.get_input_actions]), and it is the settings resource of [InputMapSettingsServer]. It emits [signal Resource.changed] when its list or one of its actions changes. Adding an action with a name that is already in the list replaces the old one in its place. Looking up an action by name is fast, also for hundreds of actions.
+		An [InputActions] resource holds a list of [InputAction]s, looked up by their names. The [InputMap] references two of them as its layers ([method InputMap.get_input_actions]), and it is the settings resource of [InputMapSettingsServer]. It emits [signal Resource.changed] when its list or one of its actions changes. Adding an action with a name that is already in the list replaces the old one in its place. Looking up an action by name is fast, also for hundreds of actions.
 		The list is the typed array [member actions], so it can be edited in the Inspector and saved as [code].tres[/code] or [code].res[/code] with the events as sub-resources. [InputMapSettingsServer] writes it to its settings file as records with named fields, one per action and one per event.
 		[codeblocks]
 		[gdscript]
@@ -79,7 +79,7 @@
 	</methods>
 	<members>
 		<member name="actions" type="InputAction[]" setter="set_actions" getter="get_actions" default="[]">
-			The actions of the list. If several entries have the same name, the last one wins.
+			The actions of the list. Setting it keeps every entry: [code]null[/code] entries (an element just added in the Inspector) stay in the array until they get an action, but are ignored otherwise, and a method that changes the list drops them. If several entries have the same name (for example after "Duplicate Element" in the Inspector), all are kept, a warning is printed, and the last one is used by [method get_action] and by the [InputMap].
 		</member>
 	</members>
 </class>

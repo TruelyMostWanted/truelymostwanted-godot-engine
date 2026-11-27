@@ -91,7 +91,8 @@
 			<param index="3" name="cache_mode" type="int" />
 			<description>
 				Loads a resource when the engine finds this loader to be compatible. If the loaded resource is the result of an import, [param original_path] will target the source file. Returns a [Resource] object on success, or an [enum Error] constant in case of failure.
-				The [param cache_mode] property defines whether and how the cache should be used or updated when loading the resource. See [enum CacheMode] for details.
+				[param cache_mode] is a [enum CacheMode] value passed as [int] (for example [code]cache_mode == ResourceFormatLoader.CACHE_MODE_IGNORE[/code], in C# [code](ResourceFormatLoader.CacheMode)cacheMode[/code]). It defines whether and how the cache should be used or updated when loading the resource. See [enum CacheMode] for details.
+				The loader does not need to set [member Resource.resource_path] on the returned resource: [ResourceLoader] sets it and handles the cache according to [param cache_mode]. Paths of subresources that the loader creates itself are up to the loader (see [method Resource.set_path_cache]).
 				[b]Why the return type is [Variant]:[/b] one script function has to return "a resource [i]or[/i] an error". GDScript has no out-parameters and no generics, and the binding layer (GDScript, C#, GDExtension) cannot expose a C++ struct, so a [Variant] holding either a [Resource] or an [enum Error] code as [int] is the only form that works in every language. Changing it to [Resource] would break every existing loader written in GDScript, C# or GDExtension (and the GDExtension ABI), so it stays as it is. Push an error with a message ([method @GlobalScope.push_error]) before returning the code: [method ResourceLoader.load_result] passes that message on to the caller in [member ResourceLoadResult.error_message].
 			</description>
 		</method>
@@ -118,12 +119,15 @@
 	<constants>
 		<constant name="CACHE_MODE_IGNORE" value="0" enum="CacheMode">
 			Neither the main resource (the one requested to be loaded) nor any of its subresources are retrieved from cache nor stored into it. Dependencies (external resources) are loaded with [constant CACHE_MODE_REUSE].
+			The returned resource reports the loaded path in [member Resource.resource_path] (set with [method Resource.set_path_cache]), but it is not stored in the cache: a resource already cached for the same path stays cached, and the next load with [constant CACHE_MODE_REUSE] returns that one.
 		</constant>
 		<constant name="CACHE_MODE_REUSE" value="1" enum="CacheMode">
 			The main resource (the one requested to be loaded), its subresources, and its dependencies (external resources) are retrieved from cache if present, instead of loaded. Those not cached are loaded and then stored into the cache. The same rules are propagated recursively down the tree of dependencies (external resources).
+			A newly loaded main resource gets [member Resource.resource_path] set to the loaded path and is stored in the cache.
 		</constant>
 		<constant name="CACHE_MODE_REPLACE" value="2" enum="CacheMode">
 			Like [constant CACHE_MODE_REUSE], but the cache is checked for the main resource (the one requested to be loaded) as well as for each of its subresources. Those already in the cache, as long as the loaded and cached types match, have their data refreshed from storage into the already existing instances. Otherwise, they are recreated as completely new objects.
+			If the main resource is already cached, the cached instance is updated in place (its stored properties are copied from the loaded file) and returned: it keeps its [member Resource.resource_path], and every reference to it sees the new data. If it is not cached yet, the new resource gets the path and is cached like with [constant CACHE_MODE_REUSE].
 		</constant>
 		<constant name="CACHE_MODE_IGNORE_DEEP" value="3" enum="CacheMode">
 			Like [constant CACHE_MODE_IGNORE], but propagated recursively down the tree of dependencies (external resources).

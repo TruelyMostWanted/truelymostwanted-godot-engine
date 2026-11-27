@@ -1484,6 +1484,13 @@ void AudioServer::finish() {
 		AudioDriverManager::get_driver(i)->finish();
 	}
 
+	// The mix thread has stopped: free the playbacks that are still listed (still playing, or stopped
+	// but not yet cleaned up by the mix thread), so their list nodes do not leak.
+	for (AudioStreamPlaybackListNode *playback_node : playback_list) {
+		_delete_stream_playback_list_node(playback_node);
+	}
+	_cleanup_lists();
+
 	for (int i = 0; i < buses.size(); i++) {
 		memdelete(buses[i]);
 	}

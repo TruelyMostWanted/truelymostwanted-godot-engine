@@ -31,6 +31,7 @@
 #include "video_stream.h"
 
 #include "core/object/class_db.h"
+#include "servers/subtitle/subtitle.h"
 
 // VideoStreamPlayback starts here.
 
@@ -176,11 +177,22 @@ String VideoStream::get_file() {
 	return file;
 }
 
+void VideoStream::set_subtitle_path(const String &p_subtitle_path) {
+	subtitle_path = p_subtitle_path; // No `changed`: it would restart the players of this stream.
+}
+
+String VideoStream::get_subtitle_path() const {
+	return subtitle_path;
+}
+
 void VideoStream::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_file", "file"), &VideoStream::set_file);
 	ClassDB::bind_method(D_METHOD("get_file"), &VideoStream::get_file);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &VideoStream::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &VideoStream::get_subtitle_path);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "file"), "set_file", "get_file");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 
 	GDVIRTUAL_BIND(_instantiate_playback);
 }

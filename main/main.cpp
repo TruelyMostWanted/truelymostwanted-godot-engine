@@ -58,6 +58,9 @@
 #include "core/os/time.h"
 #include "core/profiling/profiling.h"
 #include "core/register_core_types.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/text_insertion_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "core/truely_version.h"
 #include "core/variant/variant_parser.h"
@@ -879,6 +882,10 @@ void Main::test_cleanup() {
 	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 #ifdef TOOLS_ENABLED
@@ -3919,6 +3926,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 	}
 	OS::get_singleton()->benchmark_end_measure("Startup", "Scene");
 
+	// After the scene types and modules: `.tres` catalogs and the TOML/YAML formats can be loaded.
+	TextLocalizationServer::get_singleton()->load_project_catalogs();
+	ResourceLocalizationServer::get_singleton()->load_project_catalogs();
+
 #ifdef TOOLS_ENABLED
 	ClassDB::set_current_api(ClassDB::API_EDITOR);
 	register_editor_types();
@@ -5446,6 +5457,10 @@ void Main::cleanup(bool p_force) {
 	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 	// Remove the lock file if the engine exits successfully. Some automated processes such as

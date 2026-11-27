@@ -40,8 +40,8 @@ nutzbar aus GDScript, C# und GDExtension.
 1. **Issue** suchen oder anlegen (`gh issue list --state all --search "<Stichwort>"`), nach Vorlage, auf Englisch.
 2. **Feature-Branch** von `truely-godot-engine`, Name mit der Issue-Nummer als Präfix (mindestens zweistellig): `03-feature-path-prefix-server`. Beiträge an Godot selbst: PR-Branch von `master`.
 3. **Implementieren** nach `CONVENTIONS.md`, **beliebig oft committen**. Der pre-commit-Hook muss durchlaufen.
-4. **Mono-Build**, dann im Testprojekt `new-feature.ps1 -Name <feature-branch>` und Checks in GDScript und C# schreiben und ausführen.
-5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (`<feature-branch>`), Beispiele in GDScript, C# und C++ (GDExtension).
+4. **Mono-Build**, dann im Testprojekt den Guide-Ordner anlegen (`new-feature.ps1 -Name <guide>`) oder den vorhandenen nehmen: `Example` (Snippets des Guides) und `Test` (ganze API) in GDScript und C#, ein Statement pro Zeile; ausführen.
+5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (nach Thema, z. B. `Path-Prefixes`), Beispiele in GDScript, C# und C++ (GDExtension).
 6. **Abnahmepunkte** im Issue abhaken, Ergebnisse als Kommentar ins Issue.
 7. **Lokal grün** (Build, Unit-Tests, Checks) → **Squash-Merge** nach `truely-godot-engine`. Die volle CI läuft erst, wenn `truely-godot-engine` nach `truely-godot-engine-releases` kommt (`FEATURE-WORKFLOW.md`, 2.4).
 8. **Den Feature-Branch nie löschen** (`gh pr merge --squash` ohne `--delete-branch`).

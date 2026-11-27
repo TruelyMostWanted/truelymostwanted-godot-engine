@@ -36,6 +36,7 @@
 #include "scene/main/scene_tree.h"
 #include "servers/audio/audio_server.h"
 #include "servers/display/accessibility_server.h"
+#include "servers/subtitle/subtitle.h"
 
 int VideoStreamPlayer::sp_get_channel_count() const {
 	if (playback.is_null()) {
@@ -171,6 +172,7 @@ void VideoStreamPlayer::_notification(int p_notification) {
 					play();
 					return;
 				}
+				_update_playing_state();
 				emit_signal(SceneStringName(finished));
 			}
 		} break;
@@ -264,6 +266,7 @@ bool VideoStreamPlayer::has_loop() const {
 }
 
 void VideoStreamPlayer::set_stream(const Ref<VideoStream> &p_stream) {
+	const bool stream_changed = stream != p_stream;
 	stop();
 
 	// Make sure to handle stream changes seamlessly, e.g. when done via
@@ -326,10 +329,30 @@ void VideoStreamPlayer::set_stream(const Ref<VideoStream> &p_stream) {
 	if (!expand) {
 		update_minimum_size();
 	}
+	if (stream_changed) {
+		emit_signal(SNAME("stream_changed"), stream);
+	}
 }
 
 Ref<VideoStream> VideoStreamPlayer::get_stream() const {
 	return stream;
+}
+
+void VideoStreamPlayer::set_subtitle_path(const String &p_subtitle_path) {
+	subtitle_path = p_subtitle_path;
+}
+
+String VideoStreamPlayer::get_subtitle_path() const {
+	return subtitle_path;
+}
+
+void VideoStreamPlayer::_update_playing_state() {
+	// Playing and not paused; emitted on changes only.
+	const bool now = is_playing() && !paused;
+	if (now != playing_state) {
+		playing_state = now;
+		emit_signal(SNAME("playing_changed"), now);
+	}
 }
 
 void VideoStreamPlayer::play() {
@@ -345,6 +368,7 @@ void VideoStreamPlayer::play() {
 	if (!can_process()) {
 		_notification(NOTIFICATION_PAUSED);
 	}
+	_update_playing_state();
 }
 
 void VideoStreamPlayer::stop() {
@@ -359,6 +383,7 @@ void VideoStreamPlayer::stop() {
 	playback->stop();
 	resampler.flush();
 	set_process_internal(false);
+	_update_playing_state();
 }
 
 bool VideoStreamPlayer::is_playing() const {
@@ -375,6 +400,7 @@ void VideoStreamPlayer::set_paused(bool p_paused) {
 	}
 
 	paused = p_paused;
+	_update_playing_state();
 	if (!p_paused && !can_process()) {
 		paused_from_tree = true;
 		return;
@@ -512,6 +538,8 @@ StringName VideoStreamPlayer::get_bus() const {
 void VideoStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &VideoStreamPlayer::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &VideoStreamPlayer::get_stream);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &VideoStreamPlayer::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &VideoStreamPlayer::get_subtitle_path);
 
 	ClassDB::bind_method(D_METHOD("play"), &VideoStreamPlayer::play);
 	ClassDB::bind_method(D_METHOD("stop"), &VideoStreamPlayer::stop);
@@ -557,9 +585,12 @@ void VideoStreamPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_video_texture"), &VideoStreamPlayer::get_video_texture);
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, VideoStream::get_class_static())));
+	ADD_SIGNAL(MethodInfo("playing_changed", PropertyInfo(Variant::BOOL, "playing")));
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "audio_track", PROPERTY_HINT_RANGE, "0,128,1"), "set_audio_track", "get_audio_track");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, VideoStream::get_class_static()), "set_stream", "get_stream");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,0.01,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume", PROPERTY_HINT_RANGE, "0,15,0.01,exp", PROPERTY_USAGE_NONE), "set_volume", "get_volume");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale", PROPERTY_HINT_RANGE, "0,4,0.001,or_greater"), "set_speed_scale", "get_speed_scale");

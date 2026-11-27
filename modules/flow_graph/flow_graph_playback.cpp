@@ -642,7 +642,8 @@ void FlowGraphPlayback::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_state"), &FlowGraphPlayback::get_state);
 	ClassDB::bind_method(D_METHOD("set_state", "state"), &FlowGraphPlayback::set_state);
 
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "blackboard", PROPERTY_HINT_RESOURCE_TYPE, "FlowBlackboard"), "set_blackboard", "get_blackboard");
+	// Never null and not stored (like Node.multiplayer): no default-value comparison.
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "blackboard", PROPERTY_HINT_RESOURCE_TYPE, "FlowBlackboard", PROPERTY_USAGE_NONE), "set_blackboard", "get_blackboard");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_steps_per_advance", PROPERTY_HINT_RANGE, "1,65536,1,or_greater"), "set_max_steps_per_advance", "get_max_steps_per_advance");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_data_depth", PROPERTY_HINT_RANGE, "1,4096,1,or_greater"), "set_max_data_depth", "get_max_data_depth");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_subgraph_depth", PROPERTY_HINT_RANGE, "1,1024,1,or_greater"), "set_max_subgraph_depth", "get_max_subgraph_depth");

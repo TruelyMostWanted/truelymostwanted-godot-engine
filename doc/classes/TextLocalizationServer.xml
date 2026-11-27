@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextLocalizationServer" inherits="LocalizationServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Translates texts with context, plural forms and placeholders from [TextLocalizationCatalog]s.
+	</brief_description>
+	<description>
+		[TextLocalizationServer] is the text server of the localization system and replaces [TranslationServer] for game code. It reads [TextLocalizationCatalog]s (see [LocalizationServer] for layers, priorities and the locale chain).
+		On a locale or catalog change it builds one resolved column for the active locale chain: one text per key. [method translate] is then one hash lookup and one array read, [method translate_id] one array read. Texts are [String]s, not [StringName]s.
+		[b]tr() keeps working:[/b] while the server has catalogs, one adapter [Translation] per channel domain answers [method Object.tr], [method Node.atr], [member Node.auto_translate_mode], [method TranslationServer.translate] and their plural forms from the same column, for the keys of that channel: the catalogs of the [code]interface[/code] channel in the main [TranslationDomain], those of [code]subtitles[/code] in the domain [code]"subtitles"[/code] (nodes with [method Object.set_translation_domain] [code]"subtitles"[/code]), and so on. Pseudolocalization and POT generation work as before.
+		[b]Channels:[/b] every key is translated in the locale of its channel ([method TranslationServer.get_locale_for]); a change of one channel rebuilds only its keys.
+		[b]Missing texts:[/b] a key without a text in the chain returns the key itself. In debug builds [signal key_missing] is emitted once per key and locale.
+		[b]Placeholders:[/b] when [code]args[/code] is not empty, [code]{name}[/code] placeholders are filled with [method TextInsertionServer.insert_template]; the parsed template is cached per key. Without [code]args[/code] the text is returned as it is (use [method TextInsertionServer.insert] to fill global values).
+		[codeblocks]
+		[gdscript]
+		var title = TextLocalizationServer.translate(&amp;"MENU_TITLE")
+		var open = TextLocalizationServer.translate(&amp;"OPEN", &amp;"door")
+		var apples = TextLocalizationServer.translate(&amp;"APPLES", &amp;"", count, { "n": count })
+
+		# Hot code: look the key up once, then translate by id.
+		var gold_id = TextLocalizationServer.get_key_id(&amp;"HUD_GOLD")
+		label.text = TextLocalizationServer.translate_id(gold_id, -1, { "gold": gold })
+		[/gdscript]
+		[csharp]
+		string title = TextLocalizationServer.Translate("MENU_TITLE");
+		string open = TextLocalizationServer.Translate("OPEN", "door");
+		string apples = TextLocalizationServer.Translate("APPLES", "", count, new Godot.Collections.Dictionary { { "n", count } });
+
+		// Hot code: look the key up once, then translate by id (no StringName conversion per call).
+		int goldId = TextLocalizationServer.GetKeyId("HUD_GOLD");
+		label.Text = TextLocalizationServer.TranslateId(goldId, -1, new Godot.Collections.Dictionary { { "gold", gold } });
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_key_id" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the id of [param key] in [param context] for [method translate_id], or [code]-1[/code] if no catalog has the key. An id stays valid for the lifetime of the server, also across locale and catalog changes.
+			</description>
+		</method>
+		<method name="get_missing_keys" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="locale" type="String" default="&quot;&quot;" />
+			<description>
+				Returns the keys that have no text in [param locale] or its parent locales, so they show the text of the fallback locale or the key. An empty [param locale] means the locale of each key's channel. Meant for tools and tests: it reads every key.
+			</description>
+		</method>
+		<method name="get_translation_keys" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns all keys whose text in the active locale chain is [param text].
+			</description>
+		</method>
+		<method name="has_translation" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns [code]true[/code] if [param key] in [param context] has a text in the active locale chain, including the fallback locale.
+			</description>
+		</method>
+		<method name="translate" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="count" type="int" default="-1" />
+			<param index="3" name="args" type="Dictionary" default="{}" />
+			<description>
+				Returns the text of [param key] in [param context] for the active locale chain. With [param count] of [code]0[/code] or more, the plural form for [param count] is chosen by the plural rule of the locale the text comes from. With a non-empty [param args], placeholders are filled (see [TextInsertionServer]). Without a text, the key is returned, with its placeholders filled too.
+			</description>
+		</method>
+		<method name="translate_for_locale" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="locale" type="String" />
+			<param index="1" name="key" type="StringName" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="count" type="int" default="-1" />
+			<param index="4" name="args" type="Dictionary" default="{}" />
+			<description>
+				Like [method translate], for the chain of [param locale] without changing the active locale. For another locale the catalogs are read directly (at most one read per chain locale and layer); a locale of a [code].lcat[/code] catalog is loaded on demand.
+			</description>
+		</method>
+		<method name="translate_id" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="id" type="int" />
+			<param index="1" name="count" type="int" default="-1" />
+			<param index="2" name="args" type="Dictionary" default="{}" />
+			<description>
+				Like [method translate], for an id returned by [method get_key_id]. The fastest way to translate: one array read, no hashing of the key.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="key_missing">
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<description>
+				Emitted in debug builds when [method translate] or [method translate_id] finds no text for [param key] in the chain of [param locale]. Emitted once per key and locale; calls through [method Object.tr] do not emit it.
+			</description>
+		</signal>
+	</signals>
+</class>

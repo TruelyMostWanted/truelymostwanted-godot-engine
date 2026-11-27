@@ -193,6 +193,6 @@
 		</method>
 	</methods>
 	<members>
-		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="null" />
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="{}" />
 	</members>
 </class>

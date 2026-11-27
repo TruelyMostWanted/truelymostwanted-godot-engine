@@ -160,6 +160,19 @@ bool PerformanceRecordingProfile::is_write_summary_json() const {
 	return write_summary_json;
 }
 
+void PerformanceRecordingProfile::_validate_property(PropertyInfo &p_property) const {
+	// The monitor names as a picker instead of raw Performance.Monitor numbers. Built here: the names come from the
+	// Performance singleton, which does not exist yet when the class is bound.
+	if (p_property.name == "monitors" && Performance::get_singleton() != nullptr) {
+		PackedStringArray names;
+		for (int i = 0; i < Performance::MONITOR_MAX; i++) {
+			names.push_back(Performance::get_singleton()->get_monitor_name(Performance::Monitor(i)));
+		}
+		p_property.hint = PROPERTY_HINT_TYPE_STRING;
+		p_property.hint_string = vformat("%d/%d:%s", Variant::INT, PROPERTY_HINT_ENUM, String(",").join(names));
+	}
+}
+
 void PerformanceRecordingProfile::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_builtins", "builtins"), &PerformanceRecordingProfile::set_builtins);
 	ClassDB::bind_method(D_METHOD("get_builtins"), &PerformanceRecordingProfile::get_builtins);
@@ -203,7 +216,7 @@ void PerformanceRecordingProfile::_bind_methods() {
 	ADD_GROUP("Output", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "flush_interval_frames", PROPERTY_HINT_RANGE, "0,3600,1,or_greater"), "set_flush_interval_frames", "get_flush_interval_frames");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "flush_budget_usec", PROPERTY_HINT_RANGE, "0,16000,1,or_greater,suffix:usec"), "set_flush_budget_usec", "get_flush_budget_usec");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "output_path"), "set_output_path", "get_output_path");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "output_path", PROPERTY_HINT_SAVE_FILE, "*.csv"), "set_output_path", "get_output_path");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "delimiter"), "set_delimiter", "get_delimiter");
 	ADD_GROUP("Summary", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "hitch_threshold_usec", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater,suffix:usec"), "set_hitch_threshold_usec", "get_hitch_threshold_usec");
