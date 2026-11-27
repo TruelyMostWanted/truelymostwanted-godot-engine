@@ -40,13 +40,24 @@
 class ResourceFormatLoaderTextTree : public ResourceFormatLoader {
 	GDSOFTCLASS(ResourceFormatLoaderTextTree, ResourceFormatLoader);
 
+public:
+	// Bytes read to find the type marker of a file.
+	static constexpr int MARKER_HEAD_SIZE = 4096;
+
 protected:
 	virtual String _get_extension() const = 0;
 	// Returns ERR_FILE_UNRECOGNIZED (without printing) if the file is not a resource file of this format and another loader may take it.
 	virtual Error _parse_text(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error) const = 0;
-	// Type stored in the file, or an empty string.
+	// Type stored in the file, or an empty string. `p_text` is only the head of the file (MARKER_HEAD_SIZE
+	// bytes): the type marker must be written at the start of the file.
 	virtual String _get_marker_type(const String &p_text) const { return String(); }
+	// False for formats without a type marker (CSV): the type then comes only from the type hint of load().
+	virtual bool _has_type_marker() const { return true; }
 
+	// The first MARKER_HEAD_SIZE bytes of a file as text (a code point cut at the end is dropped).
+	static String _read_head(const String &p_path);
+	// The value of the first `$type` key in `p_head` (JSON, INI, TOML, YAML), if it names a Resource class.
+	static String _scan_key_marker(const String &p_head);
 	String _get_file_type(const String &p_path, String *r_script_class) const;
 
 public:
@@ -68,7 +79,6 @@ class ResourceFormatSaverTextTree : public ResourceFormatSaver {
 protected:
 	virtual String _get_extension() const = 0;
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const = 0;
-	virtual bool _can_save(const Ref<Resource> &p_resource) const { return true; }
 
 public:
 	virtual Error save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags = 0) override;
@@ -123,6 +133,8 @@ class ResourceFormatLoaderResourceCSV : public ResourceFormatLoaderTextTree {
 protected:
 	virtual String _get_extension() const override { return "csv"; }
 	virtual Error _parse_text(const String &p_text, const String &p_type_hint, Ref<Resource> &r_resource, String &r_error) const override;
+	// CSV has no type marker: type checks and plain files need no file read.
+	virtual bool _has_type_marker() const override { return false; }
 };
 
 class ResourceFormatSaverResourceCSV : public ResourceFormatSaverTextTree {
@@ -131,7 +143,6 @@ class ResourceFormatSaverResourceCSV : public ResourceFormatSaverTextTree {
 protected:
 	virtual String _get_extension() const override { return "csv"; }
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const override;
-	virtual bool _can_save(const Ref<Resource> &p_resource) const override;
 };
 
 // XML: root element <resource type="..."> with one child element per property. Files without that root are left to other loaders.

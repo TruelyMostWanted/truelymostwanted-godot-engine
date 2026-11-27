@@ -32,6 +32,7 @@
 
 #include "../tile_map.h"
 #include "../tile_map_layer.h"
+#include "tile_map_path_graph_editor.h"
 #include "tiles_editor_plugin.h"
 
 #include "core/input/input.h"
@@ -48,6 +49,7 @@
 #include "editor/settings/editor_command_palette.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
+#include "scene/gui/dialogs.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/split_container.h"
 #include "scene/main/scene_tree.h"
@@ -3767,6 +3769,7 @@ void TileMapLayerEditor::_notification(int p_what) {
 				_update_bottom_panel();
 				_update_layers_selector();
 				tabs_plugins[tabs_bar->get_current_tab()]->tile_set_changed();
+				_check_coordinate_settings();
 
 				const TileMapLayer *edited_layer = _get_edited_layer();
 				if (edited_layer && custom_overlay) {
@@ -4095,8 +4098,8 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 		Vector<Point2i> points;
 
 		bool transposed = tile_set->get_tile_offset_axis() == TileSet::TILE_OFFSET_AXIS_VERTICAL;
-		p_from_cell = TileSet::transform_coords_layout(p_from_cell, tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
-		p_to_cell = TileSet::transform_coords_layout(p_to_cell, tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
+		p_from_cell = TileSet::transform_coords_layout(tile_set->map_to_layout_coords(p_from_cell), tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
+		p_to_cell = TileSet::transform_coords_layout(tile_set->map_to_layout_coords(p_to_cell), tile_set->get_tile_offset_axis(), tile_set->get_tile_layout(), TileSet::TILE_LAYOUT_STACKED);
 		if (transposed) {
 			SWAP(p_from_cell.x, p_from_cell.y);
 			SWAP(p_to_cell.x, p_to_cell.y);
@@ -4107,7 +4110,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 		Vector2i sign = delta.sign();
 
 		Vector2i current = p_from_cell;
-		points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+		points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 
 		int err = 0;
 		if (Math::abs(delta.y) < Math::abs(delta.x)) {
@@ -4125,7 +4128,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 					current += Vector2i(sign.x, 0);
 					err += err_step.y;
 				}
-				points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+				points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 			}
 		} else {
 			Vector2i err_step = delta.abs();
@@ -4146,7 +4149,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 					}
 					err += err_step.y;
 				}
-				points.push_back(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout()));
+				points.push_back(tile_set->layout_to_map_coords(TileSet::transform_coords_layout(transposed ? Vector2i(current.y, current.x) : current, tile_set->get_tile_offset_axis(), TileSet::TILE_LAYOUT_STACKED, tile_set->get_tile_layout())));
 			}
 		}
 
@@ -4156,6 +4159,7 @@ Vector<Vector2i> TileMapLayerEditor::get_line(const TileMapLayer *p_tile_map_lay
 
 void TileMapLayerEditor::_tile_map_layer_changed() {
 	tile_map_layer_changed_needs_update = true;
+	path_graph_editor->queue_rebuild();
 }
 
 void TileMapLayerEditor::_tab_changed(int p_tab_id) {
@@ -4317,6 +4321,10 @@ bool TileMapLayerEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event
 		return true;
 	}
 
+	if (path_graph_editor->forward_canvas_gui_input(_get_edited_layer(), p_event)) {
+		return true;
+	}
+
 	return tabs_plugins[tabs_bar->get_current_tab()]->forward_canvas_gui_input(p_event);
 }
 
@@ -4347,6 +4355,8 @@ void TileMapLayerEditor::_draw_overlay() {
 	Transform2D xform = CanvasItemEditor::get_singleton()->get_canvas_transform() * edited_layer->get_global_transform_with_canvas();
 	Transform2D xform_inv = xform.affine_inverse();
 	Vector2i tile_shape_size = tile_set->get_tile_size();
+
+	path_graph_editor->draw(custom_overlay, _get_edited_layer(), xform);
 
 	// Fade the overlay out when size too small.
 	Vector2 hint_distance = xform.get_scale() * tile_shape_size;
@@ -4443,6 +4453,25 @@ void TileMapLayerEditor::_draw_overlay() {
 					color.a = color.a * opacity * scale_fading;
 					tile_set->draw_tile_shape(custom_overlay, xform * tile_xform, color, false);
 				}
+			}
+
+			// The direction of the map coordinates (coordinate system of the TileSet): +X and +Y from cell (0, 0).
+			const Vector2 axis_origin = xform.xform(tile_set->map_to_local(Vector2i()));
+			const Color axis_colors[2] = { Color(0.96, 0.32, 0.37), Color(0.53, 0.84, 0.01) };
+			const Ref<Font> axis_font = get_theme_font(SceneStringName(font), SNAME("Label"));
+			for (int axis = 0; axis < 2; axis++) {
+				const Vector2 axis_target = xform.xform(tile_set->map_to_local(axis == 0 ? Vector2i(1, 0) : Vector2i(0, 1)));
+				if (axis_target.is_equal_approx(axis_origin)) {
+					continue;
+				}
+				Color color = axis_colors[axis];
+				color.a *= scale_fading;
+				const Vector2 direction = (axis_target - axis_origin).normalized();
+				const Vector2 normal = direction.orthogonal();
+				const real_t head = 8.0 * EDSCALE;
+				custom_overlay->draw_line(axis_origin, axis_target - direction * head, color, 2.0 * EDSCALE);
+				custom_overlay->draw_colored_polygon({ axis_target, axis_target - direction * head + normal * head * 0.5, axis_target - direction * head - normal * head * 0.5 }, color);
+				custom_overlay->draw_string(axis_font, axis_target + direction * 2.0 * EDSCALE + normal * head, axis == 0 ? "+X" : "+Y", HORIZONTAL_ALIGNMENT_LEFT, -1, int(12 * EDSCALE), color);
 			}
 		}
 
@@ -4547,7 +4576,105 @@ void TileMapLayerEditor::update_layout(DockLayout p_layout, int p_slot) {
 	}
 }
 
+Vector<TileMapLayer *> TileMapLayerEditor::_get_layers_with_tile_set(const Ref<TileSet> &p_tile_set) const {
+	Vector<TileMapLayer *> layers;
+	Node *scene = EditorNode::get_singleton()->get_edited_scene();
+	if (scene == nullptr || p_tile_set.is_null()) {
+		return layers;
+	}
+	TypedArray<Node> nodes = scene->find_children("*", "TileMapLayer", true, false);
+	if (TileMapLayer *root_layer = Object::cast_to<TileMapLayer>(scene)) {
+		nodes.push_back(root_layer);
+	}
+	for (int i = 0; i < nodes.size(); i++) {
+		TileMapLayer *layer = Object::cast_to<TileMapLayer>(nodes[i]);
+		if (layer && layer->get_tile_set() == p_tile_set && !layer->get_used_cells().is_empty()) {
+			layers.push_back(layer);
+		}
+	}
+	return layers;
+}
+
+void TileMapLayerEditor::_check_coordinate_settings() {
+	const TileMapLayer *edited_layer = _get_edited_layer();
+	const Ref<TileSet> tile_set = edited_layer ? edited_layer->get_tile_set() : Ref<TileSet>();
+	if (tile_set.is_null()) {
+		known_tile_set_id = ObjectID();
+		return;
+	}
+	const bool same_tile_set = known_tile_set_id == tile_set->get_instance_id();
+	const TileSet::TileLayout old_layout = known_tile_layout;
+	const TileSet::CoordinateSystem old_system = known_coordinate_system;
+	known_tile_set_id = tile_set->get_instance_id();
+	known_tile_layout = tile_set->get_tile_layout();
+	known_coordinate_system = tile_set->get_coordinate_system();
+	if (!same_tile_set || (old_layout == known_tile_layout && old_system == known_coordinate_system)) {
+		return;
+	}
+	// A different layout only matters for shapes other than squares.
+	if (old_system == known_coordinate_system && tile_set->get_tile_shape() == TileSet::TILE_SHAPE_SQUARE) {
+		return;
+	}
+	const int layer_count = _get_layers_with_tile_set(tile_set).size();
+	if (layer_count == 0) {
+		return;
+	}
+	convert_from_layout = old_layout;
+	convert_from_system = old_system;
+	convert_cells_dialog->set_text(vformat(TTR("The coordinate settings of the TileSet changed. Painted cells keep their coordinates, so the map now looks different.\nConvert the cells of %d layer(s) in this scene, so the map keeps its look?"), layer_count));
+	convert_cells_dialog->popup_centered();
+}
+
+void TileMapLayerEditor::_convert_cells_confirmed() {
+	TileMapLayer *edited_layer = _get_edited_layer();
+	ERR_FAIL_NULL(edited_layer);
+	const Ref<TileSet> tile_set = edited_layer->get_tile_set();
+	ERR_FAIL_COND(tile_set.is_null());
+	const Vector<TileMapLayer *> layers = _get_layers_with_tile_set(tile_set);
+	const TileSet::CoordinateSystem new_system = tile_set->get_coordinate_system();
+	// One action in the scene's history with the TileSet settings, so one undo restores the settings and the cells
+	// together, whichever history has the focus.
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Convert Tile Coordinates"), UndoRedo::MERGE_DISABLE, edited_layer);
+	undo_redo->add_do_property(tile_set.ptr(), "tile_layout", tile_set->get_tile_layout());
+	undo_redo->add_do_property(tile_set.ptr(), "swap_x_and_y_axis", new_system.swap_x_and_y_axis);
+	undo_redo->add_do_property(tile_set.ptr(), "flip_x", new_system.flip_x);
+	undo_redo->add_do_property(tile_set.ptr(), "flip_y", new_system.flip_y);
+	for (TileMapLayer *layer : layers) {
+		undo_redo->add_do_method(layer, "convert_cell_coordinates", convert_from_layout, convert_from_system.swap_x_and_y_axis, convert_from_system.flip_x, convert_from_system.flip_y);
+		undo_redo->add_undo_property(layer, "tile_map_data", layer->get("tile_map_data"));
+	}
+	undo_redo->add_undo_property(tile_set.ptr(), "tile_layout", convert_from_layout);
+	undo_redo->add_undo_property(tile_set.ptr(), "swap_x_and_y_axis", convert_from_system.swap_x_and_y_axis);
+	undo_redo->add_undo_property(tile_set.ptr(), "flip_x", convert_from_system.flip_x);
+	undo_redo->add_undo_property(tile_set.ptr(), "flip_y", convert_from_system.flip_y);
+	undo_redo->add_do_method(this, "_sync_coordinate_settings");
+	undo_redo->add_undo_method(this, "_sync_coordinate_settings");
+	undo_redo->commit_action();
+}
+
+void TileMapLayerEditor::_sync_coordinate_settings() {
+	// After undo or redo of a conversion, the cells match the settings: no dialog.
+	const TileMapLayer *edited_layer = _get_edited_layer();
+	const Ref<TileSet> tile_set = edited_layer ? edited_layer->get_tile_set() : Ref<TileSet>();
+	if (tile_set.is_valid() && tile_set->get_instance_id() == known_tile_set_id) {
+		known_tile_layout = tile_set->get_tile_layout();
+		known_coordinate_system = tile_set->get_coordinate_system();
+	}
+}
+
+void TileMapLayerEditor::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_sync_coordinate_settings"), &TileMapLayerEditor::_sync_coordinate_settings);
+}
+
 TileMapLayerEditor::TileMapLayerEditor() {
+	convert_cells_dialog = memnew(ConfirmationDialog);
+	convert_cells_dialog->set_title(TTR("Convert Tile Coordinates"));
+	convert_cells_dialog->set_ok_button_text(TTR("Convert"));
+	convert_cells_dialog->set_cancel_button_text(TTR("Keep Coordinates"));
+	convert_cells_dialog->connect(SceneStringName(confirmed), callable_mp(this, &TileMapLayerEditor::_convert_cells_confirmed));
+	add_child(convert_cells_dialog);
+
 	set_process_internal(true);
 	set_name(TTRC("TileMap"));
 	set_icon_name("TileMapDock");
@@ -4669,6 +4796,9 @@ TileMapLayerEditor::TileMapLayerEditor() {
 	toggle_grid_button->set_tooltip_text(TTRC("Toggle grid visibility."));
 	toggle_grid_button->connect(SceneStringName(toggled), callable_mp(this, &TileMapLayerEditor::_on_grid_toggled));
 	tile_map_toolbar->add_child(toggle_grid_button);
+
+	path_graph_editor = memnew(TileMapPathGraphEditor);
+	tile_map_toolbar->add_child(path_graph_editor);
 
 	// Advanced settings menu button.
 	advanced_menu_button = memnew(MenuButton);

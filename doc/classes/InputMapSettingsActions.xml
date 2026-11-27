@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputMapSettingsActions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The content of the settings file of [InputMapSettingsServer].
+	</brief_description>
+	<description>
+		The file form of [InputActions] in the settings file of [InputMapSettingsServer] (JSON, INI, YAML, TOML, XML): one [InputMapSettingsAction] per action, each with its [InputMapSettingsEvent] records. CSV uses [InputMapSettingsEventRows]. [InputMapSettingsServer] converts between [InputActions] and this resource when it saves and loads; games do not need this class.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="actions" type="InputMapSettingsAction[]" setter="set_actions" getter="get_actions" default="[]">
+			The actions, one record each.
+		</member>
+	</members>
+</class>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphValidation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		The result of [method FlowGraph.validate]: a list of issues.
+	</brief_description>
+	<description>
+		A [FlowGraphValidation] lists the problems that [method FlowGraph.validate] found. Each issue has a kind ([enum IssueKind]), the id of the node it is about and a message. Issues that are not about one node, such as a missing start node, use [constant FlowGraph.NODE_ID_NONE] as node id. The object is a snapshot and does not change when the graph changes.
+		[method is_valid] is [code]true[/code] if there are no issues at all. Warnings of nodes ([constant ISSUE_KIND_NODE_WARNING]) count as issues too.
+		[codeblocks]
+		[gdscript]
+		var validation := graph.validate()
+		if not validation.is_valid():
+			for i in validation.get_issue_count():
+				print(validation.get_issue_node_id(i), ": ", validation.get_issue_message(i))
+		[/gdscript]
+		[csharp]
+		FlowGraphValidation validation = graph.Validate();
+		if (!validation.IsValid())
+		{
+		    for (int i = 0; i &lt; validation.GetIssueCount(); i++)
+		    {
+		        GD.Print(validation.GetIssueNodeId(i), ": ", validation.GetIssueMessage(i));
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_issue_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of issues.
+			</description>
+		</method>
+		<method name="get_issue_kind" qualifiers="const">
+			<return type="int" enum="FlowGraphValidation.IssueKind" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the kind of the issue at [param index]. Returns [constant ISSUE_KIND_MAX] and prints an error if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_issue_message" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the human-readable, translatable message of the issue at [param index]. Returns an empty string and prints an error if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_issue_node_id" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the id of the node the issue at [param index] is about, or [constant FlowGraph.NODE_ID_NONE] if it is about the graph. Prints an error and returns [constant FlowGraph.NODE_ID_NONE] if [param index] is out of range.
+			</description>
+		</method>
+		<method name="get_issues_for_node" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="node_id" type="int" />
+			<description>
+				Returns the indices of all issues about the node [param node_id], to use with [method get_issue_kind] and [method get_issue_message]. Use it to mark a node in an editor.
+			</description>
+		</method>
+		<method name="is_valid" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if there are no issues.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="ISSUE_KIND_MISSING_START" value="0" enum="IssueKind">
+			[member FlowGraph.start_node_id] is not the id of a node of the graph. The node id of the issue is [constant FlowGraph.NODE_ID_NONE].
+		</constant>
+		<constant name="ISSUE_KIND_UNREACHABLE_NODE" value="1" enum="IssueKind">
+			The node can't be reached from the start node: not by flow connections, and not as a data source of a reached node. Not reported when the start node is missing.
+		</constant>
+		<constant name="ISSUE_KIND_TYPE_MISMATCH" value="2" enum="IssueKind">
+			A connection joins a flow port and a data port, or two data ports whose types don't fit. The node id is the target node. [method FlowGraph.connect_nodes] refuses such connections, so this only appears in hand-edited or damaged files.
+		</constant>
+		<constant name="ISSUE_KIND_UNKNOWN_PORT" value="3" enum="IssueKind">
+			A connection uses a node or port that does not exist, for example after a node type changed its ports.
+		</constant>
+		<constant name="ISSUE_KIND_MULTIPLE_FLOW_OUTPUTS" value="4" enum="IssueKind">
+			A flow output has more than one connection. [method FlowGraph.connect_nodes] refuses this, so it only appears in hand-edited or damaged files.
+		</constant>
+		<constant name="ISSUE_KIND_UNDECLARED_VARIABLE" value="5" enum="IssueKind">
+			A [FlowVariableNode] names a variable that is not in [member FlowGraph.variables]. Nodes without a variable name are reported by their own warning instead.
+		</constant>
+		<constant name="ISSUE_KIND_DATA_CYCLE" value="6" enum="IssueKind">
+			The node is part of a cycle of data connections, so its inputs can never be evaluated. Nodes that are only fed by a cycle are not reported.
+		</constant>
+		<constant name="ISSUE_KIND_NODE_WARNING" value="7" enum="IssueKind">
+			A node reports a configuration warning, see [method FlowNode.get_configuration_warnings].
+		</constant>
+		<constant name="ISSUE_KIND_MULTIPLE_START" value="8" enum="IssueKind">
+			The node is a [FlowStartNode] but not the start node ([member FlowGraph.start_node_id]). A graph should have one start node; the others are never entered from the start.
+		</constant>
+		<constant name="ISSUE_KIND_INVALID_START" value="9" enum="IssueKind">
+			[member FlowGraph.start_node_id] is a node of the graph, but not a [FlowStartNode].
+		</constant>
+		<constant name="ISSUE_KIND_MAX" value="10" enum="IssueKind">
+			Represents the size of the [enum IssueKind] enum.
+		</constant>
+	</constants>
+</class>

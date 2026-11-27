@@ -11,7 +11,7 @@ Gilt für jedes Feature- und Refactoring-Issue. Branches und Remotes stehen in [
 
 Die Regeln für Code und Issues stehen in [`CONVENTIONS.md`](CONVENTIONS.md). Kurz:
 - Neue Systeme sind **keine Nodes**, sondern C++-Singletons (Server) und `Resource`s (Daten), gebunden in `_bind_methods()`.
-- C# bekommt die API über den generierten Glue: `TtsServer` (statisch) und `TtsServerInstance`.
+- C# bekommt die API über den generierten Glue: `TTSServer` (statisch) und `TTSServerInstance`.
 - Jedes Feature hat Klassenreferenz, Wiki-Seite und Checks in GDScript und C# (Mono-Build).
 - Issues auf Englisch, nach Vorlage, mit „Feasibility to check“ und den fünf Abnahmepunkten.
 
@@ -53,7 +53,8 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.4 CI in Stapeln
 
-- Die volle CI läuft nur **auf `truely-godot-engine`**, nach dem Merge. Werden mehrere Features kurz nacheinander gemergt, bricht GitHub die älteren Läufe ab; ein Stapel von etwa **fünf Features** bekommt so einen CI-Lauf.
+- Die volle CI läuft nur **auf `truely-godot-engine-releases`**, wenn `truely-godot-engine` per `release.ps1` dorthin kommt (Fast-forward). Merges nach `truely-godot-engine` und Feature-Branches starten keine CI; dort zählt der lokale Windows-Build mit Mono und die Checks in GDScript und C#.
+- Rot auf `truely-godot-engine-releases`: auf dem Feature-Branch (oder einem Bug-Branch) beheben, nach `truely-godot-engine` mergen, erneut freigeben.
 - Von Hand: `gh workflow run runner.yml --ref <branch>` (auch auf einem Feature-Branch, wenn eine Plattform fraglich ist).
 - Vor dem Lauf eines Stapels lokal auf `truely-godot-engine`: `--doctool --headless` ausführen; es darf keinen Diff geben (sonst scheitert „Check for class reference updates“, z. B. an einem `>` in Codebeispielen, das als `&gt;` geschrieben werden muss).
 - **Fehler eines Features werden auf seinem Feature-Branch behoben**, nicht mit einem eigenen Bug-Branch: ein Fix-Commit (`... (#N)`) auf `<nn>-feature-…`, lokal prüfen, dann denselben Branch erneut per Squash nach `truely-godot-engine` mergen (Git übernimmt nur den neuen Commit). Kommentar ins Issue des Features.
@@ -62,7 +63,7 @@ git switch -c 03-feature-path-prefix-server
 
 ### 2.5 Mergen
 
-Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft danach auf `truely-godot-engine` (2.4).
+Wenn lokal alles grün ist: **Squash-Merge** nach `truely-godot-engine`, also ein Commit pro Feature. Die CI läuft erst bei der Freigabe auf `truely-godot-engine-releases` (2.4).
 
 **Richtung:** Feature-Branches enthalten nur ihre eigenen Änderungen, wie ein PR. Sie gehen nach `truely-godot-engine`, nie umgekehrt: `truely-godot-engine` wird nicht in einen Feature-Branch gemergt.
 
@@ -72,6 +73,7 @@ gh pr merge --squash              # OHNE --delete-branch
 ```
 
 - **Den Feature-Branch niemals löschen**, weder auf GitHub noch lokal. Er bleibt immer bestehen.
+- **Truely-Version** ([`version.txt`](version.txt), SemVer): wird **einmal pro Release** erhöht, nicht in jedem Feature-Branch (sonst Konflikte zwischen parallelen Branches). Wer nach `truely-godot-engine` merged, vergleicht `truely/version.txt` mit dem letzten Release-Tag (`git describe --tags --match 'truely-v*' --abbrev=0`): Ist sie dort noch gleich, wird sie direkt danach in einem eigenen Commit erhöht (`Raise the Truely version to 0.2.0 (#N)`), **MINOR** für ein Feature, **PATCH** nur für Fehlerbehebungen (MINOR schließt PATCH ein: ist schon MINOR erhöht, nichts tun; war nur PATCH erhöht und kommt ein Feature dazu, auf MINOR umstellen). **MAJOR** bei einem neuen Godot-Major/Minor (4.8 → 4.9) oder inkompatiblen API-Änderungen. `release.ps1` und der Release-Workflow brechen ab, wenn der Tag der Version schon existiert.
 - In den Repo-Einstellungen ist „Automatically delete head branches“ (`delete_branch_on_merge`) **aus** und bleibt aus.
 - Beim PR das *base repository* prüfen: `TruelyMostWanted/truelymostwanted-godot-engine`, nicht `godotengine/godot`.
 
@@ -115,7 +117,7 @@ gh repo clone TruelyMostWanted/godot-custom-build-project P:/Projects/GitHub/god
 
 ### 4.2 Aufbau
 
-Wie unsere üblichen Godot-Projekte, aber **mit einem Ordner pro Feature** direkt unter `res://`. Der Ordner heißt wie der Feature-Branch der Engine.
+Wie unsere üblichen Godot-Projekte, aber **mit einem Ordner pro Wiki-Guide** direkt unter `res://`, benannt wie der Guide in Kleinbuchstaben mit Bindestrichen (`Audio-Bus-Settings` → `audio-bus-settings/`), ohne Issue-Nummer. Jeder Ordner trennt das **Beispiel** (Hands-on, die Snippets des Guides) vom **Test** (die ganze API). Vorbild: `seeds/`.
 
 ```
 godot-custom-build-project/
@@ -127,21 +129,22 @@ godot-custom-build-project/
     ├── project.godot
     ├── GodotCustomBuildProject.csproj   Godot.NET.Sdk aus dem lokalen NuGet-Ordner
     ├── nuget.config                     Godot-Pakete nur aus ../../nuget-local
-    ├── checks/                          FeatureCheck (GDScript) + FeatureCheckCs (C#), new-feature.ps1, run-checks.ps1
+    ├── checks/                          FeatureTest (GDScript und C#), new-feature.ps1, run-checks.ps1
     ├── _feature-template/               Vorlage für neue Feature-Ordner
-    └── 03-feature-path-prefix-server/
-        ├── scripts/gd/                  Checks in GDScript
-        ├── scripts/cs/                  Checks in C#
-        ├── scenes/                      check_gd.tscn, check_cs.tscn und weitere Testszenen
-        ├── resources/                   Testdaten (.tres, .json, .ini, .csv, …)
-        └── packed-scenes/               wiederverwendbare Szenen des Features
+    └── path-prefixes/
+        ├── scripts/gd/                  Example.gd (Snippets des Guides), Test.gd (ganze API)
+        ├── scripts/cs/                  Example.cs, Test.cs (dasselbe in C#)
+        ├── scenes/                      example_gd.tscn, example_cs.tscn, test_gd.tscn, test_cs.tscn
+        └── resources/                   Beispiel-Ressourcen für den Inspector und Testdaten
 ```
 
 Neuen Feature-Ordner anlegen:
 
 ```powershell
-./godot-project/checks/new-feature.ps1 -Name 03-feature-path-prefix-server
+./godot-project/checks/new-feature.ps1 -Name path-prefixes
 ```
+
+Ändert ein Issue ein bestehendes Feature, kommen Beispiel und Test in den vorhandenen Guide-Ordner.
 
 ### 4.3 C#-Anbindung an den Custom-Build
 
@@ -155,21 +158,22 @@ Neuen Feature-Ordner anlegen:
 ### 4.4 Testcode vorab, Merge nach `main` erst mit fertigem Engine-Build
 
 - Für jedes Feature wird der Testcode **vorab** im Testprojekt geschrieben, auf dem Feature-Branch mit demselben Namen wie in der Engine, auch wenn die Engine dafür noch nicht gebaut ist. Die Checks rufen die API so auf, wie sie im Issue festgelegt ist (GDScript und C#). So laufen Engine-Arbeit und Testcode parallel.
-- Der Testprojekt-Branch wird gepusht, sobald der Testcode steht. Er enthält nur den Feature-Ordner `res://<feature-branch>/`.
+- Der Testprojekt-Branch wird gepusht, sobald der Testcode steht. Er enthält nur den Guide-Ordner `res://<guide>/`.
 - **Nach `main` des Testprojekts** kommt der Testcode erst, wenn das Feature in `truely-godot-engine` gemergt und die Engine damit gebaut ist (Glue und NuGet-Pakete). Sonst baut das C#-Projekt auf `main` nicht. Danach werden die Checks auf `main` ausgeführt; das Ergebnis kommt als Kommentar ins Issue.
 
 ### 4.5 Tests
 
-- **Jedes Feature wird in GDScript und in C# getestet.** Beide Checks prüfen dasselbe.
-- GDScript: `scripts/gd/check.gd` erbt von `FeatureCheck`, überschreibt `_run_checks()` und ruft `expect()` auf.
-- C#: `scripts/cs/<Name>Check.cs` erbt von `FeatureCheckCs`, überschreibt `RunChecks()` und ruft `Expect()` auf.
-- Jede Check-Szene läuft headless und endet mit **Exit-Code 0 (bestanden) oder 1 (fehlgeschlagen)**.
+- **Jedes Feature hat ein Beispiel und einen Test, je in GDScript und in C#.** Beide Sprachen zeigen bzw. prüfen dasselbe.
+- **Beispiel** (`Example.gd`/`Example.cs`): genau die Snippets des Wiki-Guides, in seiner Reihenfolge, mit `print()`; keine Asserts. Läuft headless ohne `ERROR` in der Ausgabe.
+- **Test** (`Test.gd`/`Test.cs`): die ganze API des Features (jede Methode, Property, jedes Signal und Enum), dazu Randfälle; erbt von `FeatureTest`, überschreibt `_run_tests()`/`RunTests()`, eine Funktion je Bereich, ruft `expect()` auf.
+- **Stil:** weniger Code ist mehr, jede Zeile mit Grund, KISS, **ein Statement pro Zeile**: Wer liest, folgt Zeile für Zeile, was passiert.
+- Jede Szene läuft headless und endet mit **Exit-Code 0 (bestanden) oder 1 (fehlgeschlagen)**.
 
 ```powershell
-./godot-project/checks/run-checks.ps1 -Godot P:/Projects/GitHub/truelymostwanted-godot-engine/bin/godot.windows.editor.x86_64.mono.exe -Feature 03-feature-path-prefix-server
+./godot-project/checks/run-checks.ps1 -Godot P:/Projects/GitHub/truelymostwanted-godot-engine/bin/godot.windows.editor.x86_64.mono.exe -Feature path-prefixes
 ```
 
-- `run-checks.ps1` baut vorher das C#-Projekt (`dotnet build`), importiert das Projekt und gibt eine Tabelle aus.
+- `run-checks.ps1` baut vorher das C#-Projekt (`dotnet build`), importiert das Projekt, führt Tests und Beispiele aus (`-Only test|example`, Zeitlimit je Szene) und gibt eine Tabelle aus.
 - Die Ergebnisse (bestanden, fehlgeschlagen, Auffälligkeiten) kommen als Kommentar ins Issue der Engine.
 
 ---
@@ -181,12 +185,12 @@ Die Seiten folgen dem Aufbau der **offiziellen Godot-Docs**. Es gibt zwei Arten 
 
 ### 5.1 Klassenreferenz: eine Seite pro Klasse
 
-Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TtsServer`.
+Vorbild: [ResourceLoader](https://docs.godotengine.org/en/stable/classes/class_resourceloader.html). Seitenname `Class-<Klasse>`, zum Beispiel `Class-TTSServer`.
 Inhalt wie `doc/classes/<Klasse>.xml`, in dieser Reihenfolge:
 
 | Abschnitt | Inhalt |
 |---|---|
-| Kopf | `# TtsServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
+| Kopf | `# TTSServer`, darunter **Inherits:** `Object` (bei Bedarf **Inherited By:**) und die Kurzbeschreibung in einem Satz |
 | Description | ausführliche Beschreibung, bei Bedarf mit Beispielen |
 | Tutorials | Links zu den Guide-Seiten des Features |
 | Properties | Tabelle: Typ, Name, Default |
@@ -226,7 +230,7 @@ Jedes Feature- und Refactoring-Issue endet mit diesen fünf Punkten:
 - [ ] C#/GDScript bindings created and registered
 - [ ] Documentation written (class reference in `doc/classes/` and wiki page: GDScript, C#, GDExtension)
 - [ ] Test build on the current platform done (no errors or warnings)
-- [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
+- [ ] Tested in the test project (`res://<guide>/`: Example and Test) with a Mono build, in GDScript and in C#
 
 Danach: lokal grün → Squash-Merge → CI auf `truely-godot-engine` (im Stapel) → Feature-Branch bleibt bestehen.
 

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextInsertionValues" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A set of named values for the placeholders of [TextInsertionServer].
+	</brief_description>
+	<description>
+		[TextInsertionValues] holds values for placeholders such as [code]{game_name}[/code] or [code]{max_level}[/code]. Edit [member values] in the inspector as a table of names and values, save the resource as [code].tres[/code] or [code].res[/code] and add it with [method TextInsertionServer.add_values], or list it in [member ProjectSettings.internationalization/text_insertion/default_values] to add it at startup.
+		Several resources can be added at once, for example one for the base game and one per DLC or mod. The resource with the higher [member priority] wins when several have the same name.
+		[codeblocks]
+		[gdscript]
+		var values = TextInsertionValues.new()
+		values.set_value(&amp;"game_name", "Star Harbor")
+		TextInsertionServer.add_values(values)
+
+		# Values from a JSON file.
+		values.values = JSON.parse_string(FileAccess.get_file_as_string("res://data/names.json"))
+		[/gdscript]
+		[csharp]
+		var values = new TextInsertionValues();
+		values.SetValue("game_name", "Star Harbor");
+		TextInsertionServer.AddValues(values);
+
+		// Values from a JSON file.
+		var data = Json.ParseString(FileAccess.GetFileAsString("res://data/names.json")).AsGodotDictionary();
+		foreach (var entry in data)
+		{
+			values.SetValue(entry.Key.AsStringName(), entry.Value);
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] Resources hold values only, no code. Change them on the main thread.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value for [param name], or [param default] if there is none.
+			</description>
+		</method>
+		<method name="has_value" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if a value for [param name] exists.
+			</description>
+		</method>
+		<method name="remove_value">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the value for [param name] and emits [signal Resource.changed].
+			</description>
+		</method>
+		<method name="set_value">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Sets the value for [param name] and emits [signal Resource.changed].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="priority" type="int" setter="set_priority" getter="get_priority" default="0">
+			The order among the resources added to [TextInsertionServer]: a higher priority is asked first. With equal priority, the resource added later wins.
+		</member>
+		<member name="values" type="Dictionary[StringName, Variant]" setter="set_values" getter="get_values" default="{}">
+			The values by name. [String] keys are converted to [StringName].
+			[b]Note:[/b] The returned dictionary is a copy. Use [method set_value] or assign a whole dictionary to change the values.
+		</member>
+	</members>
+</class>

@@ -35,28 +35,28 @@
 				Returns the resource ID for the given path. If [param generate] is [code]true[/code], a new resource ID will be generated if one for the path is not found. If [param generate] is [code]false[/code] and the path is not found, [constant ResourceUID.INVALID_ID] is returned.
 			</description>
 		</method>
-		<method name="is_extension_registered">
+		<method name="has_extension_saver">
 			<return type="bool" />
 			<param index="0" name="extension" type="String" />
 			<description>
-				Returns [code]true[/code] if a save [Callable] is registered for [param extension] with [method register_extension]. The extension is compared without the leading dot and case-insensitively.
+				Returns [code]true[/code] if a save [Callable] is registered for [param extension] with [method register_extension_saver]. The extension is compared without the leading dot and case-insensitively.
 			</description>
 		</method>
-		<method name="register_extension">
+		<method name="register_extension_saver">
 			<return type="int" enum="Error" />
 			<param index="0" name="extension" type="String" />
-			<param index="1" name="save" type="Callable" />
+			<param index="1" name="saver" type="Callable" />
 			<param index="2" name="type" type="StringName" default="&amp;&quot;Resource&quot;" />
 			<param index="3" name="at_front" type="bool" default="false" />
 			<description>
-				Registers a simple resource format with one call: resources saved to a path ending with [param extension] are written by calling [param save], without writing a [ResourceFormatSaver]. Use [method ResourceLoader.register_extension] to load files of the same format.
-				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param save] receives the resource and the path ([code]func(resource: Resource, path: String)[/code]) and returns an [enum Error] code; a function without a return value counts as [constant OK].
+				Registers a simple resource format with one call: resources saved to a path ending with [param extension] are written by calling [param saver], without writing a [ResourceFormatSaver]. Use [method ResourceLoader.register_extension_loader] to load files of the same format.
+				[param extension] is given without the leading dot and is compared case-insensitively; it may contain dots, for example [code]"quiz.json"[/code]. [param saver] receives the resource and the path ([code]func(resource: Resource, path: String)[/code]) and returns an [enum Error] code; a function without a return value counts as [constant OK].
 				[param type] is the class of the resources this format saves: a [Resource] class or a global script class ([code]class_name[/code]) that extends [Resource]. Only resources of that class or of a class that inherits it are saved with this format. If [param at_front] is [code]true[/code], the format is asked before all other registered savers.
 				Registering an extension again replaces the previous [Callable]. Returns [constant OK], or [constant ERR_INVALID_PARAMETER] if the extension, the callable or the type is not valid.
 				[codeblocks]
 				[gdscript]
 				func _ready():
-					ResourceSaver.register_extension("quiz", _save_quiz, &amp;"QuizSet")
+					ResourceSaver.register_extension_saver("quiz", _save_quiz, &amp;"QuizSet")
 					ResourceSaver.save(my_quiz, "user://questions.quiz")
 
 				static func _save_quiz(quiz: QuizSet, path: String) -&gt; Error:
@@ -69,7 +69,7 @@
 				[csharp]
 				public override void _Ready()
 				{
-					ResourceSaver.RegisterExtension("quiz", Callable.From&lt;Resource, string, int&gt;(SaveQuiz), "QuizSet");
+					ResourceSaver.RegisterExtensionSaver("quiz", Callable.From&lt;Resource, string, int&gt;(SaveQuiz), "QuizSet");
 					ResourceSaver.Save(_myQuiz, "user://questions.quiz");
 				}
 
@@ -85,7 +85,7 @@
 				}
 				[/csharp]
 				[/codeblocks]
-				[b]Note:[/b] [param save] is called on the thread that calls [method save], with no engine lock held. If the object that [param save] is bound to is freed, saving fails with an error. All registrations are removed when the engine shuts down.
+				[b]Note:[/b] [param saver] is called on the thread that calls [method save], with no engine lock held. If the object that [param saver] is bound to is freed, saving fails with an error. All registrations are removed when the engine shuts down.
 			</description>
 		</method>
 		<method name="remove_resource_format_saver">
@@ -103,6 +103,7 @@
 			<description>
 				Saves a resource to disk to the given path, using a [ResourceFormatSaver] that recognizes the resource object. If [param path] is empty, [ResourceSaver] will try to use [member Resource.resource_path].
 				The [param flags] bitmask can be specified to customize the save behavior.
+				Saving does not change [member Resource.resource_path]: without [constant FLAG_CHANGE_PATH] the path is not touched, and with it the path is only changed for the duration of the save (see [constant FLAG_CHANGE_PATH]). To give the resource its new path, set [member Resource.resource_path] or call [method Resource.take_over_path] after saving.
 				Returns [constant OK] on success. Use [method save_result] to get the saver's message as well.
 				[b]Note:[/b] When the project is running, any generated UID associated with the resource will not be saved as the required code is only executed in editor mode.
 			</description>
@@ -140,11 +141,11 @@
 				Since resources will normally get a UID automatically, this method is only useful in very specific cases.
 			</description>
 		</method>
-		<method name="unregister_extension">
+		<method name="unregister_extension_saver">
 			<return type="int" enum="Error" />
 			<param index="0" name="extension" type="String" />
 			<description>
-				Removes the format registered for [param extension] with [method register_extension]. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no save [Callable] is registered for [param extension].
+				Removes the format registered for [param extension] with [method register_extension_saver]. Returns [constant OK], or [constant ERR_DOES_NOT_EXIST] if no save [Callable] is registered for [param extension].
 			</description>
 		</method>
 	</methods>
@@ -159,7 +160,7 @@
 			Bundles external resources.
 		</constant>
 		<constant name="FLAG_CHANGE_PATH" value="4" enum="SaverFlags" is_bitfield="true">
-			Changes the [member Resource.resource_path] of the saved resource to match its new location.
+			Sets [member Resource.resource_path] of the saved resource to its new location while the [ResourceFormatSaver] writes it, so that references to the resource itself are stored relative to that location. After a successful save, the previous path is restored. If another loaded resource holds the new path, the path is not taken over: an error is printed, the resource is saved without a path, and its previous path is restored afterwards.
 		</constant>
 		<constant name="FLAG_OMIT_EDITOR_PROPERTIES" value="8" enum="SaverFlags" is_bitfield="true">
 			Do not save editor-specific metadata (identified by their [code]__editor[/code] prefix).

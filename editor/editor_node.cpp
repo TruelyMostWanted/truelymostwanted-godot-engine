@@ -37,23 +37,28 @@
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/io/image.h"
+#include "core/io/json.h"
 #include "core/io/missing_resource.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "core/string/localization_catalog.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/version.h"
 #include "editor/animation/animation_player_editor_plugin.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
 #include "editor/audio/audio_stream_editor_plugin.h"
 #include "editor/audio/audio_stream_preview.h"
 #include "editor/audio/editor_audio_buses.h"
+#include "editor/data/localization_catalog_editor_plugin.h" // Truely (#403).
 #include "editor/debugger/debugger_editor_plugin.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/debugger/script_editor_debugger.h"
@@ -100,6 +105,7 @@
 #include "editor/import/fbx_importer_manager.h"
 #include "editor/import/resource_importer_bitmask.h"
 #include "editor/import/resource_importer_bmfont.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_dynamic_font.h"
 #include "editor/import/resource_importer_image.h"
@@ -155,6 +161,7 @@
 #include "editor/themes/editor_theme_manager.h"
 #include "editor/translations/editor_translation_parser.h"
 #include "editor/translations/packed_scene_translation_parser_plugin.h"
+#include "editor/translations/resource_translation_parser_plugin.h"
 #include "editor/version_control/version_control_editor_plugin.h"
 #include "main/main.h"
 #include "scene/2d/node_2d.h"
@@ -400,7 +407,7 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME + " (" TRUELY_VERSION_FULL_NAME ")");
 	if (project_title) {
 		project_title->set_text(title);
 	}
@@ -1505,6 +1512,7 @@ void EditorNode::_resources_reimporting(const Vector<String> &p_resources) {
 	scenes_modification_table.clear();
 	scenes_reimported.clear();
 	resources_reimported.clear();
+	uninstanced_scenes_reimported.clear();
 	EditorFileSystem *editor_file_system = EditorFileSystem::get_singleton();
 	for (const String &res_path : p_resources) {
 		// It's faster to use EditorFileSystem::get_file_type than fetching the resource type from disk.
@@ -1560,6 +1568,7 @@ void EditorNode::_resources_reimported(const Vector<String> &p_resources) {
 	}
 
 	reload_instances_with_path_in_edited_scenes();
+	reload_uninstanced_scenes();
 
 	scenes_modification_table.clear();
 	scenes_reimported.clear();
@@ -1759,7 +1768,11 @@ Error EditorNode::load_resource(const String &p_resource, bool p_ignore_broken_d
 	Error err;
 
 	Ref<Resource> res;
-	if (force_textfile_extensions.has(p_resource.get_extension())) {
+	// Truely (#403): a data file listed in a localization catalog manifest opens as its catalog.
+	const StringName catalog_class = LocalizationCatalogEditorPlugin::get_manifest_catalog_class(p_resource);
+	if (catalog_class != StringName()) {
+		res = LocalizationCatalogEditorPlugin::load_catalog(p_resource, catalog_class);
+	} else if (force_textfile_extensions.has(p_resource.get_extension())) {
 		const String resource_type = ResourceLoader::get_resource_type(p_resource);
 		if (resource_type != "Translation" && ResourceLoader::exists(p_resource, "")) {
 			res = ResourceLoader::load(p_resource, "", ResourceFormatLoader::CACHE_MODE_REUSE, &err);
@@ -1863,6 +1876,12 @@ void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const St
 	}
 }
 
+// Truely: a data file (CSV, ...) that was read from its own source file, not from an import, although the
+// file has a `.import` (Keep File, CSV Dataset). It is edited and saved like a file without import.
+static bool _is_data_source_file(const Resource *p_resource) {
+	return Object::cast_to<TextDataFormat>(p_resource) && p_resource->get_import_path().is_empty();
+}
+
 void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 	// If built-in resource, save the scene instead.
 	if (p_resource->is_built_in()) {
@@ -1882,7 +1901,8 @@ void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 
 	// If the resource has been imported, ask the user to use a different path in order to save it.
 	String path = p_resource->get_path();
-	if (path.is_resource_file() && !FileAccess::exists(path + ".import")) {
+	// Truely: a data file read from its own source file (Keep File, CSV Dataset) is saved in place.
+	if (path.is_resource_file() && (_is_data_source_file(p_resource.ptr()) || !FileAccess::exists(path + ".import"))) {
 		save_resource_in_path(p_resource, p_resource->get_path());
 	} else {
 		save_resource_as(p_resource);
@@ -1897,7 +1917,7 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 		// Early exit checks.
 
 		if (is_resource) {
-			if (FileAccess::exists(resource_path + ".import")) {
+			if (FileAccess::exists(resource_path + ".import") && !_is_data_source_file(p_resource.ptr())) {
 				show_warning(TTR("This resource can't be saved because it was imported from another file. Make it unique first."));
 				return;
 			}
@@ -1921,6 +1941,23 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 	List<String> extensions;
 	ResourceSaver::get_recognized_extensions(p_resource, &extensions);
 	file->clear_filters();
+
+	// Truely: data files (JSON, CSV, INI, XML, TOML, YAML) and localization catalogs (`lcat` first, #403) list their
+	// own extensions first, the first one preselected.
+	PackedStringArray own_extensions;
+	if (const TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_resource.ptr())) {
+		own_extensions = data_file->get_recognized_extensions();
+	} else if (Object::cast_to<LocalizationCatalog>(p_resource.ptr())) {
+		own_extensions = LocalizationCatalog::get_file_extensions();
+	} else if (p_resource->get_class_name() == JSON::get_class_static()) {
+		own_extensions.push_back("json");
+	}
+	for (int i = own_extensions.size() - 1; i >= 0; i--) {
+		List<String>::Element *own_element = extensions.find(own_extensions[i]);
+		if (own_element) {
+			extensions.move_to_front(own_element);
+		}
+	}
 
 	List<String> preferred;
 	for (const String &E : extensions) {
@@ -3258,7 +3295,7 @@ void EditorNode::_edit_current(bool p_skip_foreign, bool p_skip_inspector_update
 				editable_info = TTR("This resource belongs to a scene that was instantiated or inherited.\nChanges to it must be made inside the original scene.");
 			}
 		} else if (current_res->get_path().is_resource_file()) {
-			if (FileAccess::exists(current_res->get_path() + ".import")) {
+			if (FileAccess::exists(current_res->get_path() + ".import") && !_is_data_source_file(current_res)) {
 				editable_info = TTR("This resource was imported, so it's not editable. Change its settings in the import panel and then re-import.");
 			}
 		}
@@ -7434,6 +7471,8 @@ void EditorNode::preload_reimporting_with_path_in_edited_scenes(const List<Strin
 
 					// Search the scene to find nodes that references the nodes will be recreated.
 					get_preload_modifications_reference_to_nodes(edited_scene_root, edited_scene_root, instances_to_reimport, instance_list_with_children, scene_modifications.other_instances_modifications);
+				} else {
+					uninstanced_scenes_reimported.push_back(instance_path);
 				}
 			}
 
@@ -7818,6 +7857,20 @@ void EditorNode::reload_instances_with_path_in_edited_scenes() {
 	editor_data.restore_edited_scene_state(editor_selection, &editor_history);
 
 	progress.step(TTR("Reloading done."), editor_data.get_edited_scene_count());
+}
+
+void EditorNode::reload_uninstanced_scenes() {
+	if (uninstanced_scenes_reimported.is_empty()) {
+		return;
+	}
+	// Reloads resources stored in memory (cached in undo history for example).
+	for (String &scene_path : uninstanced_scenes_reimported) {
+		Error err;
+		Ref<PackedScene> instance_scene_packed_scene = ResourceLoader::load(scene_path, "", ResourceFormatLoader::CACHE_MODE_REPLACE, &err);
+
+		ERR_FAIL_COND(err != OK);
+		ERR_FAIL_COND(instance_scene_packed_scene.is_null());
+	}
 }
 
 void EditorNode::_remove_all_not_owned_children(Node *p_node, Node *p_owner) {
@@ -8774,6 +8827,11 @@ EditorNode::EditorNode() {
 		Ref<ResourceImporterCSVTranslation> import_csv_translation;
 		import_csv_translation.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_csv_translation);
+
+		// Truely: data CSVs (#393).
+		Ref<ResourceImporterCSVDataset> import_csv_dataset;
+		import_csv_dataset.instantiate();
+		ResourceFormatImporter::get_singleton()->add_importer(import_csv_dataset);
 
 		Ref<ResourceImporterWAV> import_wav;
 		import_wav.instantiate();
@@ -9746,6 +9804,11 @@ EditorNode::EditorNode() {
 
 	EditorExport::get_singleton()->add_export_plugin(shader_baker_export_plugin);
 #endif // RD_ENABLED
+
+	// Before the scene parser, which also claims "res".
+	Ref<ResourceTranslationParserPlugin> resource_translation_parser_plugin;
+	resource_translation_parser_plugin.instantiate();
+	EditorTranslationParser::get_singleton()->add_parser(resource_translation_parser_plugin, EditorTranslationParser::STANDARD);
 
 	Ref<PackedSceneEditorTranslationParserPlugin> packed_scene_translation_parser_plugin;
 	packed_scene_translation_parser_plugin.instantiate();

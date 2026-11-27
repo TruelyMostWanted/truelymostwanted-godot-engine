@@ -596,6 +596,9 @@ public:
 	// --- Shortcuts to methods defined in TileSet ---
 	Vector2i map_pattern(const Vector2i &p_position_in_tilemap, const Vector2i &p_coords_in_pattern, Ref<TileMapPattern> p_pattern);
 	TypedArray<Vector2i> get_surrounding_cells(const Vector2i &p_coords);
+	// Moves every cell so the map keeps its look after `tile_layout` or the coordinate system
+	// (`swap_x_and_y_axis`, `flip_x`, `flip_y`) of the TileSet changed.
+	void convert_cell_coordinates(TileSet::TileLayout p_from_layout, bool p_from_swap_x_and_y_axis = false, bool p_from_flip_x = false, bool p_from_flip_y = false);
 	Vector2i get_neighbor_cell(const Vector2i &p_coords, TileSet::CellNeighbor p_cell_neighbor) const;
 	Vector2 map_to_local(const Vector2i &p_pos) const;
 	Vector2i local_to_map(const Vector2 &p_pos) const;

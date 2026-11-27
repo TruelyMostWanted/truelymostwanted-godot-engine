@@ -4,7 +4,7 @@
 		Registers, edits, validates, saves and watches file manifests by name.
 	</brief_description>
 	<description>
-		[FilesManifestServer] keeps [FilesManifest] resources under names. Mods, user content and level editors register a manifest once and then edit it through the server ([method add_folder], [method add_extension], ...), check it with [method validate], save it with [method save_manifest] and get its cached file list with [method get_paths]. Loading the files is done by [method ResourceLoader.load_manifest].
+		[FilesManifestServer] keeps [FilesManifest] resources under names. Mods, user content and level editors register a manifest once and then edit it through the server ([method add_folder], [method add_extension], ...), check it with [method validate], save it with [method save_manifest] and get its cached file list with [method get_file_paths]. Loading the files is done by [method ResourceLoader.load_manifest].
 		Watching ([method set_watching]) polls the folders of a manifest on the main thread every [member watch_interval] seconds and emits [signal file_added] and [signal file_removed]. It needs no threads and no OS file watchers, so it works the same on all platforms, including the Web export. With a [SceneTree], polling runs automatically; with another [MainLoop], call [method poll] yourself.
 		Manifests listed in [member ProjectSettings.filesystem/manifests/autoload] are registered on first use of the server. All paths can use the prefixes of [PathPrefixServer]. Use the server from the main thread.
 		[codeblocks]
@@ -59,7 +59,14 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Creates the folders of the manifest [param name] that do not exist. Read-only paths (such as [code]res://[/code] in exported builds) are skipped with an error, and [constant ERR_FILE_NO_PERMISSION] is returned.
+				Creates the folders of the manifest [param name] that do not exist. For a wildcard folder ([member FilesManifest.folder_paths]), the part before the first wildcard is created. Read-only paths (such as [code]res://[/code] in exported builds) are skipped with an error, and [constant ERR_FILE_NO_PERMISSION] is returned.
+			</description>
+		</method>
+		<method name="get_file_paths">
+			<return type="PackedStringArray" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns the file list of the manifest [param name], in the load order described in [FilesManifest]. The list is cached and rebuilt after every change of the manifest; call [method refresh] to read the folders again.
 			</description>
 		</method>
 		<method name="get_manifest">
@@ -73,13 +80,6 @@
 			<return type="PackedStringArray" />
 			<description>
 				Returns the names of all registered manifests, sorted.
-			</description>
-		</method>
-		<method name="get_paths">
-			<return type="PackedStringArray" />
-			<param index="0" name="name" type="String" />
-			<description>
-				Returns the file list of the manifest [param name]. The list is cached and rebuilt after every change of the manifest; call [method refresh] to read the folders again.
 			</description>
 		</method>
 		<method name="has_manifest">
@@ -173,10 +173,24 @@
 			</description>
 		</method>
 		<method name="validate">
-			<return type="Dictionary" />
+			<return type="FilesManifestValidation" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Checks the manifest [param name] and returns a [Dictionary] with [code]missing_folders[/code], [code]missing_files[/code] and [code]unknown_extensions[/code] (extensions no resource loader recognizes), each a [PackedStringArray], and [code]valid[/code] ([code]true[/code] if all three are empty).
+				Checks the manifest [param name] and returns a [FilesManifestValidation] with the folders and files that do not exist and the extensions no resource loader recognizes. A wildcard folder counts as missing only if the part before its first wildcard does not exist. If no manifest is registered under [param name], an error is printed and the result has [constant ERR_DOES_NOT_EXIST] as [member FilesManifestValidation.error].
+				[codeblocks]
+				[gdscript]
+				var validation := FilesManifestServer.validate("mods")
+				if not validation.valid:
+					print("Missing folders: ", validation.missing_folders)
+				[/gdscript]
+				[csharp]
+				FilesManifestValidation validation = FilesManifestServer.Validate("mods");
+				if (!validation.Valid)
+				{
+				    GD.Print("Missing folders: ", validation.MissingFolders);
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 	</methods>

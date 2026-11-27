@@ -58,7 +58,11 @@
 #include "core/os/time.h"
 #include "core/profiling/profiling.h"
 #include "core/register_core_types.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/text_insertion_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
+#include "core/truely_version.h"
 #include "core/variant/variant_parser.h"
 #include "core/version.h"
 #include "drivers/register_driver_types.h"
@@ -84,6 +88,7 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/settings/settings_server_manager.h"
+#include "servers/settings/window_settings_server.h"
 #include "servers/text/text_server.h"
 #include "servers/text/text_server_dummy.h"
 
@@ -128,6 +133,7 @@
 #include "editor/doc/doc_tools.h"
 #include "editor/doc/editor_help.h"
 #include "editor/editor_node.h"
+#include "editor/export/pck_package_exporter.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/progress_dialog.h"
@@ -222,6 +228,7 @@ static bool show_help = false;
 static uint64_t quit_after = 0;
 static String record_performance_path;
 static String record_performance_profile;
+static String record_performance_budget;
 #ifdef TOOLS_ENABLED
 static ProcessID editor_pid = 0;
 static bool found_project = false;
@@ -266,6 +273,8 @@ static bool init_expand_to_title_found = false;
 #endif
 static bool use_custom_res = true;
 static bool force_res = false;
+static bool cmdline_screen_set = false; // `--screen`; init_use_custom_screen is also set by the project settings.
+static bool cmdline_position_set = false; // `--position`; init_use_custom_pos likewise.
 
 // Debug
 
@@ -279,6 +288,8 @@ static bool debug_canvas_item_redraw = false;
 static bool debug_mute_audio = false;
 #endif
 static int max_fps = -1;
+static double cmdline_time_scale = 1.0; // `--time-scale`, for EngineSettingsServer.
+static bool cmdline_time_scale_set = false;
 static int frame_delay = 0;
 static int audio_output_latency = 0;
 static bool disable_render_loop = false;
@@ -392,15 +403,15 @@ void Main::print_header(bool p_rich) {
 	if (GODOT_VERSION_TIMESTAMP > 0) {
 		// Version timestamp available.
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich("\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
 		}
 	} else {
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich("\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
 		}
 	}
 }
@@ -507,6 +518,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_title("General options");
 	print_help_option("-h, --help", "Display this help message.\n");
 	print_help_option("--version", "Display the version string.\n");
+	print_help_option("--truely-version", "Display the Truely version number (truely/version.txt), e.g. \"0.1.0\".\n");
 	print_help_option("-v, --verbose", "Use verbose stdout mode.\n");
 	print_help_option("-q, --quiet", "Quiet mode, silences stdout messages. Errors are still displayed.\n");
 	print_help_option("--no-header", "Do not print engine version and rendering driver/method header on startup.\n");
@@ -586,6 +598,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("", "--quit-after can be used to specify the number of frames to write.\n");
 	print_help_option("--record-performance <file>", "Record per-frame performance metrics to the specified CSV file (see PerformanceRecorder).\n");
 	print_help_option("--record-performance-profile <file>", "PerformanceRecordingProfile resource to use with --record-performance.\n");
+	print_help_option("--performance-budget <file>", "PerformanceBudget resource checked at exit; the exit code is 1 if the recorded run exceeds it.\n");
 
 	print_help_title("Display options");
 	print_help_option("-f, --fullscreen", "Request fullscreen mode.\n");
@@ -663,6 +676,7 @@ void Main::print_help(const char *p_binary) {
 	print_help_option("--export-pack <preset> <path>", "Export the project data only using the given preset and output path. The <path> extension determines whether it will be in PCK or ZIP format.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--export-patch <preset> <path>", "Export pack with changed files only. See --export-pack description for other considerations.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--patches <paths>", "List of patches to use with --export-patch. The list is comma-separated.\n", CLI_OPTION_AVAILABILITY_EDITOR);
+	print_help_option("--export-pack-description <preset> <description> <path>", "Build the PCKPackage description (.tres/.res) into a pack at <path>, through the export pipeline of the given preset.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 	print_help_option("--install-android-build-template", "Install the Android build template. Used in conjunction with --export-release or --export-debug.\n", CLI_OPTION_AVAILABILITY_EDITOR);
 #ifndef DISABLE_DEPRECATED
 	// Commands are long; split the description to a second line.
@@ -865,9 +879,13 @@ void Main::test_cleanup() {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
-	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 #ifdef TOOLS_ENABLED
@@ -1044,6 +1062,12 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	performance_recorder = memnew(PerformanceRecorder);
 	GDREGISTER_CLASS(PerformanceRecorder);
 	GDREGISTER_CLASS(PerformanceRecordingProfile);
+	GDREGISTER_CLASS(PerformanceColumnSummary);
+	GDREGISTER_CLASS(PerformanceSummary);
+	GDREGISTER_CLASS(PerformanceBudgetRule);
+	GDREGISTER_CLASS(PerformanceBudget);
+	GDREGISTER_CLASS(PerformanceBudgetFailure);
+	GDREGISTER_CLASS(PerformanceBudgetResult);
 	engine->add_singleton(Engine::Singleton("PerformanceRecorder", performance_recorder));
 
 	// Only flush stdout in debug builds by default, as spamming `print()` will
@@ -1193,6 +1217,11 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 		} else if (arg == "--version") {
 			print_line(get_full_version_string());
+			exit_err = ERR_HELP; // Hack to force an early exit in `main()` with a success code.
+			goto error;
+
+		} else if (arg == "--truely-version") {
+			print_line(TRUELY_VERSION_NUMBER);
 			exit_err = ERR_HELP; // Hack to force an early exit in `main()` with a success code.
 			goto error;
 
@@ -1448,6 +1477,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			if (N) {
 				init_screen = N->get().to_int();
 				init_use_custom_screen = true;
+				cmdline_screen_set = true;
 
 				N = N->next();
 			} else {
@@ -1472,6 +1502,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 				init_custom_pos = Point2(x, y);
 				init_use_custom_pos = true;
+				cmdline_position_set = true;
 
 				N = N->next();
 			} else {
@@ -1667,7 +1698,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			wait_for_import = true;
 			quit_after = 1;
 		} else if (arg == "--export-release" || arg == "--export-debug" ||
-				arg == "--export-pack" || arg == "--export-patch") { // Export project
+				arg == "--export-pack" || arg == "--export-patch" || arg == "--export-pack-description") { // Export project
 			// Actually handling is done in start().
 			editor = true;
 			cmdline_tool = true;
@@ -1837,7 +1868,9 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		} else if (arg == "--time-scale") { // force time scale
 
 			if (N) {
-				Engine::get_singleton()->set_time_scale(N->get().to_float());
+				cmdline_time_scale = N->get().to_float();
+				cmdline_time_scale_set = true;
+				Engine::get_singleton()->set_time_scale(cmdline_time_scale);
 				N = N->next();
 			} else {
 				OS::get_singleton()->print("Missing time scale argument, aborting.\n");
@@ -1961,9 +1994,9 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				OS::get_singleton()->print("Missing write-movie argument, aborting.\n");
 				goto error;
 			}
-		} else if (arg == "--record-performance" || arg == "--record-performance-profile") {
+		} else if (arg == "--record-performance" || arg == "--record-performance-profile" || arg == "--performance-budget") {
 			if (N) {
-				(arg == "--record-performance" ? record_performance_path : record_performance_profile) = N->get();
+				(arg == "--record-performance" ? record_performance_path : (arg == "--performance-budget" ? record_performance_budget : record_performance_profile)) = N->get();
 				N = N->next();
 			} else {
 				OS::get_singleton()->print("Missing %s argument, aborting.\n", arg.utf8().get_data());
@@ -3353,6 +3386,14 @@ Error Main::setup2(bool p_show_boot_logo) {
 
 	if (!editor && !project_manager) { // Player settings, phase 1: before the DisplayServer exists.
 		SettingsServerManager::get_singleton()->startup(SettingsServer::APPLY_PHASE_PRE_DISPLAY);
+		if (WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) { // The stored main window (#20).
+			WindowSettingsServer::BootWindow boot_window = { window_mode, window_vsync_mode, window_flags, window_size };
+			WindowSettingsServer::get_singleton()->get_boot_window(boot_window);
+			window_mode = boot_window.mode;
+			window_vsync_mode = boot_window.vsync_mode;
+			window_flags = boot_window.flags;
+			window_size = boot_window.size;
+		}
 	}
 
 	/* Initialize Input */
@@ -3488,6 +3529,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 #endif // PHYSICS_2D_DISABLED
 
 			return err;
+		}
+
+		if (!editor && !project_manager && WindowSettingsServer::get_singleton() && !init_embed_parent_window_id) {
+			WindowSettingsServer::get_singleton()->on_display_server_created(); // Stored screen and position, before the window is shown (#20).
 		}
 
 #ifdef TOOLS_ENABLED
@@ -3881,6 +3926,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 	}
 	OS::get_singleton()->benchmark_end_measure("Startup", "Scene");
 
+	// After the scene types and modules: `.tres` catalogs and the TOML/YAML formats can be loaded.
+	TextLocalizationServer::get_singleton()->load_project_catalogs();
+	ResourceLocalizationServer::get_singleton()->load_project_catalogs();
+
 #ifdef TOOLS_ENABLED
 	ClassDB::set_current_api(ClassDB::API_EDITOR);
 	register_editor_types();
@@ -4081,6 +4130,47 @@ String Main::get_locale_override() {
 	return locale;
 }
 
+Dictionary Main::get_command_line_window_options() {
+	Dictionary options;
+	if (init_fullscreen) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_FULLSCREEN);
+	} else if (init_maximized) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_MAXIMIZED);
+	} else if (init_windowed) {
+		options["window_mode"] = int(DisplayServerEnums::WINDOW_MODE_WINDOWED);
+	}
+	if (force_res) {
+		options["window_size"] = Vector2i(window_size);
+	}
+	if (cmdline_screen_set) {
+		options["screen"] = init_screen;
+	}
+	if (cmdline_position_set) {
+		options["window_position"] = Vector2i(init_custom_pos);
+	}
+	if (init_always_on_top) {
+		options["always_on_top"] = true;
+	}
+	if (disable_vsync) {
+		options["vsync_mode"] = int(DisplayServerEnums::VSYNC_DISABLED);
+	}
+	if (init_embed_parent_window_id) {
+		options["embedded"] = true;
+	}
+	return options;
+}
+
+Dictionary Main::get_command_line_engine_options() {
+	Dictionary options;
+	if (max_fps >= 0) {
+		options["max_fps"] = max_fps;
+	}
+	if (cmdline_time_scale_set) {
+		options["time_scale"] = cmdline_time_scale;
+	}
+	return options;
+}
+
 // everything the main loop needs to know about frame timings
 static MainTimerSync main_timer_sync;
 
@@ -4110,6 +4200,8 @@ int Main::start() {
 	bool export_pack_only = false;
 	bool install_android_build_template = false;
 	bool export_patch = false;
+	String pack_description_preset;
+	String pack_description_path;
 #ifdef MODULE_GDSCRIPT_ENABLED
 	String gdscript_docs_path;
 #endif
@@ -4231,6 +4323,13 @@ int Main::start() {
 				export_patch = true;
 			} else if (E->get() == "--patches") {
 				patches = E->next()->get().split(",", false);
+			} else if (E->get() == "--export-pack-description") {
+				ERR_FAIL_COND_V_MSG(!editor && !found_project, EXIT_FAILURE, "Please provide a valid project path when exporting, aborting.");
+				ERR_FAIL_COND_V_MSG(!E->next()->next(), EXIT_FAILURE, "Missing description path after --export-pack-description <preset>, aborting.");
+				editor = true;
+				pack_description_preset = E->next()->get();
+				E = E->next(); // The description is a second argument; the pack path is the positional argument.
+				pack_description_path = E->next()->get();
 #endif
 			} else {
 				// The parameter does not match anything known, don't skip the next argument
@@ -4696,6 +4795,10 @@ int Main::start() {
 				editor_node->export_preset(_export_preset, positional_arg, export_debug, export_pack_only, install_android_build_template, export_patch, patches);
 				game_path = ""; // Do not load anything.
 			}
+			if (!pack_description_preset.is_empty()) {
+				PCKPackageExporter::request_command_line_export(pack_description_preset, pack_description_path, positional_arg, false);
+				game_path = ""; // Do not load anything.
+			}
 
 			OS::get_singleton()->benchmark_end_measure("Startup", "Editor");
 		}
@@ -4940,7 +5043,7 @@ int Main::start() {
 		movie_writer->begin(movie_size, fixed_fps, Engine::get_singleton()->get_write_movie_path());
 	}
 
-	performance_recorder->start_from_settings(record_performance_path, record_performance_profile, !editor && !project_manager);
+	performance_recorder->start_from_settings(record_performance_path, record_performance_profile, record_performance_budget, !editor && !project_manager);
 
 	GDExtensionManager::get_singleton()->startup();
 
@@ -5351,9 +5454,13 @@ void Main::cleanup(bool p_force) {
 
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
-	// Callables of formats registered with register_extension() reference scripts: release them before the languages finish.
+	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 	// Remove the lock file if the engine exits successfully. Some automated processes such as

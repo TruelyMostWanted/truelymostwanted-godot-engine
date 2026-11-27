@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TTSPersonaSettingsServer" inherits="ListSettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings server for the player's text-to-speech personas and the player's default persona.
+	</brief_description>
+	<description>
+		[TTSPersonaSettingsServer] is the settings domain [code]"tts_personas"[/code]: it stores the [TTSPersona]s the player created or changed (voice, language, volume, pitch, rate, interrupt) and the player's default persona, loads them when the game starts and applies them to [TTSServer] (in [constant SettingsServer.APPLY_PHASE_SERVERS]).
+		The personas of the game stay unchanged. The player's personas are applied as [i]persona overrides[/i] ([method TTSServer.set_persona_override], [method TTSServer.set_default_persona_override]): [method TTSServer.get_persona], [method TTSServer.speak_with_persona] and the default persona see the player's version first, even if the game adds its personas later (for example in [method Node._ready]). Removing the player's version ([method remove_persona], [method SettingsServer.reset_to_defaults]) brings the game's persona back. The defaults of this domain are empty: only what the player created or changed is stored.
+		The settings resource is a [TTSPersonaListSettings] with one [TTSPersonaSettings] entry per persona, identified by [member TTSPersonaSettings.persona_name]. The default persona is the entry with [member TTSPersonaSettings.default] set, so the resource holds nothing but the list: with [member ProjectSettings.settings/general/default_format], or the format of the domain group [code]settings/&lt;domain&gt;/[/code], set to [constant ResourceTextSerializer.FORMAT_CSV], the file [code]user://settings/tts_personas.csv[/code] has one row per persona. The default file is [code]user://settings/tts_personas.ini[/code].
+		A stored voice that does not exist on the current device is kept (it may exist on the player's other device). [TTSServer] picks another voice then (see [method TTSServer.resolve_voice_id]), a warning is printed once per persona and voice, and [method get_missing_voice_personas] returns the persona, so an options menu can show it.
+		The typed methods below go through [method ListSettingsServer.set_entry_value] or [method ListSettingsServer.add_entry]: in [constant SettingsServer.APPLY_MODE_IMMEDIATE] a change reaches [TTSServer] at once and is saved at the end of the frame; in [constant SettingsServer.APPLY_MODE_MANUAL] it waits for [method SettingsServer.apply].
+		[codeblocks]
+		[gdscript]
+		func _ready():
+			# The game's persona, shipped with the game.
+			var narrator = TTSPersona.new()
+			narrator.persona_name = &amp;"narrator"
+			narrator.language = "en"
+			TTSServer.add_persona(narrator)
+
+		# Options menu: the player makes the narrator faster and chooses it as default.
+		func _on_rate_slider_value_changed(value):
+			TTSPersonaSettingsServer.set_persona_value(&amp;"narrator", &amp;"rate", value)
+			TTSPersonaSettingsServer.set_default_persona(&amp;"narrator")
+
+		func speak_line(text):
+			TTSServer.speak_with_persona(text, &amp;"narrator") # Uses the player's narrator.
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    // The game's persona, shipped with the game.
+		    var narrator = new TtsPersona();
+		    narrator.PersonaName = "narrator";
+		    narrator.Language = "en";
+		    TtsServer.AddPersona(narrator);
+		}
+
+		// Options menu: the player makes the narrator faster and chooses it as default.
+		private void OnRateSliderValueChanged(double value)
+		{
+		    TtsPersonaSettingsServer.SetPersonaValue("narrator", "rate", value);
+		    TtsPersonaSettingsServer.SetDefaultPersona("narrator");
+		}
+
+		private void SpeakLine(string text)
+		{
+		    TtsServer.SpeakWithPersona(text, "narrator"); // Uses the player's narrator.
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] On the Web, the browser loads its voice list asynchronously. When the settings are applied at startup, the list is usually still empty: no voice is reported missing then and the browser chooses the voice. Call [method get_missing_voice_personas] again later, for example when the options menu opens.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_persona">
+			<return type="void" />
+			<param index="0" name="persona" type="TTSPersona" />
+			<description>
+				Stores a copy of [param persona] as the player's persona under its [member TTSPersona.persona_name]. An entry with the same name is replaced (its position and its [member TTSPersonaSettings.default] flag stay). If the game has a persona with this name, the player's version replaces it in [TTSServer]. Reports an error if [param persona] is [code]null[/code] or has no name.
+				Changing [param persona] later does not change the stored entry; call [method add_persona] again or use [method set_persona_value].
+			</description>
+		</method>
+		<method name="get_default_persona" qualifiers="const">
+			<return type="StringName" />
+			<description>
+				Returns the name of the player's default persona, or an empty [StringName] if the player has not chosen one (then the default persona of the game is used, see [method TTSServer.set_default_persona]).
+			</description>
+		</method>
+		<method name="get_missing_voice_personas" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the stored personas whose [member TTSPersonaSettings.voice] is set but does not exist on the current device (by voice ID or voice name). [TTSServer] uses another voice for them (see [method TTSServer.resolve_voice_id]).
+				Returns an empty array while the device reports no voices at all: text to speech is not available, or on the Web the voice list is still loading.
+			</description>
+		</method>
+		<method name="get_persona" qualifiers="const">
+			<return type="TTSPersona" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns a new [TTSPersona] with the stored values of the player's persona called [param name] (pending values, see [method SettingsServer.get_settings]), or [code]null[/code] if the player has no such persona. Changing the returned persona does not change the settings.
+			</description>
+		</method>
+		<method name="get_persona_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the names of the player's personas, in the order of the list. The personas of the game that the player has not changed are not included; see [method TTSServer.get_persona_names] for all personas.
+			</description>
+		</method>
+		<method name="get_persona_value" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="property" type="StringName" />
+			<description>
+				Returns the value [param property] of the persona called [param name] (a property of [TTSPersonaSettings], for example [code]"rate"[/code]): the player's value if the player has this persona, otherwise the value of the game's persona in [TTSServer]. Reports an error and returns [code]null[/code] if there is no such persona.
+			</description>
+		</method>
+		<method name="has_persona" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if the player has a stored persona called [param name] (created or changed by the player).
+			</description>
+		</method>
+		<method name="remove_persona">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes the player's persona called [param name]. If the game has a persona with this name, it is used again. If it was the player's default persona, the default persona of the game is used again. Does nothing if the player has no such persona.
+			</description>
+		</method>
+		<method name="set_default_persona">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Makes the persona called [param name] the player's default persona: [method TTSServer.speak] without a persona uses it. If the player has no persona with this name yet, the entry is created from the game's persona in [TTSServer] (a copy of its current values). Reports an error if there is no such persona. An empty [param name] removes the player's choice, so the default persona of the game is used again.
+			</description>
+		</method>
+		<method name="set_persona_value">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="property" type="StringName" />
+			<param index="2" name="value" type="Variant" />
+			<description>
+				Sets the value [param property] of the player's persona called [param name] (a property of [TTSPersonaSettings], for example [code]"voice"[/code], [code]"volume"[/code] or [code]"rate"[/code]). The value is clamped to the range of the property. If the player has no persona with this name yet but the game has one, the player's entry is created from the values of the game first. Setting [code]"default"[/code] calls [method set_default_persona]. The name itself can't be changed. Reports an error if there is no such persona or property.
+			</description>
+		</method>
+	</methods>
+</class>

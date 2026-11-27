@@ -1,0 +1,420 @@
+name: 📦 Truely Release
+# truely-godot-engine: builds the editors (standard and .NET) and the export templates of all desktop
+# platforms and the Web, packs them and publishes a GitHub release.
+# Starts by itself after a green "🔗 GHA" run on the release branch truely-godot-engine-releases
+# (fast-forwarded from truely-godot-engine by truely/release.ps1), built from the exact commit that
+# run tested, but only if files other than Markdown and .agents/ changed since the last release tag
+# (truely-v* or the older truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
+# Names: Truely-v<truely>_Godot<godot>-<status>_<hash>_<platform>, tag truely-v<truely>-godot<godot>-<status>,
+# e.g. Truely-v0.2.0_Godot4.8-beta5_f031fd0_windows-x86_64.zip and tag truely-v0.1.0-godot4.8-beta5.
+# The Truely version (SemVer) comes from truely/version.txt, the status of the Godot base (e.g. beta5)
+# from truely/godot-status.txt. A tag that already exists on another commit stops the release: raise
+# truely/version.txt first. Releases before #265 keep their names (Truely_Godot..., truely-godot...).
+on:
+  workflow_run:
+    workflows: ["🔗 GHA"]
+    types: [completed]
+    branches: [truely-godot-engine-releases]
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the release as a draft
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truely-release
+  cancel-in-progress: false
+
+# Release builds never restore the shared SCons cache: cached objects of version-dependent files
+# carried old version strings into new builds.
+env:
+  # The commit to release: the one the CI run tested, or the selected commit when started by hand.
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  BUILD_NAME: truely
+  SCONS_FLAGS: production=yes debug_symbols=no
+  PYTHONIOENCODING: utf8
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  setup:
+    name: 🏷️ Names
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+      status: ${{ steps.names.outputs.status }}
+      truely: ${{ steps.names.outputs.truely }}
+      config: ${{ steps.names.outputs.config }}
+      name: ${{ steps.names.outputs.name }}
+      tag: ${{ steps.names.outputs.tag }}
+      title: ${{ steps.names.outputs.title }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      # Skip releases that would only change documentation: Markdown files and .agents/.
+      # Class reference changes (doc/classes/*.xml) are API docs and do count.
+      - name: Check for changes since the last release
+        id: check
+        run: |
+          prev=""
+          for t in $(git tag --merged "$SHA" --sort=-committerdate --list 'truely-v*' 'truely-godot*'); do
+            if [ "$(git rev-parse "$t^{commit}")" != "$SHA" ]; then prev="$t"; break; fi
+          done
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            release=true
+          elif [ -n "$(git tag --points-at "$SHA" --list 'truely-v*' 'truely-godot*')" ]; then
+            echo "$SHA is already released."
+            release=false
+          elif [ -z "$prev" ]; then
+            echo "No previous release tag."
+            release=true
+          elif changed="$(git diff --name-only "$prev" "$SHA" | grep -vE '\.md$|^\.agents/' || true)" && [ -n "$changed" ]; then
+            echo "Changes since $prev:"
+            echo "$changed"
+            release=true
+          else
+            echo "Only documentation changed since $prev."
+            release=false
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "release=$release"
+
+      - name: Compute names
+        id: names
+        run: |
+          python3 - <<'EOF'
+          import os, re, runpy, sys
+          v = runpy.run_path("version.py")
+          status = open("truely/godot-status.txt", encoding="utf-8").read().strip()
+          truely = open("truely/version.txt", encoding="utf-8").read().strip()
+          if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", truely):
+              sys.exit(f"::error::truely/version.txt holds '{truely}', expected MAJOR.MINOR.PATCH.")
+          number = f"{v['major']}.{v['minor']}" + (f".{v['patch']}" if v["patch"] else "")
+          sha = os.environ["SHA"][:7]
+          base = f"{number}-{status}"
+          m = re.fullmatch(r"([a-z]+)(\d*)", status)
+          pretty = f"{number} {m.group(1)} {m.group(2)}".strip() if m else f"{number} {status}"
+          out = {
+              "status": status,
+              "truely": truely,
+              "config": f"{number}.{status}",
+              "name": f"Truely-v{truely}_Godot{base}_{sha}",
+              "tag": f"truely-v{truely}-godot{base}",
+              "title": f"Truely v{truely} (Godot {pretty}, {sha})",
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              for key, value in out.items():
+                  print(f"{key}={value}", file=f)
+                  print(f"{key}={value}")
+          EOF
+
+      # One release per Truely version: the tag has no hash, so an existing tag on another commit
+      # means truely/version.txt was not raised. Stop instead of overwriting or skipping silently.
+      - name: Check that the version is new
+        if: steps.check.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.names.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            tagged="$(git rev-parse "$TAG^{commit}")"
+            if [ "$tagged" != "$SHA" ]; then
+              echo "::error::Tag $TAG already exists on ${tagged:0:7}. Raise truely/version.txt (MINOR for features, PATCH for fixes) and release again."
+              exit 1
+            fi
+          fi
+
+  linux:
+    name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (.NET)' || '' }}
+    needs: setup
+    if: needs.setup.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          submodules: recursive
+
+      - name: Setup dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libwayland-bin
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Setup .NET SDK
+        if: matrix.mono && matrix.target == 'editor'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download pre-built AccessKit
+        run: python ./misc/scripts/install_accesskit.py
+
+      - name: Compilation
+        run: |
+          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
+          scons platform=linuxbsd target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} accesskit=yes
+
+      # Glue and assemblies for all three editors, built here like the official release scripts do.
+      - name: Generate C# glue and build .NET assemblies
+        if: matrix.mono && matrix.target == 'editor'
+        run: |
+          ./bin/godot.linuxbsd.editor.x86_64.mono --headless --generate-mono-glue ./modules/mono/glue
+          # The .NET projects write to ./bin/GodotSharp (fixed path), so build one platform at a time.
+          for platform in linuxbsd windows macos; do
+            find modules/mono -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+            rm -rf ./bin/GodotSharp
+            python ./modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin --godot-platform="$platform"
+            mkdir -p "./sharp/$platform"
+            mv ./bin/GodotSharp "./sharp/$platform/GodotSharp"
+          done
+
+      - name: Prepare artifact
+        run: |
+          rm -rf ./bin/build_deps ./bin/obj
+          strip bin/godot.*
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-linux-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
+          path: bin/godot.*
+
+      - name: Upload GodotSharp
+        if: matrix.mono && matrix.target == 'editor'
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-godotsharp
+          path: sharp/
+
+  windows:
+    name: 🏁 Windows ${{ matrix.target }}${{ matrix.mono && ' (.NET)' || '' }}
+    needs: setup
+    if: needs.setup.outputs.release == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 240
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          submodules: recursive
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download Direct3D 12 SDK, ANGLE and AccessKit
+        shell: bash
+        run: |
+          python ./misc/scripts/install_d3d12_sdk_windows.py
+          python ./misc/scripts/install_angle.py
+          python ./misc/scripts/install_accesskit.py
+
+      - name: Compilation
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" != "editor" ]; then rm -rf editor; fi
+          scons platform=windows target=${{ matrix.target }} $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} d3d12=yes angle=yes accesskit=yes
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          rm -rf ./bin/build_deps ./bin/obj
+          rm -f bin/*.exp bin/*.lib bin/*.pdb
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-windows-${{ matrix.target }}${{ matrix.mono && '-mono' || '' }}
+          path: bin/godot.*
+
+  macos:
+    # One job per variant (standard, .NET) builds the editor and both templates: macOS runners are
+    # scarce, and six parallel jobs were often cancelled for capacity.
+    name: 🍎 macOS${{ matrix.mono && ' (.NET)' || '' }}
+    needs: setup
+    if: needs.setup.outputs.release == 'true'
+    runs-on: macos-26
+    timeout-minutes: 300
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mono: [false, true]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          submodules: recursive
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download ANGLE, AccessKit and the Vulkan SDK
+        run: |
+          python ./misc/scripts/install_angle.py
+          python ./misc/scripts/install_accesskit.py
+          sh misc/scripts/install_vulkan_sdk_macos.sh
+
+      - name: Compilation (editor and templates, x86_64 and arm64, lipo, ad-hoc signature)
+        run: |
+          suffix="${{ matrix.mono && '.mono' || '' }}"
+          mkdir -p out
+          for target in editor template_debug template_release; do
+            FLAGS="platform=macos target=$target $SCONS_FLAGS module_mono_enabled=${{ matrix.mono && 'yes' || 'no' }} vulkan=yes angle=yes accesskit=yes"
+            # Metal is not supported in x86_64 builds.
+            scons $FLAGS arch=x86_64 metal=no
+            scons $FLAGS arch=arm64
+            u="out/godot.macos.$target.universal$suffix"
+            lipo -create "./bin/godot.macos.$target.x86_64$suffix" "./bin/godot.macos.$target.arm64$suffix" -output "$u"
+            rm "./bin/godot.macos.$target.x86_64$suffix" "./bin/godot.macos.$target.arm64$suffix"
+            strip "$u"
+            codesign --force --sign - "$u"
+          done
+          rm -rf ./bin/build_deps ./bin/obj
+
+      - name: Upload artifacts
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-macos${{ matrix.mono && '-mono' || '' }}
+          path: out/godot.*
+
+  web:
+    name: 🌐 Web ${{ matrix.target }}${{ matrix.threads == 'no' && ' (no threads)' || '' }}
+    needs: setup
+    if: needs.setup.outputs.release == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    env:
+      GODOT_VERSION_STATUS: ${{ needs.setup.outputs.status }}
+      EM_VERSION: 6.0.12
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [template_debug, template_release]
+        threads: ["yes", "no"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          submodules: recursive
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EM_VERSION }}
+          no-cache: true
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Compilation
+        run: |
+          rm -rf editor
+          scons platform=web target=${{ matrix.target }} $SCONS_FLAGS threads=${{ matrix.threads }} use_closure_compiler=yes
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: release-web-${{ matrix.target }}-threads-${{ matrix.threads }}
+          path: bin/godot.web.*.zip
+
+  package:
+    name: 📦 Package and release
+    needs: [setup, linux, windows, macos, web]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      NAME: ${{ needs.setup.outputs.name }}
+      CONFIG: ${{ needs.setup.outputs.config }}
+      TRUELY: ${{ needs.setup.outputs.truely }}
+      TAG: ${{ needs.setup.outputs.tag }}
+      TITLE: ${{ needs.setup.outputs.title }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Check the version string
+        run: |
+          chmod +x artifacts/godot.linuxbsd.*
+          expected="$CONFIG.truely.${SHA:0:9}"
+          actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --version | tail -n 1)"
+          echo "expected $expected, got $actual"
+          [ "$actual" = "$expected" ]
+          actual="$(./artifacts/godot.linuxbsd.editor.x86_64 --truely-version | tail -n 1)"
+          echo "expected Truely $TRUELY, got $actual"
+          [ "$actual" = "$TRUELY" ]
+
+      - name: Package
+        run: bash .github/truely/package-release.sh artifacts release "$NAME" "$CONFIG"
+
+      # Nothing is published when a package is broken: .NET packages of the wrong version,
+      # executables of another platform (e.g. a Linux apphost in the Windows zip), wrong version.txt.
+      - name: Verify release files
+        run: python3 .github/truely/verify-release.py release "$NAME" "$CONFIG"
+
+      - name: Release notes
+        run: |
+          bash .github/truely/release-notes.sh "$SHA" "$TAG" "$CONFIG" > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create release
+        run: |
+          # Only stable releases become "Latest"; everything else is a pre-release.
+          flags="--prerelease --latest=false"
+          if [ "$(tr -d '[:space:]' < truely/godot-status.txt)" = "stable" ]; then flags="--latest"; fi
+          if [ "${{ inputs.draft }}" = "true" ]; then flags="$flags --draft"; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # The release post already exists (e.g. an older post moved to this tag with
+            # `gh release edit <old> --tag <new> --target <sha>`): replace the files, keep its curated notes.
+            echo "Updating the existing release $TAG"
+            for asset in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+              gh release delete-asset "$TAG" "$asset" --yes
+            done
+            gh release upload "$TAG" release/* --clobber
+            gh release edit "$TAG" --title "$TITLE" --draft=false
+          else
+            gh release create "$TAG" release/* --target "$SHA" --title "$TITLE" --notes-file notes.md $flags
+          fi

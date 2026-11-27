@@ -2876,8 +2876,9 @@ Error EditorFileSystem::_reimport_file(const String &p_file, const HashMap<Strin
 			fs->files[cpos]->import_md5 = FileAccess::get_md5(p_file + ".import");
 			fs->files[cpos]->import_dest_paths = Vector<String>();
 			fs->files[cpos]->deps.clear();
-			fs->files[cpos]->type = "";
-			fs->files[cpos]->import_valid = false;
+			// Truely: a kept file that a resource loader reads (CSV, JSON, ...) keeps its type, so it can be selected and opened.
+			fs->files[cpos]->type = importer_name == "keep" ? ResourceLoader::get_resource_type(p_file) : String();
+			fs->files[cpos]->import_valid = !fs->files[cpos]->type.is_empty();
 			EditorResourcePreview::get_singleton()->check_for_invalidation(p_file);
 		}
 		return OK;

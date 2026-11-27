@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DataValidationOptions" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings of one data validation.
+	</brief_description>
+	<description>
+		Passed to [method DataSchema.validate] and [method TextDataFormat.validate]. [code]null[/code] there means the defaults: at most 1000 issues, no lines.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="keep_positions" type="bool" setter="set_keep_positions" getter="is_keep_positions" default="false">
+			If [code]true[/code], [method TextDataFormat.validate] fills the line of every issue from the text kept by [method TextDataFormat.parse]. Costs one pass over the text; editors turn it on, games usually do not need it.
+		</member>
+		<member name="max_issues" type="int" setter="set_max_issues" getter="get_max_issues" default="1000">
+			The most issues kept. Validation stops when the limit is reached. [code]-1[/code] keeps all.
+		</member>
+		<member name="stop_on_first" type="bool" setter="set_stop_on_first" getter="is_stop_on_first" default="false">
+			If [code]true[/code], validation stops at the first issue (a quick yes or no).
+		</member>
+	</members>
+</class>

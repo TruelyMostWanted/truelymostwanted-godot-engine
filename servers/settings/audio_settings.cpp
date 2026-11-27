@@ -34,31 +34,31 @@
 #include "core/object/class_db.h"
 
 /////////////////////////////////////////////////////////////////////////////
-// AudioSettings.
+// AudioDeviceSettings.
 
-void AudioSettings::set_output_device(const String &p_device) {
+void AudioDeviceSettings::set_output_device(const String &p_device) {
 	output_device = p_device.is_empty() ? String("Default") : p_device;
 	emit_changed();
 }
 
-String AudioSettings::get_output_device() const {
+String AudioDeviceSettings::get_output_device() const {
 	return output_device;
 }
 
-void AudioSettings::set_input_device(const String &p_device) {
+void AudioDeviceSettings::set_input_device(const String &p_device) {
 	input_device = p_device.is_empty() ? String("Default") : p_device;
 	emit_changed();
 }
 
-String AudioSettings::get_input_device() const {
+String AudioDeviceSettings::get_input_device() const {
 	return input_device;
 }
 
-void AudioSettings::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioSettings::set_output_device);
-	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioSettings::get_output_device);
-	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioSettings::set_input_device);
-	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioSettings::get_input_device);
+void AudioDeviceSettings::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_output_device", "device"), &AudioDeviceSettings::set_output_device);
+	ClassDB::bind_method(D_METHOD("get_output_device"), &AudioDeviceSettings::get_output_device);
+	ClassDB::bind_method(D_METHOD("set_input_device", "device"), &AudioDeviceSettings::set_input_device);
+	ClassDB::bind_method(D_METHOD("get_input_device"), &AudioDeviceSettings::get_input_device);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "output_device"), "set_output_device", "get_output_device");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "input_device"), "set_input_device", "get_input_device");
@@ -147,4 +147,110 @@ void AudioBusListSettings::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_buses"), &AudioBusListSettings::get_buses);
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "buses", PROPERTY_HINT_ARRAY_TYPE, "AudioBusSettings"), "set_buses", "get_buses");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// AudioBusSettingsRow.
+
+uint32_t AudioBusSettingsRow::written_values = AudioBusSettingsRow::STORED_ALL;
+
+void AudioBusSettingsRow::set_written_values(uint32_t p_values) {
+	written_values = p_values & STORED_ALL;
+}
+
+uint32_t AudioBusSettingsRow::get_written_values() {
+	return written_values;
+}
+
+void AudioBusSettingsRow::_validate_property(PropertyInfo &p_property) const {
+	uint32_t value = 0;
+	if (p_property.name == "volume_db") {
+		value = STORED_VOLUME;
+	} else if (p_property.name == "mute") {
+		value = STORED_MUTE;
+	} else if (p_property.name == "solo") {
+		value = STORED_SOLO;
+	}
+	if (value != 0 && !(written_values & value)) {
+		// Not written to the file; still settable.
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+}
+
+void AudioBusSettingsRow::set_bus_name(const String &p_name) {
+	bus_name = p_name;
+	emit_changed();
+}
+
+String AudioBusSettingsRow::get_bus_name() const {
+	return bus_name;
+}
+
+void AudioBusSettingsRow::set_volume_db(float p_volume_db) {
+	volume_db = Math::is_nan(p_volume_db) ? 0.0f : CLAMP(p_volume_db, AudioBusSettings::MIN_VOLUME_DB, AudioBusSettings::MAX_VOLUME_DB);
+	present |= STORED_VOLUME;
+	emit_changed();
+}
+
+float AudioBusSettingsRow::get_volume_db() const {
+	return volume_db;
+}
+
+void AudioBusSettingsRow::set_mute(bool p_mute) {
+	mute = p_mute;
+	present |= STORED_MUTE;
+	emit_changed();
+}
+
+bool AudioBusSettingsRow::is_mute() const {
+	return mute;
+}
+
+void AudioBusSettingsRow::set_solo(bool p_solo) {
+	solo = p_solo;
+	present |= STORED_SOLO;
+	emit_changed();
+}
+
+bool AudioBusSettingsRow::is_solo() const {
+	return solo;
+}
+
+bool AudioBusSettingsRow::has_value(StoredValue p_value) const {
+	return (present & p_value) != 0;
+}
+
+void AudioBusSettingsRow::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_bus_name", "name"), &AudioBusSettingsRow::set_bus_name);
+	ClassDB::bind_method(D_METHOD("get_bus_name"), &AudioBusSettingsRow::get_bus_name);
+	ClassDB::bind_method(D_METHOD("set_volume_db", "volume_db"), &AudioBusSettingsRow::set_volume_db);
+	ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioBusSettingsRow::get_volume_db);
+	ClassDB::bind_method(D_METHOD("set_mute", "mute"), &AudioBusSettingsRow::set_mute);
+	ClassDB::bind_method(D_METHOD("is_mute"), &AudioBusSettingsRow::is_mute);
+	ClassDB::bind_method(D_METHOD("set_solo", "solo"), &AudioBusSettingsRow::set_solo);
+	ClassDB::bind_method(D_METHOD("is_solo"), &AudioBusSettingsRow::is_solo);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "bus_name"), "set_bus_name", "get_bus_name");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,0.1,suffix:dB"), "set_volume_db", "get_volume_db");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mute"), "set_mute", "is_mute");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "solo"), "set_solo", "is_solo");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// AudioBusSettingsRows.
+
+void AudioBusSettingsRows::set_buses(const TypedArray<AudioBusSettingsRow> &p_buses) {
+	buses = p_buses;
+	emit_changed();
+}
+
+TypedArray<AudioBusSettingsRow> AudioBusSettingsRows::get_buses() const {
+	return buses;
+}
+
+void AudioBusSettingsRows::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_buses", "buses"), &AudioBusSettingsRows::set_buses);
+	ClassDB::bind_method(D_METHOD("get_buses"), &AudioBusSettingsRows::get_buses);
+
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "buses", PROPERTY_HINT_ARRAY_TYPE, "AudioBusSettingsRow"), "set_buses", "get_buses");
 }

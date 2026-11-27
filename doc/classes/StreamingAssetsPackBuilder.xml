@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="StreamingAssetsPackBuilder" inherits="Object" api_type="editor" keywords="streaming, assets, export, pack, pck" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Builds the streaming assets folder into the streaming pack.
+	</brief_description>
+	<description>
+		In the streaming assets mode [code]pack[/code] ([code]filesystem/streaming_assets/mode[/code]), [StreamingAssetsExportPlugin] uses this class at the end of a Windows or Linux/BSD export: it builds the folder [code]filesystem/streaming_assets/source_folder[/code] into a second pack, [code]filesystem/streaming_assets/pack_file[/code] (default [code]"{exe_name}.streaming.pck"[/code]), next to the main pack or the executable. At startup, [StreamingAssetsServer] mounts that pack, so the files load with their [code]res://[/code] and [code]uid://[/code] paths, and [code]streaming://[/code] points to the folder.
+		The folder goes through the export pipeline of the preset with [method PCKPackageExporter.export_description_with_preset]: imported resources (their [code].import[/code] files and imported artifacts for the platform), [code].remap[/code] files, converted scenes and resources, and tokenized scripts are packed like in the main pack, and the preset's encryption settings and key apply. Files outside the folder that the streaming files depend on are not packed: the main pack ships them. The UIDs of the streaming files stay in the main pack's UID cache, because the main export only skips the files.
+		[codeblocks]
+		[gdscript]
+		@tool
+		extends EditorScript
+
+		func _run():
+			var description := StreamingAssetsPackBuilder.make_description("res://streaming_assets")
+			print(description.get_file_paths())
+			var preset := PCKPackageExporter.find_preset("Windows Desktop")
+			var err := StreamingAssetsPackBuilder.build(preset, "res://streaming_assets", "C:/Builds/Game.streaming.pck")
+			print(error_string(err))
+		[/gdscript]
+		[csharp]
+		using Godot;
+
+		[Tool]
+		public partial class BuildStreamingPack : EditorScript
+		{
+			public override void _Run()
+			{
+				PckPackage description = StreamingAssetsPackBuilder.MakeDescription("res://streaming_assets");
+				GD.Print(description.GetFilePaths());
+				EditorExportPreset preset = PckPackageExporter.FindPreset("Windows Desktop");
+				Error err = StreamingAssetsPackBuilder.Build(preset, "res://streaming_assets", "C:/Builds/Game.streaming.pck");
+				GD.Print(err);
+			}
+		}
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] This class is only available in editor builds and runs on the main thread. It cannot be instantiated: all methods are static.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="build" qualifiers="static">
+			<return type="int" enum="Error" />
+			<param index="0" name="preset" type="EditorExportPreset" />
+			<param index="1" name="source_folder" type="String" />
+			<param index="2" name="target_path" type="String" />
+			<param index="3" name="debug" type="bool" default="false" />
+			<description>
+				Builds the files of [param source_folder] (see [method make_description]) into a pack at [param target_path], with the export pipeline of [param preset] and without the dependencies outside the folder. [param debug] exports like a debug export. Returns [constant ERR_INVALID_PARAMETER] for a null preset, an empty target path or a [param source_folder] that is not a folder below [code]res://[/code]. See [method PCKPackageExporter.export_description_with_preset] for the other errors.
+			</description>
+		</method>
+		<method name="get_pack_path" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="export_path" type="String" />
+			<param index="1" name="pack_file" type="String" />
+			<description>
+				Returns the path of the streaming pack for an export to [param export_path]: [param pack_file] in the folder of [param export_path]. This is the folder of the main pack, also for an executable with an embedded pack. Returns an empty string if [param export_path] is empty or [param pack_file] is not a plain file name (it contains a folder, for example).
+				[codeblock]
+				StreamingAssetsPackBuilder.get_pack_path("C:/Builds/Game.exe", "Game.streaming.pck") # "C:/Builds/Game.streaming.pck"
+				[/codeblock]
+			</description>
+		</method>
+		<method name="make_description" qualifiers="static">
+			<return type="PCKPackage" />
+			<param index="0" name="source_folder" type="String" />
+			<description>
+				Returns a [PCKPackage] description with one entry per file below [param source_folder], whose target is the [code]res://[/code] path of the file without [code]res://[/code]. The files are those of [method StreamingAssetsExportPlugin.collect_files], without files imported as "Skip File" ([code]importer="skip"[/code] in their [code].import[/code] file), which the export never writes. Returns [code]null[/code] if [param source_folder] is not a folder below [code]res://[/code].
+			</description>
+		</method>
+	</methods>
+</class>

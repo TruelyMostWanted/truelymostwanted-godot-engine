@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AccessibilitySettings" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Settings resource of [AccessibilitySettingsServer]: UI scale, font size, color scheme, focus outline, spoken focus, reduced motion, colorblind mode and subtitles.
+	</brief_description>
+	<description>
+		The data of the settings domain [code]"accessibility"[/code]. [AccessibilitySettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/accessibility.ini[/code]. Change the values through [AccessibilitySettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
+		[member ui_scale], [member font_size_factor], [member color_scheme], [member custom_color_scheme_path], [member focus_outline_width], [member speak_focused_controls] and [member speech_persona] reach the engine (root window, its theme, [TTSServer]). [member reduce_motion], [member reduce_transparency], [member colorblind_mode], [member subtitles_enabled] and [member subtitle_scale] are game-side values: the engine stores them, and the game applies them.
+		It can also be used as the project defaults of the domain: save an [AccessibilitySettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/accessibility[/code].
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="color_scheme" type="int" setter="set_color_scheme" getter="get_color_scheme" default="0">
+			The color scheme of the GUI, an [enum AccessibilitySettingsServer.ColorScheme] value. Any other value than [constant AccessibilitySettingsServer.COLOR_SCHEME_DEFAULT] overlays text, selection and focus colors and the flat style boxes of the built-in controls. The default is [constant AccessibilitySettingsServer.COLOR_SCHEME_HIGH_CONTRAST_DARK] if the OS asks for more contrast ([method DisplayServer.accessibility_should_increase_contrast]).
+		</member>
+		<member name="colorblind_mode" type="int" setter="set_colorblind_mode" getter="get_colorblind_mode" default="0">
+			The color vision deficiency of the player, an [enum AccessibilitySettingsServer.ColorblindMode] value. Game-side: the engine applies no filter; the game picks distinguishable colors or icons for it.
+		</member>
+		<member name="custom_color_scheme_path" type="String" setter="set_custom_color_scheme_path" getter="get_custom_color_scheme_path" default="&quot;&quot;">
+			The path of an [AccessibilityColorScheme] resource ([code]res://[/code] or [code]user://[/code]) used with [constant AccessibilitySettingsServer.COLOR_SCHEME_CUSTOM]. A path that is not such a resource prints a warning, and no colors are overlaid.
+		</member>
+		<member name="focus_outline_width" type="int" setter="set_focus_outline_width" getter="get_focus_outline_width" default="0">
+			The width of the focus outline of the built-in controls, in pixels. [code]0[/code] keeps the theme's own [code]focus[/code] style box (or the one of the color scheme).
+		</member>
+		<member name="font_size_factor" type="float" setter="set_font_size_factor" getter="get_font_size_factor" default="1.0">
+			The factor of the GUI font size. The overlay theme gets the base font size (of the root window's theme, the project theme or [member ThemeDB.fallback_font_size]) times this factor as its default font size, and the explicit font sizes of the built-in types times this factor. Use [method AccessibilitySettingsServer.scale_font_size] for sizes the game sets itself.
+		</member>
+		<member name="reduce_motion" type="bool" setter="set_reduce_motion" getter="is_reducing_motion" default="false">
+			If [code]true[/code], the player wants less motion: no or shorter animations, no camera shake, no parallax. Game-side; see [method AccessibilitySettingsServer.get_animation_duration] and [method AccessibilitySettingsServer.get_motion_scale]. The default follows [method DisplayServer.accessibility_should_reduce_animation].
+		</member>
+		<member name="reduce_transparency" type="bool" setter="set_reduce_transparency" getter="is_reducing_transparency" default="false">
+			If [code]true[/code], the player wants opaque panels instead of transparent or blurred ones. Game-side. The default follows [method DisplayServer.accessibility_should_reduce_transparency].
+		</member>
+		<member name="speak_focused_controls" type="bool" setter="set_speak_focused_controls" getter="is_speaking_focused_controls" default="false">
+			If [code]true[/code], the control that gets the focus in the root window is spoken with [TTSServer] (see [method AccessibilitySettingsServer.get_control_speech_text]). Skipped while a screen reader is active.
+		</member>
+		<member name="speech_persona" type="String" setter="set_speech_persona" getter="get_speech_persona" default="&quot;&quot;">
+			The name of the [TTSPersona] registered in [TTSServer] that speaks the focused controls. Empty or unknown: the default persona of [TTSServer].
+		</member>
+		<member name="subtitle_scale" type="float" setter="set_subtitle_scale" getter="get_subtitle_scale" default="1.0">
+			The size factor of subtitles. Game-side; see [method AccessibilitySettingsServer.scale_subtitle_font_size].
+		</member>
+		<member name="subtitles_enabled" type="bool" setter="set_subtitles_enabled" getter="is_subtitles_enabled" default="false">
+			If [code]true[/code], the game shows subtitles. Game-side.
+		</member>
+		<member name="ui_scale" type="float" setter="set_ui_scale" getter="get_ui_scale" default="1.0">
+			The scale of the whole GUI. Multiplies [member Window.content_scale_factor] of the root window, together with the factor of [WindowSettingsServer].
+		</member>
+	</members>
+</class>

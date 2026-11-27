@@ -8,6 +8,11 @@
     <SelfContained>False</SelfContained>
     <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
+  <!-- truely-godot-engine: the release workflow builds GodotSharp of every platform on Linux. Without a runtime
+       identifier the apphost follows the build machine, and the Windows package got a Linux program without .exe. -->
+  <PropertyGroup Condition="'$(GodotPlatform)' == 'windows'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
   <PropertyGroup Condition="Exists('$(SolutionDir)/../../../../bin/GodotSharp/Api/Debug/GodotSharp.dll') And ('$(GodotPlatform)' == 'windows' Or ('$(GodotPlatform)' == '' And '$(OS)' == 'Windows_NT'))">
     <OutputPath>$(SolutionDir)/../../../../bin/GodotSharp/Tools</OutputPath>
     <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>

@@ -1484,6 +1484,13 @@ void AudioServer::finish() {
 		AudioDriverManager::get_driver(i)->finish();
 	}
 
+	// The mix thread has stopped: free the playbacks that are still listed (still playing, or stopped
+	// but not yet cleaned up by the mix thread), so their list nodes do not leak.
+	for (AudioStreamPlaybackListNode *playback_node : playback_list) {
+		_delete_stream_playback_list_node(playback_node);
+	}
+	_cleanup_lists();
+
 	for (int i = 0; i < buses.size(); i++) {
 		memdelete(buses[i]);
 	}
@@ -1648,6 +1655,8 @@ void AudioServer::set_bus_layout(const Ref<AudioBusLayout> &p_bus_layout) {
 	unlock();
 
 	// Samples bus sync.
+
+	emit_signal(SNAME("bus_layout_changed"));
 }
 
 Ref<AudioBusLayout> AudioServer::generate_bus_layout() const {
@@ -1980,6 +1989,8 @@ AudioServer::AudioServer() {
 AudioServer::~AudioServer() {
 	// Cleanup resources while we still have an active AudioServer singleton,
 	// for resources that depend on the singleton still existing.
+	_cleanup_lists();
+	// Bus details wait one frame in each graveyard; the mix thread has stopped, so free both generations.
 	_cleanup_lists();
 
 	singleton = nullptr;

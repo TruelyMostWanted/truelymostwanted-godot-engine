@@ -33,6 +33,7 @@
 #include "../toml.h"
 
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/math/math_defs.h"
@@ -476,7 +477,7 @@ TEST_CASE("[TOML] Stringify keeps key order and reads back") {
 	CHECK(text.contains("\n[[players]]\nname = \"Ann\"\n\n[players.pos]\nx = 1\n"));
 	CHECK(text.contains("name = \"\"\"\nLine\nbreak\"\"\"\n"));
 	CHECK(text.contains("mixed = [1, { width = 1280, scale = 1.5, integral = 2.0 }]\n"));
-	CHECK(text.contains("nothing = \"\"\n"));
+	CHECK_FALSE(text.contains("nothing")); // TOML has no null: the key is left out.
 	CHECK(text.contains("special = inf\n"));
 	CHECK(text.contains("tags = [\"a\", \"b\"]\n"));
 	CHECK(text.find("[window]") < text.find("[[players]]"));
@@ -508,8 +509,8 @@ TEST_CASE("[TOML] Resource round trip as text") {
 	CHECK(text.begins_with("\"$type\" = \"TOMLTestSettings\"\n\"$format_version\" = 1\n"));
 	// Plain keys in property order, then sub-tables and arrays of tables in property order.
 	CHECK(text.find("volume = ") < text.find("title = "));
-	CHECK(text.find("title = ") < text.find("spare = \"\""));
-	CHECK(text.find("spare = ") < text.find("numbers = [4, -7]"));
+	CHECK_FALSE(text.contains("spare")); // null: left out.
+	CHECK(text.find("title = ") < text.find("numbers = [4, -7]"));
 	CHECK(text.find("numbers = ") < text.find("tint = \"#ff0000ff\""));
 	CHECK(text.find("tint = ") < text.find("\n[main]\n"));
 	CHECK(text.find("\n[main]\n") < text.find("\n[main.child]\n"));
@@ -529,7 +530,10 @@ TEST_CASE("[TOML] Resource round trip as text") {
 	CHECK(TOML::deserialize(untyped).is_null());
 	ERR_PRINT_ON;
 
-	const String numbers = TOML::serialize(settings, { { "enums_as_names", false } });
+	Ref<SerializerOptions> numbers_options;
+	numbers_options.instantiate();
+	numbers_options->set_enums_as_names(false);
+	const String numbers = TOML::serialize(settings, numbers_options);
 	CHECK(numbers.contains("mode = 5"));
 	check_toml_settings(TOML::deserialize(numbers));
 }
@@ -574,16 +578,47 @@ TEST_CASE("[TOML] Through ResourceSaver and ResourceLoader") {
 	DirAccess::remove_absolute(path);
 }
 
-TEST_CASE("[TOML] Registered as text format \"toml\"") {
+TEST_CASE("[TOML] Registered as text format FORMAT_TOML") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	REQUIRE(serializer != nullptr);
-	CHECK(serializer->get_formats().has("toml"));
-	CHECK(serializer->has_format("toml"));
+	CHECK(serializer->get_available_formats().has(ResourceTextSerializer::FORMAT_TOML));
+	CHECK(serializer->is_format_available(ResourceTextSerializer::FORMAT_TOML));
+	CHECK(serializer->can_serialize(make_toml_settings(), ResourceTextSerializer::FORMAT_TOML));
 
 	const Ref<TOMLTestSettings> settings = make_toml_settings();
-	const String text = serializer->serialize(settings, "toml");
+	const String text = serializer->serialize(settings, ResourceTextSerializer::FORMAT_TOML);
 	CHECK(text == TOML::serialize(settings));
-	check_toml_settings(serializer->deserialize(text, "toml"));
+	check_toml_settings(serializer->deserialize(text, ResourceTextSerializer::FORMAT_TOML));
+}
+
+TEST_CASE("[TOML] Resource API: dotted table paths and plain files") {
+	Ref<TOML> toml;
+	toml.instantiate();
+	CHECK(toml->get_recognized_extensions() == PackedStringArray({ "toml" }));
+	toml->set_value("server.limits", "players", 8);
+	toml->set_value("", "title", "Game");
+	toml->set_value(TOML::escape_table_name("a.b"), "x", 1);
+	CHECK(toml->has_table("server"));
+	CHECK(toml->has_table("server.limits"));
+	CHECK(toml->has_table_key("server.limits", "players"));
+	CHECK(int(toml->get_value("server.limits", "players")) == 8);
+	CHECK(toml->get_value("missing", "key", 3) == Variant(3));
+	CHECK(toml->get_tables() == PackedStringArray({ "server", "server.limits", "a\\.b" }));
+	CHECK(TOML::split_table_path("a\\.b.c") == Vector<String>({ "a.b", "c" }));
+	CHECK(toml->get_table_keys("") == PackedStringArray({ "server", "title", "a.b" }));
+	toml->erase_table_key("server.limits", "players");
+	CHECK_FALSE(toml->has_table_key("server.limits", "players"));
+	toml->erase_table("server");
+	CHECK_FALSE(toml->has_table("server"));
+
+	const String path = TestUtils::get_temp_path("toml_plain.toml");
+	REQUIRE(ResourceSaver::save(toml, path) == OK);
+	CHECK_FALSE(FileAccess::get_file_as_string(path).contains("$type"));
+	CHECK(ResourceLoader::get_resource_type(path) == "TOML");
+	const Ref<TOML> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_value("", "title") == "Game");
+	DirAccess::remove_absolute(path);
 }
 
 } // namespace TestTOML

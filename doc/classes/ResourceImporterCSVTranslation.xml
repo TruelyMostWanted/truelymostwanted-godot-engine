@@ -6,6 +6,7 @@
 	<description>
 		Comma-separated values are a plain text table storage format. The format's simplicity makes it easy to edit in any text editor or spreadsheet software. This makes it a common choice for game localization.
 		In the CSV file used for translation, the first column contains string identifiers, and the first row serves as the header. The first column's header can be any value. The remaining headers indicate the locale for that column. Columns whose headers begin with an underscore ([code]_[/code]) will be ignored.
+		If no header starts with a known language code (see [method TranslationServer.get_all_languages]), the file is not a translation table and nothing is imported: a single warning names the file and its columns. For CSV files that hold data instead of translations, select [b]CSV Dataset[/b] (the default for such files, see [ResourceImporterCSVDataset]) or [b]Keep File (exported as is)[/b] as the import mode in the Import dock. Headers with an unknown language code are still imported as locales when another header has a known one; they are reported together in one warning.
 		[b]Example CSV file:[/b]
 		[codeblock lang=text]
 		keys,en,es,ja

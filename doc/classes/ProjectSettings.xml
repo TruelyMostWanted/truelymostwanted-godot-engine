@@ -11,9 +11,9 @@
 	</description>
 	<tutorials>
 		<link title="Project Settings">$DOCS_URL/tutorials/editor/project_settings.html</link>
-		<link title="3D Physics Tests Demo">https://godotengine.org/asset-library/asset/2747</link>
-		<link title="3D Platformer Demo">https://godotengine.org/asset-library/asset/2748</link>
-		<link title="Operating System Testing Demo">https://godotengine.org/asset-library/asset/2789</link>
+		<link title="3D Physics Tests Demo">https://store.godotengine.org/asset/godot-foundation/physics-tests-3d-demo/</link>
+		<link title="3D Platformer Demo">https://store.godotengine.org/asset/godot-foundation/platformer-3d-demo/</link>
+		<link title="Operating System Testing Demo">https://store.godotengine.org/asset/godot-foundation/operating-system-testing-demo/</link>
 	</tutorials>
 	<methods>
 		<method name="add_property_info">
@@ -176,7 +176,7 @@
 				[b]Note:[/b] If a file from [param pack] shares the same path as a file already in the resource filesystem, any attempts to load that file will use the file from [param pack] unless [param replace_files] is set to [code]false[/code].
 				[b]Note:[/b] The optional [param offset] parameter can be used to specify the offset in bytes to the start of the resource pack. This is only supported for .pck files.
 				[b]Note:[/b] [DirAccess] will not show changes made to the contents of [code]res://[/code] after calling this function.
-				[b]Note:[/b] This method calls [method PckPackageServer.mount], so the pack is listed by [method PckPackageServer.get_mounted], can be unmounted with [method PckPackageServer.unmount], and [signal PckPackageServer.pack_mounted] is emitted.
+				[b]Note:[/b] This method calls [method PCKPackageServer.mount], so the pack is listed by [method PCKPackageServer.get_mounted_packs], can be unmounted with [method PCKPackageServer.unmount], and [signal PCKPackageServer.pack_mounted] is emitted.
 			</description>
 		</method>
 		<method name="localize_path" qualifiers="const">
@@ -502,8 +502,14 @@
 			If [code]true[/code], text-to-speech support is enabled on startup, otherwise it is enabled the first time any TTS method is used. See also [method DisplayServer.tts_get_voices] and [method DisplayServer.tts_speak].
 			[b]Note:[/b] Enabling TTS can cause additional idle CPU usage and interfere with the sleep mode, so consider disabling it if TTS is not used.
 		</member>
+		<member name="audio/info/read_file_tags" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], track information (title, artist, album, cover and so on, see [member AudioStream.title]) is read from the file when an [AudioStreamMP3], [AudioStreamWAV], [AudioStreamOggVorbis] or [AudioStreamOpus] is loaded from a buffer or file at runtime, and when such a file is imported. If [code]false[/code], the track information stays empty and the tags are not parsed. Can be overridden per file with the [code]info/read_file_tags[/code] import option.
+		</member>
+		<member name="audio/mixer/default_commands" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to an [AudioCommandList] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
+		</member>
 		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
-			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.load_layout].
+			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.apply_layout].
 		</member>
 		<member name="audio/video/video_delay_compensation_ms" type="int" setter="" getter="" default="0">
 			Setting to hardcode audio delay when playing video. Best to leave this unchanged unless you know what you are doing.
@@ -701,6 +707,10 @@
 		</member>
 		<member name="debug/gdscript/warnings/unused_variable" type="int" setter="" getter="" default="1">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when a local variable is unused.
+		</member>
+		<member name="debug/performance_recording/budget" type="String" setter="" getter="" default="&quot;&quot;">
+			Path to a [PerformanceBudget] resource. If set and recording started at startup, the budget is checked against [method PerformanceRecorder.get_summary] when the engine quits; the result is printed, and the exit code becomes [code]1[/code] if the budget fails and no other exit code was set. A budget that cannot be loaded also sets the exit code to [code]1[/code].
+			This can be specified on the command line with [code]--performance-budget &lt;file&gt;[/code], which also starts recording (in memory if no output path is set).
 		</member>
 		<member name="debug/performance_recording/enabled" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], [PerformanceRecorder] starts recording when the project starts, with the profile from [member debug/performance_recording/profile]. It does not start in the editor or the project manager. Use feature tags to enable it only for some exports, for example [code]debug/performance_recording/enabled.web[/code].
@@ -984,6 +994,18 @@
 		<member name="display/mouse_cursor/tooltip_position_offset" type="Vector2" setter="" getter="" default="Vector2(10, 10)">
 			Position offset for tooltips, relative to the mouse cursor's hotspot.
 		</member>
+		<member name="display/screenshots/file_name" type="String" setter="" getter="" default="&quot;Screenshot {year}-{month}-{day} {hour}-{minute}-{second}&quot;">
+			The file name of screenshots saved by [ScreenshotServer], without extension. Placeholders: [code]{year}[/code], [code]{month}[/code], [code]{day}[/code], [code]{hour}[/code], [code]{minute}[/code], [code]{second}[/code], [code]{millisecond}[/code] (local time), [code]{unix}[/code] (Unix time) and [code]{project}[/code] ([member application/config/name]). Characters that are not allowed in file names, such as [code]:[/code], become [code]-[/code]. If the file exists, [code] (2)[/code], [code] (3)[/code], … is added.
+		</member>
+		<member name="display/screenshots/folder" type="String" setter="" getter="" default="&quot;user://screenshots&quot;">
+			The folder for screenshots saved by [ScreenshotServer]. Created when the first screenshot is saved.
+		</member>
+		<member name="display/screenshots/format" type="String" setter="" getter="" default="&quot;png&quot;">
+			The image format of screenshots saved by [ScreenshotServer]: [code]png[/code] (lossless), [code]jpg[/code] or [code]webp[/code] (lossy, see [member display/screenshots/quality]).
+		</member>
+		<member name="display/screenshots/quality" type="float" setter="" getter="" default="0.9">
+			The quality of [code]jpg[/code] and [code]webp[/code] screenshots saved by [ScreenshotServer], from [code]0.01[/code] to [code]1.0[/code].
+		</member>
 		<member name="display/window/dpi/allow_hidpi" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], allows HiDPI display on Windows, macOS, Android, iOS and Web. If [code]false[/code], the platform's low-DPI fallback will be used on HiDPI displays, which causes the window to be displayed in a blurry or pixelated manner (and can cause various window management bugs). Therefore, it is recommended to make your project scale to [url=$DOCS_URL/tutorials/rendering/multiple_resolutions.html]multiple resolutions[/url] instead of disabling this setting.
 			[b]Note:[/b] This setting has no effect on Linux as DPI-awareness fallbacks are not supported there.
@@ -1232,6 +1254,10 @@
 		</member>
 		<member name="editor/version_control/plugin_name" type="String" setter="" getter="" default="&quot;&quot;">
 		</member>
+		<member name="filesystem/data/schema_files" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The [DataSchema] files of the project. When a data file (JSON, INI, CSV, XML, TOML, YAML) is open in the script editor, the editor validates it while typing against the first schema in this list whose [member DataSchema.file_patterns] match the file's path, and marks the lines of all issues. Used by the editor only; at runtime, pass the schema to [method TextDataFormat.validate] or [method DataSchema.validate] directly.
+			See also [member EditorSettings.text_editor/data_files/schema_validation_max_size_mb].
+		</member>
 		<member name="filesystem/import/blender/enabled" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], Blender 3D scene files with the [code].blend[/code] extension will be imported by converting them to glTF 2.0.
 			This requires configuring a path to a Blender executable in the [member EditorSettings.filesystem/import/blender/blender_path] setting. Blender 3.0 or later is required.
@@ -1262,16 +1288,29 @@
 			Paths of [PreloadList] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
 		</member>
 		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
-			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. See [ResourceTextSerializer].
+			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_delimiter].
+		</member>
+		<member name="filesystem/resources/text_formats/csv_headers" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].csv[/code] resource files start with a header row of property names. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_headers].
 		</member>
 		<member name="filesystem/resources/text_formats/enums_as_names" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], enum properties are written as their names into [code].json[/code], [code].ini[/code] and [code].csv[/code] resource files. If [code]false[/code], they are written as numbers. Both are read. See [ResourceTextSerializer].
 		</member>
-		<member name="filesystem/resources/text_formats/ini_plain_values" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [code].ini[/code] resource files are written without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. If [code]false[/code], values use the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. See [ResourceTextSerializer].
+		<member name="filesystem/resources/text_formats/full_precision_floats" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the 32-bit floats of vectors, rectangles, transforms and colors are written with all digits into text resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.full_precision_floats].
 		</member>
-		<member name="filesystem/resources/text_formats/json_indent" type="String" setter="" getter="" default="&quot;  &quot;">
-			The indentation of [code].json[/code] resource files. An empty string writes each file on one line. See [ResourceTextSerializer].
+		<member name="filesystem/resources/text_formats/indent" type="String" setter="" getter="" default="&quot;  &quot;">
+			The indentation of [code].json[/code] and [code].xml[/code] resource files. An empty string writes each file on one line. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.indent].
+		</member>
+		<member name="filesystem/resources/text_formats/ini_value_style" type="int" setter="" getter="" default="1">
+			How values are written into [code].ini[/code] files (see [enum SerializerOptions.IniValueStyle]). [b]Plain[/b] writes them without type syntax ([code]name=Ann[/code], [code]size=1, 2[/code]), so other tools can read them. [b]Godot Variant[/b] uses the Variant syntax of [ConfigFile] ([code]name="Ann"[/code], [code]size=Vector2(1, 2)[/code]). Both are read. Used when the options of [ResourceTextSerializer] or [INI] are [code]null[/code]; see [member SerializerOptions.ini_value_style].
+			[b]Note:[/b] This setting replaces the bool [code]filesystem/resources/text_formats/ini_plain_values[/code]. If a [code]project.godot[/code] still has the bool and this setting is the default, the bool is used.
+		</member>
+		<member name="filesystem/resources/text_formats/sort_keys" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], keys are written in alphabetical order into [code].json[/code], [code].ini[/code], [code].xml[/code] and [code].toml[/code] resource files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.sort_keys].
+		</member>
+		<member name="filesystem/resources/text_formats/xml_declaration" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [code].xml[/code] resource files start with [code]&lt;?xml version="1.0" encoding="UTF-8"?&gt;[/code]. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.xml_declaration].
 		</member>
 		<member name="filesystem/scene_formats/animation_fps" type="float" setter="" getter="" default="30.0">
 			The frame rate used to bake animations when [ResourceLoader] loads a [code].gltf[/code], [code].glb[/code] or [code].fbx[/code] file that is not imported by the editor (for example from [code]user://[/code]). Same as the [code]bake_fps[/code] parameter of [method GLTFDocument.generate_scene]. Read on every load.
@@ -1310,6 +1349,9 @@
 		</member>
 		<member name="filesystem/streaming_assets/target_folder" type="String" setter="" getter="" default="&quot;{exe_name}_Data/StreamingAssets&quot;">
 			The folder that holds the streaming assets in [code]Raw[/code] mode, relative to the folder of the executable (Windows, Linux) or to the bundle resources (macOS, iOS). Placeholders are expanded with [method StreamingAssetsServer.expand_template]: [code]{exe_name}[/code] is the base name of the exported executable, for example [code]MyGame[/code] for [code]MyGame.exe[/code]. Must be a relative folder without [code].[/code] or [code]..[/code].
+		</member>
+		<member name="flow_graph/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [FlowGraph] files in text formats ([code]mmd[/code] and the JSON, YAML and TOML formats of [ResourceTextSerializer]) are converted to binary [code]res[/code] files on export, so exported projects load them without parsing text. [code]tres[/code] files follow [member editor/export/convert_text_resources_to_binary].
 		</member>
 		<member name="gui/common/auto_focus_strategy" type="int" setter="" getter="" default="0">
 			Determines what strategy to use when inferring the top/left/right/bottom [Control] to focus if no neighbor is defined.
@@ -1772,6 +1814,21 @@
 			If [code]true[/code], disables bulk processing of raw input, enable it if you want to process [code]WM_INPUT[/code] messages directly. Enabling this setting will significantly decrease performance with high polling rate devices.
 			[b]Note:[/b] This property is implemented only on Windows.
 		</member>
+		<member name="input_devices/icons/generic_gamepad" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of the [InputIconSet] for gamepads of unknown make ([constant InputIconServer.INPUT_ICON_FAMILY_GENERIC_GAMEPAD]); also the second choice for the Xbox, PlayStation and Nintendo families. Loaded by [InputIconServer] on first use; [method InputIconServer.set_icon_set] overrides it at runtime. Empty means no set.
+		</member>
+		<member name="input_devices/icons/keyboard_mouse" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of the [InputIconSet] for keys and mouse buttons ([constant InputIconServer.INPUT_ICON_FAMILY_KEYBOARD_MOUSE]). Loaded by [InputIconServer] on first use; [method InputIconServer.set_icon_set] overrides it at runtime. Empty means no set.
+		</member>
+		<member name="input_devices/icons/nintendo" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of the [InputIconSet] for Nintendo gamepads ([constant InputIconServer.INPUT_ICON_FAMILY_NINTENDO]). Loaded by [InputIconServer] on first use; [method InputIconServer.set_icon_set] overrides it at runtime. Empty means no set.
+		</member>
+		<member name="input_devices/icons/playstation" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of the [InputIconSet] for PlayStation gamepads ([constant InputIconServer.INPUT_ICON_FAMILY_PLAYSTATION]). Loaded by [InputIconServer] on first use; [method InputIconServer.set_icon_set] overrides it at runtime. Empty means no set.
+		</member>
+		<member name="input_devices/icons/xbox" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of the [InputIconSet] for Xbox and XInput gamepads ([constant InputIconServer.INPUT_ICON_FAMILY_XBOX]). Loaded by [InputIconServer] on first use; [method InputIconServer.set_icon_set] overrides it at runtime. Empty means no set.
+		</member>
 		<member name="input_devices/joypads/ignore_joypad_on_unfocused_application" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], joypad input (including motion sensors) and LED light changes will be ignored and joypad vibration will be stopped when the application is not focused.
 		</member>
@@ -1846,6 +1903,13 @@
 			If non-empty, this locale will be used instead of the automatically detected system locale.
 			[b]Note:[/b] This setting also applies to the exported project. To only affect testing within the editor, override this setting with an [code]editor[/code] [url=$DOCS_URL/tutorials/export/feature_tags.html]feature tag[/url] for localization testing purposes.
 		</member>
+		<member name="internationalization/localization/catalog_manifests" type="Array" setter="" getter="" default="[]">
+			The localization catalogs of the game, DLCs and mods as a list of [FilesManifest]s, loaded at startup by [method LocalizationServer.load_project_catalogs]. The list order is the priority: the catalogs of a later manifest win over those of an earlier one. The [member FilesManifest.type_hint] of a manifest names the catalog kind: [code skip-lint]TextLocalizationCatalog[/code] (also when empty) for [TextLocalizationServer], [code skip-lint]ResourceLocalizationCatalog[/code] for [ResourceLocalizationServer]. Without [member FilesManifest.extensions], all catalog formats are listed. Folders may hold wildcards, for example [code]user://mods/*/translations[/code]; missing folders are skipped. On the Web, only paths in [code]user://[/code] or the PCK can be read.
+			[b]Note:[/b] Resource catalogs replace the remaps of the Localization tab ([code]internationalization/locale/translation_remaps[/code]), which are still imported as the first resource layer.
+		</member>
+		<member name="internationalization/localization/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], the text catalogs (CSV, JSON, YAML, TOML, INI, XML) listed by [member internationalization/localization/catalog_manifests] are exported as binary [code].lcat[/code] files: the text is parsed once in the editor, and the game loads only the keys and reads one locale at a time. The original path keeps working through a remap, so manifests and [method ResourceLoader.load] need no change. Catalogs in [code].lcat[/code], [code].tres[/code] or [code].res[/code] are exported unchanged.
+		</member>
 		<member name="internationalization/pseudolocalization/double_vowels" type="bool" setter="" getter="" default="false">
 			Double vowels in strings during pseudolocalization to simulate the lengthening of text due to localization.
 		</member>
@@ -1889,6 +1953,15 @@
 			"ICU / HarfBuzz / Graphite" ([TextServerAdvanced]) is the most advanced text driver, supporting right-to-left typesetting and complex scripts (for languages like Arabic, Hebrew, etc.). The "Fallback" text driver ([TextServerFallback]) does not support right-to-left typesetting and complex scripts.
 			[b]Note:[/b] The driver in use can be overridden at runtime via the [code]--text-driver[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
 			[b]Note:[/b] There is an additional [code]Dummy[/code] text driver available, which disables all text rendering and font-related functionality. This driver is not listed in the project settings, but it can be enabled when running the editor or project using the [code]--text-driver Dummy[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
+		</member>
+		<member name="internationalization/text_insertion/default_values" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Paths of [TextInsertionValues] resources that [TextInsertionServer] adds on its first use, as with [method TextInsertionServer.add_values].
+		</member>
+		<member name="internationalization/text_insertion/escape_bbcode" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [method TextInsertionServer.insert] and [method TextInsertionServer.insert_template] escape the inserted values for [RichTextLabel] when called with [constant TextInsertionServer.ESCAPE_DEFAULT].
+		</member>
+		<member name="internationalization/text_insertion/warn_missing_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [TextInsertionServer] prints a warning once per name when a placeholder has no value or uses an unknown modifier. Only in debug builds.
 		</member>
 		<member name="layer_names/2d_navigation/layer_1" type="String" setter="" getter="" default="&quot;&quot;">
 			Optional name for the 2D navigation layer 1. If left empty, the layer will display as "Layer 1".
@@ -3688,29 +3761,266 @@
 			- 8×8 = rgb(255, 255, 0) - #ffff00 - Not supported on most hardware
 			[/codeblock]
 		</member>
-		<member name="settings/apply/confirmation_timeout" type="float" setter="" getter="" default="15.0">
-			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_pending] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
+		<member name="settings/accessibility/file_name" type="String" setter="" getter="" default="&quot;accessibility&quot;">
+			The name of the settings file of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/accessibility/format] with [member settings/accessibility/override_format]). It may contain a relative subfolder, for example [code]profiles/accessibility[/code] for [code]user://settings/profiles/accessibility.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
 		</member>
-		<member name="settings/audio/create_missing_buses" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], [AudioBusSettingsServer] adds a bus to [AudioServer] for every stored bus that the current bus layout does not have, at the end of the layout. If [code]false[/code], those buses are skipped with a warning and their values stay in the settings file. Read once when the server is created; see [member AudioBusSettingsServer.create_missing_buses].
+		<member name="settings/accessibility/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/accessibility/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/accessibility/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]) stores its file in [member settings/accessibility/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/audio_bus/file_name" type="String" setter="" getter="" default="&quot;audio_bus&quot;">
+			The name of the settings file of the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/audio_bus/format] with [member settings/audio_bus/override_format]). It may contain a relative subfolder, for example [code]profiles/audio_bus[/code] for [code]user://settings/profiles/audio_bus.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/audio_bus/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_CSV] (if the list fits the CSV format), [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/audio_bus/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/audio_bus/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]) stores its file in [member settings/audio_bus/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/audio_bus/player_buses" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The buses of the bus layout whose values the player may change and [AudioBusSettingsServer] stores, for example [code]["Music", "Sfx", "Voice"][/code]. If empty, all buses of the layout are player buses. Other buses (mix buses, sends) are never touched by the settings: they keep the values of the layout, also after the game sets another layout with [method AudioServer.set_bus_layout]. Read once when the server is created; see [member AudioBusSettingsServer.player_buses].
+		</member>
+		<member name="settings/audio_bus/store_mute" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [AudioBusSettingsServer] stores, loads and applies the mute state of the player buses. If [code]false[/code], the mute state stays the value of the bus layout: it is not written to the settings file, a value in the file is ignored, and [method AudioBusSettingsServer.set_bus_mute] prints a warning. Read once when the server is created; see [member AudioBusSettingsServer.store_mute].
+		</member>
+		<member name="settings/audio_bus/store_solo" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [AudioBusSettingsServer] stores, loads and applies the solo state of the player buses. If [code]false[/code], the solo state stays the value of the bus layout: it is not written to the settings file, a value in the file is ignored, and [method AudioBusSettingsServer.set_bus_solo] prints a warning. Read once when the server is created; see [member AudioBusSettingsServer.store_solo].
+		</member>
+		<member name="settings/audio_bus/store_volume" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [AudioBusSettingsServer] stores, loads and applies the volume of the player buses. If [code]false[/code], the volume stays the value of the bus layout: it is not written to the settings file, a value in the file is ignored, and [method AudioBusSettingsServer.set_bus_volume_db] prints a warning. Read once when the server is created; see [member AudioBusSettingsServer.store_volume].
+		</member>
+		<member name="settings/audio_device/file_name" type="String" setter="" getter="" default="&quot;audio_device&quot;">
+			The name of the settings file of the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/audio_device/format] with [member settings/audio_device/override_format]). It may contain a relative subfolder, for example [code]profiles/audio_device[/code] for [code]user://settings/profiles/audio_device.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/audio_device/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/audio_device/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/audio_device/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]) stores its file in [member settings/audio_device/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/camera_3d/far" type="float" setter="" getter="" default="4000.0">
+			The default of [member Camera3DSettings.far]: the far clip plane distance in meters that [Camera3DSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera_3d/field_of_view" type="float" setter="" getter="" default="75.0">
+			The default of [member Camera3DSettings.field_of_view]: the field of view in degrees that [Camera3DSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera_3d/file_name" type="String" setter="" getter="" default="&quot;camera_3d&quot;">
+			The name of the settings file of the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/camera_3d/format] with [member settings/camera_3d/override_format]). It may contain a relative subfolder, for example [code]profiles/camera_3d[/code] for [code]user://settings/profiles/camera_3d.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/camera_3d/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/camera_3d/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/camera_3d/keep_aspect" type="int" setter="" getter="" default="1">
+			The default of [member Camera3DSettings.keep_aspect]: whether the field of view is horizontal ([code]0[/code], Keep Width) or vertical ([code]1[/code], Keep Height). See [enum Camera3D.KeepAspect].
+		</member>
+		<member name="settings/camera_3d/near" type="float" setter="" getter="" default="0.05">
+			The default of [member Camera3DSettings.near]: the near clip plane distance in meters that [Camera3DSettingsServer] gives the player cameras until the player changes it.
+		</member>
+		<member name="settings/camera_3d/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]) stores its file in [member settings/camera_3d/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/defaults/accessibility" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/audio_bus" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings]. Not used by this domain: its defaults are the project's bus layout.
+		</member>
+		<member name="settings/defaults/audio_device" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/camera_3d" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/engine" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"engine"[/code] domain ([EngineSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/graphics_preset" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input"[/code] domain ([InputSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input_map" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input_map"[/code] domain ([InputMapSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/language" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"language"[/code] domain ([LanguageSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_effect" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_quality" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/shadow" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"shadow"[/code] domain ([ShadowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture"[/code] domain ([TextureSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture_streaming" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/tts_personas" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/window" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"window"[/code] domain ([WindowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/xr" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"xr"[/code] domain ([XRSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
+		</member>
+		<member name="settings/engine/file_name" type="String" setter="" getter="" default="&quot;engine&quot;">
+			The name of the settings file of the [code]"engine"[/code] domain ([EngineSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/engine/format] with [member settings/engine/override_format]). It may contain a relative subfolder, for example [code]profiles/engine[/code] for [code]user://settings/profiles/engine.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/engine/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"engine"[/code] domain ([EngineSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/engine/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/engine/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"engine"[/code] domain ([EngineSettingsServer]) stores its file in [member settings/engine/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/general/autosave" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_changes]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
+		</member>
+		<member name="settings/general/confirmation_timeout" type="float" setter="" getter="" default="15.0">
+			The time in seconds that [method SettingsServer.apply_with_confirmation] waits for [method SettingsServer.confirm_changes] by default. When the time is over, the previous values are restored. Used when [method SettingsServer.apply_with_confirmation] is called without a timeout, and for values with [constant SettingsServer.SETTING_FLAG_CONFIRM] in [constant SettingsServer.APPLY_MODE_IMMEDIATE].
+		</member>
+		<member name="settings/general/default_format" type="int" setter="" getter="" default="1">
+			The text format of the settings files, a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_INI] (plain INI that players can edit, the default), [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_CSV], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. The file extension always follows the format. A domain can use another format with its own [code]settings/&lt;domain&gt;/override_format[/code] and [code]settings/&lt;domain&gt;/format[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_serialize]); a format that is not available (TOML or YAML with its module disabled) can't be used either. These domains use INI instead and print a warning once. See [method SettingsServerManager.get_storage_format].
+		</member>
+		<member name="settings/general/folder" type="String" setter="" getter="" default="&quot;user://settings&quot;">
+			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;file_name&gt;.&lt;extension of the format&gt;[/code], with the file name and format of its domain group [code]settings/&lt;domain&gt;/[/code], unless [member SettingsServer.file_path] is set at runtime. Keep it in [code]user://[/code]: [code]res://[/code] is read-only in exported games.
+		</member>
+		<member name="settings/general/only_changed_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
+		</member>
+		<member name="settings/graphics_preset/file_name" type="String" setter="" getter="" default="&quot;graphics_preset&quot;">
+			The name of the settings file of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/graphics_preset/format] with [member settings/graphics_preset/override_format]). It may contain a relative subfolder, for example [code]profiles/graphics_preset[/code] for [code]user://settings/profiles/graphics_preset.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/graphics_preset/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/graphics_preset/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/graphics_preset/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]) stores its file in [member settings/graphics_preset/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/graphics_preset/presets" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The graphics presets of the project: [code].tres[/code] or [code].res[/code] files with a [GraphicsPreset]. A preset with the name of a built-in preset ([code]"Low"[/code], [code]"Medium"[/code], [code]"High"[/code], [code]"Ultra"[/code]) replaces it, other names are added after the built-in presets. Files that are no [GraphicsPreset] or have no name are ignored with an error. See [GraphicsPresetSettingsServer].
+		</member>
+		<member name="settings/graphics_preset/use_builtin_presets" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [GraphicsPresetSettingsServer] starts with the four built-in presets ([method GraphicsPresetSettingsServer.create_builtin_preset]). If [code]false[/code], only the presets of [member settings/graphics_preset/presets] exist.
+		</member>
+		<member name="settings/input/file_name" type="String" setter="" getter="" default="&quot;input&quot;">
+			The name of the settings file of the [code]"input"[/code] domain ([InputSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/input/format] with [member settings/input/override_format]). It may contain a relative subfolder, for example [code]profiles/input[/code] for [code]user://settings/profiles/input.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/input/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"input"[/code] domain ([InputSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/input/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/input/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"input"[/code] domain ([InputSettingsServer]) stores its file in [member settings/input/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/input_map/file_name" type="String" setter="" getter="" default="&quot;input_map&quot;">
+			The name of the settings file of the [code]"input_map"[/code] domain ([InputMapSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/input_map/format] with [member settings/input_map/override_format]). It may contain a relative subfolder, for example [code]profiles/input_map[/code] for [code]user://settings/profiles/input_map.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/input_map/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"input_map"[/code] domain ([InputMapSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_CSV] (if the list fits the CSV format), [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/input_map/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/input_map/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"input_map"[/code] domain ([InputMapSettingsServer]) stores its file in [member settings/input_map/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/input_map/save_mode" type="int" setter="" getter="" default="0">
+			The default of [member InputMapSettingsServer.save_mode]: which actions [InputMapSettingsServer] manages and stores. [code]0[/code] (Custom Only) stores the custom actions of the project and leaves the built-in [code]ui_*[/code] actions out; [code]1[/code] (All) stores the built-in actions too, so players can rebind the keys of the GUI. See [enum InputMapSettingsServer.SaveMode]. Read once when the server is created.
+		</member>
+		<member name="settings/language/file_name" type="String" setter="" getter="" default="&quot;language&quot;">
+			The name of the settings file of the [code]"language"[/code] domain ([LanguageSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/language/format] with [member settings/language/override_format]). It may contain a relative subfolder, for example [code]profiles/language[/code] for [code]user://settings/profiles/language.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/language/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"language"[/code] domain ([LanguageSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/language/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/language/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"language"[/code] domain ([LanguageSettingsServer]) stores its file in [member settings/language/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/render_effect/file_name" type="String" setter="" getter="" default="&quot;render_effect&quot;">
+			The name of the settings file of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/render_effect/format] with [member settings/render_effect/override_format]). It may contain a relative subfolder, for example [code]profiles/render_effect[/code] for [code]user://settings/profiles/render_effect.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/render_effect/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/render_effect/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/render_effect/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]) stores its file in [member settings/render_effect/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/render_quality/file_name" type="String" setter="" getter="" default="&quot;render_quality&quot;">
+			The name of the settings file of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/render_quality/format] with [member settings/render_quality/override_format]). It may contain a relative subfolder, for example [code]profiles/render_quality[/code] for [code]user://settings/profiles/render_quality.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/render_quality/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/render_quality/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/render_quality/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]) stores its file in [member settings/render_quality/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/shadow/file_name" type="String" setter="" getter="" default="&quot;shadow&quot;">
+			The name of the settings file of the [code]"shadow"[/code] domain ([ShadowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/shadow/format] with [member settings/shadow/override_format]). It may contain a relative subfolder, for example [code]profiles/shadow[/code] for [code]user://settings/profiles/shadow.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/shadow/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"shadow"[/code] domain ([ShadowSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/shadow/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/shadow/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"shadow"[/code] domain ([ShadowSettingsServer]) stores its file in [member settings/shadow/format] instead of [member settings/general/default_format].
 		</member>
 		<member name="settings/startup/apply_on_startup" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [SettingsServerManager] loads the stored settings of every settings server and applies them while the game starts (see [enum SettingsServer.ApplyPhase]). If [code]false[/code], the servers stay at their defaults until [method SettingsServer.load] and [method SettingsServer.apply] are called. Not used in the editor and the project manager.
 		</member>
 		<member name="settings/startup/custom_servers" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
-			Scripts of the settings servers of your game: paths to [code].gd[/code] or [code].cs[/code] files (or the names of global classes) whose class extends [SettingsServer]. [SettingsServerManager] creates one instance of each in [constant SettingsServer.APPLY_PHASE_SCENE], registers it and frees it when the game exits. Not used in the editor and the project manager.
+			Scripts of the settings servers of your game: paths to [code].gd[/code] or [code].cs[/code] files (or the names of global classes) whose class extends [SettingsServer]. [SettingsServerManager] creates one instance of each in [constant SettingsServer.APPLY_PHASE_SCENE], registers and starts it at once (whatever [method SettingsServer._get_apply_phase] returns: scripts can't run earlier) and frees it when the game exits. Not used in the editor and the project manager.
 		</member>
-		<member name="settings/storage/autosave" type="bool" setter="" getter="" default="true">
-			If [code]true[/code], a settings server saves its file at the end of the frame after [method SettingsServer.apply] (or [method SettingsServer.confirm_pending]) changed values, at most once per frame. This is needed on the Web, where [code]user://[/code] is synchronized to IndexedDB asynchronously and the game gets no notification on exit, and on Android, where the process can be killed after the game is paused. If [code]false[/code], call [method SettingsServer.save] yourself.
+		<member name="settings/texture/file_name" type="String" setter="" getter="" default="&quot;texture&quot;">
+			The name of the settings file of the [code]"texture"[/code] domain ([TextureSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/texture/format] with [member settings/texture/override_format]). It may contain a relative subfolder, for example [code]profiles/texture[/code] for [code]user://settings/profiles/texture.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
 		</member>
-		<member name="settings/storage/folder" type="String" setter="" getter="" default="&quot;user://settings&quot;">
-			The folder with the settings files. A settings server stores its file as [code]&lt;folder&gt;/&lt;domain&gt;.&lt;format&gt;[/code] unless [member SettingsServer.file_path] is set.
+		<member name="settings/texture/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"texture"[/code] domain ([TextureSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/texture/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
 		</member>
-		<member name="settings/storage/format" type="String" setter="" getter="" default="&quot;ini&quot;">
-			The file format of the settings files: [code]"ini"[/code] (plain INI that players can edit), [code]"json"[/code] or [code]"csv"[/code]. CSV is only used by [ListSettingsServer] domains whose list fits the CSV format (see [method ResourceTextSerializer.can_save_as_csv]); all other domains use INI instead and print a warning once. Unknown values are treated as [code]"ini"[/code].
+		<member name="settings/texture/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"texture"[/code] domain ([TextureSettingsServer]) stores its file in [member settings/texture/format] instead of [member settings/general/default_format].
 		</member>
-		<member name="settings/storage/only_changed_values" type="bool" setter="" getter="" default="true">
-			If [code]true[/code], INI and JSON files contain only the values that differ from the defaults of the domain. Values added or changed later in a game update then reach players that never changed them. If [code]false[/code], all values are written.
+		<member name="settings/texture_streaming/file_name" type="String" setter="" getter="" default="&quot;texture_streaming&quot;">
+			The name of the settings file of the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/texture_streaming/format] with [member settings/texture_streaming/override_format]). It may contain a relative subfolder, for example [code]profiles/texture_streaming[/code] for [code]user://settings/profiles/texture_streaming.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/texture_streaming/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/texture_streaming/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/texture_streaming/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]) stores its file in [member settings/texture_streaming/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/tts_personas/file_name" type="String" setter="" getter="" default="&quot;tts_personas&quot;">
+			The name of the settings file of the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/tts_personas/format] with [member settings/tts_personas/override_format]). It may contain a relative subfolder, for example [code]profiles/tts_personas[/code] for [code]user://settings/profiles/tts_personas.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/tts_personas/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_CSV] (if the list fits the CSV format), [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/tts_personas/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/tts_personas/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]) stores its file in [member settings/tts_personas/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/window/file_name" type="String" setter="" getter="" default="&quot;window&quot;">
+			The name of the settings file of the [code]"window"[/code] domain ([WindowSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/window/format] with [member settings/window/override_format]). It may contain a relative subfolder, for example [code]profiles/window[/code] for [code]user://settings/profiles/window.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
+		</member>
+		<member name="settings/window/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"window"[/code] domain ([WindowSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/window/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format.
+		</member>
+		<member name="settings/window/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"window"[/code] domain ([WindowSettingsServer]) stores its file in [member settings/window/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/xr/file_name" type="String" setter="" getter="" default="&quot;xr&quot;">
+			The name of the settings file of the [code]"xr"[/code] domain ([XRSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/xr/format] with [member settings/xr/override_format]). It may contain a relative subfolder, for example [code]profiles/xr[/code] for [code]user://settings/profiles/xr.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence. Only defined when the engine is built with the OpenXR module.
+		</member>
+		<member name="settings/xr/format" type="int" setter="" getter="" default="1">
+			The text format of the [code]"xr"[/code] domain ([XRSettingsServer]), a value of [enum ResourceTextSerializer.Format]: [constant ResourceTextSerializer.FORMAT_JSON], [constant ResourceTextSerializer.FORMAT_INI], [constant ResourceTextSerializer.FORMAT_XML], [constant ResourceTextSerializer.FORMAT_TOML] or [constant ResourceTextSerializer.FORMAT_YAML]. Only used if [member settings/xr/override_format] is [code]true[/code]; otherwise the domain uses [member settings/general/default_format]. The extension of the file follows the format. Only defined when the engine is built with the OpenXR module.
+		</member>
+		<member name="settings/xr/override_format" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], the [code]"xr"[/code] domain ([XRSettingsServer]) stores its file in [member settings/xr/format] instead of [member settings/general/default_format]. Only defined when the engine is built with the OpenXR module.
 		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">
 			The ratio of [WorkerThreadPool]'s threads that will be reserved for low-priority tasks. For example, if 10 threads are available and this value is set to [code]0.3[/code], 3 of the worker threads will be reserved for low-priority tasks. The actual value won't exceed the number of CPU cores minus one, and if possible, at least one worker thread will be dedicated to low-priority tasks.

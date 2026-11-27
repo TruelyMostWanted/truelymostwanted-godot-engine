@@ -30,37 +30,53 @@
 
 #pragma once
 
+#include "core/io/pck_extract_result.h"
 #include "core/io/pck_package.h"
 #include "core/object/object.h"
 
 // One place for `.pck` files: open and inspect without mounting, read single files, verify,
-// build a new pack, mount and unmount packs, and find the pack that provides a `res://` file.
+// build a new pack, extract a pack into a folder, mount and unmount packs, and find the pack that provides a `res://` file.
 // The mounted packs live in `PackedData`; the server keeps no state of its own.
-class PckPackageServer : public Object {
-	GDCLASS(PckPackageServer, Object);
+class PCKPackageServer : public Object {
+	GDCLASS(PCKPackageServer, Object);
 
-	static PckPackageServer *singleton;
+public:
+	enum ExtractPolicy {
+		EXTRACT_SKIP,
+		EXTRACT_OVERWRITE,
+		EXTRACT_RENAME,
+	};
+
+private:
+	static PCKPackageServer *singleton;
 
 	void _emit_deferred(const StringName &p_signal, const String &p_path);
+	// Emits a progress signal on the main thread; deferred from other threads.
+	void _emit_progress(const StringName &p_signal, const String &p_path, int p_done, int p_total);
 
 protected:
 	static void _bind_methods();
 
 public:
-	static PckPackageServer *get_singleton();
+	static PCKPackageServer *get_singleton();
 
-	Ref<PckPackage> open(const String &p_path, const String &p_key = String(), uint64_t p_offset = 0);
-	Vector<uint8_t> read_file(const Ref<PckPackage> &p_package, const String &p_path);
-	Error verify(const Ref<PckPackage> &p_package);
-	Error build(const Ref<PckPackage> &p_package, const String &p_target_path, const String &p_key = String());
+	Ref<PCKPackage> open(const String &p_path, const String &p_key = String(), uint64_t p_offset = 0);
+	Vector<uint8_t> read_file(const Ref<PCKPackage> &p_package, const String &p_path);
+	Error verify(const Ref<PCKPackage> &p_package);
+	Error build(const Ref<PCKPackage> &p_package, const String &p_target_path, const String &p_key = String());
+	// Writes the files of `p_package` below `p_target_dir`. `p_paths` filters (files, folders or `*`/`?` patterns;
+	// empty: all files). Sidecars (`.import`, `.uid`) are selected with their source file and follow its decision.
+	Ref<PCKExtractResult> extract(const Ref<PCKPackage> &p_package, const String &p_target_dir, const PackedStringArray &p_paths = PackedStringArray(), ExtractPolicy p_policy = EXTRACT_SKIP, bool p_skip_engine_files = true);
 
 	Error mount(const String &p_path, bool p_replace_files = true, uint64_t p_offset = 0);
 	Error unmount(const String &p_path);
 	bool is_mounted(const String &p_path) const;
 	bool is_main_pack(const String &p_path) const;
-	PackedStringArray get_mounted() const;
-	String get_pack_of(const String &p_res_path) const;
+	PackedStringArray get_mounted_packs() const;
+	String get_providing_pack(const String &p_res_path) const;
 
-	PckPackageServer();
-	~PckPackageServer();
+	PCKPackageServer();
+	~PCKPackageServer();
 };
+
+VARIANT_ENUM_CAST(PCKPackageServer::ExtractPolicy);

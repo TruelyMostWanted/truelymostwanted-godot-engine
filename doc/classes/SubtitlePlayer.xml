@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitlePlayer" inherits="Node" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Plays a [Subtitle] in sync with an audio, video or animation player and signals when segments change.
+	</brief_description>
+	<description>
+		Assign a [member subtitle] and a [member sync_node] in the Inspector, then connect [signal segment_changed] to a [Label] or any other node that shows text. The player then follows the time of the sync node while it plays. The sync node can be an [AudioStreamPlayer], [AudioStreamPlayer2D], [AudioStreamPlayer3D], [VideoStreamPlayer] or [AnimationPlayer]. Playing, pausing, seeking and stopping the sync node is all the control you need.
+		If [member subtitle] is empty and the sync node is an audio or video player, the player picks the subtitle itself, in this order: the [code]subtitle_path[/code] of the player (for example [member AudioStreamPlayer.subtitle_path]), the [code]subtitle_path[/code] of the current stream (for an [AudioStreamPlaylist], the stream of the current track; it switches on [signal AudioStreamPlayer.track_changed], and a crossfade switches with [signal AudioStreamPlayer.stream_changed]), and a sidecar file next to the stream file with the same base name and the extension [code].srt[/code] or [code].vtt[/code] (for example [code]res://voice/intro.ogg[/code] uses [code]res://voice/intro.srt[/code]). The file is loaded with [ResourceLoader], so translation remaps apply, and it is loaded again only when the path changes. A [code]subtitle_path[/code] changed while the sync node plays applies when it starts playing again or changes its stream. [member SubtitlePlayback.subtitle] of [method get_playback] returns the subtitle in use. In the editor, the Inspector of the audio and video players has an [b]Add SubtitlePlayer[/b] button that adds a child [SubtitlePlayer] with [member sync_node] set to [code]..[/code].
+		Without a sync node, the player has a clock of its own: control it with [method play], [method seek] and [method stop], or start it with [member autoplay].
+		[codeblocks]
+		[gdscript]
+		func _ready():
+		    $SubtitlePlayer.segment_changed.connect(_on_segment_changed)
+		    $Voice.play()
+
+		func _on_segment_changed(segment):
+		    $SubtitleLabel.text = SubtitleServer.get_display_text($SubtitlePlayer.subtitle, segment) if segment else ""
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var player = GetNode&lt;SubtitlePlayer&gt;("SubtitlePlayer");
+		    var label = GetNode&lt;Label&gt;("SubtitleLabel");
+		    player.SegmentChanged += segment =&gt; label.Text = segment != null ? SubtitleServer.GetDisplayText(player.Subtitle, segment) : "";
+		    GetNode&lt;AudioStreamPlayer&gt;("Voice").Play();
+		}
+		[/csharp]
+		[/codeblocks]
+		The player connects to [signal AudioStreamPlayer.playing_changed], [signal AudioStreamPlayer.stream_changed] and [signal AudioStreamPlayer.track_changed] of the sync node and reads its position every frame only while it plays (audio players: [method AudioStreamPlayer.get_track_position], so the time of the current playlist track). An [AnimationPlayer] is still polled every frame. The player updates in the process step, so it follows [member Node.process_mode] and stops while the tree is paused. It does not run in the editor. All of its logic is in a [SubtitlePlayback], which [method get_playback] returns.
+		[b]Note:[/b] When the sync node stops or finishes, the shown text is hidden. When it is paused ([member AudioStreamPlayer.stream_paused], [member VideoStreamPlayer.paused], or a paused scene tree), the text stays visible and the player stops advancing until it resumes; a stop while paused hides the text in the next frame.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_playback" qualifiers="const">
+			<return type="SubtitlePlayback" />
+			<description>
+				Returns the [SubtitlePlayback] that this player drives, for example to call [method SubtitlePlayback.get_active_segments].
+			</description>
+		</method>
+		<method name="get_playback_position" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the position of the own clock, or the last position read from the sync node, in seconds, without [member time_offset].
+			</description>
+		</method>
+		<method name="is_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the own clock runs, or, with a sync node, if the sync node was playing at the last update.
+			</description>
+		</method>
+		<method name="play">
+			<return type="void" />
+			<param index="0" name="from_position" type="float" default="0.0" />
+			<description>
+				Starts the own clock at [param from_position] seconds and emits the segments active at that time. Not allowed with a [member sync_node]: play the sync node instead.
+			</description>
+		</method>
+		<method name="seek">
+			<return type="void" />
+			<param index="0" name="position" type="float" />
+			<description>
+				Moves the own clock to [param position] seconds. While playing, the segments change at once (see [method SubtitlePlayback.seek]). Not allowed with a [member sync_node].
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops the own clock, sets the position to [code]0.0[/code] and ends all active segments. Not allowed with a [member sync_node].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="autoplay" type="bool" setter="set_autoplay" getter="is_autoplay_enabled" default="false">
+			If [code]true[/code], the own clock starts when the node is ready. Has no effect with a [member sync_node].
+		</member>
+		<member name="subtitle" type="Subtitle" setter="set_subtitle" getter="get_subtitle">
+			The subtitle to play. An explicitly set subtitle always wins, and [code]get_subtitle()[/code] returns only this one. If empty, the player takes the subtitle from the [member sync_node], see the description. Assigning another subtitle ends the active segments of the previous one.
+		</member>
+		<member name="sync_node" type="NodePath" setter="set_sync_node" getter="get_sync_node" default="NodePath(&quot;&quot;)">
+			The node whose time the player follows: an [AudioStreamPlayer], [AudioStreamPlayer2D] or [AudioStreamPlayer3D] ([method AudioStreamPlayer.get_playback_position]), a [VideoStreamPlayer] ([member VideoStreamPlayer.stream_position]) or an [AnimationPlayer] ([member AnimationPlayer.current_animation_position]). The player follows it only while it is playing. If empty, the player uses its own clock.
+		</member>
+		<member name="time_offset" type="float" setter="set_time_offset" getter="get_time_offset" default="0.0">
+			Seconds added to the position before looking up segments. Positive values show segments earlier, negative values later. Use it to fix a delay between the audio and the subtitle without editing the [Subtitle].
+		</member>
+	</members>
+	<signals>
+		<signal name="segment_changed">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when the current segment changes: the active segment that started last, or [code]null[/code] if none is active. See [signal SubtitlePlayback.segment_changed].
+			</description>
+		</signal>
+		<signal name="segment_ended">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when [param segment] stops being active. See [signal SubtitlePlayback.segment_ended].
+			</description>
+		</signal>
+		<signal name="segment_started">
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Emitted when [param segment] becomes active. See [signal SubtitlePlayback.segment_started].
+			</description>
+		</signal>
+	</signals>
+</class>

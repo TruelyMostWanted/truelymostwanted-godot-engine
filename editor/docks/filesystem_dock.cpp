@@ -69,6 +69,7 @@
 #include "editor/themes/editor_scale.h"
 #include "editor/themes/editor_theme_manager.h"
 #include "scene/gui/box_container.h"
+#include "scene/gui/color_picker.h"
 #include "scene/gui/item_list.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
@@ -251,7 +252,7 @@ void FileSystemDock::_create_tree(TreeItem *p_parent, EditorFileSystemDirectory 
 
 	// Set custom folder color (if applicable).
 	bool has_custom_color = assigned_folder_colors.has(lpath);
-	Color custom_color = has_custom_color ? folder_colors[assigned_folder_colors[lpath]] : Color();
+	Color custom_color = has_custom_color ? resolve_folder_color(folder_colors, assigned_folder_colors[lpath], get_theme_color(SNAME("folder_icon_color"), SNAME("FileDialog"))) : Color();
 	Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 
 	if (has_custom_color) {
@@ -1038,7 +1039,6 @@ void FileSystemDock::_update_file_list(bool p_keep_selection, const Vector<Strin
 	_set_current_path_line_edit_text(current_path);
 
 	String directory = current_path;
-	String file = "";
 
 	int thumbnail_size = thumbnail_size_setting * EDSCALE;
 	Ref<Texture2D> folder_thumbnail;
@@ -1148,7 +1148,6 @@ void FileSystemDock::_update_file_list(bool p_keep_selection, const Vector<Strin
 		EditorFileSystemDirectory *efd = EditorFileSystem::get_singleton()->get_filesystem_path(directory);
 		if (!efd) {
 			directory = current_path.get_base_dir();
-			file = current_path.get_file();
 			efd = EditorFileSystem::get_singleton()->get_filesystem_path(directory);
 		}
 		if (!efd) {
@@ -1192,7 +1191,7 @@ void FileSystemDock::_update_file_list(bool p_keep_selection, const Vector<Strin
 
 					files->add_item(dname, folder_icon, true);
 					files->set_item_metadata(-1, dpath);
-					Color this_folder_color = has_custom_color ? folder_colors[assigned_folder_colors[dpath]] : inherited_folder_color;
+					Color this_folder_color = has_custom_color ? resolve_folder_color(folder_colors, assigned_folder_colors[dpath], default_folder_color) : inherited_folder_color;
 					if (!editor_is_dark_icon_and_font && this_folder_color != default_folder_color) {
 						this_folder_color *= ITEM_COLOR_SCALE;
 					}
@@ -1275,7 +1274,7 @@ void FileSystemDock::_update_file_list(bool p_keep_selection, const Vector<Strin
 			valid_selection.insert(item_index);
 		}
 
-		if (!p_keep_selection && !file.is_empty() && fname == file) {
+		if (!p_keep_selection && current_path == fpath) {
 			files->select(item_index, true);
 			files->ensure_current_is_visible();
 		}
@@ -1348,7 +1347,8 @@ void FileSystemDock::_select_file(const String &p_path, bool p_select_in_favorit
 			if (err == OK) {
 				if (config->has_section_key("remap", "importer")) {
 					String importer = config->get_value("remap", "importer");
-					if (importer == "keep" || importer == "skip") {
+					// Truely: kept files that a resource loader reads (CSV, JSON, ...) open like other resources.
+					if ((importer == "keep" && ResourceLoader::get_resource_type(fpath).is_empty()) || importer == "skip") {
 						EditorNode::get_singleton()->show_warning(TTRC("Importing has been disabled for this file, so it can't be opened for editing."));
 						return;
 					}
@@ -3436,8 +3436,7 @@ void FileSystemDock::_update_folder_colors_setting() {
 	ProjectSettings::get_singleton()->save();
 }
 
-void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu) {
-	Variant chosen_color_name = p_menu->get_item_metadata(p_index);
+Vector<String> FileSystemDock::_get_selected_paths_for_folder_color() const {
 	Vector<String> selected;
 
 	// Get all selected folders based on whether the files panel or tree panel is currently focused.
@@ -3454,13 +3453,24 @@ void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu)
 			tree_selected = tree->get_next_selected(tree_selected);
 		}
 	}
+	return selected;
+}
+
+void FileSystemDock::_set_folder_color(const Vector<String> &p_paths, const Variant &p_color_value) {
+	// Custom colors go to the front of the recent list of this project, also when no folder uses them anymore.
+	const String color_value = p_color_value;
+	if (color_value.begins_with("#")) {
+		PackedStringArray recent = EditorSettings::get_singleton()->get_project_metadata("filesystem_dock", "recent_folder_colors", PackedStringArray());
+		recent.erase(color_value);
+		recent.insert(0, color_value);
+		recent.resize(MIN(recent.size(), MAX_RECENT_FOLDER_COLORS));
+		EditorSettings::get_singleton()->set_project_metadata("filesystem_dock", "recent_folder_colors", recent);
+	}
 
 	// Update project settings with new folder colors.
-	for (int i = 0; i < selected.size(); i++) {
-		const String &fpath = selected[i];
-
-		if (chosen_color_name) {
-			assigned_folder_colors[fpath] = chosen_color_name;
+	for (const String &fpath : p_paths) {
+		if (p_color_value) {
+			assigned_folder_colors[fpath] = p_color_value;
 		} else {
 			assigned_folder_colors.erase(fpath);
 		}
@@ -3470,6 +3480,29 @@ void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu)
 	update_all();
 
 	emit_signal(SNAME("folder_color_changed"));
+}
+
+void FileSystemDock::_folder_color_index_pressed(int p_index, PopupMenu *p_menu) {
+	Variant chosen_color_name = p_menu->get_item_metadata(p_index);
+	Vector<String> selected = _get_selected_paths_for_folder_color();
+
+	if (chosen_color_name == Variant(String(FOLDER_COLOR_CUSTOM))) {
+		// Open the picker, preset with the color of the first selected folder.
+		folder_color_targets = selected;
+		Color current = Color(1, 1, 1);
+		if (!selected.is_empty() && assigned_folder_colors.has(selected[0])) {
+			current = resolve_folder_color(folder_colors, assigned_folder_colors[selected[0]], current);
+		}
+		folder_color_picker->set_pick_color(current);
+		folder_color_dialog->popup_centered();
+		return;
+	}
+
+	_set_folder_color(selected, chosen_color_name);
+}
+
+void FileSystemDock::_folder_color_dialog_confirmed() {
+	_set_folder_color(folder_color_targets, "#" + folder_color_picker->get_pick_color().to_html(false));
 }
 
 void FileSystemDock::_file_and_folders_fill_popup(PopupMenu *p_popup, const Vector<String> &p_paths, bool p_display_path_dependent_options, bool p_show_expand_options) {
@@ -3594,6 +3627,28 @@ void FileSystemDock::_file_and_folders_fill_popup(PopupMenu *p_popup, const Vect
 				folder_colors_menu->set_item_icon_modulate(-1, editor_is_dark_icon_and_font ? E.value : E.value * 2);
 				folder_colors_menu->set_item_metadata(-1, E.key);
 			}
+
+			// Recent custom colors of this project (most recently assigned first).
+			Vector<String> recent_colors;
+			const PackedStringArray recent_values = EditorSettings::get_singleton()->get_project_metadata("filesystem_dock", "recent_folder_colors", PackedStringArray());
+			for (const String &value : recent_values) {
+				if (Color::html_is_valid(value) && recent_colors.size() < MAX_RECENT_FOLDER_COLORS) {
+					recent_colors.push_back(value);
+				}
+			}
+			if (!recent_colors.is_empty()) {
+				folder_colors_menu->add_separator();
+			}
+			for (const String &recent : recent_colors) {
+				const Color recent_color = Color::html(recent);
+				folder_colors_menu->add_icon_item(get_editor_theme_icon(SNAME("Folder")), recent.to_upper());
+				folder_colors_menu->set_item_icon_modulate(-1, editor_is_dark_icon_and_font ? recent_color : recent_color * 2);
+				folder_colors_menu->set_item_metadata(-1, recent);
+			}
+
+			folder_colors_menu->add_separator();
+			folder_colors_menu->add_icon_item(get_editor_theme_icon(SNAME("ColorPick")), TTRC("Custom..."));
+			folder_colors_menu->set_item_metadata(-1, String(FOLDER_COLOR_CUSTOM));
 		}
 	}
 
@@ -4252,6 +4307,17 @@ void FileSystemDock::_file_sort_popup(int p_id) {
 }
 
 // TODO: Could use a unit test.
+Color FileSystemDock::resolve_folder_color(const HashMap<String, Color> &p_named_colors, const String &p_value, const Color &p_default) {
+	const Color *named = p_named_colors.getptr(p_value);
+	if (named) {
+		return *named;
+	}
+	if (p_value.begins_with("#") && Color::html_is_valid(p_value)) {
+		return Color::html(p_value);
+	}
+	return p_default;
+}
+
 Color FileSystemDock::get_dir_icon_color(const String &p_dir_path, const Color &p_default) {
 	if (!singleton) { // This method can be called from the project manager.
 		return p_default;
@@ -4267,7 +4333,7 @@ Color FileSystemDock::get_dir_icon_color(const String &p_dir_path, const Color &
 
 		const String color_name = singleton->assigned_folder_colors.get(parent_dir, String());
 		if (!color_name.is_empty()) {
-			folder_icon_color = singleton->folder_colors[color_name];
+			folder_icon_color = resolve_folder_color(singleton->folder_colors, color_name, p_default);
 			break;
 		}
 		parent_dir = parent_dir.trim_suffix("/").get_base_dir();
@@ -4824,6 +4890,15 @@ FileSystemDock::FileSystemDock() {
 	add_child(conversion_dialog);
 	conversion_dialog->set_ok_button_text(TTRC("Convert"));
 	conversion_dialog->connect(SceneStringName(confirmed), callable_mp(this, &FileSystemDock::_convert_dialog_action));
+
+	folder_color_dialog = memnew(ConfirmationDialog);
+	folder_color_dialog->set_title(TTRC("Custom Folder Color"));
+	folder_color_dialog->connect(SceneStringName(confirmed), callable_mp(this, &FileSystemDock::_folder_color_dialog_confirmed));
+	add_child(folder_color_dialog);
+
+	folder_color_picker = memnew(ColorPicker);
+	folder_color_picker->set_edit_alpha(false);
+	folder_color_dialog->add_child(folder_color_picker);
 
 	move_confirm_dialog = memnew(ConfirmationDialog);
 	add_child(move_confirm_dialog);

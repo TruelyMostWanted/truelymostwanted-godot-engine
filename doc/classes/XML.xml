@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="XML" inherits="TextDataFormat" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads and writes XML as dictionaries, and any [Resource] as XML.
+	</brief_description>
+	<description>
+		[XML] converts XML documents to [Dictionary] trees and back, with [XMLElement] views to read and change the tree. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
+		A document is read into the [Dictionary] of its root element. Every element is a [Dictionary] with these keys:
+		- [code]"name"[/code]: the tag name ([String]).
+		- [code]"attributes"[/code]: a [Dictionary] of attribute name to value (both [String]).
+		- [code]"children"[/code]: an [Array] of child elements ([Dictionary]) and text nodes ([String]), in document order. This keeps mixed content such as [code]&lt;p&gt;Hello &lt;b&gt;big&lt;/b&gt; world&lt;/p&gt;[/code] in order.
+		- [code]"text"[/code]: the text of the direct children joined together, for convenience.
+		[codeblocks]
+		[gdscript]
+		var xml = XML.new()
+		if xml.parse("&lt;window width=\"1280\"&gt;&lt;title&gt;Game&lt;/title&gt;&lt;/window&gt;") == OK:
+			var root = xml.get_data()
+			print(root["attributes"]["width"]) # Prints 1280
+			print(root["children"][0]["text"]) # Prints Game
+		else:
+			print(xml.get_error_message()) # For example "Line 2: ..."; the line alone is xml.get_error_line().
+
+		var element = { "name": "note", "attributes": { "to": "Ann" }, "text": "Hi" }
+		print(XML.stringify(element)) # Prints the declaration and &lt;note to="Ann"&gt;Hi&lt;/note&gt;
+		[/gdscript]
+		[csharp]
+		var xml = new Xml();
+		if (xml.Parse("&lt;window width=\"1280\"&gt;&lt;title&gt;Game&lt;/title&gt;&lt;/window&gt;") == Error.Ok)
+		{
+			var root = xml.GetData();
+			GD.Print(root["attributes"].AsGodotDictionary()["width"]); // Prints 1280
+			GD.Print(root["children"].AsGodotArray()[0].AsGodotDictionary()["text"]); // Prints Game
+		}
+		else
+		{
+			GD.Print(xml.GetErrorMessage()); // For example "Line 2: ..."; the line alone is xml.GetErrorLine().
+		}
+
+		var element = new Godot.Collections.Dictionary
+		{
+			{ "name", "note" },
+			{ "attributes", new Godot.Collections.Dictionary { { "to", "Ann" } } },
+			{ "text", "Hi" },
+		};
+		GD.Print(Xml.Stringify(element));
+		[/csharp]
+		[/codeblocks]
+		[b]Round trip:[/b] reading drops whitespace-only text between elements (indentation), but keeps CDATA sections as text. Writing puts whitespace-only text into CDATA and writes an element that contains text on one line, so no indentation becomes part of the text. Therefore [code]XML.parse_string(XML.stringify(data)) == data[/code] for all data returned by [method parse_string]. Adjacent text nodes are joined into one [String]. Comments, processing instructions and the XML declaration are not kept.
+		[b]Resource and files:[/b] [XML] is a [Resource] (see [TextDataFormat]). [code]load("res://x.xml")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
+		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [XMLElement] writes) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
+		[b]Tree and elements:[/b] [member TextDataFormat.data] is the element [Dictionary] tree, stored once. [method get_root] returns an [XMLElement], a lazy view of the root element that is created on first use; writes through an [XMLElement] change the tree. Paths of [method find_first] and [method find_all] are element names separated by [code]/[/code], relative to the root element ([code]"items/item"[/code]; the root's own name is not part of the path).
+		[codeblocks]
+		[gdscript]
+		var xml = XML.new()
+		xml.parse("&lt;shop&gt;&lt;item id=\"1\"&gt;Sword&lt;/item&gt;&lt;item id=\"2\"&gt;Shield&lt;/item&gt;&lt;/shop&gt;")
+		for item in xml.find_all("item"):
+			print(item.get_attribute("id"), " ", item.text) # Prints "1 Sword", then "2 Shield"
+		xml.find_first("item").text = "Axe" # Changes the tree; comments and formatting are lost on save.
+		[/gdscript]
+		[csharp]
+		var xml = new Xml();
+		xml.Parse("&lt;shop&gt;&lt;item id=\"1\"&gt;Sword&lt;/item&gt;&lt;item id=\"2\"&gt;Shield&lt;/item&gt;&lt;/shop&gt;");
+		foreach (var item in xml.FindAll("item"))
+		{
+			GD.Print(item.GetAttribute("id"), " ", item.Text); // Prints "1 Sword", then "2 Shield"
+		}
+		xml.FindFirst("item").Text = "Axe";
+		[/csharp]
+		[/codeblocks]
+		[b]Note:[/b] The whole file is kept in memory as dictionaries. For huge files use [XMLParser] to read and [XMLWriter] to write.
+		[b]Note:[/b] In C# the class is [code]XmlElement[/code], which clashes with [code]System.Xml.XmlElement[/code] when both namespaces are imported. Use the qualified name [code]Godot.XmlElement[/code].
+		[b]Note:[/b] The static methods can be called from any thread. An [XML] instance should be used by one thread at a time.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_root">
+			<return type="XMLElement" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Replaces the data with a new, empty root element named [param name] and returns it. Drops the kept parsed text.
+			</description>
+		</method>
+		<method name="deserialize" qualifiers="static">
+			<return type="Resource" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="type_hint" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="2" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a [Resource] from XML [param text] written by [method serialize]. The class comes from the attribute [code]type[/code] of the root element, or from [param type_hint]. Returns [code]null[/code] and prints an error if the text can't be read. The same as [code]ResourceTextSerializer.deserialize(text, ResourceTextSerializer.FORMAT_XML, type_hint, options)[/code].
+			</description>
+		</method>
+		<method name="find_all">
+			<return type="XMLElement[]" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns all elements that match [param path]: element names separated by [code]/[/code], relative to the root element. Returns an empty array if there is no root or no match.
+			</description>
+		</method>
+		<method name="find_first">
+			<return type="XMLElement" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns the first element that matches [param path]: element names separated by [code]/[/code], relative to the root element. Returns [code]null[/code] if there is no root or no match.
+			</description>
+		</method>
+		<method name="get_root">
+			<return type="XMLElement" />
+			<description>
+				Returns the root element as an [XMLElement] view, or [code]null[/code] if the document has no root (after a failed parse or [method TextDataFormat.clear]; a new [XML] has an empty root element named [code]root[/code]). The view is created on first use and shares the tree: writes through it change [member TextDataFormat.data].
+			</description>
+		</method>
+		<method name="parse_string" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Parses the XML document [param text] and returns its root element. Returns an empty [Dictionary] and prints the error if the text can't be read. Use [method TextDataFormat.parse] for the error details.
+			</description>
+		</method>
+		<method name="serialize" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Returns [param resource] as XML text, with its stored properties, sub-resources and the type marker (attribute [code]type[/code] of the root element [code]&lt;resource&gt;[/code]). [code]null[/code] [param options] uses the project settings [code]filesystem/resources/text_formats/*[/code]. Returns an empty [String] and prints an error if the resource can't be written. The same as [code]ResourceTextSerializer.serialize(resource, ResourceTextSerializer.FORMAT_XML, options)[/code].
+				[b]Note:[/b] [method stringify] writes element dictionaries; use [method serialize] for resources.
+			</description>
+		</method>
+		<method name="stringify" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="data" type="Dictionary" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Writes the element [Dictionary] [param data] (see the class description) as an XML document. Without [code]"children"[/code], the [String] in [code]"text"[/code] is the content. [param options] sets the indentation ([member SerializerOptions.indent]), the declaration ([member SerializerOptions.xml_declaration]) and the attribute order ([member SerializerOptions.sort_keys]); [code]null[/code] uses the project settings. Attribute values and text that are not [String]s are converted with [method @GlobalScope.str]. Returns an empty [String] and prints an error if an element has no valid [code]"name"[/code], an attribute name is invalid or a child is neither a [Dictionary] nor text.
+			</description>
+		</method>
+	</methods>
+</class>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="InputAction" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		One action of the [InputMap] as a resource: its name, deadzone and events.
+	</brief_description>
+	<description>
+		An [InputAction] describes one action of the [InputMap] ([code]"jump"[/code], [code]"ui_accept"[/code], ...) with its [member action] name, its [member deadzone] and its [member events]. The layers of the [InputMap] are [InputActions] of [InputAction]s: [method InputMap.get_input_action] returns the action of the [InputMap] itself (changing it changes the [InputMap]), and [method InputMap.set_input_action] puts one into the [InputMap]. A set of actions is an [InputActions]. [InputMapSettingsServer] stores the player's bindings as [InputActions].
+		[member events] is a list of [InputEvent]s. It is stored like any other resource property: a [code].tres[/code] file holds the events as sub-resources, the same layout the editor writes, so an [InputAction] or an [InputActions] can be edited in the Inspector and saved again. [InputMapSettingsServer] stores the player's bindings in readable text instead (see [method InputMapSettingsServer.events_to_text]).
+		[method event_to_text] and [method text_to_event] convert one event to and from its text form The grammar is [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code]. Only keys, mouse buttons, gamepad buttons and gamepad axes have one. Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code].
+		- [code]Device&lt;N&gt;:[/code] (optional): only the gamepad with this device number ([member InputEvent.device]). Without it the event reacts to all devices; [code]Any:[/code] is read as well, and so is the [code]@N[/code] suffix of older texts. It is written only for gamepad events of one pad; keys and mouse buttons are always bound for all devices (the prefix is read, not kept).
+		- Type: [code]Keyboard[/code] (an [InputEventKey] matched by [member InputEventKey.physical_keycode], the key at the same place on every layout, the usual choice for games), [code]KeyboardLabel[/code] ([member InputEventKey.keycode]), [code]KeyboardPrinted[/code] ([member InputEventKey.key_label]), [code]Mouse[/code] ([InputEventMouseButton]), [code]Gamepad[/code] ([InputEventJoypadButton]) and [code]GamepadAxis[/code] ([InputEventJoypadMotion]). The older names [code]PhysicalKey[/code], [code]Key[/code], [code]KeyLabel[/code], [code]MouseButton[/code], [code]JoypadButton[/code] and [code]JoypadMotion[/code] are still read.
+		- Modifiers (only [code]Keyboard*[/code] and [code]Mouse[/code]): [code]CmdOrCtrl[/code] ([member InputEventWithModifiers.command_or_control_autoremap]: Command on macOS, Ctrl on the other platforms), [code]Ctrl[/code], [code]Alt[/code], [code]Shift[/code] and [code]Meta[/code]. They are written in this order and read in any order. A modifier key alone is the input itself ([code]Keyboard:Shift[/code]).
+		- Input of a key: a name of [method OS.get_keycode_string], never a character ([code]Colon[/code], [code]Semicolon[/code], [code]Plus[/code], [code]Minus[/code], [code]At[/code], [code]Space[/code]), so [code]:[/code] and [code]+[/code] stay separators; unknown codes are written as [code]#[/code] and the number.
+		- Input of a mouse button: [code]Left[/code], [code]Right[/code], [code]Middle[/code], [code]WheelUp[/code], [code]WheelDown[/code], [code]WheelLeft[/code], [code]WheelRight[/code], [code]Extra1[/code] or [code]Extra2[/code].
+		- Input of a gamepad button: [code]A[/code], [code]B[/code], [code]X[/code], [code]Y[/code] (positions, [code]A[/code] is the bottom one), [code]LeftShoulder[/code], [code]RightShoulder[/code], [code]DPadUp[/code], [code]DPadDown[/code], [code]DPadLeft[/code], [code]DPadRight[/code], [code]Back[/code], [code]Start[/code], [code]Guide[/code], [code]LeftStickPress[/code], [code]RightStickPress[/code], [code]Misc1[/code], [code]Paddle1[/code] to [code]Paddle4[/code], [code]Touchpad[/code], or the button index. [code]LeftStick[/code] and [code]RightStick[/code] are read as the stick clicks.
+		- Input of a gamepad axis, with the direction in the name: [code]LeftStickLeft[/code], [code]LeftStickRight[/code], [code]LeftStickUp[/code], [code]LeftStickDown[/code], the same for [code]RightStick[/code], [code]LeftTrigger[/code] and [code]RightTrigger[/code]. Other axes are written as the index with [code]+[/code] or [code]-[/code]. The older names with a sign ([code]LeftX-[/code], [code]LeftY+[/code], [code]TriggerRight+[/code]) are still read; [code]GamepadAxis:LeftStickX-[/code] is not valid.
+		Not valid are, for example, [code]Gamepad:Ctrl+A[/code] (a gamepad has no modifiers), [code]Device:Gamepad:A[/code], [code]DeviceX:Gamepad:A[/code], [code]Keyboard:[/code], [code]Keyboard:Ctrl+[/code], an unknown type and an unknown key.
+		[codeblocks]
+		[gdscript]
+		var action = InputAction.new()
+		action.action = &amp;"jump"
+		action.deadzone = 0.3
+		action.add_event(InputAction.text_to_event("Keyboard:Space"))
+		action.add_event(InputAction.text_to_event("Gamepad:A"))
+		InputMap.set_input_action(action)
+		ResourceSaver.save(action, "user://jump.tres") # The events are sub-resources of the file.
+		[/gdscript]
+		[csharp]
+		var action = new InputAction();
+		action.Action = "jump";
+		action.Deadzone = 0.3f;
+		action.AddEvent(InputAction.TextToEvent("Keyboard:Space"));
+		action.AddEvent(InputAction.TextToEvent("Gamepad:A"));
+		InputMap.Singleton.SetInputAction(action);
+		ResourceSaver.Save(action, "user://jump.tres"); // The events are sub-resources of the file.
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_event">
+			<return type="void" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Adds [param event] to [member events]. Does nothing if the action already has the event (see [method has_event]).
+			</description>
+		</method>
+		<method name="clear_events">
+			<return type="void" />
+			<description>
+				Removes all events from the action.
+			</description>
+		</method>
+		<method name="event_to_text" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the text form [code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code] of [param event] (see the class description), or an empty [String] for event types that have none (touch, MIDI, ...). Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code]. A key the player presses has all three codes; it is written as [code]Keyboard[/code], so the binding stays on the same key position on every keyboard layout. A modifier key on its own ([code]Keyboard:Shift[/code]) is written without modifiers. A gamepad event of one pad ([member InputEvent.device] [code]0[/code] or more) starts with [code]Device&lt;N&gt;:[/code].
+			</description>
+		</method>
+		<method name="get_device_events" qualifiers="const">
+			<return type="InputEvent[]" />
+			<param index="0" name="device" type="int" enum="InputAction.InputDevice" />
+			<description>
+				Returns the events of [param device] in the order of [member events]. For example [constant INPUT_DEVICE_KEYBOARD] returns all keys of the action.
+			</description>
+		</method>
+		<method name="get_event_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of events of the action.
+			</description>
+		</method>
+		<method name="get_event_device" qualifiers="static">
+			<return type="int" enum="InputAction.InputDevice" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns the device that [param event] belongs to: [constant INPUT_DEVICE_KEYBOARD] for an [InputEventKey], [constant INPUT_DEVICE_MOUSE] for an [InputEventMouseButton], [constant INPUT_DEVICE_GAMEPAD] for an [InputEventJoypadButton] or [InputEventJoypadMotion], and [constant INPUT_DEVICE_MAX] for event types that can't be bound.
+			</description>
+		</method>
+		<method name="has_event" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Returns [code]true[/code] if the action has [param event] itself or an event that matches it exactly (see [method InputEvent.is_match] with [code]exact_match[/code] set to [code]true[/code]).
+			</description>
+		</method>
+		<method name="remove_event">
+			<return type="bool" />
+			<param index="0" name="event" type="InputEvent" />
+			<description>
+				Removes [param event] or the first event that matches it exactly (see [method has_event]) from the action. Returns [code]true[/code] if an event was removed, [code]false[/code] if the action has no such event.
+			</description>
+		</method>
+		<method name="text_to_event" qualifiers="static">
+			<return type="InputEvent" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Returns a new event of the text form [param text] ([code][Device&lt;N&gt;:]&lt;Type&gt;:[&lt;Modifiers&gt;+]&lt;Input&gt;[/code], see the class description), or [code]null[/code] if the text is not valid. Examples: [code]Keyboard:W[/code], [code]Keyboard:Ctrl+Shift+S[/code], [code]Keyboard:CmdOrCtrl+Z[/code], [code]Keyboard:Colon[/code], [code]Keyboard:Shift+Semicolon[/code], [code]Keyboard:Ctrl+Plus[/code], [code]Keyboard:Shift[/code], [code]KeyboardLabel:W[/code], [code]Mouse:Ctrl+Left[/code], [code]Gamepad:LeftShoulder[/code], [code]GamepadAxis:LeftStickLeft[/code], [code]Device3:Gamepad:A[/code], [code]Device3:GamepadAxis:RightTrigger[/code]. Its [member InputEvent.device] is the number of the [code]Device&lt;N&gt;:[/code] prefix for a gamepad event, otherwise [code]-1[/code] (all devices). [code]CmdOrCtrl[/code] is resolved here: the event uses [member InputEventWithModifiers.command_or_control_autoremap].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="action" type="StringName" setter="set_action" getter="get_action" default="&amp;&quot;&quot;">
+			The name of the action in the [InputMap], for example [code]&amp;"jump"[/code]. The property is not called [code]name[/code], because [member Resource.resource_name] already uses that name.
+		</member>
+		<member name="deadzone" type="float" setter="set_deadzone" getter="get_deadzone" default="0.2">
+			The deadzone of the action, from [code]0.0[/code] to [code]1.0[/code] (see [method InputMap.action_set_deadzone]).
+		</member>
+		<member name="events" type="InputEvent[]" setter="set_events" getter="get_events" default="[]">
+			The events that trigger the action, shown in the Inspector and stored as sub-resources. Setting it replaces all events. [code]null[/code] entries (an element just added in the Inspector) are kept in the array until they get an event, but the action ignores them: [method get_event_count], [method has_event], the [InputMap] and the settings servers see only the events. A method that changes the events drops the [code]null[/code] entries. The getter returns a new array: change the events with [method add_event], [method remove_event] and [method clear_events], or set the whole list.
+		</member>
+	</members>
+	<constants>
+		<constant name="INPUT_DEVICE_KEYBOARD" value="0" enum="InputDevice">
+			A key ([InputEventKey]).
+		</constant>
+		<constant name="INPUT_DEVICE_MOUSE" value="1" enum="InputDevice">
+			A mouse button or the mouse wheel ([InputEventMouseButton]).
+		</constant>
+		<constant name="INPUT_DEVICE_GAMEPAD" value="2" enum="InputDevice">
+			A joypad button or axis ([InputEventJoypadButton], [InputEventJoypadMotion]).
+		</constant>
+		<constant name="INPUT_DEVICE_MAX" value="3" enum="InputDevice">
+			The number of devices; also returned by [method get_event_device] for events that can't be bound.
+		</constant>
+	</constants>
+</class>

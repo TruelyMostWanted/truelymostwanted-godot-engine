@@ -30,6 +30,7 @@
 
 #include "resource_importer_csv_translation.h"
 
+#include "core/io/csv_format.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_saver.h"
 #include "core/string/optimized_translation.h"
@@ -97,33 +98,54 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 	int plural_column = -1;
 	{
 		const Vector<String> line = f->get_csv_line(delimiter);
+
+		// Header problems are collected and reported once per file, not once per column.
+		// A column whose language code is unknown is still imported as a locale (custom locales),
+		// unless no column has a known language code: then the file is most likely a data CSV.
+		CSV::TranslationHeader header;
+		Ref<DataValidation> header_issues;
+		header_issues.instantiate();
+		CSV::check_translation_header(line, header, header_issues.ptr());
+		for (int i = 0; i < header_issues->get_issue_count(); i++) {
+			if (header_issues->get_issue_kind(i) == DataValidation::ISSUE_KIND_DUPLICATE_KEY) {
+				ERR_PRINT(vformat("Error importing CSV translation: Multiple '%s' columns found. Only one is allowed. Subsequent ones will be ignored.", header_issues->get_issue_field(i)));
+			}
+		}
+		context_column = header.context_column;
+		plural_column = header.plural_column;
+		Vector<String> invalid_columns; // Not a locale at all (e.g. an empty header cell).
+		Vector<String> unknown_columns; // A locale whose language code is not known.
+		Vector<String> not_known_columns; // Both of the above, in column order.
 		for (int i = 1; i < line.size(); i++) {
-			if (line[i].left(1) == "_") {
-				continue;
+			const bool invalid = header.invalid_columns.has(i);
+			if (invalid || header.unknown_columns.has(i)) {
+				const String column_desc = vformat("'%s' (column %d)", line[i], i + 1);
+				(invalid ? invalid_columns : unknown_columns).push_back(column_desc);
+				not_known_columns.push_back(column_desc);
 			}
-			if (line[i].to_lower() == "?context") {
-				ERR_CONTINUE_MSG(context_column != -1, "Error importing CSV translation: Multiple '?context' columns found. Only one is allowed. Subsequent ones will be ignored.");
-				context_column = i;
-				continue;
-			}
-			if (line[i].to_lower() == "?plural") {
-				ERR_CONTINUE_MSG(plural_column != -1, "Error importing CSV translation: Multiple '?plural' columns found. Only one is allowed. Subsequent ones will be ignored.");
-				plural_column = i;
-				continue;
-			}
-
-			const String locale = TranslationServer::get_singleton()->standardize_locale(line[i]);
-			ERR_CONTINUE_MSG(locale.is_empty(), vformat("Error importing CSV translation: Invalid locale format '%s', should be 'language_Script_COUNTRY_VARIANT@extra'. This column will be ignored.", line[i]));
-
-			Ref<Translation> translation;
-			translation.instantiate();
-			translation->set_locale(locale);
-			column_to_translation[i] = translation;
 		}
 
-		if (column_to_translation.is_empty()) {
-			WARN_PRINT(vformat("CSV file '%s' does not contain any translation.", p_source_file));
+		if (!header.has_known_language) {
+			if (not_known_columns.is_empty()) {
+				WARN_PRINT(vformat("CSV file '%s' does not contain any translation.", p_source_file));
+			} else {
+				WARN_PRINT(vformat("CSV file '%s' was not imported as a translation: no column of its header row starts with a known language code (%s). If the file holds data, select \"Keep File (exported as is)\" as its import mode in the Import dock. If it is a translation table, name each column after a locale such as 'en' or 'pt_BR'.", p_source_file, String(", ").join(not_known_columns)));
+			}
 			return OK;
+		}
+
+		if (!invalid_columns.is_empty()) {
+			ERR_PRINT(vformat("Error importing CSV translation '%s': Invalid locale format in %s, should be 'language_Script_COUNTRY_VARIANT@extra'. These columns will be ignored.", p_source_file, String(", ").join(invalid_columns)));
+		}
+		if (!unknown_columns.is_empty()) {
+			WARN_PRINT(vformat("CSV translation '%s': Unknown language code in %s. These columns are imported as locales anyway. Prefix a column name with '_' to ignore the column.", p_source_file, String(", ").join(unknown_columns)));
+		}
+
+		for (const KeyValue<int, String> &E : header.locale_columns) {
+			Ref<Translation> translation;
+			translation.instantiate();
+			translation->set_locale(E.value);
+			column_to_translation[E.key] = translation;
 		}
 	}
 

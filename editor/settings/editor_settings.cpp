@@ -731,7 +731,8 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	// FileSystem
 	EDITOR_SETTING(Variant::INT, PROPERTY_HINT_RANGE, "docks/filesystem/thumbnail_size", 64, "32,224,16")
 	_initial_set("docks/filesystem/always_show_folders", true);
-	_initial_set("docks/filesystem/textfile_extensions", "txt,md,cfg,ini,log,json,yml,yaml,toml,xml");
+	// Truely (#391): "pot", so gettext templates saved by the localization catalog inspector are listed.
+	_initial_set("docks/filesystem/textfile_extensions", "txt,md,cfg,ini,log,json,yml,yaml,toml,xml,pot");
 	_initial_set("docks/filesystem/other_file_extensions", "ico,icns");
 	_initial_set("docks/filesystem/automatically_open_created_scripts", true);
 	_initial_set("docks/filesystem/ask_before_moving_files", true);
@@ -893,6 +894,9 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	// Completion
 	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/idle_parse_delay", 1.5, "0.1,10,0.01")
 	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/idle_parse_delay_with_errors_found", 0.5, "0.1,5,0.01")
+	// Live errors of data files (JSON, INI, CSV, XML, TOML, YAML): size caps in MiB.
+	EDITOR_SETTING(Variant::INT, PROPERTY_HINT_RANGE, "text_editor/data_files/live_parse_max_size_mb", 10, "0,1024,1,or_greater")
+	EDITOR_SETTING(Variant::INT, PROPERTY_HINT_RANGE, "text_editor/data_files/schema_validation_max_size_mb", 2, "0,1024,1,or_greater")
 	_initial_set("text_editor/completion/auto_brace_complete", true, true);
 	_initial_set("text_editor/completion/code_complete_enabled", true, true);
 	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/code_complete_delay", 0.3, "0.01,5,0.01,or_greater")

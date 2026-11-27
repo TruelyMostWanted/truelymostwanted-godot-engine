@@ -34,6 +34,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
@@ -44,6 +45,9 @@ static_assert(Window::LAYOUT_DIRECTION_INHERITED == 0 && Window::LAYOUT_DIRECTIO
 static_assert(Node::AUTO_TRANSLATE_MODE_INHERIT == 0 && Node::AUTO_TRANSLATE_MODE_DISABLED == 2, "LanguageSettings.root_auto_translate_mode mirrors Node::AutoTranslateMode.");
 
 LanguageSettingsServer *LanguageSettingsServer::singleton = nullptr;
+
+// The stored locale channels (TranslationServer::set_locale_for()).
+static const char *const CHANNELS[] = { "interface", "audio", "subtitles" };
 
 LanguageSettingsServer *LanguageSettingsServer::get_singleton() {
 	return singleton;
@@ -71,11 +75,28 @@ String LanguageSettingsServer::get_command_line_locale() {
 }
 
 PackedStringArray LanguageSettingsServer::get_available_locales() {
+	return get_available_locales_for(StringName());
+}
+
+PackedStringArray LanguageSettingsServer::get_available_locales_for(const StringName &p_channel) {
 	const TranslationServer *translation_server = TranslationServer::get_singleton();
 	if (translation_server == nullptr) {
 		return PackedStringArray();
 	}
-	Vector<String> locales = translation_server->get_loaded_locales();
+	PackedStringArray locales = LocalizationServer::get_all_available_locales(p_channel);
+	if (p_channel.is_empty() || p_channel == SNAME("interface")) {
+		// Godot translations (the main domain). Skips the tr() adapter of the catalogs: its locale is the active one.
+		const TextLocalizationServer *text_server = TextLocalizationServer::get_singleton();
+		for (const Ref<Translation> &translation : translation_server->get_main_domain()->get_translations()) {
+			if ((text_server == nullptr || !text_server->is_adapter(translation)) && !locales.has(translation->get_locale())) {
+				locales.push_back(translation->get_locale());
+			}
+		}
+	}
+	if (locales.is_empty() && !p_channel.is_empty()) {
+		// No catalog declares the channel: it may use every locale.
+		return get_available_locales();
+	}
 	locales.sort();
 	return locales;
 }
@@ -90,22 +111,19 @@ bool LanguageSettingsServer::_is_developer_locale(const String &p_locale) {
 	return !test.is_empty() && translation_server->standardize_locale(test) == p_locale;
 }
 
-String LanguageSettingsServer::_resolve_locale(const String &p_locale) {
-	const TranslationServer *translation_server = TranslationServer::get_singleton();
-	const PackedStringArray loaded = translation_server->get_loaded_locales();
-	if (loaded.is_empty()) {
+bool LanguageSettingsServer::_has_locale(const String &p_locale, const StringName &p_channel) {
+	const PackedStringArray available = get_available_locales_for(p_channel);
+	if (available.is_empty()) {
 		// No translations: the game may still use the locale for its own texts.
-		return p_locale;
+		return true;
 	}
-	for (const String &locale : loaded) {
-		if (translation_server->compare_locales(p_locale, locale) > 0) {
-			return p_locale;
+	// The same matching rule as the localization servers: the locale, its parents or the closest other locale.
+	for (const String &locale : LocalizationServer::build_locale_chain(p_locale, available, false)) {
+		if (available.has(locale)) {
+			return true;
 		}
 	}
-	// A translation that was removed, or a file from another version of the game: the normal case, no error.
-	const String project_locale = get_project_locale();
-	print_verbose(vformat("Language settings: no translation is loaded for the locale \"%s\"; \"%s\" is used.", p_locale, project_locale));
-	return project_locale;
+	return false;
 }
 
 void LanguageSettingsServer::_push_locale(const String &p_locale) {
@@ -116,15 +134,43 @@ void LanguageSettingsServer::_push_locale(const String &p_locale) {
 	String locale;
 	if (p_locale.is_empty()) {
 		locale = get_project_locale();
-	} else if (_is_developer_locale(p_locale)) {
+	} else if (_is_developer_locale(p_locale) || _has_locale(p_locale, StringName())) {
 		// `--language` and the test locale are used as they are, also to test a missing translation.
 		locale = p_locale;
 	} else {
-		locale = _resolve_locale(p_locale);
+		// A translation that was removed, or a file from another version of the game: the normal case, no error.
+		locale = get_project_locale();
+		print_verbose(vformat("Language settings: no translation is loaded for the locale \"%s\"; \"%s\" is used.", p_locale, locale));
 	}
 	if (!locale.is_empty()) {
 		translation_server->set_locale(locale);
 	}
+}
+
+StringName LanguageSettingsServer::_get_channel_value(const StringName &p_channel) {
+	if (p_channel.is_empty()) {
+		return SNAME("locale");
+	}
+	if (p_channel == SNAME("interface") || p_channel == SNAME("audio") || p_channel == SNAME("subtitles")) {
+		return StringName(String(p_channel) + "_locale");
+	}
+	return StringName();
+}
+
+void LanguageSettingsServer::_push_channel_locale(const String &p_locale, const StringName &p_channel) {
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	if (translation_server == nullptr) {
+		return;
+	}
+	if (!p_locale.is_empty() && _has_locale(p_locale, p_channel)) {
+		translation_server->set_locale_for(p_channel, p_locale);
+		return;
+	}
+	if (!p_locale.is_empty()) {
+		// Kept in the settings, so it works again once the translation exists.
+		print_verbose(vformat("Language settings: no translation of the channel \"%s\" is loaded for the locale \"%s\"; the channel follows the language.", p_channel, p_locale));
+	}
+	translation_server->clear_locale_for(p_channel);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -202,12 +248,15 @@ void LanguageSettingsServer::_on_loaded() {
 		locale = _get_test_locale();
 	}
 	if (!locale.is_empty()) {
-		// Pushed now, never saved; a later set_locale() replaces it.
+		// Pushed now, never saved; a later set_locale() replaces it. The channels follow it (a test shows one language).
 		set_session_override(SNAME("locale"), locale);
+		for (const char *channel : CHANNELS) {
+			set_session_override(_get_channel_value(StringName(channel)), String());
+		}
 	}
 }
 
-void LanguageSettingsServer::_on_startup_applied(int p_phase) {
+void LanguageSettingsServer::_on_startup_applied(ApplyPhase p_phase) {
 	if (p_phase >= APPLY_PHASE_SCENE) {
 		_push_pending_root_values();
 	}
@@ -233,7 +282,7 @@ Ref<Resource> LanguageSettingsServer::_create_default_settings() const {
 
 Variant LanguageSettingsServer::_validate_setting(const StringName &p_name, const Variant &p_value) const {
 	const Variant value = SettingsServer::_validate_setting(p_name, p_value);
-	if (p_name == SNAME("locale")) {
+	if (String(p_name).ends_with("locale")) {
 		const String locale = String(value).strip_edges();
 		const TranslationServer *translation_server = TranslationServer::get_singleton();
 		if (locale.is_empty() || translation_server == nullptr) {
@@ -253,6 +302,18 @@ void LanguageSettingsServer::set_locale(const String &p_locale) {
 
 String LanguageSettingsServer::get_locale() const {
 	return get_value(SNAME("locale"));
+}
+
+void LanguageSettingsServer::set_locale_for(const StringName &p_channel, const String &p_locale) {
+	const StringName value_name = _get_channel_value(p_channel);
+	ERR_FAIL_COND_MSG(value_name.is_empty(), vformat("Language settings store the channels \"interface\", \"audio\" and \"subtitles\", not \"%s\"; use TranslationServer.set_locale_for() for custom channels.", p_channel));
+	set_value(value_name, p_locale);
+}
+
+String LanguageSettingsServer::get_locale_for(const StringName &p_channel) const {
+	const StringName value_name = _get_channel_value(p_channel);
+	ERR_FAIL_COND_V_MSG(value_name.is_empty(), String(), vformat("Language settings store the channels \"interface\", \"audio\" and \"subtitles\", not \"%s\".", p_channel));
+	return get_value(value_name);
 }
 
 void LanguageSettingsServer::set_pseudolocalization_enabled(bool p_enabled) {
@@ -279,9 +340,33 @@ Node::AutoTranslateMode LanguageSettingsServer::get_root_auto_translate_mode() c
 	return Node::AutoTranslateMode(int(get_value(SNAME("root_auto_translate_mode"))));
 }
 
+void LanguageSettingsServer::_notify_value_applied(const StringName &p_name, const Variant &p_value) {
+	SettingsServer::_notify_value_applied(p_name, p_value);
+	// The values with a typed signal `<value>_changed` (see the class reference).
+	static const char *const SIGNAL_VALUES[] = {
+		"locale", // Deprecated signal (#357): TranslationServer.locale_changed reports every channel.
+		"pseudolocalization_enabled",
+		"layout_direction",
+		"root_auto_translate_mode",
+	};
+	for (const char *value_name : SIGNAL_VALUES) {
+		if (p_name == StringName(value_name)) {
+			emit_signal(StringName(String(value_name) + "_changed"), p_value);
+			return;
+		}
+	}
+}
+
 void LanguageSettingsServer::_bind_methods() {
+	ADD_SIGNAL(MethodInfo("locale_changed", PropertyInfo(Variant::STRING, "locale")));
+	ADD_SIGNAL(MethodInfo("pseudolocalization_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("layout_direction_changed", PropertyInfo(Variant::INT, "direction", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Window.LayoutDirection")));
+	ADD_SIGNAL(MethodInfo("root_auto_translate_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Node.AutoTranslateMode")));
+
 	ClassDB::bind_method(D_METHOD("set_locale", "locale"), &LanguageSettingsServer::set_locale);
 	ClassDB::bind_method(D_METHOD("get_locale"), &LanguageSettingsServer::get_locale);
+	ClassDB::bind_method(D_METHOD("set_locale_for", "channel", "locale"), &LanguageSettingsServer::set_locale_for);
+	ClassDB::bind_method(D_METHOD("get_locale_for", "channel"), &LanguageSettingsServer::get_locale_for);
 	ClassDB::bind_method(D_METHOD("set_pseudolocalization_enabled", "enabled"), &LanguageSettingsServer::set_pseudolocalization_enabled);
 	ClassDB::bind_method(D_METHOD("is_pseudolocalization_enabled"), &LanguageSettingsServer::is_pseudolocalization_enabled);
 	ClassDB::bind_method(D_METHOD("set_layout_direction", "direction"), &LanguageSettingsServer::set_layout_direction);
@@ -291,6 +376,7 @@ void LanguageSettingsServer::_bind_methods() {
 	ClassDB::bind_static_method("LanguageSettingsServer", D_METHOD("get_project_locale"), &LanguageSettingsServer::get_project_locale);
 	ClassDB::bind_static_method("LanguageSettingsServer", D_METHOD("get_command_line_locale"), &LanguageSettingsServer::get_command_line_locale);
 	ClassDB::bind_static_method("LanguageSettingsServer", D_METHOD("get_available_locales"), &LanguageSettingsServer::get_available_locales);
+	ClassDB::bind_static_method("LanguageSettingsServer", D_METHOD("get_available_locales_for", "channel"), &LanguageSettingsServer::get_available_locales_for);
 }
 
 LanguageSettingsServer::LanguageSettingsServer() {
@@ -299,6 +385,9 @@ LanguageSettingsServer::LanguageSettingsServer() {
 	}
 	// No getter: an empty locale (follow the OS) is the default, not the locale the engine has now.
 	bind_setting_callbacks(SNAME("locale"), callable_mp_static(&LanguageSettingsServer::_push_locale), Callable());
+	for (const char *channel : CHANNELS) {
+		bind_setting_callbacks(_get_channel_value(StringName(channel)), callable_mp_static(&LanguageSettingsServer::_push_channel_locale).bind(StringName(channel)), Callable());
+	}
 	bind_setting_singleton_property(SNAME("pseudolocalization_enabled"), SNAME("TranslationServer"), SNAME("pseudolocalization_enabled"));
 	bind_setting_callbacks(SNAME("layout_direction"), callable_mp(this, &LanguageSettingsServer::_push_layout_direction), callable_mp(this, &LanguageSettingsServer::_pull_layout_direction));
 	bind_setting_callbacks(SNAME("root_auto_translate_mode"), callable_mp(this, &LanguageSettingsServer::_push_root_auto_translate_mode), callable_mp(this, &LanguageSettingsServer::_pull_root_auto_translate_mode));

@@ -45,6 +45,7 @@
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
+#include "scene/audio/audio_command.h"
 #include "scene/audio/audio_mixer_server.h"
 #include "scene/audio/audio_stream_player.h"
 #include "scene/debugger/scene_debugger.h"
@@ -103,15 +104,20 @@
 #include "scene/main/canvas_layer.h"
 #include "scene/main/http_request.h"
 #include "scene/main/http_response.h"
+#include "scene/main/input_icon_server.h"
 #include "scene/main/instance_placeholder.h"
 #include "scene/main/missing_node.h"
 #include "scene/main/multiplayer_api.h"
+#include "scene/main/progress_bar_server.h"
 #include "scene/main/resource_preloader.h"
 #include "scene/main/scene_tree.h"
+#include "scene/main/screenshot_server.h"
 #include "scene/main/shader_globals_override.h"
 #include "scene/main/status_indicator.h"
+#include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
 #include "scene/main/viewport.h"
+#include "scene/main/viewport_server.h"
 #include "scene/main/window.h"
 #include "scene/resources/animation_library.h"
 #include "scene/resources/atlas_texture.h"
@@ -145,21 +151,24 @@
 #include "scene/resources/image_texture.h"
 #include "scene/resources/image_texture_resource_format.h"
 #include "scene/resources/immediate_mesh.h"
+#include "scene/resources/input_icon_set.h"
 #include "scene/resources/label_settings.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/mesh_texture.h"
 #include "scene/resources/multimesh.h"
-#include "scene/resources/texture_atlas.h"
+#include "scene/resources/sprite_sheet.h"
 #if !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/navigation_mesh.h"
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/audio/audio_stream_generator.h"
 #include "scene/resources/dpi_texture.h"
+#include "scene/resources/localized_text.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/particle_process_material.h"
 #include "scene/resources/placeholder_textures.h"
 #include "scene/resources/portable_compressed_texture.h"
+#include "scene/resources/progress_bar_style.h"
 #include "scene/resources/resource_format_text.h"
 #include "scene/resources/shader_include.h"
 #include "scene/resources/shader_include_resource_format.h"
@@ -173,6 +182,7 @@
 #include "scene/resources/style_box_texture.h"
 #include "scene/resources/surface_tool.h"
 #include "scene/resources/syntax_highlighter.h"
+#include "scene/resources/system_font_resource_format.h"
 #include "scene/resources/text_line.h"
 #include "scene/resources/text_paragraph.h"
 #include "scene/resources/texture.h"
@@ -390,6 +400,10 @@
 #endif // PHYSICS_3D_DISABLED
 
 static AudioMixerServer *audio_mixer_server = nullptr;
+static ScreenshotServer *screenshot_server = nullptr;
+static ViewportServer *viewport_server = nullptr;
+static InputIconServer *input_icon_server = nullptr;
+static ProgressBarServer *progress_bar_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
 static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
@@ -412,6 +426,7 @@ static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
 
 static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
 static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
+static Ref<ResourceFormatLoaderSystemFont> resource_loader_system_font;
 
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
@@ -482,6 +497,11 @@ void register_scene_types() {
 		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
 	}
 
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		resource_loader_system_font.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_system_font);
+	}
+
 	OS::get_singleton()->yield(); // may take time to init
 
 	GDREGISTER_CLASS(Node);
@@ -511,6 +531,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(HTTPRequestTarget);
 	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
+	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
@@ -1006,7 +1027,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(ImageTexture);
 	GDREGISTER_CLASS(ImageSaveOptions);
 	GDREGISTER_CLASS(AtlasTexture);
-	GDREGISTER_CLASS(TextureAtlas);
+	GDREGISTER_CLASS(SpriteSheet);
 	GDREGISTER_CLASS(MeshTexture);
 	GDREGISTER_CLASS(CurveTexture);
 	GDREGISTER_CLASS(CurveXYZTexture);
@@ -1070,6 +1091,9 @@ void register_scene_types() {
 	GDREGISTER_CLASS(StyleBoxFlat);
 	GDREGISTER_CLASS(StyleBoxLine);
 	GDREGISTER_CLASS(Theme);
+	GDREGISTER_CLASS(InputIconSet);
+	GDREGISTER_CLASS(ProgressBarStyle);
+	GDREGISTER_CLASS(LocalizedText);
 
 	GDREGISTER_CLASS(BitMap);
 	GDREGISTER_CLASS(Gradient);
@@ -1093,6 +1117,8 @@ void register_scene_types() {
 	GDREGISTER_ABSTRACT_CLASS(AudioStreamPlaybackPolyphonic);
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
+	GDREGISTER_CLASS(AudioCommand);
+	GDREGISTER_CLASS(AudioCommandList);
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
@@ -1408,10 +1434,28 @@ void unregister_scene_types() {
 
 	SceneDebugger::deinitialize();
 
+	if (screenshot_server) {
+		memdelete(screenshot_server);
+		screenshot_server = nullptr;
+	}
+	if (viewport_server) {
+		memdelete(viewport_server);
+		viewport_server = nullptr;
+	}
 	if (audio_mixer_server) {
 		memdelete(audio_mixer_server);
 		audio_mixer_server = nullptr;
 	}
+
+	if (input_icon_server) {
+		memdelete(input_icon_server);
+		input_icon_server = nullptr;
+	}
+	if (progress_bar_server) {
+		memdelete(progress_bar_server);
+		progress_bar_server = nullptr;
+	}
+	LocalizedText::finish();
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
@@ -1478,6 +1522,11 @@ void unregister_scene_types() {
 		resource_loader_font_file.unref();
 	}
 
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_system_font);
+		resource_loader_system_font.unref();
+	}
+
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either
 #ifndef _3D_DISABLED
 	BaseMaterial3D::finish_shaders();
@@ -1508,6 +1557,22 @@ void register_scene_singletons() {
 	GDREGISTER_CLASS(AudioMixerServer);
 	audio_mixer_server = memnew(AudioMixerServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("AudioMixerServer", AudioMixerServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ScreenshotServer);
+	screenshot_server = memnew(ScreenshotServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ScreenshotServer", ScreenshotServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ViewportServer);
+	viewport_server = memnew(ViewportServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ViewportServer", ViewportServer::get_singleton()));
+
+	GDREGISTER_CLASS(InputIconServer);
+	input_icon_server = memnew(InputIconServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("InputIconServer", InputIconServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(ProgressBarServer);
+	progress_bar_server = memnew(ProgressBarServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ProgressBarServer", ProgressBarServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }

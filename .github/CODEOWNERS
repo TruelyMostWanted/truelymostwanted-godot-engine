@@ -141,6 +141,7 @@
 /modules/interactive_music/**/SCsub           @godotengine/audio @godotengine/buildsystem
 /modules/interactive_music/doc_classes/       @godotengine/audio @godotengine/documentation
 /modules/interactive_music/editor/            @godotengine/audio @godotengine/editor
+/modules/interactive_music/tests/             @godotengine/audio @godotengine/tests
 /modules/mp3/                                 @godotengine/audio
 /modules/mp3/**/*.py                          @godotengine/audio @godotengine/buildsystem
 /modules/mp3/**/SCsub                         @godotengine/audio @godotengine/buildsystem
@@ -155,11 +156,19 @@
 /modules/theora/**/SCsub                      @godotengine/audio @godotengine/buildsystem
 /modules/theora/doc_classes/                  @godotengine/audio @godotengine/documentation
 /modules/theora/editor/                       @godotengine/audio @godotengine/editor
+/modules/webm/                                @godotengine/audio
+/modules/webm/**/*.py                         @godotengine/audio @godotengine/buildsystem
+/modules/webm/**/SCsub                        @godotengine/audio @godotengine/buildsystem
+/modules/webm/doc_classes/                    @godotengine/audio @godotengine/documentation
 /modules/vorbis/                              @godotengine/audio
 /modules/vorbis/**/*.py                       @godotengine/audio @godotengine/buildsystem
 /modules/vorbis/**/SCsub                      @godotengine/audio @godotengine/buildsystem
 /modules/vorbis/doc_classes/                  @godotengine/audio @godotengine/documentation
 /modules/vorbis/editor/                       @godotengine/audio @godotengine/editor
+/modules/opus/                                @godotengine/audio
+/modules/opus/**/*.py                         @godotengine/audio @godotengine/buildsystem
+/modules/opus/**/SCsub                        @godotengine/audio @godotengine/buildsystem
+/modules/opus/doc_classes/                    @godotengine/audio @godotengine/documentation
 
 ## Import
 /modules/astcenc/                             @godotengine/asset-pipeline
@@ -381,6 +390,7 @@
 /modules/tilemap/                             @godotengine/2d-nodes
 /modules/tilemap/**/*.py                      @godotengine/2d-nodes @godotengine/buildsystem
 /modules/tilemap/**/SCsub                     @godotengine/2d-nodes @godotengine/buildsystem
+/modules/tilemap/tests/                       @godotengine/2d-nodes @godotengine/tests
 /modules/tilemap/doc_classes/                 @godotengine/2d-nodes @godotengine/documentation
 /modules/tilemap/editor/                      @godotengine/2d-nodes @godotengine/editor
 /modules/tilemap/editor/**/SCsub              @godotengine/2d-nodes @godotengine/editor @godotengine/buildsystem
@@ -530,12 +540,35 @@
 /truely/                                      @TruelyMostWanted
 /truely/**/*.py                               @TruelyMostWanted @godotengine/buildsystem
 /.agents/                                     @TruelyMostWanted
+/servers/subtitle/                            @TruelyMostWanted
+/servers/subtitle/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
 /servers/tts/                                 @TruelyMostWanted
 /servers/tts/**/SCsub                         @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/                                @TruelyMostWanted
 /modules/toml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/toml/editor/                         @TruelyMostWanted @godotengine/editor
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
+/modules/yaml/                                @TruelyMostWanted
+/modules/yaml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
+/modules/yaml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
+/modules/yaml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/yaml/editor/                         @TruelyMostWanted @godotengine/editor
+/modules/yaml/tests/                          @TruelyMostWanted @godotengine/tests
+/modules/sqlite/                              @TruelyMostWanted
+/modules/sqlite/**/*.py                       @TruelyMostWanted @godotengine/buildsystem
+/modules/sqlite/**/SCsub                      @TruelyMostWanted @godotengine/buildsystem
+/modules/sqlite/doc_classes/                  @TruelyMostWanted @godotengine/documentation
+/modules/sqlite/editor/                       @TruelyMostWanted @godotengine/editor
+/modules/sqlite/tests/                        @TruelyMostWanted @godotengine/tests
+/modules/flow_graph/                          @TruelyMostWanted
+/modules/flow_graph/**/*.py                   @TruelyMostWanted @godotengine/buildsystem
+/modules/flow_graph/**/SCsub                  @TruelyMostWanted @godotengine/buildsystem
+/modules/flow_graph/doc_classes/              @TruelyMostWanted @godotengine/documentation
+/modules/flow_graph/editor/                   @TruelyMostWanted @godotengine/editor
+/modules/flow_graph/tests/                    @TruelyMostWanted @godotengine/tests
+/thirdparty/sqlite/                           @TruelyMostWanted @godotengine/buildsystem
 /servers/settings/                            @TruelyMostWanted
 /servers/settings/**/SCsub                    @TruelyMostWanted @godotengine/buildsystem
+/modules/mono/tests/                          @TruelyMostWanted @godotengine/dotnet @godotengine/tests

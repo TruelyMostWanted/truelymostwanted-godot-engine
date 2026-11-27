@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LocalizationServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Base class of the localization servers: catalog layers, locale chains per channel and catalog manifests.
+	</brief_description>
+	<description>
+		[LocalizationServer] is the abstract base of [TextLocalizationServer] (texts) and [ResourceLocalizationServer] (localized resource paths). It holds [LocalizationCatalog]s as layers with a priority, one key index over all layers and the data of the active locale chains.
+		[b]Locale:[/b] the locale is stored in [TranslationServer], per channel: [method TranslationServer.set_locale] sets the general locale, [method TranslationServer.set_locale_for] the locale of a channel ([code]interface[/code], [code]audio[/code], [code]subtitles[/code] or a custom one). Every key follows the [member LocalizationCatalog.channel] of the highest-priority catalog that has it. The servers listen to [signal TranslationServer.locale_changed]: a change of one channel rebuilds only the keys of that channel, before the nodes re-translate.
+		[b]Locale chain:[/b] a key is looked up for the locale, its parent locales, the closest other locale of the catalogs and then the fallback locale, for example [code]de_DE[/code] → [code]de[/code] → [code]de_AT[/code] → [code]en[/code] (see [method get_locale_chain]). Texts, resources and [LanguageSettingsServer] use the same rule.
+		[b]Priority:[/b] the chain comes first (a text for [code]de_DE[/code] beats a text for [code]de[/code]), then the layers: the catalog with the higher priority wins; with equal priority, the catalog added later wins (the same rule as [member TextInsertionValues.priority]).
+		[b]On-demand locales:[/b] catalogs loaded from [code].lcat[/code] files read a locale only when it is needed. The server reads the locales of the active chains and unloads the other locales of file-backed catalogs on a locale change.
+		[b]Project catalogs:[/b] [member ProjectSettings.internationalization/localization/catalog_manifests] lists [FilesManifest]s; the list order is the priority, the [member FilesManifest.type_hint] names the catalog kind. They are loaded at startup (see [method load_project_catalogs]) and again when a watched manifest reports a new or removed file or a pack is mounted or unmounted.
+		[b]Threads:[/b] reading is lock-free. Changes of catalogs and locales are applied on the main thread; calls from other threads are deferred. Signals are emitted on the main thread.
+		[codeblocks]
+		[gdscript]
+		TranslationServer.set_locale("de_DE")
+		print(TextLocalizationServer.get_locale_chain("de_DE")) # ["de_DE", "de", "en"]
+
+		var mods = FilesManifest.new()
+		mods.folder_paths = ["user://mods/*/translations"]
+		TextLocalizationServer.add_catalog_manifest(mods, 100)
+		[/gdscript]
+		[csharp]
+		TranslationServer.SetLocale("de_DE");
+		// Methods of this base class are reached through the singleton instance in C#.
+		GD.Print(TextLocalizationServer.Singleton.GetLocaleChain("de_DE")); // ["de_DE", "de", "en"]
+
+		var mods = new FilesManifest();
+		mods.FolderPaths = ["user://mods/*/translations"];
+		TextLocalizationServer.Singleton.AddCatalogManifest(mods, 100);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_catalog">
+			<return type="void" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<param index="1" name="priority" type="int" default="0" />
+			<description>
+				Adds [param catalog] as a layer with [param priority]. A catalog that was already added moves to the new priority. The catalog must be of the class this server takes ([TextLocalizationCatalog] for [TextLocalizationServer]). Changes of the catalog's content are picked up on the next idle frame. Emits [signal catalogs_changed].
+			</description>
+		</method>
+		<method name="add_catalog_manifest">
+			<return type="int" />
+			<param index="0" name="manifest" type="FilesManifest" />
+			<param index="1" name="priority" type="int" default="0" />
+			<description>
+				Loads the catalog files of [param manifest] in its load order and adds them with [param priority]; returns the number of catalogs added. The [member FilesManifest.type_hint] names the catalog kind ([code skip-lint]TextLocalizationCatalog[/code] when empty, or [code skip-lint]ResourceLocalizationCatalog[/code]) and must be this server's; it is not used as a file filter. Without [member FilesManifest.extensions], the catalog formats are listed ([method LocalizationCatalog.get_file_extensions], [code].tres[/code], [code].res[/code]). Folders may hold wildcards, for example [code]user://mods/*/translations[/code]. Files are loaded with [ResourceLoader] (cached under their path). Main thread only.
+			</description>
+		</method>
+		<method name="clear_catalogs">
+			<return type="void" />
+			<description>
+				Removes all catalogs. Key ids returned by [method TextLocalizationServer.get_key_id] stay valid. Emits [signal catalogs_changed].
+			</description>
+		</method>
+		<method name="get_available_locales" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the locales of all catalogs, each once, for example to fill a language menu.
+			</description>
+		</method>
+		<method name="get_available_locales_for" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the locales of the catalogs that give keys of the locale [param channel] (see [member LocalizationCatalog.channel] and [method TranslationServer.set_locale_for]), each once, in the order of the catalogs. A key counts for the channel of the highest-priority catalog that has it, and every catalog with that key serves the channel. Returns an empty array if no catalog has keys of [param channel], for example [code]"audio"[/code] in [TextLocalizationServer]. [method LanguageSettingsServer.get_available_locales_for] combines the locales of all localization servers.
+			</description>
+		</method>
+		<method name="get_catalogs" qualifiers="const">
+			<return type="LocalizationCatalog[]" />
+			<description>
+				Returns the catalogs, the lowest priority first.
+			</description>
+		</method>
+		<method name="get_key_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of keys (rows) the server knows. Rows are never removed while the server runs, so this also counts keys of removed catalogs.
+			</description>
+		</method>
+		<method name="get_locale_chain" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns the locales a key is looked up in, in order: the standardized [param locale], its parent locales, the closest other locale of this server's catalogs by [method TranslationServer.compare_locales], then the fallback locale and its parents, each once. For example [code]"de_DE"[/code] gives [code]["de_DE", "de", "de_AT", "en"][/code] with catalogs for [code]de_AT[/code] and the fallback locale [code]en[/code].
+			</description>
+		</method>
+		<method name="has_catalog" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<description>
+				Returns [code]true[/code] if [param catalog] was added.
+			</description>
+		</method>
+		<method name="load_project_catalogs">
+			<return type="int" />
+			<description>
+				Loads the catalogs of the manifests in [member ProjectSettings.internationalization/localization/catalog_manifests] whose kind is this server's, with priority 0 in list order (a later manifest wins), and returns the number of catalogs. The catalogs of the previous call are replaced, so calling it again does not add layers twice. [ResourceLocalizationServer] adds the project's [code]internationalization/locale/translation_remaps[/code] as the first layer. Each manifest is registered in [FilesManifestServer] as [code]localization_catalogs_&lt;index&gt;[/code]: when it is watched ([method FilesManifestServer.set_watching]), new or removed files reload the catalogs, as do packs mounted or unmounted by [PCKPackageServer]. The engine calls it at startup.
+			</description>
+		</method>
+		<method name="remove_catalog">
+			<return type="void" />
+			<param index="0" name="catalog" type="LocalizationCatalog" />
+			<description>
+				Removes [param catalog]. Its keys keep their ids but have no text from it anymore. Emits [signal catalogs_changed].
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="catalogs_changed">
+			<description>
+				Emitted after catalogs were added or removed, or after the content of a catalog changed, once the server's data was rebuilt.
+			</description>
+		</signal>
+		<signal name="locale_loaded">
+			<param index="0" name="locale" type="String" />
+			<description>
+				Emitted when the texts of [param locale] became available: when it joins the active locale chain and a catalog has it.
+			</description>
+		</signal>
+	</signals>
+</class>

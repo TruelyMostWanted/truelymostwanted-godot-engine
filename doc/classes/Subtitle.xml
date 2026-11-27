@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Subtitle" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A timed list of texts: subtitles and closed captions.
+	</brief_description>
+	<description>
+		A [Subtitle] holds [SubtitleSegment]s, each with a time range and a text. It knows nothing about audio or video: [SubtitleServer] plays it on a track, driven by any clock, for example the position of an [AudioStreamPlayer], a [VideoStreamPlayer] or an [AnimationPlayer], or its own clock.
+		The subtitle emits [signal Resource.changed] when one of its segments emits it, so an edit of a segment's times or text reaches everything that listens to the subtitle, such as [SubtitlePlayback].
+		Subtitle files load as [Subtitle] through [ResourceLoader], also from [code]user://[/code] and packs, and [ResourceSaver] writes them, in every format of [enum Format]: SubRip ([code].srt[/code]), WebVTT ([code].vtt[/code]), TTML/DFXP ([code].ttml[/code], [code].dfxp[/code]), SubStation Alpha ([code].ass[/code], [code].ssa[/code]) and YouTube SBV ([code].sbv[/code]). The extension picks the format. The rules below are those of SubRip; the other formats map their own speaker, italics and top placement (see [enum Format]). Styling is not read. Formatting is removed on loading: [code]&lt;i&gt;[/code], [code]&lt;b&gt;[/code], [code]&lt;u&gt;[/code], [code]&lt;font&gt;[/code] and [code]{\an8}[/code]-style tags. Kinds and speakers are recognized: a text fully in brackets ([code][Applause][/code] or [code](Applause)[/code]) becomes [constant SubtitleSegment.KIND_SOUND], a text between music notes becomes [constant SubtitleSegment.KIND_MUSIC], a leading name in capitals ([code]JOHN: Hello[/code]) becomes [member SubtitleSegment.speaker], and a text fully in [code]&lt;i&gt;[/code] sets [member SubtitleSegment.off_screen]. Saving writes these decorations back, so the file works in any video player. Saved as [code].tres[/code], every property is kept.
+		[codeblocks]
+		[gdscript]
+		var subtitle: Subtitle = load("res://dialog/intro.srt")
+		subtitle.time_offset = -3600.0 # The file was exported from a timeline starting at 01:00:00.
+
+		SubtitleServer.text_changed.connect(func(_track_id, text): $SubtitleLabel.text = text)
+		SubtitleServer.play(subtitle, $Voice.get_playback_position)
+		$Voice.play()
+		[/gdscript]
+		[csharp]
+		var subtitle = GD.Load&lt;Subtitle&gt;("res://dialog/intro.srt");
+		subtitle.TimeOffset = -3600.0; // The file was exported from a timeline starting at 01:00:00.
+
+		SubtitleServer.Singleton.TextChanged += (trackId, text) =&gt; GetNode&lt;Label&gt;("SubtitleLabel").Text = text;
+		var voice = GetNode&lt;AudioStreamPlayer&gt;("Voice");
+		SubtitleServer.Play(subtitle, new Callable(voice, AudioStreamPlayer.MethodName.GetPlaybackPosition));
+		voice.Play();
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_segment">
+			<return type="void" />
+			<param index="0" name="segment" type="SubtitleSegment" />
+			<description>
+				Inserts [param segment] after the last segment that starts at the same time or earlier, so the list stays sorted by start time.
+			</description>
+		</method>
+		<method name="clear_segments">
+			<return type="void" />
+			<description>
+				Removes all segments.
+			</description>
+		</method>
+		<method name="find_segment_at" qualifiers="const">
+			<return type="SubtitleSegment" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Returns the first segment shown at the playback time [param time] ([member time_offset] included), or [code]null[/code].
+			</description>
+		</method>
+		<method name="get_end_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the latest [member SubtitleSegment.end_time] plus [member time_offset], or [code]0.0[/code] without segments.
+			</description>
+		</method>
+		<method name="get_segment" qualifiers="const">
+			<return type="SubtitleSegment" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Returns the segment at [param index].
+			</description>
+		</method>
+		<method name="get_segment_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of segments.
+			</description>
+		</method>
+		<method name="get_segments_at" qualifiers="const">
+			<return type="SubtitleSegment[]" />
+			<param index="0" name="time" type="float" />
+			<description>
+				Returns all segments shown at the playback time [param time] ([member time_offset] included), in list order. Overlapping segments are all returned.
+			</description>
+		</method>
+		<method name="get_start_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the earliest [member SubtitleSegment.start_time] plus [member time_offset], or [code]0.0[/code] without segments.
+			</description>
+		</method>
+		<method name="load_from_file">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Replaces the segments with those of the subtitle file at [param path] and resets [member time_offset] to [code]0.0[/code]. The extension picks the format (see [enum Format]); an unknown extension returns [constant ERR_FILE_UNRECOGNIZED]. Unlike [method ResourceLoader.load], this fills an existing resource and skips the resource cache.
+			</description>
+		</method>
+		<method name="load_from_text">
+			<return type="int" enum="Error" />
+			<param index="0" name="text" type="String" />
+			<param index="1" name="format" type="int" enum="Subtitle.Format" />
+			<description>
+				Replaces the segments with those read from [param text] and resets [member time_offset] to [code]0.0[/code]. Cues that can't be read are skipped. Returns [constant ERR_PARSE_ERROR] if [param text] has content but not a single cue could be read; the subtitle is then unchanged.
+			</description>
+		</method>
+		<method name="remove_segment">
+			<return type="void" />
+			<param index="0" name="index" type="int" />
+			<description>
+				Removes the segment at [param index].
+			</description>
+		</method>
+		<method name="save_to_file" qualifiers="const">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Writes the subtitle to [param path] in the format of its extension (see [enum Format]), like [method to_text]. An unknown extension returns [constant ERR_FILE_UNRECOGNIZED].
+			</description>
+		</method>
+		<method name="shift_times">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<description>
+				Adds [param seconds] to the start and end time of every segment. Unlike [member time_offset], this changes the segments themselves.
+			</description>
+		</method>
+		<method name="sort_segments">
+			<return type="void" />
+			<description>
+				Sorts the segments by start time, then by end time. Segments with the same times keep their order.
+			</description>
+		</method>
+		<method name="to_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="format" type="int" enum="Subtitle.Format" />
+			<description>
+				Returns the subtitle as text in [param format]. Every format adds [member time_offset] to the written times and writes the cues sorted by start time. For SubRip, the cues are sorted by start time and numbered from 1, and segments without text are left out, because an empty cue cannot be read back; [member time_offset] is added to the written times, because SubRip has no offset field; decorations are written back ([code][Applause][/code], music notes, [code]JOHN: [/code] in capitals, [code]&lt;i&gt;[/code] for [member SubtitleSegment.off_screen]); lines end with [code]\n[/code].
+			</description>
+		</method>
+		<method name="validate" qualifiers="const">
+			<return type="SubtitleValidation" />
+			<param index="0" name="max_characters_per_second" type="float" default="20.0" />
+			<description>
+				Checks the segments for invalid times, empty texts, overlaps and text that is too long to read in time. A reading speed above [param max_characters_per_second] counts as too fast; [code]0.0[/code] skips this check. The Inspector shows the result.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="auto_translate" type="bool" setter="set_auto_translate" getter="is_auto_translate" default="false">
+			If [code]true[/code], [SubtitleServer] passes each [member SubtitleSegment.text] through [method TranslationServer.translate], with [member SubtitleSegment.translation_context] as the context. The texts are then translation keys or source texts.
+		</member>
+		<member name="language" type="String" setter="set_language" getter="get_language" default="&quot;&quot;">
+			The locale of the texts, such as [code]"de"[/code] or [code]"en_US"[/code]. Informational.
+		</member>
+		<member name="segments" type="SubtitleSegment[]" setter="set_segments" getter="get_segments" default="[]">
+			The segments. Keep them sorted by start time ([method sort_segments]); [method validate] and the Inspector expect it.
+		</member>
+		<member name="time_offset" type="float" setter="set_time_offset" getter="get_time_offset" default="0.0">
+			Added to every segment time when the subtitle is played or queried. Video editors often start their timeline at [code]01:00:00[/code]; a SubRip file exported from them needs [code]-3600.0[/code]. The Inspector suggests the value.
+		</member>
+	</members>
+	<constants>
+		<constant name="FORMAT_SRT" value="0" enum="Format">
+			SubRip ([code].srt[/code]) without formatting.
+		</constant>
+		<constant name="FORMAT_VTT" value="1" enum="Format">
+			WebVTT ([code].vtt[/code]): the web format (HTML5 video, YouTube, Vimeo). Speakers as [code]&lt;v Name&gt;[/code], top placement as the cue setting [code]line:0[/code].
+		</constant>
+		<constant name="FORMAT_TTML" value="2" enum="Format">
+			TTML / DFXP ([code].ttml[/code], [code].dfxp[/code]): the XML format of broadcasters and streaming services. Reads clock times, frames ([code]ttp:frameRate[/code]), offsets ([code]1.5s[/code], [code]1500ms[/code], [code]90f[/code], ticks) and [code]dur[/code]; [code]xml:lang[/code] becomes [member language]. Off-screen as [code]tts:fontStyle="italic"[/code].
+		</constant>
+		<constant name="FORMAT_ASS" value="3" enum="Format">
+			Advanced SubStation Alpha ([code].ass[/code]; [code].ssa[/code] is read too, and written in the [code].ass[/code] dialect): the format of subtitle editors such as Aegisub. Speakers in the [code]Name[/code] field, [code]{\i1}[/code] for italics, [code]{\an8}[/code] for the top; styles and other override tags are dropped.
+		</constant>
+		<constant name="FORMAT_SBV" value="4" enum="Format">
+			YouTube SBV ([code].sbv[/code]): times and text only.
+		</constant>
+		<constant name="FORMAT_MAX" value="5" enum="Format">
+			Represents the size of the [enum Format] enum.
+		</constant>
+	</constants>
+</class>

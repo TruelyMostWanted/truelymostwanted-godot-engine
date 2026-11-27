@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowGraphState" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Saved state of a [FlowGraphPlayback], for savegames.
+	</brief_description>
+	<description>
+		[method FlowGraphPlayback.get_state] fills a [FlowGraphState]; [method FlowGraphPlayback.set_state] restores it. Save it like any resource, or store it inside your own savegame resource.
+		The state names the node on every graph level; the graphs of inner levels follow from the [FlowSubgraphNode]s of the outer levels, so only the main graph is stored ([member graph_path]). If the graph changed since the state was saved (nodes removed), [method FlowGraphPlayback.set_state] fails with [constant ERR_INVALID_DATA].
+		[codeblocks]
+		[gdscript]
+		ResourceSaver.save(player.get_playback().get_state(), "user://quest_state.tres")
+		# Later:
+		var state := load("user://quest_state.tres") as FlowGraphState
+		player.get_playback().set_state(state)
+		[/gdscript]
+		[csharp]
+		ResourceSaver.Save(player.GetPlayback().GetState(), "user://quest_state.tres");
+		// Later:
+		var state = GD.Load&lt;FlowGraphState&gt;("user://quest_state.tres");
+		player.GetPlayback().SetState(state);
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="graph_path" type="String" setter="set_graph_path" getter="get_graph_path" default="&quot;&quot;">
+			The main graph, as [code]uid://[/code] text when the graph has a UID, else as path. Empty for a graph built in code.
+		</member>
+		<member name="history" type="PackedInt32Array" setter="set_history" getter="get_history" default="PackedInt32Array()">
+			See [method FlowGraphPlayback.get_history].
+		</member>
+		<member name="layout_version" type="int" setter="set_layout_version" getter="get_layout_version" default="1">
+			The version of this layout, [constant STATE_LAYOUT_VERSION] when saved. A newer version is refused by [method FlowGraphPlayback.set_state].
+		</member>
+		<member name="node_memory" type="Array" setter="set_node_memory" getter="get_node_memory" default="[]">
+			One [Dictionary] per graph level: node id to the value stored with [method FlowGraphPlayback.set_node_memory]. Only nodes that stored a value are listed.
+		</member>
+		<member name="node_stack" type="PackedInt32Array" setter="set_node_stack" getter="get_node_stack" default="PackedInt32Array()">
+			The current node id on every graph level, main graph first. Empty when the playback did not play.
+		</member>
+		<member name="variables" type="Dictionary" setter="set_variables" getter="get_variables" default="{}">
+			A copy of the variables of the blackboard.
+		</member>
+		<member name="waiting" type="bool" setter="set_waiting" getter="is_waiting" default="false">
+			If [code]true[/code], the current node was waiting.
+		</member>
+	</members>
+	<constants>
+		<constant name="STATE_LAYOUT_VERSION" value="1">
+			The layout version this engine writes.
+		</constant>
+	</constants>
+</class>

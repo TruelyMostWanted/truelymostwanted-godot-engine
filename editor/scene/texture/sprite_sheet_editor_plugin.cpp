@@ -1,0 +1,1521 @@
+/**************************************************************************/
+/*  sprite_sheet_editor_plugin.cpp                                        */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#include "sprite_sheet_editor_plugin.h"
+
+#include "core/config/project_settings.h"
+#include "core/input/input_event.h"
+#include "core/io/file_access.h"
+#include "core/io/image.h"
+#include "core/io/resource_saver.h"
+#include "core/object/callable_mp.h"
+#include "core/object/class_db.h"
+#include "core/os/keyboard.h"
+#include "editor/docks/editor_dock_manager.h"
+#include "editor/docks/inspector_dock.h"
+#include "editor/editor_data.h"
+#include "editor/editor_node.h"
+#include "editor/editor_string_names.h"
+#include "editor/editor_undo_redo_manager.h"
+#include "editor/file_system/editor_file_system.h"
+#include "editor/gui/editor_file_dialog.h"
+#include "editor/scene/texture/texture_region_editor_plugin.h"
+#include "editor/themes/editor_scale.h"
+#include "scene/gui/button.h"
+#include "scene/gui/dialogs.h"
+#include "scene/gui/flow_container.h"
+#include "scene/gui/grid_container.h"
+#include "scene/gui/label.h"
+#include "scene/gui/line_edit.h"
+#include "scene/gui/option_button.h"
+#include "scene/gui/separator.h"
+#include "scene/gui/spin_box.h"
+#include "scene/gui/split_container.h"
+#include "scene/gui/tree.h"
+#include "scene/resources/sprite_frames.h"
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetEditing
+
+void SpriteSheetEditing::commit(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_old_regions, const TypedDictionary<StringName, Rect2i> &p_old_margins, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(p_action, p_merge, p_atlas.ptr());
+	undo_redo->add_do_method(p_atlas.ptr(), "set_regions", p_new_regions);
+	undo_redo->add_do_method(p_atlas.ptr(), "set_margins", p_new_margins);
+	undo_redo->add_undo_method(p_atlas.ptr(), "set_regions", p_old_regions);
+	undo_redo->add_undo_method(p_atlas.ptr(), "set_margins", p_old_margins);
+	undo_redo->commit_action();
+}
+
+void SpriteSheetEditing::commit_regions(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	commit(p_action, p_atlas, p_atlas->get_regions(), p_atlas->get_margins(), p_new_regions, p_new_margins, p_merge);
+}
+
+void SpriteSheetEditing::remove(const Ref<SpriteSheet> &p_atlas, const PackedStringArray &p_names) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	if (p_names.is_empty()) {
+		return;
+	}
+	TypedDictionary<StringName, Rect2i> regions = p_atlas->get_regions();
+	TypedDictionary<StringName, Rect2i> margins = p_atlas->get_margins();
+	for (const String &name : p_names) {
+		regions.erase(StringName(name));
+		margins.erase(StringName(name));
+	}
+	commit_regions(p_names.size() == 1 ? TTR("Delete Region") : TTR("Delete Regions"), p_atlas, regions, margins);
+}
+
+void SpriteSheetEditing::rename(const Ref<SpriteSheet> &p_atlas, const StringName &p_from, const StringName &p_to) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	if (p_from == p_to) {
+		return;
+	}
+	if (!SpriteSheet::is_valid_region_name(p_to)) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("\"%s\" is not a valid region name: it must not be empty and must not contain '/', ':', '\"', control characters or surrounding spaces."), p_to));
+		return;
+	}
+	if (p_atlas->has_region(p_to)) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("A region named \"%s\" exists already."), p_to));
+		return;
+	}
+	// rename_region() keeps the position and the AtlasTexture that nodes already use.
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Rename Region"), UndoRedo::MERGE_DISABLE, p_atlas.ptr());
+	undo_redo->add_do_method(p_atlas.ptr(), "rename_region", p_from, p_to);
+	undo_redo->add_undo_method(p_atlas.ptr(), "rename_region", p_to, p_from);
+	undo_redo->commit_action();
+}
+
+PackedStringArray SpriteSheetEditing::add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
+	ERR_FAIL_COND_V(p_atlas.is_null(), PackedStringArray());
+	if (p_rects.is_empty()) {
+		return PackedStringArray();
+	}
+	// Names and validation from the runtime API, applied to a copy so the change goes through undo/redo.
+	Ref<SpriteSheet> copy;
+	copy.instantiate();
+	copy->set_texture(p_atlas->get_sheet_texture());
+	copy->set_regions(p_atlas->get_regions());
+	copy->set_margins(p_atlas->get_margins());
+	const PackedStringArray names = copy->add_regions(p_rects, p_prefix);
+	if (names.is_empty()) {
+		return names; // The error was printed by add_regions().
+	}
+	commit_regions(p_action, p_atlas, copy->get_regions(), copy->get_margins());
+	return names;
+}
+
+bool SpriteSheetEditing::parse_rect(const String &p_text, Rect2i &r_rect) {
+	const PackedStringArray parts = p_text.replace_chars("()[]", ' ').split(",", false);
+	if (parts.size() != 4) {
+		return false;
+	}
+	int values[4];
+	for (int i = 0; i < 4; i++) {
+		const String part = parts[i].strip_edges();
+		if (!part.is_valid_int()) {
+			return false;
+		}
+		values[i] = part.to_int();
+	}
+	r_rect = Rect2i(values[0], values[1], values[2], values[3]);
+	return true;
+}
+
+bool SpriteSheetEditing::rect_from_region_editor(const Rect2 &p_rect, const Size2i &p_texture_size, Rect2i &r_rect) {
+	const Rect2 rect = p_rect.abs();
+	const Vector2i from = Vector2i(rect.position.round());
+	const Vector2i to = Vector2i(rect.get_end().round());
+	Rect2i result(from, to - from);
+	if (p_texture_size.x > 0 && p_texture_size.y > 0) {
+		result = result.intersection(Rect2i(Point2i(), p_texture_size));
+	}
+	if (result.size.x <= 0 || result.size.y <= 0) {
+		return false;
+	}
+	r_rect = result;
+	return true;
+}
+
+String SpriteSheetEditing::get_texture_warning(const Ref<SpriteSheet> &p_atlas) {
+	if (p_atlas.is_null()) {
+		return String();
+	}
+	const Ref<Texture2D> texture = p_atlas->get_sheet_texture();
+	if (texture.is_null()) {
+		if (!p_atlas->get_texture_path().is_empty()) {
+			return vformat(TTR("The texture \"%s\" could not be loaded. Regions cannot be checked against its size."), p_atlas->get_texture_path());
+		}
+		return TTR("No texture: set the sprite sheet in \"Texture\" to see and slice the regions.");
+	}
+	if (texture->get_width() <= 0 || texture->get_height() <= 0) {
+		return TTR("The texture has no size.");
+	}
+	// No get_image() here: it reads the texture back from the GPU, and this runs on every change of the sheet.
+	return String();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetRegionList
+
+void SpriteSheetRegionList::_atlas_changed() {
+	if (update_queued) {
+		return;
+	}
+	update_queued = true;
+	callable_mp(this, &SpriteSheetRegionList::update_list).call_deferred();
+}
+
+void SpriteSheetRegionList::set_atlas(const Ref<SpriteSheet> &p_atlas) {
+	if (atlas == p_atlas) {
+		return;
+	}
+	if (atlas.is_valid()) {
+		atlas->disconnect_changed(callable_mp(this, &SpriteSheetRegionList::_atlas_changed));
+	}
+	atlas = p_atlas;
+	if (atlas.is_valid()) {
+		atlas->connect_changed(callable_mp(this, &SpriteSheetRegionList::_atlas_changed));
+	}
+	update_list();
+}
+
+void SpriteSheetRegionList::update_list() {
+	update_queued = false;
+	const PackedStringArray selected = get_selected_names();
+	updating = true;
+	tree->clear();
+	TreeItem *root = tree->create_item();
+	if (atlas.is_null()) {
+		updating = false;
+		return;
+	}
+	const Ref<Texture2D> texture = atlas->get_sheet_texture();
+	const String filter_text = filter->get_text().strip_edges();
+	const int thumbnail_size = int(32 * EDSCALE);
+	const Ref<Texture2D> edit_icon = EditorNode::get_singleton()->get_editor_theme()->get_icon(SNAME("RegionEdit"), EditorStringName(EditorIcons));
+	for (const String &name : atlas->get_region_names()) {
+		if (!filter_text.is_empty() && !name.containsn(filter_text)) {
+			continue;
+		}
+		const Rect2i rect = atlas->get_region(name);
+		TreeItem *item = tree->create_item(root);
+		item->set_text(0, name);
+		item->set_metadata(0, name);
+		item->set_editable(0, true);
+		item->set_text(1, vformat("%d, %d, %d, %d", rect.position.x, rect.position.y, rect.size.x, rect.size.y));
+		item->set_editable(1, true);
+		item->set_tooltip_text(1, TTR("X, Y, width, height in pixels of the texture."));
+		item->add_button(1, edit_icon, 0, texture.is_null(), TTR("Edit Region"));
+		if (texture.is_valid()) {
+			// A thumbnail of its own, so the list does not create the cached textures of the atlas.
+			Ref<AtlasTexture> thumbnail;
+			thumbnail.instantiate();
+			thumbnail->set_atlas(texture);
+			thumbnail->set_region(Rect2(rect));
+			item->set_icon(0, thumbnail);
+			item->set_icon_max_width(0, thumbnail_size);
+		}
+		if (selected.has(name)) {
+			item->select(0);
+		}
+	}
+	updating = false;
+}
+
+void SpriteSheetRegionList::_item_edited() {
+	if (updating || atlas.is_null()) {
+		return;
+	}
+	TreeItem *item = tree->get_edited();
+	ERR_FAIL_NULL(item);
+	const StringName old_name = item->get_metadata(0);
+	if (tree->get_edited_column() == 0) {
+		const String new_name = item->get_text(0);
+		if (new_name != String(old_name)) {
+			SpriteSheetEditing::rename(atlas, old_name, new_name);
+		}
+	} else {
+		Rect2i rect;
+		if (!SpriteSheetEditing::parse_rect(item->get_text(1), rect)) {
+			EditorNode::get_singleton()->show_warning(TTR("Enter the rectangle as \"x, y, width, height\"."));
+		} else if (rect != atlas->get_region(old_name)) {
+			const Ref<Texture2D> texture = atlas->get_sheet_texture();
+			if (rect.size.x <= 0 || rect.size.y <= 0 || (texture.is_valid() && !Rect2i(Point2i(), Size2i(texture->get_size())).encloses(rect))) {
+				EditorNode::get_singleton()->show_warning(TTR("The rectangle must have a size greater than 0 and lie inside the texture."));
+			} else {
+				TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
+				regions[old_name] = rect;
+				SpriteSheetEditing::commit_regions(TTR("Set Region Rectangle"), atlas, regions, atlas->get_margins());
+			}
+		}
+	}
+	_atlas_changed(); // Shows the stored values again if the change was refused.
+}
+
+void SpriteSheetRegionList::_multi_selected(Object *p_item, int p_column, bool p_selected) {
+	if (updating) {
+		return;
+	}
+	// Tree emits one signal per changed cell; report the selection once.
+	callable_mp(this, &SpriteSheetRegionList::_emit_selection_changed).call_deferred();
+}
+
+void SpriteSheetRegionList::_button_clicked(Object *p_item, int p_column, int p_id, MouseButton p_button) {
+	if (p_button == MouseButton::LEFT) {
+		_edit_region(Object::cast_to<TreeItem>(p_item));
+	}
+}
+
+void SpriteSheetRegionList::_icon_double_clicked() {
+	_edit_region(tree->get_selected());
+}
+
+void SpriteSheetRegionList::_edit_region(TreeItem *p_item) {
+	if (p_item == nullptr || atlas.is_null()) {
+		return;
+	}
+	SpriteSheetEditor *editor = SpriteSheetEditor::get_singleton();
+	ERR_FAIL_NULL(editor);
+	editor->edit_region(atlas, p_item->get_metadata(0));
+}
+
+void SpriteSheetRegionList::_emit_selection_changed() {
+	if (selection_changed_callback.is_valid()) {
+		selection_changed_callback.call();
+	}
+}
+
+PackedStringArray SpriteSheetRegionList::get_selected_names() const {
+	PackedStringArray names;
+	TreeItem *item = tree->get_next_selected(nullptr);
+	while (item) {
+		const String name = item->get_metadata(0);
+		if (!names.has(name)) {
+			names.push_back(name);
+		}
+		item = tree->get_next_selected(item);
+	}
+	return names;
+}
+
+void SpriteSheetRegionList::set_selected_names(const PackedStringArray &p_names) {
+	TreeItem *root = tree->get_root();
+	if (root == nullptr) {
+		return;
+	}
+	updating = true;
+	tree->deselect_all();
+	TreeItem *first = nullptr;
+	for (TreeItem *item = root->get_first_child(); item; item = item->get_next()) {
+		if (p_names.has(String(item->get_metadata(0)))) {
+			item->select(0);
+			if (first == nullptr) {
+				first = item;
+			}
+		}
+	}
+	if (first) {
+		tree->scroll_to_item(first);
+	}
+	updating = false;
+}
+
+void SpriteSheetRegionList::set_tree_minimum_height(int p_height) {
+	tree->set_custom_minimum_size(Size2(0, p_height));
+}
+
+Variant SpriteSheetRegionList::_get_drag_data_fw(const Point2 &p_point, Control *p_from) {
+	if (atlas.is_null()) {
+		return Variant();
+	}
+	TreeItem *item = tree->get_item_at_position(p_point);
+	if (item == nullptr) {
+		return Variant();
+	}
+	const StringName name = item->get_metadata(0);
+	if (!atlas->has_region(name)) {
+		return Variant();
+	}
+	// The cached AtlasTexture of the atlas: it follows later changes of the region while the editor runs.
+	const Ref<AtlasTexture> texture = atlas->get_region_texture(name);
+	Dictionary drag_data;
+	drag_data["type"] = "resource";
+	drag_data["resource"] = texture;
+
+	Label *preview = memnew(Label);
+	preview->set_text(name);
+	preview->set_focus_mode(FOCUS_NONE);
+	set_drag_preview(preview);
+	return drag_data;
+}
+
+SpriteSheetRegionList::SpriteSheetRegionList() {
+	filter = memnew(LineEdit);
+	filter->set_placeholder(TTR("Filter Regions"));
+	filter->set_clear_button_enabled(true);
+	filter->set_accessibility_name(TTRC("Filter Regions"));
+	filter->connect(SceneStringName(text_changed), callable_mp(this, &SpriteSheetRegionList::update_list).unbind(1));
+	add_child(filter);
+
+	tree = memnew(Tree);
+	tree->set_columns(2);
+	tree->set_column_titles_visible(true);
+	tree->set_column_title(0, TTR("Name"));
+	tree->set_column_title(1, TTR("Rectangle"));
+	tree->set_column_expand(0, true);
+	tree->set_column_expand(1, true);
+	tree->set_hide_root(true);
+	tree->set_select_mode(Tree::SELECT_MULTI);
+	tree->set_v_size_flags(SIZE_EXPAND_FILL);
+	tree->set_custom_minimum_size(Size2(0, 160 * EDSCALE));
+	tree->set_accessibility_name(TTRC("Regions"));
+	tree->connect("item_edited", callable_mp(this, &SpriteSheetRegionList::_item_edited));
+	tree->connect("multi_selected", callable_mp(this, &SpriteSheetRegionList::_multi_selected));
+	tree->connect("button_clicked", callable_mp(this, &SpriteSheetRegionList::_button_clicked));
+	tree->connect("item_icon_double_clicked", callable_mp(this, &SpriteSheetRegionList::_icon_double_clicked));
+	tree->set_drag_forwarding(callable_mp(this, &SpriteSheetRegionList::_get_drag_data_fw).bind(tree), Callable(), Callable());
+	add_child(tree);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetCanvas
+
+static const real_t HANDLE_RADIUS = 6;
+
+Vector2 SpriteSheetCanvas::_to_texture(const Vector2 &p_screen) const {
+	return (p_screen - view_offset) / zoom;
+}
+
+Vector2 SpriteSheetCanvas::_to_screen(const Vector2 &p_texture) const {
+	return p_texture * zoom + view_offset;
+}
+
+Vector2i SpriteSheetCanvas::_snap(const Vector2 &p_texture) const {
+	if (editor->is_grid_snap()) {
+		const Vector2i step = editor->get_grid_step();
+		const Vector2i offset = editor->get_grid_offset();
+		return Vector2i(
+				int(Math::round((p_texture.x - offset.x) / step.x)) * step.x + offset.x,
+				int(Math::round((p_texture.y - offset.y) / step.y)) * step.y + offset.y);
+	}
+	return Vector2i(int(Math::round(p_texture.x)), int(Math::round(p_texture.y)));
+}
+
+Rect2i SpriteSheetCanvas::_get_texture_area() const {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	const Size2i size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? Size2i(atlas->get_sheet_texture()->get_size()) : Size2i();
+	if (size.x > 0 && size.y > 0) {
+		return Rect2i(Point2i(), size);
+	}
+	// Without a texture, regions still start at (0, 0) or later.
+	return Rect2i(0, 0, 1 << 20, 1 << 20);
+}
+
+Rect2i SpriteSheetCanvas::_clamp_to_texture(const Rect2i &p_rect) const {
+	const Size2i size = _get_texture_area().size;
+	Rect2i rect = p_rect;
+	rect.size = rect.size.min(size).maxi(1);
+	rect.position = rect.position.clamp(Vector2i(), size - rect.size);
+	return rect;
+}
+
+StringName SpriteSheetCanvas::_region_at(const Vector2 &p_texture) const {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	StringName found;
+	int64_t found_area = INT64_MAX;
+	// The smallest region under the cursor wins, so nested regions stay reachable.
+	for (const String &name : atlas->get_region_names()) {
+		const Rect2i rect = atlas->get_region(name);
+		if (Rect2(rect).has_point(p_texture) && int64_t(rect.get_area()) < found_area) {
+			found = name;
+			found_area = rect.get_area();
+		}
+	}
+	return found;
+}
+
+void SpriteSheetCanvas::_handle_positions(const Rect2i &p_rect, Vector2 r_points[8]) const {
+	const Vector2 from = _to_screen(Vector2(p_rect.position));
+	const Vector2 to = _to_screen(Vector2(p_rect.get_end()));
+	const Vector2 mid = (from + to) / 2;
+	// Clockwise from the top-left corner.
+	r_points[0] = from;
+	r_points[1] = Vector2(mid.x, from.y);
+	r_points[2] = Vector2(to.x, from.y);
+	r_points[3] = Vector2(to.x, mid.y);
+	r_points[4] = to;
+	r_points[5] = Vector2(mid.x, to.y);
+	r_points[6] = Vector2(from.x, to.y);
+	r_points[7] = Vector2(from.x, mid.y);
+}
+
+int SpriteSheetCanvas::_handle_at(const Vector2 &p_screen) const {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	const PackedStringArray &selection = editor->get_selection();
+	if (atlas.is_null() || selection.size() != 1 || !atlas->has_region(selection[0])) {
+		return -1;
+	}
+	Vector2 points[8];
+	_handle_positions(atlas->get_region(selection[0]), points);
+	for (int i = 0; i < 8; i++) {
+		if (points[i].distance_to(p_screen) <= HANDLE_RADIUS * EDSCALE) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void SpriteSheetCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
+	const float new_zoom = CLAMP(p_zoom, 0.0625f, 64.0f);
+	const Vector2 texture_point = _to_texture(p_center);
+	zoom = new_zoom;
+	view_offset = p_center - texture_point * zoom;
+	queue_redraw();
+}
+
+void SpriteSheetCanvas::fit() {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	const Size2 texture_size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? atlas->get_sheet_texture()->get_size() : Size2();
+	if (texture_size.x <= 0 || texture_size.y <= 0 || get_size().x <= 0 || get_size().y <= 0) {
+		zoom = 1.0f;
+		view_offset = Vector2(8, 8) * EDSCALE;
+		queue_redraw();
+		return;
+	}
+	const Size2 available = get_size() - Size2(16, 16) * EDSCALE;
+	zoom = CLAMP(MIN(available.x / texture_size.x, available.y / texture_size.y), 0.0625f, 64.0f);
+	// Whole steps for pixel art when the sheet is smaller than the view.
+	if (zoom > 1.0f) {
+		zoom = Math::floor(zoom);
+	}
+	view_offset = ((get_size() - texture_size * zoom) / 2).floor();
+	queue_redraw();
+}
+
+void SpriteSheetCanvas::_draw_canvas() {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	if (atlas.is_null()) {
+		return;
+	}
+	const Ref<Texture2D> texture = atlas->get_sheet_texture();
+	const Color accent = get_theme_color(SNAME("accent_color"), EditorStringName(Editor));
+	const Color outline = Color(1, 1, 1, 0.5);
+	const Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Label"));
+	const int font_size = get_theme_font_size(SNAME("font_size"), SNAME("Label"));
+
+	Size2 texture_size;
+	if (texture.is_valid()) {
+		texture_size = texture->get_size();
+		draw_texture_rect(texture, Rect2(view_offset, texture_size * zoom));
+		draw_rect(Rect2(view_offset, texture_size * zoom), Color(0.5, 0.5, 0.5, 0.6), false, 1);
+	}
+
+	// Grid lines of the grid snap, only when they are far enough apart.
+	if (editor->is_grid_snap() && texture.is_valid()) {
+		const Vector2i step = editor->get_grid_step();
+		const Vector2i offset = editor->get_grid_offset();
+		if (step.x * zoom >= 6 && step.y * zoom >= 6) {
+			const Color grid_color = Color(1, 1, 1, 0.12);
+			for (int x = offset.x % step.x; x <= texture_size.x; x += step.x) {
+				draw_line(_to_screen(Vector2(x, 0)), _to_screen(Vector2(x, texture_size.y)), grid_color);
+			}
+			for (int y = offset.y % step.y; y <= texture_size.y; y += step.y) {
+				draw_line(_to_screen(Vector2(0, y)), _to_screen(Vector2(texture_size.x, y)), grid_color);
+			}
+		}
+	}
+
+	const PackedStringArray &selection = editor->get_selection();
+	for (const String &name : atlas->get_region_names()) {
+		const Rect2i rect = atlas->get_region(name);
+		const Rect2 screen_rect(_to_screen(Vector2(rect.position)), Vector2(rect.size) * zoom);
+		const bool selected = selection.has(name);
+		if (selected) {
+			draw_rect(screen_rect, Color(accent, 0.15));
+		}
+		draw_rect(screen_rect, selected ? accent : outline, false, selected ? 2 : 1);
+		if (screen_rect.size.y >= font_size + 2 && screen_rect.size.x >= font_size * 2) {
+			draw_string(font, screen_rect.position + Vector2(2, font_size), name, HORIZONTAL_ALIGNMENT_LEFT, screen_rect.size.x - 4, int(font_size * 0.8f), selected ? accent : Color(1, 1, 1, 0.8));
+		}
+	}
+
+	if (drag_mode == DRAG_CREATE) {
+		const Rect2 screen_rect(_to_screen(Vector2(drag_new_rect.position)), Vector2(drag_new_rect.size) * zoom);
+		draw_rect(screen_rect, accent, false, 2);
+	}
+
+	if (selection.size() == 1 && atlas->has_region(selection[0])) {
+		Vector2 points[8];
+		_handle_positions(atlas->get_region(selection[0]), points);
+		for (int i = 0; i < 8; i++) {
+			draw_rect(Rect2(points[i] - Vector2(3, 3) * EDSCALE, Vector2(6, 6) * EDSCALE), accent);
+		}
+	}
+}
+
+void SpriteSheetCanvas::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_DRAW: {
+			_draw_canvas();
+		} break;
+	}
+}
+
+Control::CursorShape SpriteSheetCanvas::get_cursor_shape(const Point2 &p_pos) const {
+	if (drag_mode == DRAG_PAN) {
+		return CURSOR_DRAG;
+	}
+	const int handle = drag_mode == DRAG_RESIZE ? drag_handle : _handle_at(p_pos);
+	switch (handle) {
+		case 0:
+		case 4:
+			return CURSOR_FDIAGSIZE;
+		case 2:
+		case 6:
+			return CURSOR_BDIAGSIZE;
+		case 1:
+		case 5:
+			return CURSOR_VSIZE;
+		case 3:
+		case 7:
+			return CURSOR_HSIZE;
+		default:
+			break;
+	}
+	if (drag_mode == DRAG_MOVE) {
+		return CURSOR_MOVE;
+	}
+	return CURSOR_CROSS;
+}
+
+void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
+	const Ref<SpriteSheet> atlas = editor->get_atlas();
+	if (atlas.is_null()) {
+		return;
+	}
+
+	const Ref<InputEventMouseButton> mb = p_event;
+	if (mb.is_valid()) {
+		const Vector2 position = mb->get_position();
+		if (mb->is_pressed() && (mb->get_button_index() == MouseButton::WHEEL_UP || mb->get_button_index() == MouseButton::WHEEL_DOWN)) {
+			set_zoom(zoom * (mb->get_button_index() == MouseButton::WHEEL_UP ? 1.25f : 0.8f), position);
+			accept_event();
+			return;
+		}
+		if (mb->get_button_index() == MouseButton::MIDDLE || mb->get_button_index() == MouseButton::RIGHT) {
+			// No pan during a left drag: its release commits the undo step.
+			if (mb->is_pressed() && drag_mode == DRAG_NONE) {
+				drag_mode = DRAG_PAN;
+				drag_from = position;
+			} else if (!mb->is_pressed() && drag_mode == DRAG_PAN) {
+				drag_mode = DRAG_NONE;
+			}
+			accept_event();
+			return;
+		}
+		if (mb->get_button_index() != MouseButton::LEFT) {
+			return;
+		}
+		grab_focus();
+		if (mb->is_pressed()) {
+			const Vector2 texture_point = _to_texture(position);
+			drag_old_regions = atlas->get_regions();
+			drag_old_margins = atlas->get_margins();
+			const int handle = _handle_at(position);
+			if (handle != -1) {
+				drag_mode = DRAG_RESIZE;
+				drag_handle = handle;
+				drag_name = editor->get_selection()[0];
+				drag_start_rect = atlas->get_region(drag_name);
+				drag_from = texture_point;
+				accept_event();
+				return;
+			}
+			const StringName name = _region_at(texture_point);
+			if (name != StringName()) {
+				PackedStringArray selection = editor->get_selection();
+				if (mb->is_command_or_control_pressed() || mb->is_shift_pressed()) {
+					if (selection.has(name)) {
+						selection.erase(name);
+					} else {
+						selection.push_back(name);
+					}
+					editor->set_selection(selection);
+					accept_event();
+					return;
+				}
+				if (!selection.has(name)) {
+					editor->set_selection(PackedStringArray({ name }));
+				}
+				drag_mode = DRAG_MOVE;
+				drag_name = name;
+				drag_start_rect = atlas->get_region(name);
+				drag_from = texture_point;
+			} else {
+				editor->set_selection(PackedStringArray());
+				drag_mode = DRAG_CREATE;
+				drag_from = Vector2(_snap(texture_point));
+				drag_new_rect = Rect2i(Vector2i(drag_from), Vector2i());
+			}
+			accept_event();
+			return;
+		}
+
+		// Release: one undo action for the whole drag.
+		const DragMode finished = drag_mode;
+		drag_mode = DRAG_NONE;
+		drag_handle = -1;
+		if (finished == DRAG_CREATE) {
+			const Rect2i rect = drag_new_rect.intersection(_get_texture_area());
+			if (rect.size.x > 0 && rect.size.y > 0) {
+				const String name = editor->make_new_region_name();
+				if (!name.is_empty()) {
+					TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
+					regions[StringName(name)] = rect;
+					SpriteSheetEditing::commit_regions(TTR("Add Region"), atlas, regions, atlas->get_margins());
+					editor->set_selection(PackedStringArray({ name }));
+				}
+			}
+		} else if (finished == DRAG_MOVE || finished == DRAG_RESIZE) {
+			const TypedDictionary<StringName, Rect2i> new_regions = atlas->get_regions();
+			if (!(Dictionary(new_regions) == Dictionary(drag_old_regions))) {
+				SpriteSheetEditing::commit(finished == DRAG_MOVE ? TTR("Move Region") : TTR("Resize Region"), atlas, drag_old_regions, drag_old_margins, new_regions, atlas->get_margins());
+			}
+		}
+		queue_redraw();
+		accept_event();
+		return;
+	}
+
+	const Ref<InputEventMouseMotion> mm = p_event;
+	if (mm.is_valid()) {
+		if (drag_mode == DRAG_NONE) {
+			return;
+		}
+		if (drag_mode == DRAG_PAN) {
+			view_offset += mm->get_position() - drag_from;
+			drag_from = mm->get_position();
+			queue_redraw();
+			accept_event();
+			return;
+		}
+		const Vector2 texture_point = _to_texture(mm->get_position());
+		if (drag_mode == DRAG_CREATE) {
+			const Vector2i to = _snap(texture_point);
+			const Vector2i from = Vector2i(drag_from);
+			drag_new_rect = Rect2i(from.min(to), (to - from).abs());
+			queue_redraw();
+		} else if (drag_mode == DRAG_MOVE) {
+			// Preview on the atlas (no undo); the release commits one action.
+			const Vector2i delta = _snap(Vector2(drag_start_rect.position) + texture_point - drag_from) - drag_start_rect.position;
+			const PackedStringArray &selection = editor->get_selection();
+			for (const String &name : selection) {
+				if (!drag_old_regions.has(StringName(name))) {
+					continue;
+				}
+				Rect2i rect = drag_old_regions[StringName(name)];
+				rect.position += delta;
+				atlas->set_region(name, _clamp_to_texture(rect));
+			}
+		} else if (drag_mode == DRAG_RESIZE) {
+			const Vector2i point = _snap(texture_point);
+			Vector2i from = drag_start_rect.position;
+			Vector2i to = drag_start_rect.get_end();
+			// Handles: 0 top-left, 1 top, 2 top-right, 3 right, 4 bottom-right, 5 bottom, 6 bottom-left, 7 left.
+			if (drag_handle == 0 || drag_handle == 6 || drag_handle == 7) {
+				from.x = MIN(point.x, to.x - 1);
+			}
+			if (drag_handle == 2 || drag_handle == 3 || drag_handle == 4) {
+				to.x = MAX(point.x, from.x + 1);
+			}
+			if (drag_handle == 0 || drag_handle == 1 || drag_handle == 2) {
+				from.y = MIN(point.y, to.y - 1);
+			}
+			if (drag_handle == 4 || drag_handle == 5 || drag_handle == 6) {
+				to.y = MAX(point.y, from.y + 1);
+			}
+			const Rect2i rect = Rect2i(from, to - from).intersection(_get_texture_area());
+			if (rect.size.x > 0 && rect.size.y > 0) {
+				atlas->set_region(drag_name, rect);
+			}
+		}
+		accept_event();
+		return;
+	}
+
+	const Ref<InputEventKey> k = p_event;
+	if (k.is_valid() && k->is_pressed() && drag_mode == DRAG_NONE) {
+		const PackedStringArray &selection = editor->get_selection();
+		if (selection.is_empty()) {
+			return;
+		}
+		if (k->get_keycode() == Key::KEY_DELETE) {
+			SpriteSheetEditing::remove(atlas, selection);
+			editor->set_selection(PackedStringArray());
+			accept_event();
+			return;
+		}
+		Vector2i direction;
+		switch (k->get_keycode()) {
+			case Key::LEFT:
+				direction = Vector2i(-1, 0);
+				break;
+			case Key::RIGHT:
+				direction = Vector2i(1, 0);
+				break;
+			case Key::UP:
+				direction = Vector2i(0, -1);
+				break;
+			case Key::DOWN:
+				direction = Vector2i(0, 1);
+				break;
+			default:
+				return;
+		}
+		// Arrow keys move the selected regions by one pixel, with Shift by one grid step.
+		const Vector2i step = k->is_shift_pressed() ? editor->get_grid_step() : Vector2i(1, 1);
+		TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
+		for (const String &name : selection) {
+			if (!regions.has(StringName(name))) {
+				continue;
+			}
+			Rect2i rect = regions[StringName(name)];
+			rect.position += direction * step;
+			regions[StringName(name)] = _clamp_to_texture(rect);
+		}
+		accept_event();
+		if (Dictionary(regions) == Dictionary(atlas->get_regions())) {
+			return; // At the edge: no empty undo step.
+		}
+		SpriteSheetEditing::commit_regions(TTR("Nudge Regions"), atlas, regions, atlas->get_margins(), UndoRedo::MERGE_ENDS);
+		accept_event();
+	}
+}
+
+SpriteSheetCanvas::SpriteSheetCanvas() {
+	set_clip_contents(true);
+	set_focus_mode(FOCUS_ALL);
+	set_texture_filter(TEXTURE_FILTER_NEAREST_WITH_MIPMAPS);
+	set_h_size_flags(SIZE_EXPAND_FILL);
+	set_v_size_flags(SIZE_EXPAND_FILL);
+	set_custom_minimum_size(Size2(200, 150) * EDSCALE);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetEditor
+
+SpriteSheetEditor *SpriteSheetEditor::singleton = nullptr;
+
+void SpriteSheetEditor::edit(const Ref<SpriteSheet> &p_atlas) {
+	if (atlas == p_atlas) {
+		return;
+	}
+	if (atlas.is_valid()) {
+		atlas->disconnect_changed(callable_mp(this, &SpriteSheetEditor::_atlas_changed));
+	}
+	atlas = p_atlas;
+	selection.clear();
+	if (atlas.is_valid()) {
+		atlas->connect_changed(callable_mp(this, &SpriteSheetEditor::_atlas_changed));
+	}
+	region_list->set_atlas(atlas);
+	_atlas_changed();
+	callable_mp(canvas, &SpriteSheetCanvas::fit).call_deferred();
+}
+
+void SpriteSheetEditor::_atlas_changed() {
+	// Drop names that do not exist any more (deleted, renamed or undone).
+	PackedStringArray kept;
+	for (const String &name : selection) {
+		if (atlas.is_valid() && atlas->has_region(name)) {
+			kept.push_back(name);
+		}
+	}
+	selection = kept;
+	const String text = SpriteSheetEditing::get_texture_warning(atlas);
+	warning->set_text(text);
+	warning->set_visible(!text.is_empty());
+	canvas->queue_redraw();
+}
+
+void SpriteSheetEditor::_inspector_object_changed() {
+	// Another resource in the Inspector ends the editing of this sheet; a node keeps it for "Assign to Selected Nodes".
+	const Object *object = InspectorDock::get_inspector_singleton()->get_edited_object();
+	if (Object::cast_to<Resource>(object) != nullptr && Object::cast_to<SpriteSheet>(object) == nullptr) {
+		edit(Ref<SpriteSheet>());
+	}
+}
+
+void SpriteSheetEditor::_filesystem_changed() {
+	// The sheet file was deleted.
+	if (atlas.is_valid() && atlas->get_path().is_resource_file() && !FileAccess::exists(atlas->get_path())) {
+		edit(Ref<SpriteSheet>());
+	}
+}
+
+void SpriteSheetEditor::set_selection(const PackedStringArray &p_names) {
+	selection = p_names;
+	region_list->set_selected_names(selection);
+	canvas->queue_redraw();
+}
+
+void SpriteSheetEditor::_list_selection_changed() {
+	selection = region_list->get_selected_names();
+	canvas->queue_redraw();
+}
+
+bool SpriteSheetEditor::is_grid_snap() const {
+	return snap_mode->get_selected() == SNAP_GRID;
+}
+
+Vector2i SpriteSheetEditor::get_grid_step() const {
+	return Vector2i(MAX(1, int(grid_step_x->get_value())), MAX(1, int(grid_step_y->get_value())));
+}
+
+Vector2i SpriteSheetEditor::get_grid_offset() const {
+	return Vector2i(int(grid_offset_x->get_value()), int(grid_offset_y->get_value()));
+}
+
+String SpriteSheetEditor::_get_prefix() const {
+	return name_prefix->get_text();
+}
+
+String SpriteSheetEditor::make_new_region_name() const {
+	if (atlas.is_null()) {
+		return String();
+	}
+	if (!SpriteSheet::is_valid_region_name(_get_prefix() + "0")) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("\"%s\" cannot start a region name."), _get_prefix()));
+		return String();
+	}
+	return atlas->make_unique_region_name(_get_prefix());
+}
+
+void SpriteSheetEditor::_snap_changed(int p_index) {
+	const bool grid = p_index == SNAP_GRID;
+	grid_step_x->set_editable(grid);
+	grid_step_y->set_editable(grid);
+	grid_offset_x->set_editable(grid);
+	grid_offset_y->set_editable(grid);
+	canvas->queue_redraw();
+}
+
+void SpriteSheetEditor::_grid_value_changed(double p_value) {
+	canvas->queue_redraw();
+}
+
+void SpriteSheetEditor::_auto_slice() {
+	if (atlas.is_null()) {
+		return;
+	}
+	const String warning_text = SpriteSheetEditing::get_texture_warning(atlas);
+	if (!warning_text.is_empty()) {
+		EditorNode::get_singleton()->show_warning(warning_text);
+		return;
+	}
+	const Ref<Image> image = atlas->get_sheet_texture()->get_image();
+	if (image.is_null() || image->is_empty()) {
+		EditorNode::get_singleton()->show_warning(TTR("The texture has no image data: Auto Slice is not available."));
+		return;
+	}
+	const TypedArray<Rect2i> found = SpriteSheet::detect_sprite_rects(image);
+	// Like SpriteSheet.auto_slice(): sprites that are regions already are skipped.
+	TypedArray<Rect2i> new_rects;
+	const TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
+	const Array existing = Dictionary(regions).values();
+	for (int i = 0; i < found.size(); i++) {
+		if (!existing.has(found[i])) {
+			new_rects.push_back(found[i]);
+		}
+	}
+	if (new_rects.is_empty()) {
+		EditorNode::get_singleton()->show_warning(TTR("Auto Slice found no new sprites."));
+		return;
+	}
+	SpriteSheetEditing::add(atlas, TTR("Auto Slice"), new_rects, _get_prefix());
+}
+
+void SpriteSheetEditor::_add_from_grid() {
+	if (atlas.is_null()) {
+		return;
+	}
+	grid_dialog->popup_centered();
+}
+
+void SpriteSheetEditor::_add_from_grid_confirmed() {
+	if (atlas.is_null() || atlas->get_sheet_texture().is_null()) {
+		EditorNode::get_singleton()->show_warning(TTR("Add from Grid needs a texture."));
+		return;
+	}
+	const Vector2i cell(int(grid_cell[0]->get_value()), int(grid_cell[1]->get_value()));
+	const Vector2i separation(int(grid_separation[0]->get_value()), int(grid_separation[1]->get_value()));
+	const Vector2i offset(int(grid_offset[0]->get_value()), int(grid_offset[1]->get_value()));
+	const TypedArray<Rect2i> cells = SpriteSheet::make_grid_rects(Vector2i(atlas->get_sheet_texture()->get_size()), cell, separation, offset);
+	if (cells.is_empty()) {
+		EditorNode::get_singleton()->show_warning(TTR("No cell of this size fits into the texture."));
+		return;
+	}
+	SpriteSheetEditing::add(atlas, TTR("Add Regions from Grid"), cells, _get_prefix());
+}
+
+void SpriteSheetEditor::_sort() {
+	if (atlas.is_null()) {
+		return;
+	}
+	Vector<String> names;
+	for (const String &name : atlas->get_region_names()) {
+		names.push_back(name);
+	}
+	names.sort_custom<NaturalNoCaseComparator>();
+	const TypedDictionary<StringName, Rect2i> old_regions = atlas->get_regions();
+	TypedDictionary<StringName, Rect2i> regions;
+	for (const String &name : names) {
+		regions[StringName(name)] = old_regions[StringName(name)];
+	}
+	SpriteSheetEditing::commit_regions(TTR("Sort Regions"), atlas, regions, atlas->get_margins());
+}
+
+void SpriteSheetEditor::_delete_selected() {
+	if (atlas.is_null()) {
+		return;
+	}
+	SpriteSheetEditing::remove(atlas, selection);
+	set_selection(PackedStringArray());
+}
+
+void SpriteSheetEditor::_create_sprite_frames() {
+	if (atlas.is_null() || atlas->get_region_count() == 0) {
+		EditorNode::get_singleton()->show_warning(TTR("The sprite sheet has no regions."));
+		return;
+	}
+	if (!atlas->get_path().is_empty() && atlas->get_path().is_resource_file()) {
+		frames_dialog->set_current_path(atlas->get_path().get_basename() + "_frames.tres");
+	}
+	frames_dialog->popup_file_dialog();
+}
+
+void SpriteSheetEditor::_create_sprite_frames_confirmed(const String &p_path) {
+	if (atlas.is_null()) {
+		return;
+	}
+	// The selected regions (all if none is selected) in a copy of the atlas, so names and frame order
+	// follow SpriteSheet.create_sprite_frames().
+	Ref<SpriteSheet> copy;
+	copy.instantiate();
+	copy->set_texture(atlas->get_sheet_texture());
+	copy->set_filter_clip(atlas->is_filter_clip());
+	TypedDictionary<StringName, Rect2i> regions;
+	TypedDictionary<StringName, Rect2i> margins;
+	for (const String &name : atlas->get_region_names()) {
+		if (!selection.is_empty() && !selection.has(name)) {
+			continue;
+		}
+		regions[StringName(name)] = atlas->get_region(name);
+		margins[StringName(name)] = atlas->get_region_margin(name);
+	}
+	copy->set_regions(regions);
+	copy->set_margins(margins);
+	const Ref<SpriteFrames> frames = copy->create_sprite_frames();
+	const Error err = ResourceSaver::save(frames, p_path, ResourceSaver::FLAG_CHANGE_PATH);
+	if (err != OK) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("Saving \"%s\" failed: %s."), p_path, error_names[err]));
+		return;
+	}
+	EditorFileSystem::get_singleton()->update_file(p_path);
+	EditorNode::get_singleton()->edit_resource(frames);
+}
+
+void SpriteSheetEditor::_assign_to_nodes() {
+	if (atlas.is_null() || selection.size() != 1) {
+		EditorNode::get_singleton()->show_warning(TTR("Select exactly one region."));
+		return;
+	}
+	const StringName name = selection[0];
+	List<Node *> nodes = EditorNode::get_singleton()->get_editor_selection()->get_top_selected_node_list();
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	bool any = false;
+	for (Node *node : nodes) {
+		// Sprite2D, Sprite3D, TextureRect and any node with a Texture2D "texture" property, also without a texture
+		// (an empty Ref is an OBJECT Variant without an object).
+		bool valid = false;
+		const Variant old_texture = node->get("texture", &valid);
+		const Object *old_object = old_texture.get_validated_object();
+		if (!valid || (old_texture.get_type() != Variant::NIL && old_texture.get_type() != Variant::OBJECT) || (old_object != nullptr && !Object::cast_to<Texture2D>(old_object))) {
+			continue;
+		}
+		if (!any) {
+			undo_redo->create_action(TTR("Assign Region Texture"));
+			any = true;
+		}
+		undo_redo->add_do_property(node, "texture", atlas->get_region_texture(name));
+		undo_redo->add_undo_property(node, "texture", old_texture);
+	}
+	if (!any) {
+		EditorNode::get_singleton()->show_warning(TTR("Select a Sprite2D (or another node with a \"texture\" property) in the Scene dock first."));
+		return;
+	}
+	undo_redo->commit_action();
+}
+
+void SpriteSheetEditor::_import() {
+	if (atlas.is_null()) {
+		return;
+	}
+	import_dialog->popup_file_dialog();
+}
+
+void SpriteSheetEditor::_import_confirmed(const String &p_path) {
+	if (atlas.is_null()) {
+		return;
+	}
+	// Load into a copy (all-or-nothing, errors are printed by the atlas), then apply it with undo.
+	// The dialog returns OS paths: inside the project, the texture path of TexturePacker files becomes a res:// path.
+	const String path = ProjectSettings::get_singleton()->localize_path(p_path);
+	Ref<SpriteSheet> copy;
+	copy.instantiate();
+	copy->set_texture(atlas->get_sheet_texture());
+	copy->set_texture_path(atlas->get_texture_path());
+	if (copy->load_from_file(path) != OK) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("Importing \"%s\" failed. See the Output panel for details."), p_path));
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Import Regions"), UndoRedo::MERGE_DISABLE, atlas.ptr());
+	// Regions are cleared first, so a smaller texture does not report the old regions as outside.
+	undo_redo->add_do_method(atlas.ptr(), "clear_regions");
+	undo_redo->add_do_method(atlas.ptr(), "set_texture", copy->get_sheet_texture());
+	undo_redo->add_do_method(atlas.ptr(), "set_texture_path", copy->get_texture_path());
+	undo_redo->add_do_method(atlas.ptr(), "set_regions", copy->get_regions());
+	undo_redo->add_do_method(atlas.ptr(), "set_margins", copy->get_margins());
+	undo_redo->add_undo_method(atlas.ptr(), "clear_regions");
+	undo_redo->add_undo_method(atlas.ptr(), "set_texture", atlas->get_sheet_texture());
+	undo_redo->add_undo_method(atlas.ptr(), "set_texture_path", atlas->get_texture_path());
+	undo_redo->add_undo_method(atlas.ptr(), "set_regions", atlas->get_regions());
+	undo_redo->add_undo_method(atlas.ptr(), "set_margins", atlas->get_margins());
+	undo_redo->commit_action();
+	callable_mp(canvas, &SpriteSheetCanvas::fit).call_deferred();
+}
+
+void SpriteSheetEditor::_export() {
+	if (atlas.is_null()) {
+		return;
+	}
+	if (!atlas->get_path().is_empty() && atlas->get_path().is_resource_file()) {
+		export_dialog->set_current_path(atlas->get_path().get_basename() + ".json");
+	}
+	export_dialog->popup_file_dialog();
+}
+
+void SpriteSheetEditor::_export_confirmed(const String &p_path) {
+	if (atlas.is_null()) {
+		return;
+	}
+	const String path = ProjectSettings::get_singleton()->localize_path(p_path);
+	const Error err = atlas->save_to_file(path);
+	if (err != OK) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("Exporting \"%s\" failed: %s."), path, error_names[err]));
+		return;
+	}
+	if (path.begins_with("res://")) {
+		EditorFileSystem::get_singleton()->update_file(path);
+	}
+}
+
+void SpriteSheetEditor::_zoom(float p_factor) {
+	canvas->set_zoom(canvas->get_zoom() * p_factor, canvas->get_size() / 2);
+}
+
+void SpriteSheetEditor::_zoom_reset() {
+	canvas->set_zoom(1.0f, canvas->get_size() / 2);
+}
+
+void SpriteSheetEditor::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_THEME_CHANGED: {
+			warning->add_theme_color_override(SceneStringName(font_color), get_theme_color(SNAME("warning_color"), EditorStringName(Editor)));
+		} break;
+		case NOTIFICATION_READY: {
+			InspectorDock::get_inspector_singleton()->connect("edited_object_changed", callable_mp(this, &SpriteSheetEditor::_inspector_object_changed));
+			EditorFileSystem::get_singleton()->connect("filesystem_changed", callable_mp(this, &SpriteSheetEditor::_filesystem_changed));
+		} break;
+	}
+}
+
+static SpinBox *_make_spin_box(const String &p_tooltip, double p_min, double p_value) {
+	SpinBox *spin_box = memnew(SpinBox);
+	spin_box->set_min(p_min);
+	spin_box->set_max(16384);
+	spin_box->set_step(1);
+	spin_box->set_value(p_value);
+	spin_box->set_tooltip_text(p_tooltip);
+	spin_box->set_accessibility_name(p_tooltip);
+	return spin_box;
+}
+
+static Button *_make_button(Control *p_parent, const String &p_text, const String &p_tooltip) {
+	Button *button = memnew(Button);
+	button->set_text(p_text);
+	button->set_tooltip_text(p_tooltip);
+	button->set_flat(true);
+	p_parent->add_child(button);
+	return button;
+}
+
+SpriteSheetEditor::SpriteSheetEditor() {
+	singleton = this;
+
+	set_name(TTRC("SpriteSheet"));
+	set_icon_name("SpriteSheet");
+	set_default_slot(EditorDock::DOCK_SLOT_BOTTOM);
+	set_available_layouts(EditorDock::DOCK_LAYOUT_HORIZONTAL | EditorDock::DOCK_LAYOUT_FLOATING);
+	set_global(false);
+	set_transient(true);
+
+	VBoxContainer *main_vb = memnew(VBoxContainer);
+	add_child(main_vb);
+
+	// Toolbar.
+	HFlowContainer *toolbar_box = memnew(HFlowContainer);
+	main_vb->add_child(toolbar_box);
+
+	snap_mode = memnew(OptionButton);
+	snap_mode->add_item(TTR("Pixel Snap"), SNAP_PIXEL);
+	snap_mode->add_item(TTR("Grid Snap"), SNAP_GRID);
+	snap_mode->set_accessibility_name(TTRC("Snap Mode"));
+	snap_mode->connect(SceneStringName(item_selected), callable_mp(this, &SpriteSheetEditor::_snap_changed));
+	toolbar_box->add_child(snap_mode);
+
+	grid_step_x = _make_spin_box(TTR("Grid Step X"), 1, 16);
+	grid_step_y = _make_spin_box(TTR("Grid Step Y"), 1, 16);
+	grid_offset_x = _make_spin_box(TTR("Grid Offset X"), 0, 0);
+	grid_offset_y = _make_spin_box(TTR("Grid Offset Y"), 0, 0);
+	for (SpinBox *spin_box : { grid_step_x, grid_step_y, grid_offset_x, grid_offset_y }) {
+		spin_box->set_editable(false);
+		spin_box->connect(SceneStringName(value_changed), callable_mp(this, &SpriteSheetEditor::_grid_value_changed));
+		toolbar_box->add_child(spin_box);
+	}
+
+	toolbar_box->add_child(memnew(VSeparator));
+	Label *prefix_label = memnew(Label);
+	prefix_label->set_text(TTR("Name Prefix:"));
+	toolbar_box->add_child(prefix_label);
+	name_prefix = memnew(LineEdit);
+	name_prefix->set_text("sprite_");
+	name_prefix->set_custom_minimum_size(Size2(90, 0) * EDSCALE);
+	name_prefix->set_tooltip_text(TTR("New regions are named with this prefix and a number: sprite_0, sprite_1, ..."));
+	name_prefix->set_accessibility_name(TTRC("Name Prefix"));
+	toolbar_box->add_child(name_prefix);
+
+	toolbar_box->add_child(memnew(VSeparator));
+	_make_button(toolbar_box, TTR("Auto Slice"), TTR("Add a region for every sprite (group of opaque pixels) that is not a region yet."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_auto_slice));
+	_make_button(toolbar_box, TTR("Add from Grid..."), TTR("Add equal regions from a grid of cells."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_add_from_grid));
+	_make_button(toolbar_box, TTR("Sort"), TTR("Sort the regions by name (natural order: walk_2 before walk_10)."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_sort));
+	_make_button(toolbar_box, TTR("Delete"), TTR("Delete the selected regions (Delete key in the canvas)."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_delete_selected));
+
+	toolbar_box->add_child(memnew(VSeparator));
+	_make_button(toolbar_box, TTR("Create SpriteFrames..."), TTR("Save a SpriteFrames resource made from the selected regions (all regions if none is selected) and open it."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_create_sprite_frames));
+	_make_button(toolbar_box, TTR("Assign to Selected Nodes"), TTR("Set the texture of the selected Sprite2D nodes (or other nodes with a \"texture\" property) to the selected region."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_assign_to_nodes));
+
+	toolbar_box->add_child(memnew(VSeparator));
+	_make_button(toolbar_box, TTR("Import..."), TTR("Replace the regions with a JSON, CSV or INI sprite sheet file or a TexturePacker JSON file."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_import));
+	_make_button(toolbar_box, TTR("Export..."), TTR("Save the regions as a JSON, CSV or INI sprite sheet file."))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_export));
+
+	toolbar_box->add_child(memnew(VSeparator));
+	_make_button(toolbar_box, "-", TTR("Zoom Out"))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_zoom).bind(0.8f));
+	_make_button(toolbar_box, "1:1", TTR("Zoom Reset"))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_zoom_reset));
+	_make_button(toolbar_box, "+", TTR("Zoom In"))->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetEditor::_zoom).bind(1.25f));
+
+	warning = memnew(Label);
+	warning->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	warning->hide();
+	main_vb->add_child(warning);
+
+	HSplitContainer *split = memnew(HSplitContainer);
+	split->set_v_size_flags(SIZE_EXPAND_FILL);
+	main_vb->add_child(split);
+
+	canvas = memnew(SpriteSheetCanvas);
+	canvas->editor = this;
+	split->add_child(canvas);
+
+	region_list = memnew(SpriteSheetRegionList);
+	region_list->set_custom_minimum_size(Size2(260, 0) * EDSCALE);
+	region_list->selection_changed_callback = callable_mp(this, &SpriteSheetEditor::_list_selection_changed);
+	split->add_child(region_list);
+
+	// Dialogs.
+	grid_dialog = memnew(ConfirmationDialog);
+	grid_dialog->set_title(TTR("Add Regions from Grid"));
+	GridContainer *grid = memnew(GridContainer);
+	grid->set_columns(3);
+	grid_dialog->add_child(grid);
+	const String grid_labels[3] = { TTR("Cell Size:"), TTR("Separation:"), TTR("Offset:") };
+	SpinBox **grid_boxes[3] = { grid_cell, grid_separation, grid_offset };
+	for (int row = 0; row < 3; row++) {
+		Label *label = memnew(Label);
+		label->set_text(grid_labels[row]);
+		grid->add_child(label);
+		for (int axis = 0; axis < 2; axis++) {
+			grid_boxes[row][axis] = _make_spin_box(grid_labels[row] + (axis == 0 ? " X" : " Y"), row == 0 ? 1 : 0, row == 0 ? 32 : 0);
+			grid->add_child(grid_boxes[row][axis]);
+		}
+	}
+	grid_dialog->connect(SceneStringName(confirmed), callable_mp(this, &SpriteSheetEditor::_add_from_grid_confirmed));
+	add_child(grid_dialog);
+
+	import_dialog = memnew(EditorFileDialog);
+	import_dialog->set_file_mode(FileDialog::FILE_MODE_OPEN_FILE);
+	import_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	import_dialog->set_title(TTR("Import Sprite Sheet Regions"));
+	import_dialog->add_filter("*.json", TTR("JSON (own layout or TexturePacker)"));
+	import_dialog->add_filter("*.csv", TTR("CSV"));
+	import_dialog->add_filter("*.ini", TTR("INI"));
+	import_dialog->connect("file_selected", callable_mp(this, &SpriteSheetEditor::_import_confirmed));
+	add_child(import_dialog);
+
+	export_dialog = memnew(EditorFileDialog);
+	export_dialog->set_file_mode(FileDialog::FILE_MODE_SAVE_FILE);
+	export_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	export_dialog->set_title(TTR("Export Sprite Sheet Regions"));
+	export_dialog->add_filter("*.json", TTR("JSON"));
+	export_dialog->add_filter("*.csv", TTR("CSV"));
+	export_dialog->add_filter("*.ini", TTR("INI"));
+	export_dialog->connect("file_selected", callable_mp(this, &SpriteSheetEditor::_export_confirmed));
+	add_child(export_dialog);
+
+	frames_dialog = memnew(EditorFileDialog);
+	frames_dialog->set_file_mode(FileDialog::FILE_MODE_SAVE_FILE);
+	frames_dialog->set_access(FileDialog::ACCESS_RESOURCES);
+	frames_dialog->set_title(TTR("Save SpriteFrames"));
+	frames_dialog->add_filter("*.tres", TTR("SpriteFrames"));
+	frames_dialog->connect("file_selected", callable_mp(this, &SpriteSheetEditor::_create_sprite_frames_confirmed));
+	add_child(frames_dialog);
+}
+
+void SpriteSheetEditor::edit_region(const Ref<SpriteSheet> &p_atlas, const StringName &p_name) {
+	ERR_FAIL_COND(p_atlas.is_null());
+	ERR_FAIL_COND_MSG(!p_atlas->has_region(p_name), vformat("The sprite sheet has no region \"%s\".", p_name));
+	const Ref<Texture2D> texture = p_atlas->get_sheet_texture();
+	if (texture.is_null()) {
+		EditorNode::get_singleton()->show_warning(TTR("The sprite sheet has no texture: set \"Texture\" to edit a region."));
+		return;
+	}
+	if (region_dialog == nullptr) {
+		// Godot's region editor; undo/redo is off there, the result is committed here on OK.
+		region_dialog = memnew(TextureRegionEditor);
+		region_dialog->set_use_undo_redo(false);
+		region_dialog->set_ok_button_text(TTR("OK"));
+		region_dialog->add_cancel_button(TTR("Cancel"));
+		region_dialog->connect(SceneStringName(confirmed), callable_mp(this, &SpriteSheetEditor::_region_dialog_confirmed));
+		region_dialog->connect(SceneStringName(visibility_changed), callable_mp(this, &SpriteSheetEditor::_region_dialog_visibility_changed));
+		EditorNode::get_singleton()->get_gui_base()->add_child(region_dialog);
+	}
+	region_dialog_atlas = p_atlas;
+	region_dialog_name = p_name;
+	// A temporary AtlasTexture carries the rectangle; the sheet itself changes only on OK.
+	region_dialog_texture.instantiate();
+	region_dialog_texture->set_atlas(texture);
+	region_dialog_texture->set_region(Rect2(p_atlas->get_region(p_name)));
+	region_dialog->edit(region_dialog_texture.ptr());
+	region_dialog->set_title(vformat(TTR("Edit Region: %s"), p_name));
+}
+
+void SpriteSheetEditor::_region_dialog_confirmed() {
+	const Ref<SpriteSheet> sheet = region_dialog_atlas;
+	const StringName region_name = region_dialog_name;
+	const Ref<AtlasTexture> edited = region_dialog_texture;
+	_region_dialog_release();
+	if (sheet.is_null() || edited.is_null() || !sheet->has_region(region_name)) {
+		return; // Removed or renamed while the dialog was open.
+	}
+	Size2i texture_size;
+	if (sheet->get_sheet_texture().is_valid()) {
+		texture_size = Size2i(sheet->get_sheet_texture()->get_size());
+	}
+	Rect2i rect;
+	if (!SpriteSheetEditing::rect_from_region_editor(edited->get_region(), texture_size, rect)) {
+		EditorNode::get_singleton()->show_warning(TTR("The rectangle must have a size greater than 0 and lie inside the texture."));
+		return;
+	}
+	if (rect == sheet->get_region(region_name)) {
+		return;
+	}
+	TypedDictionary<StringName, Rect2i> regions = sheet->get_regions();
+	regions[region_name] = rect;
+	SpriteSheetEditing::commit_regions(TTR("Set Region Rectangle"), sheet, regions, sheet->get_margins());
+}
+
+void SpriteSheetEditor::_region_dialog_visibility_changed() {
+	// Cancel, Escape and the close button only hide the dialog. Deferred, so "confirmed" (emitted after
+	// hiding) still finds the edited region.
+	if (region_dialog && !region_dialog->is_visible()) {
+		callable_mp(this, &SpriteSheetEditor::_region_dialog_release).call_deferred();
+	}
+}
+
+void SpriteSheetEditor::_region_dialog_release() {
+	if (region_dialog && region_dialog->is_visible()) {
+		return; // Opened again for another region.
+	}
+	region_dialog_atlas.unref();
+	region_dialog_name = StringName();
+	region_dialog_texture.unref();
+}
+
+SpriteSheetEditor::~SpriteSheetEditor() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetInspector
+
+void SpriteSheetInspector::_atlas_changed() {
+	const String text = SpriteSheetEditing::get_texture_warning(atlas);
+	warning->set_text(text);
+	warning->set_visible(!text.is_empty());
+}
+
+void SpriteSheetInspector::_edit_regions() {
+	SpriteSheetEditor *editor = SpriteSheetEditor::get_singleton();
+	ERR_FAIL_NULL(editor);
+	editor->edit(atlas);
+	editor->make_visible();
+	editor->set_selection(region_list->get_selected_names());
+}
+
+void SpriteSheetInspector::_add_region() {
+	Rect2i rect(0, 0, 16, 16);
+	const Ref<Texture2D> texture = atlas->get_sheet_texture();
+	if (texture.is_valid()) {
+		rect.size = rect.size.min(Size2i(texture->get_size())).maxi(1);
+	}
+	const PackedStringArray names = SpriteSheetEditing::add(atlas, TTR("Add Region"), TypedArray<Rect2i>({ rect }), "sprite_");
+	// After the list has been rebuilt for the change.
+	callable_mp(region_list, &SpriteSheetRegionList::set_selected_names).call_deferred(names);
+	callable_mp(this, &SpriteSheetInspector::_selection_changed).call_deferred();
+}
+
+void SpriteSheetInspector::_delete_regions() {
+	SpriteSheetEditing::remove(atlas, region_list->get_selected_names());
+	delete_button->set_disabled(true);
+}
+
+void SpriteSheetInspector::_selection_changed() {
+	delete_button->set_disabled(region_list->get_selected_names().is_empty());
+}
+
+SpriteSheetInspector::SpriteSheetInspector(const Ref<SpriteSheet> &p_atlas) {
+	atlas = p_atlas;
+
+	warning = memnew(Label);
+	warning->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	warning->add_theme_color_override(SceneStringName(font_color), EditorNode::get_singleton()->get_editor_theme()->get_color(SNAME("warning_color"), EditorStringName(Editor)));
+	add_child(warning);
+
+	EditorInspectorActionButton *edit_button = memnew(EditorInspectorActionButton(TTRC("Edit Regions"), SNAME("RegionEdit")));
+	edit_button->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetInspector::_edit_regions));
+	add_child(edit_button);
+
+	HBoxContainer *buttons = memnew(HBoxContainer);
+	add_child(buttons);
+	Button *add_button = memnew(Button);
+	add_button->set_text(TTR("Add Region"));
+	add_button->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetInspector::_add_region));
+	buttons->add_child(add_button);
+	delete_button = memnew(Button);
+	delete_button->set_text(TTR("Delete Selected"));
+	delete_button->set_disabled(true);
+	delete_button->connect(SceneStringName(pressed), callable_mp(this, &SpriteSheetInspector::_delete_regions));
+	buttons->add_child(delete_button);
+
+	region_list = memnew(SpriteSheetRegionList);
+	region_list->set_tree_minimum_height(int(220 * EDSCALE));
+	region_list->selection_changed_callback = callable_mp(this, &SpriteSheetInspector::_selection_changed);
+	add_child(region_list);
+	region_list->set_atlas(atlas);
+
+	atlas->connect_changed(callable_mp(this, &SpriteSheetInspector::_atlas_changed));
+	_atlas_changed();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// EditorInspectorPluginSpriteSheet
+
+bool EditorInspectorPluginSpriteSheet::can_handle(Object *p_object) {
+	return Object::cast_to<SpriteSheet>(p_object) != nullptr;
+}
+
+void EditorInspectorPluginSpriteSheet::parse_category(Object *p_object, const String &p_category) {
+	// Below the class header of SpriteSheet, like the class's own properties.
+	if (p_category != "SpriteSheet") {
+		return;
+	}
+	Ref<SpriteSheet> atlas(Object::cast_to<SpriteSheet>(p_object));
+	ERR_FAIL_COND(atlas.is_null());
+	add_custom_control(memnew(SpriteSheetInspector(atlas)));
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// SpriteSheetEditorPlugin
+
+void SpriteSheetEditorPlugin::edit(Object *p_object) {
+	// Keep the last atlas when the selection moves to a node, so "Assign to Selected Nodes" works.
+	Ref<SpriteSheet> atlas(Object::cast_to<SpriteSheet>(p_object));
+	if (atlas.is_valid()) {
+		atlas_editor->edit(atlas);
+	}
+}
+
+bool SpriteSheetEditorPlugin::handles(Object *p_object) const {
+	return Object::cast_to<SpriteSheet>(p_object) != nullptr;
+}
+
+void SpriteSheetEditorPlugin::make_visible(bool p_visible) {
+	// The dock stays open when another object is edited; it is closed by the user.
+	if (p_visible) {
+		atlas_editor->make_visible();
+	}
+}
+
+SpriteSheetEditorPlugin::SpriteSheetEditorPlugin() {
+	atlas_editor = memnew(SpriteSheetEditor);
+	atlas_editor->set_custom_minimum_size(Size2(0, 300) * EDSCALE);
+	EditorDockManager::get_singleton()->add_dock(atlas_editor);
+	atlas_editor->close();
+
+	Ref<EditorInspectorPluginSpriteSheet> inspector_plugin;
+	inspector_plugin.instantiate();
+	add_inspector_plugin(inspector_plugin);
+}

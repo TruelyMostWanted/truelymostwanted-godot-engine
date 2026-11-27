@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DialogueLineNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A line of dialogue in a [FlowGraph]: who speaks and what.
+	</brief_description>
+	<description>
+		A dialogue line node holds one line of a dialogue: the [member speaker], the [member text] and optionally a [member voice] recording and a [member subtitle]. It has the flow input [code]in[/code] and the flow output [code]out[/code].
+		At runtime the node waits ([constant FlowGraphPlayback.ENTER_RESULT_WAIT]). The game's dialogue UI shows the line when [signal FlowGraphPlayback.node_waiting] reports it and calls [method FlowGraphPlayback.advance] when the player continues. The engine has no dialogue UI node; the game builds its own. Because the waiting state lives in the playback, [method FlowGraphPlayback.set_state] shows the same line again after loading a savegame.
+		[b]Translation.[/b] [member text] is either the sentence itself or a translation key such as [code]SHOP_HELLO[/code] for a CSV translation. [method get_translated_text] translates it with [method Object.tr] and [member translation_context]. The texts of a graph saved as [code].tres[/code], [code].res[/code] or [code].mmd[/code] are collected by the POT generation of the project settings (Localization &gt; POT Generation). Text with variables is formatted by the UI, for example with [method String.format] and the blackboard variables.
+		[codeblocks]
+		[gdscript]
+		func _on_node_waiting(node_id: int, node: FlowNode) -&gt; void:
+			if node is DialogueLineNode:
+				name_label.text = node.get_translated_speaker_name()
+				text_label.text = node.get_translated_text().format(playback.get_blackboard().variables)
+				if node.voice:
+					voice_player.stream = node.voice
+					voice_player.play()
+
+		func _on_continue_pressed() -&gt; void:
+			playback.advance()
+		[/gdscript]
+		[csharp]
+		private void OnNodeWaiting(long nodeId, FlowNode node)
+		{
+			if (node is DialogueLineNode line)
+			{
+				_nameLabel.Text = line.GetTranslatedSpeakerName();
+				_textLabel.Text = line.GetTranslatedText();
+			}
+		}
+
+		private void OnContinuePressed()
+		{
+			_playback.Advance();
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_translated_speaker_name" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns [member speaker_name] translated with [member translation_context], or [member speaker] if [member speaker_name] is empty.
+			</description>
+		</method>
+		<method name="get_translated_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns [member text] translated with [member translation_context] through [method Object.tr]. Returns [member text] unchanged if there is no translation for the current locale.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="speaker" type="StringName" setter="set_speaker" getter="get_speaker" default="&amp;&quot;&quot;">
+			The id of the speaker for the game, for example to pick a portrait, a color or a voice bus. Not shown to the player; see [member speaker_name].
+		</member>
+		<member name="speaker_name" type="String" setter="set_speaker_name" getter="get_speaker_name" default="&quot;&quot;">
+			The name of the speaker as shown to the player. Translatable, see [method get_translated_speaker_name].
+		</member>
+		<member name="subtitle" type="Subtitle" setter="set_subtitle" getter="get_subtitle">
+			Optional subtitles for [member voice], for example to show the line in sync with the recording.
+		</member>
+		<member name="text" type="String" setter="set_text" getter="get_text" default="&quot;&quot;">
+			The text of the line, or a translation key. An empty text is a configuration warning.
+		</member>
+		<member name="translation_context" type="StringName" setter="set_translation_context" getter="get_translation_context" default="&amp;&quot;&quot;">
+			The translation context of [member text] and [member speaker_name], for texts that are the same in the source language but need different translations.
+		</member>
+		<member name="voice" type="AudioStream" setter="set_voice" getter="get_voice">
+			Optional voice recording of the line. The node does not play it; the dialogue UI does.
+		</member>
+	</members>
+</class>

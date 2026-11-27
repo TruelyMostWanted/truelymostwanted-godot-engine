@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AccessibilityColorScheme" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		The colors of an accessibility color scheme for the GUI.
+	</brief_description>
+	<description>
+		A color scheme that [AccessibilitySettingsServer] turns into an overlay theme for the root window: [member text_color] and [member field_text_color] for the font colors, [member selection_color] for selections, [member surface_color] and [member border_color] for panels and normal buttons, [member accent_color] and [member accent_border_color] for hovered, pressed and selected states, [member focus_color] for the focus outline, [member border_width] for all borders. [member ok_color], [member problem_color] and [member caution_color] are for the game: read them with [method AccessibilitySettingsServer.get_scheme_color].
+		Two schemes are built in ([method create_high_contrast_dark], [method create_high_contrast_light]). For an own scheme, save an [AccessibilityColorScheme] as a [code].tres[/code] file and set its path with [method AccessibilitySettingsServer.set_custom_color_scheme_path] and [constant AccessibilitySettingsServer.COLOR_SCHEME_CUSTOM].
+		The default values are the dark high-contrast scheme.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_high_contrast_dark" qualifiers="static">
+			<return type="AccessibilityColorScheme" />
+			<description>
+				Returns a new scheme with white text on black surfaces, white borders, a yellow focus outline and 2 pixel borders.
+			</description>
+		</method>
+		<method name="create_high_contrast_light" qualifiers="static">
+			<return type="AccessibilityColorScheme" />
+			<description>
+				Returns a new scheme with black text on white surfaces, black borders, a blue focus outline and 2 pixel borders.
+			</description>
+		</method>
+		<method name="get_role_color" qualifiers="const">
+			<return type="Color" />
+			<param index="0" name="role" type="StringName" />
+			<param index="1" name="default" type="Color" default="Color(0, 0, 0, 1)" />
+			<description>
+				Returns the color of [param role]: [code]text[/code], [code]field_text[/code], [code]ok[/code], [code]problem[/code], [code]caution[/code], [code]selection[/code], [code]focus[/code], [code]surface[/code], [code]accent[/code], [code]border[/code] or [code]accent_border[/code] (the property name without [code]_color[/code]). Returns [param default] for any other role.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="accent_border_color" type="Color" setter="set_accent_border_color" getter="get_accent_border_color" default="Color(1, 0.85, 0, 1)">
+			The border color of hovered, pressed and selected controls.
+		</member>
+		<member name="accent_color" type="Color" setter="set_accent_color" getter="get_accent_color" default="Color(0, 0.25, 0.6, 1)">
+			The background of hovered, pressed and selected controls, and of progress bar fills and slider grabber areas.
+		</member>
+		<member name="border_color" type="Color" setter="set_border_color" getter="get_border_color" default="Color(1, 1, 1, 1)">
+			The border color of panels, fields and normal buttons. Disabled controls use it with half the alpha.
+		</member>
+		<member name="border_width" type="int" setter="set_border_width" getter="get_border_width" default="2">
+			The border width of all flat style boxes, in pixels (0 to 16). The focus outline is at least 2 pixels wide.
+		</member>
+		<member name="caution_color" type="Color" setter="set_caution_color" getter="get_caution_color" default="Color(1, 0.85, 0.2, 1)">
+			The color for warnings, for the game.
+		</member>
+		<member name="field_text_color" type="Color" setter="set_field_text_color" getter="get_field_text_color" default="Color(1, 1, 1, 1)">
+			The font color of text fields ([LineEdit], [TextEdit], [CodeEdit]).
+		</member>
+		<member name="focus_color" type="Color" setter="set_focus_color" getter="get_focus_color" default="Color(1, 0.85, 0, 1)">
+			The color of the focus outline.
+		</member>
+		<member name="ok_color" type="Color" setter="set_ok_color" getter="get_ok_color" default="Color(0.3, 1, 0.3, 1)">
+			The color for success, for the game.
+		</member>
+		<member name="problem_color" type="Color" setter="set_problem_color" getter="get_problem_color" default="Color(1, 0.35, 0.35, 1)">
+			The color for errors and danger, for the game.
+		</member>
+		<member name="selection_color" type="Color" setter="set_selection_color" getter="get_selection_color" default="Color(0, 0.35, 0.9, 1)">
+			The background of selected text.
+		</member>
+		<member name="surface_color" type="Color" setter="set_surface_color" getter="get_surface_color" default="Color(0, 0, 0, 1)">
+			The background of panels, fields and normal buttons.
+		</member>
+		<member name="text_color" type="Color" setter="set_text_color" getter="get_text_color" default="Color(1, 1, 1, 1)">
+			The font color of all built-in controls except text fields. Disabled and placeholder text use it with 60% of its alpha.
+		</member>
+	</members>
+</class>

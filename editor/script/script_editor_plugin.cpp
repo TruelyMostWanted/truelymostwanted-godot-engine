@@ -36,6 +36,7 @@
 #include "core/io/json.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/editor_language.h"
@@ -1432,8 +1433,6 @@ void DocumentEditorContainer::_resave_scripts(const String &p_str) {
 			continue; // Internal script, who cares.
 		}
 
-		_auto_format_text(seb);
-
 		Ref<TextFile> text_file = scr;
 		if (text_file.is_valid()) {
 			seb->apply_code();
@@ -1724,6 +1723,14 @@ void DocumentEditorContainer::_file_dialog_action(const String &p_file) {
 				if (err) {
 					EditorNode::get_singleton()->show_warning(TTR("Error writing TextFile:") + "\n" + p_file, TTR("Error!"));
 					break;
+				}
+				// Truely: a new data file starts as a valid empty document ("{}" for JSON, "<root/>" for XML).
+				const String type = ResourceLoader::get_resource_type(p_file);
+				if (type == "JSON") {
+					file->store_string("{}\n");
+				} else if (ClassDB::is_parent_class(type, "TextDataFormat") && ClassDB::can_instantiate(type)) {
+					const Ref<TextDataFormat> data_file = Object::cast_to<TextDataFormat>(ClassDB::instantiate(type));
+					file->store_string(data_file->encode_to_text());
 				}
 			}
 
@@ -2845,6 +2852,7 @@ void DocumentEditorContainer::apply_scripts() const {
 			continue;
 		}
 
+		_auto_format_text(seb);
 		if (TextEditorBase *teb = Object::cast_to<TextEditorBase>(seb)) {
 			teb->insert_final_newline();
 		}
@@ -2903,6 +2911,13 @@ void DocumentEditorContainer::_reload_scripts(bool p_refresh_only) {
 				json->parse(rel_json->get_parsed_text(), true);
 			}
 
+			Ref<TextDataFormat> data_file = edited_res;
+			if (data_file.is_valid()) {
+				Ref<TextDataFormat> rel_data_file = ResourceLoader::load(data_file->get_path(), data_file->get_class(), ResourceFormatLoader::CACHE_MODE_IGNORE);
+				ERR_CONTINUE(rel_data_file.is_null());
+				data_file->parse(rel_data_file->get_parsed_text(), true);
+			}
+
 			Ref<TextFile> text_file = edited_res;
 			if (text_file.is_valid()) {
 				text_file->reload_from_file();
@@ -2936,7 +2951,7 @@ void DocumentEditorContainer::_reload_scripts(bool p_refresh_only) {
 	disk_changed->hide();
 }
 
-void DocumentEditorContainer::_auto_format_text(ScriptEditorBase *p_seb) {
+void DocumentEditorContainer::_auto_format_text(ScriptEditorBase *p_seb) const {
 	if (TextEditorBase *teb = Object::cast_to<TextEditorBase>(p_seb)) {
 		if (trim_trailing_whitespace_on_save) {
 			teb->trim_trailing_whitespace();
@@ -4307,6 +4322,14 @@ DocumentEditorContainer::DocumentEditorContainer(bool p_is_main_editor, const St
 	config_file_syntax_highlighter.instantiate();
 	register_syntax_highlighter(config_file_syntax_highlighter);
 
+	Ref<EditorCSVSyntaxHighlighter> csv_syntax_highlighter;
+	csv_syntax_highlighter.instantiate();
+	register_syntax_highlighter(csv_syntax_highlighter);
+
+	Ref<EditorXMLSyntaxHighlighter> xml_syntax_highlighter;
+	xml_syntax_highlighter.instantiate();
+	register_syntax_highlighter(xml_syntax_highlighter);
+
 	Ref<GDShaderSyntaxHighlighter> gdshader_syntax_highlighter;
 	gdshader_syntax_highlighter.instantiate();
 	register_syntax_highlighter(gdshader_syntax_highlighter);
@@ -4429,7 +4452,8 @@ void ScriptEditor::_on_find_in_files_result_selected(const String &fpath, int li
 		} else {
 			Ref<Script> scr = res;
 			Ref<JSON> json = res;
-			if (scr.is_valid() || json.is_valid()) {
+			Ref<TextDataFormat> data_file = res;
+			if (scr.is_valid() || json.is_valid() || data_file.is_valid()) {
 				edit(scr);
 
 				ScriptTextEditor *ste = Object::cast_to<ScriptTextEditor>(get_current_editor());
@@ -4547,7 +4571,7 @@ ScriptEditor::ScriptEditor() {
 	script_editor = this;
 
 	script_container = memnew(DocumentEditorContainer(true, "ScriptEditor", "script_editor_cache.cfg"));
-	script_container->set_handled_resource_types({ "GDScript", "Script", "JSON" });
+	script_container->set_handled_resource_types({ "GDScript", "Script", "JSON", "TextDataFormat" });
 	add_child(script_container);
 	connect("_focused", callable_mp(script_container, &DocumentEditorContainer::focus_active_editor));
 
@@ -4649,7 +4673,7 @@ void ScriptEditorPlugin::edit(Object *p_object) {
 			EditorNode::get_singleton()->load_scene_or_resource(res_path, false, false);
 		}
 		script_editor->edit(p_script);
-	} else if (Object::cast_to<JSON>(p_object) || Object::cast_to<TextFile>(p_object)) {
+	} else if (Object::cast_to<JSON>(p_object) || Object::cast_to<TextFile>(p_object) || Object::cast_to<TextDataFormat>(p_object)) {
 		script_editor->edit(Object::cast_to<Resource>(p_object));
 	}
 }
@@ -4665,6 +4689,10 @@ bool ScriptEditorPlugin::handles(Object *p_object) const {
 		}
 	} else if (Object::cast_to<TextFile>(p_object)) {
 		return true;
+	} else if (TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_object)) {
+		// Like JSON: only plain data files open as text; a format resource embedded in a scene or
+		// saved as `.tres` stays in the inspector.
+		return data_file->is_recognized_path(data_file->get_path());
 	}
 
 	return p_object->is_class("Script");

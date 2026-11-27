@@ -107,8 +107,8 @@ void ResourceLoader::remove_resource_format_loader(RequiredParam<ResourceFormatL
 	::ResourceLoader::remove_resource_format_loader(format_loader);
 }
 
-void ResourceLoader::refresh_format_index() {
-	::ResourceLoader::refresh_format_index();
+void ResourceLoader::rebuild_extension_index() {
+	::ResourceLoader::rebuild_extension_index();
 }
 
 void ResourceLoader::set_abort_on_missing_resources(bool p_abort) {
@@ -147,28 +147,64 @@ static PackedStringArray _cached_paths_to_packed(const List<String> &p_paths) {
 	return ret;
 }
 
-PackedStringArray ResourceLoader::get_cached_paths() {
+PackedStringArray ResourceLoader::get_cached_paths(BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths(&paths);
+	ResourceCache::get_cached_paths(&paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact) {
+PackedStringArray ResourceLoader::get_cached_paths_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_for_type(p_type, p_exact, &paths);
+	ResourceCache::get_cached_paths_for_type(p_type, p_exact_type, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_with_extension(const String &p_extension) {
+PackedStringArray ResourceLoader::get_cached_paths_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_with_extension(p_extension, &paths);
+	ResourceCache::get_cached_paths_with_extension(p_extension, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
 }
 
-PackedStringArray ResourceLoader::get_cached_paths_in_directory(const String &p_directory, bool p_recursive) {
+PackedStringArray ResourceLoader::get_cached_paths_in_directory(const String &p_directory, bool p_recursive, BitField<CachedResourceKind> p_kinds) {
 	List<String> paths;
-	ResourceCache::get_cached_paths_in_directory(p_directory, p_recursive, &paths);
+	ResourceCache::get_cached_paths_in_directory(p_directory, p_recursive, &paths, uint32_t(p_kinds));
 	return _cached_paths_to_packed(paths);
+}
+
+int ResourceLoader::get_cached_count(BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count(uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_for_type(p_type, p_exact_type, uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_with_extension(const String &p_extension, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_with_extension(p_extension, uint32_t(p_kinds));
+}
+
+int ResourceLoader::get_cached_count_in_directory(const String &p_directory, bool p_recursive, BitField<CachedResourceKind> p_kinds) {
+	return ResourceCache::get_cached_count_in_directory(p_directory, p_recursive, uint32_t(p_kinds));
+}
+
+TypedArray<Resource> ResourceLoader::get_cached_resources_for_type(const StringName &p_type, bool p_exact_type, BitField<CachedResourceKind> p_kinds) {
+	List<Ref<Resource>> resources;
+	ResourceCache::get_cached_resources_for_type(p_type, p_exact_type, &resources, uint32_t(p_kinds));
+	TypedArray<Resource> result;
+	for (const Ref<Resource> &resource : resources) {
+		result.push_back(resource);
+	}
+	return result;
+}
+
+Dictionary ResourceLoader::get_cached_type_counts(BitField<CachedResourceKind> p_kinds) {
+	HashMap<StringName, int> counts;
+	ResourceCache::get_cached_type_counts(&counts, uint32_t(p_kinds));
+	Dictionary result;
+	for (const KeyValue<StringName, int> &E : counts) {
+		result[E.key] = E.value;
+	}
+	return result;
 }
 
 bool ResourceLoader::exists(const String &p_path, const String &p_type_hint) {
@@ -202,15 +238,15 @@ Error ResourceLoader::load_threaded_request_manifest(const Ref<FilesManifest> &p
 	return p_manifest->load_threaded_request_resources(p_use_sub_threads, ResourceFormatLoader::CacheMode(p_cache_mode));
 }
 
-Error ResourceLoader::register_extension(const String &p_extension, const Callable &p_load, const StringName &p_type, bool p_at_front) {
-	return ResourceFormatLoaderCallable::register_extension(p_extension, p_load, p_type, p_at_front);
+Error ResourceLoader::register_extension_loader(const String &p_extension, const Callable &p_loader, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatLoaderCallable::register_extension(p_extension, p_loader, p_type, p_at_front);
 }
 
-Error ResourceLoader::unregister_extension(const String &p_extension) {
+Error ResourceLoader::unregister_extension_loader(const String &p_extension) {
 	return ResourceFormatLoaderCallable::unregister_extension(p_extension);
 }
 
-bool ResourceLoader::is_extension_registered(const String &p_extension) {
+bool ResourceLoader::has_extension_loader(const String &p_extension) {
 	return ResourceFormatLoaderCallable::is_extension_registered(p_extension);
 }
 
@@ -314,15 +350,21 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_recognized_extensions_for_type", "type"), &ResourceLoader::get_recognized_extensions_for_type);
 	ClassDB::bind_method(D_METHOD("add_resource_format_loader", "format_loader", "at_front"), &ResourceLoader::add_resource_format_loader, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_loader", "format_loader"), &ResourceLoader::remove_resource_format_loader);
-	ClassDB::bind_method(D_METHOD("refresh_format_index"), &ResourceLoader::refresh_format_index);
+	ClassDB::bind_method(D_METHOD("rebuild_extension_index"), &ResourceLoader::rebuild_extension_index);
 	ClassDB::bind_method(D_METHOD("set_abort_on_missing_resources", "abort"), &ResourceLoader::set_abort_on_missing_resources);
 	ClassDB::bind_method(D_METHOD("get_dependencies", "path"), &ResourceLoader::get_dependencies);
 	ClassDB::bind_method(D_METHOD("has_cached", "path"), &ResourceLoader::has_cached);
 	ClassDB::bind_method(D_METHOD("get_cached_ref", "path"), &ResourceLoader::get_cached_ref);
-	ClassDB::bind_method(D_METHOD("get_cached_paths"), &ResourceLoader::get_cached_paths);
-	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension"), &ResourceLoader::get_cached_paths_with_extension);
-	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("get_cached_paths", "kinds"), &ResourceLoader::get_cached_paths, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_paths_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_with_extension", "extension", "kinds"), &ResourceLoader::get_cached_paths_with_extension, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_paths_in_directory", "directory", "recursive", "kinds"), &ResourceLoader::get_cached_paths_in_directory, DEFVAL(true), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count", "kinds"), &ResourceLoader::get_cached_count, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_count_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_with_extension", "extension", "kinds"), &ResourceLoader::get_cached_count_with_extension, DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_count_in_directory", "directory", "recursive", "kinds"), &ResourceLoader::get_cached_count_in_directory, DEFVAL(true), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_resources_for_type", "type", "exact_type", "kinds"), &ResourceLoader::get_cached_resources_for_type, DEFVAL(false), DEFVAL(CACHED_RESOURCE_KIND_ALL));
+	ClassDB::bind_method(D_METHOD("get_cached_type_counts", "kinds"), &ResourceLoader::get_cached_type_counts, DEFVAL(CACHED_RESOURCE_KIND_ALL));
 	ClassDB::bind_method(D_METHOD("exists", "path", "type_hint"), &ResourceLoader::exists, DEFVAL(""));
 	ClassDB::bind_method(D_METHOD("get_resource_uid", "path"), &ResourceLoader::get_resource_uid);
 	ClassDB::bind_method(D_METHOD("get_resource_type", "path"), &ResourceLoader::get_resource_type);
@@ -330,9 +372,9 @@ void ResourceLoader::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_manifest_paths", "manifest"), &ResourceLoader::get_manifest_paths);
 	ClassDB::bind_method(D_METHOD("load_manifest", "manifest", "cache_mode"), &ResourceLoader::load_manifest, DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_request_manifest", "manifest", "use_sub_threads", "cache_mode"), &ResourceLoader::load_threaded_request_manifest, DEFVAL(false), DEFVAL(CACHE_MODE_REUSE));
-	ClassDB::bind_method(D_METHOD("register_extension", "extension", "load", "type", "at_front"), &ResourceLoader::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceLoader::unregister_extension);
-	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceLoader::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("register_extension_loader", "extension", "loader", "type", "at_front"), &ResourceLoader::register_extension_loader, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension_loader", "extension"), &ResourceLoader::unregister_extension_loader);
+	ClassDB::bind_method(D_METHOD("has_extension_loader", "extension"), &ResourceLoader::has_extension_loader);
 	ClassDB::bind_method(D_METHOD("load_result", "path", "type_hint", "cache_mode"), &ResourceLoader::load_result, DEFVAL(""), DEFVAL(CACHE_MODE_REUSE));
 	ClassDB::bind_method(D_METHOD("load_threaded_get_result", "path"), &ResourceLoader::load_threaded_get_result);
 
@@ -340,6 +382,11 @@ void ResourceLoader::_bind_methods() {
 	BIND_ENUM_CONSTANT(THREAD_LOAD_IN_PROGRESS);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_FAILED);
 	BIND_ENUM_CONSTANT(THREAD_LOAD_LOADED);
+
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_FILE);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_IMPORTED);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_BUILT_IN);
+	BIND_BITFIELD_FLAG(CACHED_RESOURCE_KIND_ALL);
 
 	BIND_ENUM_CONSTANT(CACHE_MODE_IGNORE);
 	BIND_ENUM_CONSTANT(CACHE_MODE_REUSE);
@@ -383,15 +430,15 @@ ResourceUID::ID ResourceSaver::get_resource_id_for_path(const String &p_path, bo
 	return ::ResourceSaver::get_resource_id_for_path(p_path, p_generate);
 }
 
-Error ResourceSaver::register_extension(const String &p_extension, const Callable &p_save, const StringName &p_type, bool p_at_front) {
-	return ResourceFormatSaverCallable::register_extension(p_extension, p_save, p_type, p_at_front);
+Error ResourceSaver::register_extension_saver(const String &p_extension, const Callable &p_saver, const StringName &p_type, bool p_at_front) {
+	return ResourceFormatSaverCallable::register_extension(p_extension, p_saver, p_type, p_at_front);
 }
 
-Error ResourceSaver::unregister_extension(const String &p_extension) {
+Error ResourceSaver::unregister_extension_saver(const String &p_extension) {
 	return ResourceFormatSaverCallable::unregister_extension(p_extension);
 }
 
-bool ResourceSaver::is_extension_registered(const String &p_extension) {
+bool ResourceSaver::has_extension_saver(const String &p_extension) {
 	return ResourceFormatSaverCallable::is_extension_registered(p_extension);
 }
 
@@ -419,9 +466,9 @@ void ResourceSaver::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_resource_format_saver", "format_saver", "at_front"), &ResourceSaver::add_resource_format_saver, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_resource_format_saver", "format_saver"), &ResourceSaver::remove_resource_format_saver);
 	ClassDB::bind_method(D_METHOD("get_resource_id_for_path", "path", "generate"), &ResourceSaver::get_resource_id_for_path, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("register_extension", "extension", "save", "type", "at_front"), &ResourceSaver::register_extension, DEFVAL(StringName("Resource")), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("unregister_extension", "extension"), &ResourceSaver::unregister_extension);
-	ClassDB::bind_method(D_METHOD("is_extension_registered", "extension"), &ResourceSaver::is_extension_registered);
+	ClassDB::bind_method(D_METHOD("register_extension_saver", "extension", "saver", "type", "at_front"), &ResourceSaver::register_extension_saver, DEFVAL(StringName("Resource")), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("unregister_extension_saver", "extension"), &ResourceSaver::unregister_extension_saver);
+	ClassDB::bind_method(D_METHOD("has_extension_saver", "extension"), &ResourceSaver::has_extension_saver);
 	ClassDB::bind_method(D_METHOD("save_result", "resource", "path", "flags"), &ResourceSaver::save_result, DEFVAL(""), DEFVAL((uint32_t)FLAG_NONE));
 
 	BIND_BITFIELD_FLAG(FLAG_NONE);

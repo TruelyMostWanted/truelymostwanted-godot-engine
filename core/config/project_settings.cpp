@@ -588,9 +588,9 @@ void ProjectSettings::_emit_changed() {
 }
 
 bool ProjectSettings::load_resource_pack(const String &p_pack, bool p_replace_files, int p_offset) {
-	// PckPackageServer records the pack and emits `pack_mounted`; it calls `_load_resource_pack()`.
-	if (PckPackageServer::get_singleton()) {
-		return PckPackageServer::get_singleton()->mount(p_pack, p_replace_files, p_offset) == OK;
+	// PCKPackageServer records the pack and emits `pack_mounted`; it calls `_load_resource_pack()`.
+	if (PCKPackageServer::get_singleton()) {
+		return PCKPackageServer::get_singleton()->mount(p_pack, p_replace_files, p_offset) == OK;
 	}
 	return ProjectSettings::_load_resource_pack(p_pack, p_replace_files, p_offset, false);
 }
@@ -619,7 +619,7 @@ bool ProjectSettings::_load_resource_pack(const String &p_pack, bool p_replace_f
 		return false;
 	}
 	if (p_main_pack) {
-		// Main packs can't be unmounted with PckPackageServer.
+		// Main packs can't be unmounted with PCKPackageServer.
 		PackedData::get_singleton()->mark_main_pack(p_pack);
 	}
 
@@ -1821,6 +1821,7 @@ ProjectSettings::ProjectSettings() {
 
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "audio/general/ios/session_category", PROPERTY_HINT_ENUM, "Ambient,Multi Route,Play and Record,Playback,Record,Solo Ambient"), 0);
 	GLOBAL_DEF("audio/general/ios/mix_with_others", false);
+	GLOBAL_DEF("audio/info/read_file_tags", true);
 
 	_add_builtin_input_map();
 

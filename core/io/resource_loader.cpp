@@ -65,7 +65,7 @@ ResourceLoaderFormatSnapshot ResourceLoader::_get_loaders() {
 	MutexLock lock(loaders_mutex);
 	if (unlikely(loaders.class_db_version != class_db_version)) {
 		// ClassDB registered new resource extensions (the binary loader's list): read the C++ lists again.
-		// C++ loaders neither print nor lock here; script lists are only read by refresh_format_index(), outside the lock.
+		// C++ loaders neither print nor lock here; script lists are only read by rebuild_extension_index(), outside the lock.
 		loaders.class_db_version = class_db_version;
 		for (int i = 0; i < loaders.formats.size(); i++) {
 			if (!loaders.entries[i].scripted) {
@@ -197,7 +197,7 @@ ResourceLoaderFormatSnapshot::Candidates::Iterator ResourceLoaderFormatSnapshot:
 
 bool ResourceFormatLoader::recognizes_path_by_extension() const {
 	// A script, C# or GDExtension `_recognize_path` may accept any path. A `_get_recognized_extensions` list is indexed;
-	// loaders that change it call ResourceLoader::refresh_format_index().
+	// loaders that change it call ResourceLoader::rebuild_extension_index().
 	return !GDVIRTUAL_IS_OVERRIDDEN(_recognize_path);
 }
 
@@ -1470,7 +1470,7 @@ void ResourceLoader::remove_resource_format_loader(Ref<ResourceFormatLoader> p_f
 	ERR_FAIL_COND(index < 0); // Not found; reported after releasing the lock.
 }
 
-void ResourceLoader::refresh_format_index() {
+void ResourceLoader::rebuild_extension_index() {
 	// Read every list outside the lock (script code may run), then store the entries of the loaders still registered.
 	const ResourceLoaderFormatSnapshot current = _get_loaders();
 	Vector<ResourceLoaderFormatSnapshot::Entry> fresh;
@@ -1638,8 +1638,9 @@ bool ResourceLoader::should_create_uid_file(const String &p_path) {
 
 String ResourceLoader::_path_remap(const String &p_path, bool *r_translation_remapped) {
 	String new_path = p_path;
+	const bool localized = path_localizer && path_localizer(p_path, new_path);
 
-	if (translation_remaps.has(p_path)) {
+	if (!localized && translation_remaps.has(p_path)) {
 		// translation_remaps has the following format:
 		//   { "res://path.png": PackedStringArray( "res://path-ru.png:ru", "res://path-de.png:de" ) }
 
@@ -1673,11 +1674,14 @@ String ResourceLoader::_path_remap(const String &p_path, bool *r_translation_rem
 		if (r_translation_remapped) {
 			*r_translation_remapped = true;
 		}
+	}
 
-		// Fallback to p_path if new_path does not exist.
-		if (!FileAccess::exists(new_path + ".import") &&
-				!FileAccess::exists(new_path + ".remap") &&
-				!FileAccess::exists(new_path)) {
+	// Fallback to p_path if new_path does not exist.
+	if (new_path != p_path) {
+		const String file = ResourceUID::ensure_path(new_path);
+		if (!FileAccess::exists(file + ".import") &&
+				!FileAccess::exists(file + ".remap") &&
+				!FileAccess::exists(file)) {
 			WARN_PRINT(vformat("Translation remap '%s' does not exist. Falling back to '%s'.", new_path, p_path));
 			new_path = p_path;
 		}
@@ -2000,5 +2004,6 @@ HashMap<String, ResourceLoader::LoadToken *> ResourceLoader::user_load_tokens;
 
 SelfList<Resource>::List ResourceLoader::remapped_list;
 HashMap<String, Vector<String>> ResourceLoader::translation_remaps;
+ResourceLoader::PathLocalizer ResourceLoader::path_localizer = nullptr;
 
 ResourceLoaderImport ResourceLoader::import = nullptr;

@@ -14,6 +14,8 @@ nutzbar aus GDScript, C# und GDExtension.
 |---|---|
 | [`truely/CONVENTIONS.md`](truely/CONVENTIONS.md) | Regeln für Code (Server als C++-Singletons, keine Nodes, Namen, Bindings, Doku) und für Issues (Englisch, Vorlagen, Labels, fünf Abnahmepunkte) |
 | [`truely/FEATURE-WORKFLOW.md`](truely/FEATURE-WORKFLOW.md) | Ablauf pro Issue: Feature-Branch, Commits, Mono-Build, Testprojekt, Wiki, Push, CI, Squash-Merge |
+| [`GLOSSARY.md`](GLOSSARY.md) | Begriffe dieser Fork (Server, Settings, Pfad-Präfixe, Packs, Workflow) mit Pfaden, Issues und Wiki-Links, dazu Datei-Index nach Feature-Bereich |
+| [`BUILDING.md`](BUILDING.md) | Bauen für alle: Voraussetzungen, Editor, Export-Templates (Standard und .NET), Ausführen, Fehlerbehebung (Englisch, auch im Wiki unter „Building“) |
 | [`truely/README.md`](truely/README.md) | Branches (`master`, `truely-godot-engine`, PR- und Feature-Branches), Remotes, Sync mit Godot, `build.ps1` |
 | [`.agents/project.md`](.agents/project.md) | Arbeit mit Agenten (Truely-Run-Agentic-Project): Parameter, Abweichungen vom Skill, Board-IDs, Stand und Übergabe; Fortsetzen mit `Mode=Resume` |
 | Tracker-Issue (`flag: tracker`) | Reihenfolge und Abhängigkeiten der laufenden Issues: `gh issue list --label "flag: tracker"` |
@@ -38,10 +40,10 @@ nutzbar aus GDScript, C# und GDExtension.
 1. **Issue** suchen oder anlegen (`gh issue list --state all --search "<Stichwort>"`), nach Vorlage, auf Englisch.
 2. **Feature-Branch** von `truely-godot-engine`, Name mit der Issue-Nummer als Präfix (mindestens zweistellig): `03-feature-path-prefix-server`. Beiträge an Godot selbst: PR-Branch von `master`.
 3. **Implementieren** nach `CONVENTIONS.md`, **beliebig oft committen**. Der pre-commit-Hook muss durchlaufen.
-4. **Mono-Build**, dann im Testprojekt `new-feature.ps1 -Name <feature-branch>` und Checks in GDScript und C# schreiben und ausführen.
-5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (`<feature-branch>`), Beispiele in GDScript, C# und C++ (GDExtension).
+4. **Mono-Build**, dann im Testprojekt den Guide-Ordner anlegen (`new-feature.ps1 -Name <guide>`) oder den vorhandenen nehmen: `Example` (Snippets des Guides) und `Test` (ganze API) in GDScript und C#, ein Statement pro Zeile; ausführen.
+5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (nach Thema, z. B. `Path-Prefixes`), Beispiele in GDScript, C# und C++ (GDExtension).
 6. **Abnahmepunkte** im Issue abhaken, Ergebnisse als Kommentar ins Issue.
-7. **Lokal grün** (Build, Unit-Tests, Checks) → **Squash-Merge** nach `truely-godot-engine`. Die volle CI läuft nur dort, in Stapeln von etwa fünf Features (`FEATURE-WORKFLOW.md`, 2.4).
+7. **Lokal grün** (Build, Unit-Tests, Checks) → **Squash-Merge** nach `truely-godot-engine`. Die volle CI läuft erst, wenn `truely-godot-engine` nach `truely-godot-engine-releases` kommt (`FEATURE-WORKFLOW.md`, 2.4).
 8. **Den Feature-Branch nie löschen** (`gh pr merge --squash` ohne `--delete-branch`).
 
 ## Regeln für Agents
@@ -52,5 +54,5 @@ nutzbar aus GDScript, C# und GDExtension.
 - **Cross-Plattform und Web:** Beim Entwerfen, Planen und Umsetzen jedes Features die Benutzbarkeit und Performance auf Windows, Linux, macOS, Android, iOS **und im Web-Export** bedenken. Features sollen möglichst überall funktionieren, auch im Web (single-threaded, Dateien nur in `user://` und im PCK, wenig Speicher). Was nicht geht, steht im Issue unter „Platforms“.
 - **Kein Commit auf `master`.** Keine Änderungen an `version.py` (Konflikte beim Sync).
 - **Kein Push zu `upstream`.** PRs an Godot nur auf ausdrücklichen Wunsch, und dann das *base repository* prüfen.
-- Nur Pushes auf `truely-godot-engine` starten die volle CI aller Plattformen (Feature-Branches nicht). Reine Doku- oder Vorlagen-Änderungen auf `truely-godot-engine` dürfen `[skip ci]` in der Commit-Message tragen.
+- Nur Pushes auf `truely-godot-engine-releases` starten die volle CI aller Plattformen (`truely-godot-engine` und Feature-Branches nicht; von Hand: `gh workflow run runner.yml --ref <branch>`). Auf Feature-Branches nur lokal bauen: Windows, Mono, Tests in GDScript und C#.
 - Commits enden mit der Zeile `Co-Authored-By:` des Agents, wenn ein Agent sie erstellt.

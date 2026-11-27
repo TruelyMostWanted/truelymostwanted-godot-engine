@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FlowStartNode" inherits="FlowNode" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		The entry point of a [FlowGraph].
+	</brief_description>
+	<description>
+		The start node is where the execution of a graph begins. It has no input ports and one flow output port, [code]out[/code]. [method FlowGraph.add_node] makes the first [FlowStartNode] added to a graph the start node of the graph ([member FlowGraph.start_node_id]) if none is set yet. A graph should have exactly one start node that is set as its start.
+		At runtime the node does nothing and continues at [code]out[/code]. [method FlowGraphPlayback.start] and [method FlowGraphPlayer.play] begin at [member FlowGraph.start_node_id] unless another node id is given.
+		[codeblocks]
+		[gdscript]
+		var start_id := graph.add_node(FlowStartNode.new())
+		[/gdscript]
+		[csharp]
+		int startId = graph.AddNode(new FlowStartNode());
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

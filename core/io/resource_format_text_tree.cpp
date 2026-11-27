@@ -33,7 +33,10 @@
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/io/resource_text_serializer.h"
+#include "core/io/text_data_format.h"
+#include "core/object/class_db.h"
 #include "core/object/script_language.h"
+#include "core/string/char_utils.h"
 
 // ResourceFormatLoader::load() gets no type hint, but ResourceLoader calls recognize_path() with the hint
 // right before load() on the same thread. The hint is kept here for that one call (needed by CSV, which has no
@@ -44,11 +47,76 @@ static thread_local String text_tree_hint_type;
 /////////////////////////////////////////////////////////////////////////////
 // Loader base.
 
-String ResourceFormatLoaderTextTree::_get_file_type(const String &p_path, String *r_script_class) const {
-	if (p_path.get_extension().nocasecmp_to(_get_extension()) != 0 || !FileAccess::exists(p_path)) {
+// Resource classes that load from plain files of their own format (JSON, INI, CSV, XML, TOML, YAML, ...)
+// are never handled by the text-tree loaders and savers.
+static bool _is_plain_data_class(const String &p_type) {
+	return p_type == "JSON" || p_type == "TextDataFormat" || ClassDB::is_parent_class(p_type, "TextDataFormat");
+}
+
+String ResourceFormatLoaderTextTree::_read_head(const String &p_path) {
+	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::READ);
+	if (file.is_null()) {
 		return String();
 	}
-	const String marker = _get_marker_type(FileAccess::get_file_as_string(p_path));
+	const Vector<uint8_t> bytes = file->get_buffer(MARKER_HEAD_SIZE);
+	int size = bytes.size();
+	if (size == MARKER_HEAD_SIZE) {
+		// Drop a UTF-8 sequence cut at the end of the head.
+		int start = size - 1;
+		while (start > 0 && size - start < 4 && (bytes[start] & 0xC0) == 0x80) {
+			start--;
+		}
+		const uint8_t lead = bytes[start];
+		int length = 1;
+		if ((lead & 0xE0) == 0xC0) {
+			length = 2;
+		} else if ((lead & 0xF0) == 0xE0) {
+			length = 3;
+		} else if ((lead & 0xF8) == 0xF0) {
+			length = 4;
+		}
+		if (start + length > size) {
+			size = start;
+		}
+	}
+	String head;
+	head.append_utf8((const char *)bytes.ptr(), size);
+	return head;
+}
+
+String ResourceFormatLoaderTextTree::_scan_key_marker(const String &p_head) {
+	const int key = p_head.find("$type");
+	if (key < 0) {
+		return String(); // Fast path for plain files.
+	}
+	// `"$type": "Name"` (JSON), `$type=Name` (INI), `"$type" = "Name"` (TOML), `$type: Name` (YAML).
+	int pos = key + 5;
+	while (pos < p_head.length() && (p_head[pos] == ' ' || p_head[pos] == '\t' || p_head[pos] == '"' || p_head[pos] == '\'')) {
+		pos++;
+	}
+	if (pos >= p_head.length() || (p_head[pos] != ':' && p_head[pos] != '=')) {
+		return String();
+	}
+	pos++;
+	while (pos < p_head.length() && (p_head[pos] == ' ' || p_head[pos] == '\t' || p_head[pos] == '"' || p_head[pos] == '\'')) {
+		pos++;
+	}
+	const int begin = pos;
+	while (pos < p_head.length() && is_unicode_identifier_continue(p_head[pos])) {
+		pos++;
+	}
+	const String type = p_head.substr(begin, pos - begin);
+	if (type.is_empty() || _is_plain_data_class(type) || !ResourceTextSerializer::is_resource_type(type)) {
+		return String();
+	}
+	return type;
+}
+
+String ResourceFormatLoaderTextTree::_get_file_type(const String &p_path, String *r_script_class) const {
+	if (!_has_type_marker() || p_path.get_extension().nocasecmp_to(_get_extension()) != 0 || !FileAccess::exists(p_path)) {
+		return String();
+	}
+	const String marker = _get_marker_type(_read_head(p_path));
 	if (marker.is_empty()) {
 		return String();
 	}
@@ -71,6 +139,16 @@ Ref<Resource> ResourceFormatLoaderTextTree::load(const String &p_path, const Str
 
 	if (r_error) {
 		*r_error = ERR_FILE_CANT_OPEN;
+	}
+	if (type_hint.is_empty() || type_hint == "Resource") {
+		// Without a type marker in the head, this is a plain data file: leave it to the next loader
+		// (JSON, INI, CSV, XML, ...) without reading and parsing the whole file here.
+		if (!_has_type_marker() || _get_marker_type(_read_head(p_path)).is_empty()) {
+			if (r_error) {
+				*r_error = ERR_FILE_UNRECOGNIZED;
+			}
+			return Ref<Resource>();
+		}
 	}
 	Error err = OK;
 	const String text = FileAccess::get_file_as_string(p_path, &err);
@@ -121,6 +199,9 @@ bool ResourceFormatLoaderTextTree::recognize_path(const String &p_path, const St
 }
 
 bool ResourceFormatLoaderTextTree::handles_type(const String &p_type) const {
+	if (_is_plain_data_class(p_type)) {
+		return false; // Loaded by the plain loader of their format.
+	}
 	return p_type == "Resource" || ResourceTextSerializer::is_resource_type(p_type);
 }
 
@@ -155,18 +236,17 @@ Error ResourceFormatSaverTextTree::save(const Ref<Resource> &p_resource, const S
 }
 
 void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (recognize(p_resource) && _can_save(p_resource)) {
-		p_extensions->push_back(_get_extension());
-	}
+	// Nothing: the editor's save dialog offers a class only its native formats (its own savers, tres and res).
+	// The generic text formats stay available from code: ResourceSaver.save(resource, "x.json") goes through
+	// recognize_path(), which accepts the extension.
 }
 
 bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) const {
-	// JSON resources keep their own saver.
-	return p_resource.is_valid() && p_resource->get_class_name() != JSON::get_class_static();
+	// JSON and TextDataFormat resources (INI, CSV, XML, TOML, YAML) keep their own savers, which write plain text.
+	return p_resource.is_valid() && p_resource->get_class_name() != JSON::get_class_static() && Object::cast_to<TextDataFormat>(p_resource.ptr()) == nullptr;
 }
 
 bool ResourceFormatSaverTextTree::recognize_path(const Ref<Resource> &p_resource, const String &p_path) const {
-	// Also when _can_save() is false, so that save() can report why the resource does not fit.
 	return p_path.get_extension().nocasecmp_to(_get_extension()) == 0;
 }
 
@@ -178,20 +258,12 @@ Error ResourceFormatLoaderResourceJSON::_parse_text(const String &p_text, const 
 }
 
 String ResourceFormatLoaderResourceJSON::_get_marker_type(const String &p_text) const {
-	if (!p_text.contains("\"$type\"")) {
-		return String(); // Fast path for plain JSON files.
-	}
-	Ref<JSON> json;
-	json.instantiate();
-	if (json->parse(p_text) != OK) {
-		return String();
-	}
-	return ResourceTextSerializer::get_json_marker_type(json->get_data());
+	return _scan_key_marker(p_text);
 }
 
 bool ResourceFormatLoaderResourceJSON::handles_type(const String &p_type) const {
 	// The JSON class itself stays with ResourceFormatLoaderJSON.
-	return p_type != "JSON" && ResourceFormatLoaderTextTree::handles_type(p_type);
+	return ResourceFormatLoaderTextTree::handles_type(p_type);
 }
 
 Error ResourceFormatSaverResourceJSON::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
@@ -206,7 +278,7 @@ Error ResourceFormatLoaderResourceINI::_parse_text(const String &p_text, const S
 }
 
 String ResourceFormatLoaderResourceINI::_get_marker_type(const String &p_text) const {
-	return ResourceTextSerializer::get_ini_marker_type(p_text);
+	return _scan_key_marker(p_text);
 }
 
 Error ResourceFormatSaverResourceINI::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
@@ -222,11 +294,6 @@ Error ResourceFormatLoaderResourceCSV::_parse_text(const String &p_text, const S
 
 Error ResourceFormatSaverResourceCSV::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
 	return ResourceTextSerializer::write_csv(p_resource, ResourceTextSerializer::get_default_options(), r_text, r_error);
-}
-
-bool ResourceFormatSaverResourceCSV::_can_save(const Ref<Resource> &p_resource) const {
-	String error;
-	return ResourceTextSerializer::check_csv(p_resource, error) == OK;
 }
 
 /////////////////////////////////////////////////////////////////////////////

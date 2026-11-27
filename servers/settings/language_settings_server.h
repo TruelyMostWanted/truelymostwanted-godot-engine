@@ -39,6 +39,8 @@
 // so the locale is set before the autoloads and the main scene; the root window values are pushed as soon
 // as the root exists (APPLY_PHASE_SCENE at the latest).
 // Precedence of the locale: command line `--language` > `internationalization/locale/test` > stored > OS.
+// The locale channels `interface`, `audio` and `subtitles` (#357) are stored as `<channel>_locale` (empty: same as
+// the language) and pushed to TranslationServer::set_locale_for(); the developer locale makes them follow the language.
 class LanguageSettingsServer : public SettingsServer {
 	GDCLASS(LanguageSettingsServer, SettingsServer);
 
@@ -51,8 +53,10 @@ class LanguageSettingsServer : public SettingsServer {
 	static Window *_get_root();
 	static String _get_test_locale();
 	static bool _is_developer_locale(const String &p_locale);
-	static String _resolve_locale(const String &p_locale);
+	static bool _has_locale(const String &p_locale, const StringName &p_channel);
+	static StringName _get_channel_value(const StringName &p_channel);
 	static void _push_locale(const String &p_locale);
+	static void _push_channel_locale(const String &p_locale, const StringName &p_channel);
 
 	void _push_root_value(const StringName &p_name, int p_value);
 	int _pull_root_value(const StringName &p_name, int p_default) const;
@@ -63,10 +67,13 @@ class LanguageSettingsServer : public SettingsServer {
 	void _push_pending_root_values();
 
 	void _on_loaded();
-	void _on_startup_applied(int p_phase);
+	void _on_startup_applied(ApplyPhase p_phase);
 
 protected:
 	static void _bind_methods();
+
+	// Emits the typed `<value>_changed` signal of an applied value.
+	virtual void _notify_value_applied(const StringName &p_name, const Variant &p_value) override;
 
 	virtual Ref<Resource> _create_default_settings() const override;
 	virtual Variant _validate_setting(const StringName &p_name, const Variant &p_value) const override;
@@ -78,14 +85,19 @@ public:
 	static String get_project_locale();
 	// The locale passed with `--language` or `-l`, or an empty string.
 	static String get_command_line_locale();
-	// The locales of the loaded translations (TranslationServer.get_loaded_locales()), sorted.
+	// The locales of the localization catalogs and of the loaded translations, sorted.
 	static PackedStringArray get_available_locales();
+	// The locales of the catalogs with keys of `p_channel` (`&""`: all); all if no catalog declares the channel.
+	static PackedStringArray get_available_locales_for(const StringName &p_channel);
 
 	virtual StringName get_domain() const override;
 	virtual ApplyPhase get_apply_phase() const override;
 
 	void set_locale(const String &p_locale);
 	String get_locale() const;
+	// `p_channel`: `&""` (the language, same as set_locale()), `interface`, `audio` or `subtitles`.
+	void set_locale_for(const StringName &p_channel, const String &p_locale);
+	String get_locale_for(const StringName &p_channel) const;
 	void set_pseudolocalization_enabled(bool p_enabled);
 	bool is_pseudolocalization_enabled() const;
 	void set_layout_direction(Window::LayoutDirection p_direction);

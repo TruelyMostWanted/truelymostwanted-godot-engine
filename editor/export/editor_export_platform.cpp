@@ -56,6 +56,7 @@
 #include "editor/export/editor_export_plugin.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
@@ -1549,7 +1550,8 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 		if (has_import_file) {
 			String importer_type = config->get_value("remap", "importer");
 
-			if (importer_type == "keep") {
+			// Truely: CSV Dataset keeps the file as well; the CSV loader reads it.
+			if (importer_type == "keep" || importer_type == ResourceImporterCSVDataset::IMPORTER_NAME) {
 				save_info.path = path;
 				err = save_proxy.save_file(p_preset, p_udata, save_info, FileAccess::get_file_as_bytes(path));
 				if (err != OK) {
