@@ -107,7 +107,7 @@
 		<method name="get_root">
 			<return type="XMLElement" />
 			<description>
-				Returns the root element as an [XMLElement] view, or [code]null[/code] if the document has no root. The view is created on first use and shares the tree: writes through it change [member TextDataFormat.data].
+				Returns the root element as an [XMLElement] view, or [code]null[/code] if the document has no root (after a failed parse or [method TextDataFormat.clear]; a new [XML] has an empty root element named [code]root[/code]). The view is created on first use and shares the tree: writes through it change [member TextDataFormat.data].
 			</description>
 		</method>
 		<method name="parse_string" qualifiers="static">
@@ -135,4 +135,7 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="{ &quot;name&quot;: &quot;root&quot; }" />
+	</members>
 </class>
