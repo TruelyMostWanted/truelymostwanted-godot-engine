@@ -157,7 +157,7 @@ if [ -n "$TRUELY" ]; then
 else
 	printf 'Truely Godot Engine at commit [`%s`](%s/commit/%s), based on Godot %s.\n' "${SHA:0:7}" "$URL" "$SHA" "$NOW"
 fi
-printf 'Version string: `%s.truely.%s` (.NET: `%s.mono.truely.%s`, Godot's name for the .NET build).\n\n' "$CONFIG" "$HASH" "$CONFIG" "$HASH"
+printf 'Version string: `%s.truely.%s` (.NET: `%s.mono.truely.%s`, Godot naming for the .NET build).\n\n' "$CONFIG" "$HASH" "$CONFIG" "$HASH"
 
 printf '## Changes\n\n'
 if [ -n "$PREV" ]; then
