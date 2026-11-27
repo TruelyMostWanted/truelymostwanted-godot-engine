@@ -365,6 +365,10 @@ void EditorInspectorPluginSubtitle::parse_category(Object *p_object, const Strin
 static const char *const _subtitle_sync_classes[] = { "AudioStreamPlayer", "AudioStreamPlayer2D", "AudioStreamPlayer3D", "VideoStreamPlayer" };
 
 bool EditorInspectorPluginSubtitleSync::can_handle(Object *p_object) {
+	// Variant, Array and Dictionary editors ask every plugin with a null object.
+	if (p_object == nullptr) {
+		return false;
+	}
 	for (const char *class_name : _subtitle_sync_classes) {
 		if (p_object->is_class(class_name)) {
 			return true;
