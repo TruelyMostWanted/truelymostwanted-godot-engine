@@ -69,6 +69,7 @@ Node *SubtitlePlayer::_get_sync_node() {
 	}
 	ERR_FAIL_COND_V_MSG(sync_position_method.is_empty(), nullptr, vformat("SubtitlePlayer cannot follow a %s: use an AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D, VideoStreamPlayer or AnimationPlayer.", node->get_class()));
 	sync_signals = node->has_signal(SNAME("playing_changed"));
+	sync_paused_method = node->has_method(SNAME("get_stream_paused")) ? SNAME("get_stream_paused") : (node->has_method(SNAME("is_paused")) ? SNAME("is_paused") : StringName());
 	_connect_sync(true);
 	_update_source();
 	return node;
@@ -139,14 +140,34 @@ void SubtitlePlayer::_update_source(const Ref<Resource> &p_stream) {
 	playback->set_subtitle(path.is_empty() ? Ref<Subtitle>() : Ref<Subtitle>(ResourceLoader::load(path, "Subtitle")));
 }
 
+bool SubtitlePlayer::_is_sync_paused(Node *p_node) const {
+	// An audio player with a paused stream, or a video that is paused while it plays (`paused` stays set after stop()).
+	if (sync_paused_method.is_empty() || !bool(p_node->call(sync_paused_method))) {
+		return false;
+	}
+	return sync_paused_method == SNAME("get_stream_paused") || bool(p_node->call(SNAME("is_playing")));
+}
+
+void SubtitlePlayer::_sync_stopped(Node *p_node) {
+	playing = false;
+	if (p_node != nullptr && _is_sync_paused(p_node)) {
+		// Paused: the text stays. Checked every frame, since a stop while paused emits no `playing_changed`.
+		set_process_internal(true);
+		return;
+	}
+	// Stopped or finished: hide what it showed.
+	playback->reset();
+	if (p_node != nullptr && sync_signals) {
+		set_process_internal(false); // Until `playing_changed(true)`.
+	}
+}
+
 void SubtitlePlayer::_sync_playing_changed(bool p_playing) {
-	set_process_internal(p_playing);
 	if (p_playing) {
+		set_process_internal(true);
 		_update_source(); // Picks up a changed override; the position is read in the next frame.
-	} else if (playing) {
-		// Stopped, finished or paused: hide what it showed until it plays again.
-		playing = false;
-		playback->reset();
+	} else {
+		_sync_stopped(_get_sync_node());
 	}
 }
 
@@ -168,20 +189,13 @@ void SubtitlePlayer::_advance(double p_delta) {
 	}
 	Node *node = _get_sync_node();
 	// A node with `playing_changed` is known to play while this processes; others are asked every frame.
-	if (node != nullptr && ((sync_signals && playing) || bool(node->call(SNAME("is_playing"))))) {
+	if (node != nullptr && ((sync_signals && playing) || (bool(node->call(SNAME("is_playing"))) && !_is_sync_paused(node)))) {
 		playing = true;
 		position = node->call(sync_position_method);
 		playback->update(position + time_offset);
 		return;
 	}
-	if (playing) {
-		// The sync node stopped (or its audio stream was paused): hide what it showed.
-		playing = false;
-		playback->reset();
-	}
-	if (node != nullptr && sync_signals) {
-		set_process_internal(false); // Until `playing_changed(true)`.
-	}
+	_sync_stopped(node);
 }
 
 void SubtitlePlayer::_segment_changed(const Ref<SubtitleSegment> &p_segment) {

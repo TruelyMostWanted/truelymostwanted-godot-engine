@@ -242,17 +242,32 @@ TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Subtitle of the synced AudioStream
 	SceneTree::get_singleton()->process(0.0);
 	CHECK(log->take() == "A2");
 
+	// Paused: the text stays.
 	audio->set_stream_paused(true);
 	SIGNAL_CHECK("playing_changed", stopped);
+	SceneTree::get_singleton()->process(0.0);
 	CHECK_FALSE(player->is_playing());
-	CHECK(log->texts.size() == 1);
-	CHECK(log->take().is_empty());
+	CHECK(log->texts.is_empty());
 
 	audio->set_stream_paused(false);
 	SIGNAL_CHECK("playing_changed", started);
 	SceneTree::get_singleton()->process(0.0);
-	CHECK(log->take() == "A2");
+	CHECK(player->is_playing());
+	CHECK(log->texts.is_empty()); // Still "A2".
 
+	// Stopped while paused (no playing_changed): the text is hidden in the next frame.
+	audio->set_stream_paused(true);
+	SIGNAL_DISCARD("playing_changed");
+	audio->stop();
+	SIGNAL_CHECK_FALSE("playing_changed");
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->texts.size() == 1);
+	CHECK(log->take().is_empty());
+
+	audio->play();
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "A1");
+	SIGNAL_DISCARD("playing_changed");
 	audio->stop();
 	SIGNAL_CHECK("playing_changed", stopped);
 	CHECK_FALSE(player->is_playing());

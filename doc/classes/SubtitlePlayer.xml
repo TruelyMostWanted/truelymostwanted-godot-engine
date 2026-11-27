@@ -27,7 +27,7 @@
 		[/csharp]
 		[/codeblocks]
 		The player connects to [signal AudioStreamPlayer.playing_changed], [signal AudioStreamPlayer.stream_changed] and [signal AudioStreamPlayer.track_changed] of the sync node and reads its position every frame only while it plays (audio players: [method AudioStreamPlayer.get_track_position], so the time of the current playlist track). An [AnimationPlayer] is still polled every frame. The player updates in the process step, so it follows [member Node.process_mode] and stops while the tree is paused. It does not run in the editor. All of its logic is in a [SubtitlePlayback], which [method get_playback] returns.
-		[b]Note:[/b] When the sync node stops, finishes or is paused, the shown text is hidden until it plays again. An [AudioStreamPlayer] with [member AudioStreamPlayer.stream_paused] and a paused [VideoStreamPlayer] count as stopped.
+		[b]Note:[/b] When the sync node stops or finishes, the shown text is hidden. When it is paused ([member AudioStreamPlayer.stream_paused], [member VideoStreamPlayer.paused], or a paused scene tree), the text stays visible and the player stops advancing until it resumes; a stop while paused hides the text in the next frame.
 	</description>
 	<tutorials>
 	</tutorials>

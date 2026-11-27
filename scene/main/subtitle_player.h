@@ -52,11 +52,14 @@ class SubtitlePlayer : public Node {
 	ObjectID sync_id;
 	StringName sync_position_method; // Empty when the sync node is not supported.
 	bool sync_signals = false; // The sync node has `playing_changed`: process only while it plays.
+	StringName sync_paused_method; // `get_stream_paused` (audio), `is_paused` (video), empty (AnimationPlayer).
 
 	Node *_get_sync_node();
 	void _connect_sync(bool p_connect);
 	void _release_sync();
 	void _update_source(const Ref<Resource> &p_stream = Ref<Resource>());
+	bool _is_sync_paused(Node *p_node) const;
+	void _sync_stopped(Node *p_node);
 	void _sync_playing_changed(bool p_playing);
 	void _sync_stream_changed(const Ref<Resource> &p_stream);
 	void _sync_track_changed(int p_index, const Ref<Resource> &p_stream);
