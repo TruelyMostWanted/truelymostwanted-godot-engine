@@ -234,3 +234,10 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 - **Danach:** Testprojekt-Gesamtlauf mit neuem Build (Glue + Assemblies vorher!), PR des Fix-Branches → Squash-Merge, Issues #385–#413 mit Kommentar schließen (und im jeweiligen Feature-Issue verlinken, neue Regel), dann **Godot 4.8 RC1 sync** (`truely/sync-upstream.ps1`, `truely/godot-status.txt` = rc1), Build, alle Tests, **finaler Playtest aller 6 Bereiche** (Briefs `P:/wt/pt/brief.md`), CI, Release 0.2.1.
 - **0.3.0-Ideen offen anzulegen:** Proposals 15808, 15806, 8766 analysieren; `DisplayServer.get_resolutions(16, 9)` + `Resolution`-Liste.
 - Entschieden: #391 default_values bleibt Dateipfad (*.tres,*.res), kein Typed Array.
+
+### Stand (2026-11-27, Resume)
+
+- Fix-Branch `389-bug-editor-playtest-fixes` = `1dc24a8df4` (gepusht): #416 (PROPERTY_USAGE_NONE für `FlowGraphPlayback.blackboard`/`TileMapPathGraph.options`, Frame vor dem Speichern einpassen), #403 (Manifeste ohne Neustart, Save As `.lcat` zuerst; Branch `389-fix-loc2`). Build 0/0, 2151/2151 Unit-Tests.
+- Am Build verifiziert: media fix_410–413, loc fix_385/386/403 (26/26)/391 (20/21; Drop auf Ressourcen-Zelle von Hand, `P:/wt/pt/queue.txt`), data fix_409 1–10, flow fix_401. `add_image`-Fehler = Upstream (leere `[preset.0.options]` im Harness).
+- Testprojekt-Gesamtlauf: 198 Szenen grün, 10 rot (155 YAML, 36 TOML, 268 INI, 341 Katalog, 172 Input-Layer) → Agent analysiert (Branches `389-fix-regress` Engine / `389-checks-update` Testprojekt).
+- Danach: Rebuild, Gesamtlauf grün → PR Fix-Branch → Squash-Merge, Issues #385–#416 schließen (Feature-Issues verlinken), RC1-Sync, finaler Playtest, CI, Release 0.2.1.
