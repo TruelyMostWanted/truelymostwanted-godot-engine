@@ -930,8 +930,9 @@ bool CSVTableEditor::can_edit(const Object *p_object) {
 
 void CSVTableEditor::_inspector_object_changed() {
 	// Opened with "Open in Table", the dock is not closed by the editor when another file is inspected.
+	// A catalog stays open until another table object replaces it (#391).
 	const Resource *inspected = Object::cast_to<Resource>(InspectorDock::get_inspector_singleton()->get_edited_object());
-	if (inspected && !inspected->get_path().is_empty() && !can_edit(inspected)) {
+	if (catalog.is_null() && inspected && !inspected->get_path().is_empty() && !can_edit(inspected)) {
 		edit(Ref<Resource>());
 		close();
 	}
