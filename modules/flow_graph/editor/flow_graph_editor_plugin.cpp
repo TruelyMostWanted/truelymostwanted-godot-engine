@@ -32,6 +32,7 @@
 
 #include "../dialogue/dialogue_nodes.h"
 #include "../flow_graph_debugger.h"
+#include "../flow_nodes.h"
 
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
@@ -1077,7 +1078,9 @@ void FlowGraphEditor::_debug_update() {
 		if (&playback != selected && (path.is_empty() || (playback.graph_path != path && playback.current_graph_path != path))) {
 			continue;
 		}
-		debug_selector->add_item(vformat(playback.waiting ? TTR("Playback %d (waiting)") : TTR("Playback %d"), playback.id), i);
+		const String label = vformat(TTR("Playback %d: %s"), debug_selector->get_item_count() + 1, playback.graph_path.get_file());
+		debug_selector->add_item(playback.waiting ? vformat(TTR("%s (waiting)"), label) : label, i);
+		debug_selector->set_item_tooltip(debug_selector->get_item_count() - 1, vformat(TTR("FlowGraphPlayback %s in %s"), String::num_uint64((uint64_t)playback.id), playback.graph_path));
 		if (&playback == selected) {
 			debug_selector->select(debug_selector->get_item_count() - 1);
 		}
@@ -1090,10 +1093,22 @@ void FlowGraphEditor::_debug_update() {
 	}
 	debug_selector->set_visible(debug_selector->get_item_count() > 0);
 	debug_follow->set_visible(debug_selector->get_item_count() > 0);
+	if (!debug_follow->is_visible()) {
+		debug_follow->set_pressed_no_signal(false); // The next run starts unfollowed, and opened graphs frame their view again.
+	}
 
 	StringName active;
 	if (selected != nullptr && !path.is_empty() && selected->current_graph_path == path && selected->node_id != FlowGraph::NODE_ID_NONE) {
 		active = "n" + itos(selected->node_id);
+	} else if (selected != nullptr && !path.is_empty() && selected->graph_path == path) {
+		// Inside a subgraph: highlight the Subgraph node that leads there.
+		for (const int id : graph->get_node_ids()) {
+			const Ref<FlowSubgraphNode> subgraph = graph->get_node(id);
+			if (subgraph.is_valid() && subgraph->get_graph().is_valid() && subgraph->get_graph()->get_path() == selected->current_graph_path) {
+				active = "n" + itos(id);
+				break;
+			}
+		}
 	}
 	if (active == debug_highlighted) {
 		return;
