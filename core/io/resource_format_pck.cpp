@@ -71,9 +71,17 @@ Error ResourceFormatSaverPck::save(const Ref<Resource> &p_resource, const String
 }
 
 void ResourceFormatSaverPck::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (Object::cast_to<PCKPackage>(*p_resource)) {
+	// Save dialogs list these extensions. A description saved as a pack would become a read-only pack and
+	// lose the description, so only opened packs offer `.pck`; descriptions are built with "Build Pack...".
+	const PCKPackage *package = Object::cast_to<PCKPackage>(*p_resource);
+	if (package != nullptr && !package->is_description()) {
 		p_extensions->push_back("pck");
 	}
+}
+
+bool ResourceFormatSaverPck::recognize_path(const Ref<Resource> &p_resource, const String &p_path) const {
+	// `ResourceSaver.save(description, "x.pck")` still builds the pack.
+	return p_path.get_extension().to_lower() == "pck";
 }
 
 bool ResourceFormatSaverPck::recognize(const Ref<Resource> &p_resource) const {
