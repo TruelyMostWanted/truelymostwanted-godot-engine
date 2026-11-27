@@ -1877,9 +1877,10 @@ void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const St
 }
 
 // Truely: a data file (CSV, ...) that was read from its own source file, not from an import, although the
-// file has a `.import` (Keep File, CSV Dataset). It is edited and saved like a file without import.
+// file has a `.import` (Keep File, CSV Dataset), or a localization catalog read from such a file (#346).
+// It is edited and saved like a file without import.
 static bool _is_data_source_file(const Resource *p_resource) {
-	return Object::cast_to<TextDataFormat>(p_resource) && p_resource->get_import_path().is_empty();
+	return (Object::cast_to<TextDataFormat>(p_resource) || Object::cast_to<LocalizationCatalog>(p_resource)) && p_resource->get_import_path().is_empty();
 }
 
 void EditorNode::save_resource(const Ref<Resource> &p_resource) {
@@ -5591,7 +5592,7 @@ bool EditorNode::is_resource_read_only(Ref<Resource> p_resource, bool p_foreign_
 				}
 			}
 		}
-	} else if (FileAccess::exists(path + ".import")) {
+	} else if (FileAccess::exists(path + ".import") && !_is_data_source_file(p_resource.ptr())) { // Truely (#346): data source files stay writable.
 		// The resource is not a subresource, but if it has an .import file, it's imported so treat it as read only.
 		return true;
 	}
