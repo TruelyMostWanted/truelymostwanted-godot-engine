@@ -32,6 +32,7 @@
 		[/codeblocks]
 		The settings need a restart: the location is resolved once. Debug builds and the editor accept the command line argument [code]--streaming-assets-path=&lt;folder&gt;[/code], which forces [constant LOCATION_EXTERNAL_FOLDER] with that folder, for example to test the layout of an export.
 		[b]Note:[/b] [code]streaming://[/code] is read-only except for the source folder in the editor. It can't be replaced or removed with [method PathPrefixServer.register_prefix] or [method PathPrefixServer.unregister_prefix].
+		[b]Note:[/b] With [constant LOCATION_SOURCE_FOLDER] (the editor and games run from it), [DirAccess] lists the source folder as it is, including the [code].import[/code] and [code].uid[/code] files that exports leave out. Skip them when you list files.
 	</description>
 	<tutorials>
 	</tutorials>
