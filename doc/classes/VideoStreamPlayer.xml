@@ -84,6 +84,9 @@
 		<member name="stream_position" type="float" setter="set_stream_position" getter="get_stream_position">
 			The current position of the stream, in seconds.
 		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Overrides [member VideoStreamPlayer.subtitle_path] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
+		</member>
 		<member name="volume" type="float" setter="set_volume" getter="get_volume">
 			Audio volume as a linear value.
 		</member>
@@ -95,6 +98,18 @@
 		<signal name="finished">
 			<description>
 				Emitted when playback is finished.
+			</description>
+		</signal>
+		<signal name="playing_changed">
+			<param index="0" name="playing" type="bool" />
+			<description>
+				Emitted when the player starts playing ([method play]), stops ([method stop], or setting a new stream), finishes (before [signal finished]), or is paused or resumed ([member paused]). [param playing] is the new state.
+			</description>
+		</signal>
+		<signal name="stream_changed">
+			<param index="0" name="stream" type="VideoStream" />
+			<description>
+				Emitted when [member stream] is replaced by a different stream.
 			</description>
 		</signal>
 	</signals>

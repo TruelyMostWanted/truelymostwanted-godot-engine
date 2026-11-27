@@ -168,6 +168,9 @@
 			If [code]true[/code], the sounds are paused. Setting [member stream_paused] to [code]false[/code] resumes all sounds.
 			[b]Note:[/b] This property is automatically changed when exiting or entering the tree, or this node is paused (see [member Node.process_mode]).
 		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Overrides [member AudioStreamPlayer.subtitle_path] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
+		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
 			Volume of sound, in decibels. This is an offset of the [member stream]'s volume.
 			[b]Note:[/b] To convert between decibel and linear energy (like most volume sliders do), use [member volume_linear], or [method @GlobalScope.db_to_linear] and [method @GlobalScope.linear_to_db].
@@ -186,6 +189,12 @@
 		<signal name="finished">
 			<description>
 				Emitted when a sound finishes playing without interruptions. This signal is [i]not[/i] emitted when calling [method stop], or when exiting the tree while sounds are playing.
+			</description>
+		</signal>
+		<signal name="playing_changed">
+			<param index="0" name="playing" type="bool" />
+			<description>
+				Emitted when the player starts playing ([method play], also when [method crossfade_to] or [method fade_in] start it), stops ([method stop], [method fade_out] with stop at the end, or setting a new stream), finishes (before [signal finished]), or is paused or resumed ([member stream_paused], also when the scene tree pauses it). [param playing] is the new state. It is not emitted for the internal restart of [method seek] or of a monophonic stream. It is emitted after playback started, so [member playing] is already [code]true[/code] in a handler.
 			</description>
 		</signal>
 		<signal name="position_changed">

@@ -194,6 +194,9 @@
 		<member name="stream_paused" type="bool" setter="set_stream_paused" getter="get_stream_paused" default="false">
 			If [code]true[/code], the playback is paused. You can resume it by setting [member stream_paused] to [code]false[/code].
 		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Overrides [member AudioStreamPlayer3D.subtitle_path] for a [SubtitlePlayer] that syncs with this player. If empty, the [SubtitlePlayer] uses the subtitle of the stream. This is only a path: nothing is loaded until a [SubtitlePlayer] uses it.
+		</member>
 		<member name="unit_size" type="float" setter="set_unit_size" getter="get_unit_size" default="10.0">
 			The factor for the attenuation effect. Higher values make the sound audible over a larger distance.
 		</member>
@@ -214,6 +217,12 @@
 		<signal name="finished">
 			<description>
 				Emitted when the audio stops playing.
+			</description>
+		</signal>
+		<signal name="playing_changed">
+			<param index="0" name="playing" type="bool" />
+			<description>
+				Emitted when the player starts playing ([method play], also when [method crossfade_to] or [method fade_in] start it), stops ([method stop], [method fade_out] with stop at the end, or setting a new stream), finishes (before [signal finished]), or is paused or resumed ([member stream_paused], also when the scene tree pauses it). [param playing] is the new state. It is not emitted for the internal restart of [method seek] or of a monophonic stream. It is emitted after playback started, so [member playing] is already [code]true[/code] in a handler.
 			</description>
 		</signal>
 		<signal name="position_changed">
