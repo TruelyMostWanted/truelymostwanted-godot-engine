@@ -192,6 +192,12 @@ Error CSV::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 		for (const String &column : header) {
 			cells.push_back(column);
 		}
+		// A row wider than the header (set_cell(), set_cells()) gets unnamed columns: the parser rejects
+		// rows wider than the header, and a failed re-parse of this text would drop the data.
+		for (int i = 0; i < rows.size(); i++) {
+			const PackedStringArray values = rows[i];
+			cells.resize(MAX(cells.size(), values.size()));
+		}
 		text += ResourceTextSerializer::write_csv_row(cells, delimiter);
 	}
 	for (int i = 0; i < rows.size(); i++) {

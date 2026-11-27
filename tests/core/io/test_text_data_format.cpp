@@ -398,6 +398,25 @@ TEST_CASE("[CSV] Blocks of cells for copy, paste and undo") {
 	CHECK(csv->get_row_count() == 2);
 }
 
+TEST_CASE("[CSV] Cells wider than the header survive a text round trip") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("name,hp
+knight,100
+") == OK);
+	Array block;
+	block.push_back(PackedStringArray({ "90", "4", "fast" }));
+	csv->set_cells(0, 1, block);
+
+	// The text gets unnamed header columns, so parsing it again keeps every cell.
+	const String text = csv->encode_to_text();
+	CHECK(text == "name,hp,,
+knight,90,4,fast
+");
+	REQUIRE(csv->parse(text) == OK);
+	CHECK(csv->get_row(0) == PackedStringArray({ "knight", "90", "4", "fast" }));
+}
+
 TEST_CASE("[TextDataFormat] Instance load() and save()") {
 	const String path = TestUtils::get_temp_path("text_data_instance.ini");
 	Ref<INI> ini;
