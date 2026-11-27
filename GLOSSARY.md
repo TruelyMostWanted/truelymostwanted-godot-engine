@@ -191,7 +191,7 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 ### T
 
-**Test project**: separate public repository `godot-custom-build-project` with one folder per feature and checks in GDScript and C#; `new-feature.ps1 -Name <feature-branch>` creates the folder. See `truely/FEATURE-WORKFLOW.md` (section 4).
+**Test project**: separate public repository `godot-custom-build-project` with one folder per wiki guide (`Audio-Bus-Settings` → `audio-bus-settings/`). Each folder has an `Example` (the guide's snippets, hands-on) and a `Test` (the full API, `FeatureTest`), both in GDScript and C#; `new-feature.ps1 -Name <guide>` creates the folder. See `truely/FEATURE-WORKFLOW.md` (section 4).
 
 **TextInsertionServer** / **TextInsertionValues** / **TextInsertionTemplate**: fills `{name}` placeholders (with modifiers like `{item:t}`, `{gold:number}`) from call args, main-thread `Callable` providers, `set_value()` values and `TextInsertionValues` resources by priority; `parse()` returns a reusable `TextInsertionTemplate`. Project settings `internationalization/text_insertion/*`. In code: `core/string/text_insertion_*.*`. Issues: #339 (decision), #342. Wiki: [`342-feature-text-insertion-server`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/342-feature-text-insertion-server), [`Class-TextInsertionServer`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Class-TextInsertionServer).
 
