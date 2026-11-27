@@ -53,6 +53,7 @@ class PerformanceRecordingProfile : public Resource {
 
 protected:
 	static void _bind_methods();
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_builtins(const PackedInt32Array &p_builtins);
