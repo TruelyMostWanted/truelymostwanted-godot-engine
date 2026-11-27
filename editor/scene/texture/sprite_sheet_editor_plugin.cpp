@@ -497,6 +497,7 @@ int SpriteSheetCanvas::_handle_at(const Vector2 &p_screen) const {
 
 void SpriteSheetCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
 	const float new_zoom = CLAMP(p_zoom, 0.0625f, 64.0f);
+	fit_pending = false;
 	const Vector2 texture_point = _to_texture(p_center);
 	zoom = new_zoom;
 	view_offset = p_center - texture_point * zoom;
@@ -506,7 +507,6 @@ void SpriteSheetCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
 void SpriteSheetCanvas::fit() {
 	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	const Size2 texture_size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? atlas->get_sheet_texture()->get_size() : Size2();
-	fit_pending = texture_size.x > 0 && texture_size.y > 0 && (get_size().x <= 0 || get_size().y <= 0);
 	if (texture_size.x <= 0 || texture_size.y <= 0 || get_size().x <= 0 || get_size().y <= 0) {
 		zoom = 1.0f;
 		view_offset = Vector2(8, 8) * EDSCALE;
@@ -729,6 +729,7 @@ void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
 			return;
 		}
 		if (drag_mode == DRAG_PAN) {
+			fit_pending = false;
 			view_offset += mm->get_position() - drag_from;
 			drag_from = mm->get_position();
 			queue_redraw();
@@ -856,6 +857,8 @@ void SpriteSheetEditor::edit(const Ref<SpriteSheet> &p_atlas) {
 	}
 	region_list->set_atlas(atlas);
 	_atlas_changed();
+	// The dock may still be hidden or growing: fit again on each resize until the user zooms or pans.
+	canvas->fit_pending = true;
 	callable_mp(canvas, &SpriteSheetCanvas::fit).call_deferred();
 }
 
