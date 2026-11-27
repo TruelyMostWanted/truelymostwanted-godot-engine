@@ -35,6 +35,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "editor/inspector/editor_resource_picker.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
@@ -104,10 +105,25 @@ void EditorPropertyAudioStreamList::update_property() {
 		picker->set_base_type(AudioStream::get_class_static());
 		picker->set_edited_resource(Ref<Resource>(streams[i]));
 		picker->set_editable(!locked);
-		picker->set_h_size_flags(SIZE_EXPAND_FILL);
+		picker->set_custom_minimum_size(Size2(96 * EDSCALE, 0));
 		picker->connect(SNAME("resource_changed"), callable_mp(this, &EditorPropertyAudioStreamList::_stream_changed).bind(i));
 		picker->connect(SNAME("resource_selected"), callable_mp(this, &EditorPropertyAudioStreamList::_stream_selected));
 		row->add_child(picker);
+
+		// The picker alone shows only a waveform thumbnail: name the track (title from the tags, else the file name).
+		Label *name = memnew(Label);
+		const Ref<AudioStream> stream = streams[i];
+		String track_name = TTR("(empty)");
+		if (stream.is_valid()) {
+			track_name = !stream->get_title().is_empty() ? stream->get_title() : (!stream->get_path().is_empty() ? stream->get_path().get_file() : stream->get_class());
+			name->set_tooltip_text(stream->get_path());
+		}
+		name->set_text(track_name);
+		name->set_mouse_filter(MOUSE_FILTER_PASS);
+		name->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+		name->set_clip_text(true);
+		name->set_h_size_flags(SIZE_EXPAND_FILL);
+		row->add_child(name);
 
 		struct RowButton {
 			const char *icon;
