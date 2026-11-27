@@ -36,13 +36,10 @@
 
 int InputActions::_find(const StringName &p_action) const {
 	if (lookup_dirty) {
-		// An action was renamed or removed: index again. The first action of a name wins.
+		// An action was renamed or removed: index again. The last action of a name wins, as in set_actions().
 		lookup.clear();
 		for (uint32_t i = 0; i < actions.size(); i++) {
-			const StringName action_name = actions[i]->get_action();
-			if (!lookup.has(action_name)) {
-				lookup.insert(action_name, i);
-			}
+			lookup.insert(actions[i]->get_action(), i);
 		}
 		lookup_dirty = false;
 	}
@@ -84,32 +81,44 @@ void InputActions::set_actions(const TypedArray<InputAction> &p_actions) {
 		_detach(action);
 	}
 	actions.clear();
+	action_slots.clear();
 	lookup.clear();
 	lookup_dirty = false;
+	bool has_empty_slot = false;
+	PackedStringArray duplicates;
 	for (int i = 0; i < p_actions.size(); i++) {
 		const Ref<InputAction> action = p_actions[i];
 		if (action.is_null()) {
+			has_empty_slot = true;
 			continue;
 		}
-		// Actions without a name yet (a new element in the Inspector, a loader that sets the
-		// properties later) are kept; the lookup is rebuilt when they get their name.
-		const int index = action->get_action() == StringName() ? -1 : _find(action->get_action());
-		if (index >= 0) {
-			// The later action of the same name wins.
-			_detach(actions[index]);
-			actions[index] = action;
-		} else {
-			lookup.insert(action->get_action(), actions.size());
-			actions.push_back(action);
+		// All entries are kept, so the Inspector never loses one; the later action of a name wins in the lookup.
+		// Actions without a name yet (a new element in the Inspector, a loader that sets the properties later)
+		// are kept too; the lookup is rebuilt when they get their name.
+		const StringName action_name = action->get_action();
+		if (action_name != StringName()) {
+			if (lookup.has(action_name) && !duplicates.has(action_name)) {
+				duplicates.push_back(action_name);
+			}
+			lookup.insert(action_name, actions.size());
 		}
+		actions.push_back(action);
 		_attach(action);
+	}
+	if (has_empty_slot) {
+		for (int i = 0; i < p_actions.size(); i++) {
+			action_slots.push_back(p_actions[i]);
+		}
+	}
+	if (!duplicates.is_empty()) {
+		WARN_PRINT(vformat("InputActions: the action %s is listed more than once; the last entry of a name is used.", String(", ").join(duplicates)));
 	}
 	emit_changed();
 }
 
 TypedArray<InputAction> InputActions::get_actions() const {
 	TypedArray<InputAction> result;
-	for (const Ref<InputAction> &action : actions) {
+	for (const Ref<InputAction> &action : action_slots.is_empty() ? actions : action_slots) {
 		result.push_back(action);
 	}
 	return result;
@@ -129,6 +138,7 @@ void InputActions::add_action(const Ref<InputAction> &p_action) {
 		lookup.insert(p_action->get_action(), actions.size());
 		actions.push_back(p_action);
 	}
+	action_slots.clear();
 	_attach(p_action);
 	emit_changed();
 }
@@ -149,6 +159,7 @@ bool InputActions::remove_action(const StringName &p_action) {
 	}
 	_detach(actions[index]);
 	actions.remove_at(index);
+	action_slots.clear();
 	lookup_dirty = true;
 	emit_changed();
 	return true;
@@ -167,13 +178,14 @@ int InputActions::get_action_count() const {
 }
 
 void InputActions::clear() {
-	if (actions.is_empty()) {
+	if (actions.is_empty() && action_slots.is_empty()) {
 		return;
 	}
 	for (const Ref<InputAction> &action : actions) {
 		_detach(action);
 	}
 	actions.clear();
+	action_slots.clear();
 	lookup.clear();
 	lookup_dirty = false;
 	emit_changed();

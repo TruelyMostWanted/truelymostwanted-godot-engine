@@ -109,7 +109,7 @@
 			The deadzone of the action, from [code]0.0[/code] to [code]1.0[/code] (see [method InputMap.action_set_deadzone]).
 		</member>
 		<member name="events" type="InputEvent[]" setter="set_events" getter="get_events" default="[]">
-			The events that trigger the action, shown in the Inspector and stored as sub-resources. Setting it replaces all events; [code]null[/code] entries are skipped. The getter returns a new array: change the events with [method add_event], [method remove_event] and [method clear_events], or set the whole list.
+			The events that trigger the action, shown in the Inspector and stored as sub-resources. Setting it replaces all events. [code]null[/code] entries (an element just added in the Inspector) are kept in the array until they get an event, but the action ignores them: [method get_event_count], [method has_event], the [InputMap] and the settings servers see only the events. A method that changes the events drops the [code]null[/code] entries. The getter returns a new array: change the events with [method add_event], [method remove_event] and [method clear_events], or set the whole list.
 		</member>
 	</members>
 	<constants>
