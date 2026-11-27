@@ -46,7 +46,7 @@
 		<method name="_is_read_only" qualifiers="virtual const">
 			<return type="bool" />
 			<description>
-				Returns [code]true[/code] if paths with this prefix cannot be written to. Optional, [code]false[/code] by default.
+				Returns [code]true[/code] if paths with this prefix cannot be written to. Optional, [code]false[/code] by default [method FileAccess.open] in a write mode and the [DirAccess] [code]*_absolute[/code] methods that change files refuse such paths with [constant ERR_FILE_NO_PERMISSION].
 			</description>
 		</method>
 		<method name="_localize" qualifiers="virtual const">
