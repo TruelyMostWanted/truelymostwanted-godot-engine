@@ -69,6 +69,7 @@ class SubtitleEditor : public VBoxContainer {
 	VBoxContainer *offset_box = nullptr;
 	Label *offset_label = nullptr;
 	Button *offset_button = nullptr;
+	Label *save_note_label = nullptr;
 	Button *add_button = nullptr;
 	Button *sort_button = nullptr;
 	Tree *tree = nullptr;

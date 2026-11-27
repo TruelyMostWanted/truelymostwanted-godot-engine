@@ -83,9 +83,13 @@ void SubtitlePlayer::_connect_sync(bool p_connect) {
 	static const char *const signals[] = { "playing_changed", "stream_changed", "track_changed" };
 	const Callable callables[] = { callable_mp(this, &SubtitlePlayer::_sync_playing_changed), callable_mp(this, &SubtitlePlayer::_sync_stream_changed), callable_mp(this, &SubtitlePlayer::_sync_track_changed) };
 	for (int i = 0; i < 3; i++) {
-		if (p_connect && node->has_signal(signals[i])) {
+		// VideoStreamPlayer has no `track_changed`: is_connected() would report a nonexistent signal.
+		if (!node->has_signal(signals[i])) {
+			continue;
+		}
+		if (p_connect) {
 			node->connect(signals[i], callables[i]);
-		} else if (!p_connect && node->is_connected(signals[i], callables[i])) {
+		} else if (node->is_connected(signals[i], callables[i])) {
 			node->disconnect(signals[i], callables[i]);
 		}
 	}
