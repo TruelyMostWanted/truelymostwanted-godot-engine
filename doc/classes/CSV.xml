@@ -267,7 +267,7 @@
 	<members>
 		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="[]" />
 		<member name="header" type="PackedStringArray" setter="set_header" getter="get_header" default="PackedStringArray()">
-			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line. Changing it drops the kept parsed text.
+			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line, with unnamed columns added for rows that are wider, so the text parses again. Changing it drops the kept parsed text.
 		</member>
 	</members>
 </class>
