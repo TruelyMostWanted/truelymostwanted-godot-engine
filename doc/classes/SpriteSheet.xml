@@ -207,7 +207,7 @@
 			<return type="void" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Removes the region [param name]. The [AtlasTexture] handed out before for it keeps its last values.
+				Removes the region [param name]. The [AtlasTexture] handed out before for it keeps its last values, and a new region with the same name uses it again.
 			</description>
 		</method>
 		<method name="rename_region">
@@ -297,7 +297,7 @@
 			The names of the regions in their order. Only used when saving and loading, because the text resource format sorts the keys of [member regions]; use [method get_region_names] instead.
 		</member>
 		<member name="regions" type="Dictionary[StringName, Rect2i]" setter="set_regions" getter="get_regions" default="{}">
-			The regions: sprite name to rectangle [code](x, y, width, height)[/code] in pixels of [member texture], in insertion order. Setting this property replaces all regions; invalid entries are skipped with an error. Regions that keep their name keep their margin and their [AtlasTexture].
+			The regions: sprite name to rectangle [code](x, y, width, height)[/code] in pixels of [member texture], in insertion order. Setting this property replaces all regions; invalid names and empty rectangles are skipped with an error. Rectangles are not checked against [member texture], like regions that a new, smaller texture leaves outside. Regions that keep their name keep their margin and their [AtlasTexture]. A region that comes back under the name of a removed one (for example on undo) gets the [AtlasTexture] of the removed region again, so nodes that use it follow the region.
 			[b]Note:[/b] The returned dictionary is a copy. Use [method set_region] and [method remove_region] to change single regions.
 		</member>
 		<member name="texture" type="Texture2D" setter="set_texture" getter="get_sheet_texture">

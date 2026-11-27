@@ -133,6 +133,22 @@ TEST_CASE("[SceneTree][SpriteSheet] Handed-out AtlasTextures stay linked to the 
 	CHECK(atlas->get_region_texture("Missing").is_null());
 	ERR_PRINT_ON;
 	CHECK(atlas->get_region_count() == 3);
+
+	// set_regions() keeps regions outside the texture, so undo can restore them.
+	TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
+	atlas->set_regions(regions);
+	CHECK(atlas->get_region_count() == 3);
+	CHECK(atlas->get_region_texture("Gold") == coin);
+
+	// A region that comes back under its name (undo of a delete, an import) gets its texture again.
+	atlas->set_regions(TypedDictionary<StringName, Rect2i>());
+	CHECK(atlas->get_region_count() == 0);
+	atlas->set_regions(regions);
+	CHECK(atlas->get_region_texture("Gold") == coin);
+	atlas->remove_region("Gold");
+	CHECK(atlas->set_region("Gold", Rect2i(0, 0, 4, 4)) == OK);
+	CHECK(atlas->get_region_texture("Gold") == coin);
+	CHECK(coin->get_region() == Rect2(0, 0, 4, 4));
 }
 
 TEST_CASE("[SceneTree][SpriteSheet] Works with GradientTexture2D") {
