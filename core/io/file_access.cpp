@@ -57,6 +57,11 @@ static String _resolve_prefixed_path(const String &p_path) {
 	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
 }
 
+// Writes through a read-only prefix (`streaming://` in exports) are refused.
+static Error _check_prefixed_path_writable(const String &p_path) {
+	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->check_writable(p_path) : OK;
+}
+
 bool FileAccess::exists(const String &p_name) {
 	const String name = _resolve_prefixed_path(p_name);
 	if (PackedData::get_singleton() && !PackedData::get_singleton()->is_disabled() && PackedData::get_singleton()->has_path(name)) {
@@ -165,6 +170,15 @@ Error FileAccess::reopen(const String &p_path, int p_mode_flags) {
 }
 
 Ref<FileAccess> FileAccess::open(const String &p_path, int p_mode_flags, Error *r_error) {
+	if (p_mode_flags & WRITE) {
+		const Error write_err = _check_prefixed_path_writable(p_path);
+		if (write_err != OK) {
+			if (r_error) {
+				*r_error = write_err;
+			}
+			return Ref<FileAccess>();
+		}
+	}
 	const String path = _resolve_prefixed_path(p_path);
 
 	//try packed data first

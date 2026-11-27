@@ -262,6 +262,7 @@ PCKPackageExportDialog::PCKPackageExportDialog() {
 
 	hint_label = memnew(Label);
 	hint_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	hint_label->set_custom_minimum_size(Size2(400, 0) * EDSCALE);
 	hint_label->hide();
 	main_vb->add_child(hint_label);
 

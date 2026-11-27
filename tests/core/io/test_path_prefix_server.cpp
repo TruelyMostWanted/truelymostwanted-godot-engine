@@ -322,4 +322,52 @@ TEST_CASE("[PathPrefixServer] Prefixes into user:// use the user:// access") {
 	CHECK(server->unregister_prefix("unittestuser://") == OK);
 }
 
+// A read-only logic into user://, like `streaming://` in exports.
+class TestReadOnlyPathPrefix : public PathPrefix {
+	GDSOFTCLASS(TestReadOnlyPathPrefix, PathPrefix);
+
+public:
+	virtual String globalize_path(const String &p_prefix, const String &p_path) const override {
+		return "user://unittest_88_ro/" + p_path.substr(p_prefix.length());
+	}
+	virtual bool is_read_only() const override { return true; }
+};
+
+TEST_CASE("[PathPrefixServer] Read-only prefixes refuse writes") {
+	DirAccess::make_dir_recursive_absolute("user://unittest_88_ro/sub");
+	{
+		Ref<FileAccess> file = FileAccess::open("user://unittest_88_ro/a.txt", FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string("Shipped");
+	}
+	PathPrefixServer *server = PathPrefixServer::get_singleton();
+	REQUIRE(server->register_prefix("unittestro://", Ref<PathPrefix>(memnew(TestReadOnlyPathPrefix))) == OK);
+
+	// Reads still work.
+	CHECK(FileAccess::get_file_as_string("unittestro://a.txt") == "Shipped");
+	CHECK(DirAccess::dir_exists_absolute("unittestro://sub"));
+	CHECK(server->check_writable("user://a.txt") == OK);
+	CHECK(server->check_writable("C:/a.txt") == OK);
+
+	ERR_PRINT_OFF;
+	Error err = OK;
+	CHECK(FileAccess::open("unittestro://a.txt", FileAccess::WRITE, &err).is_null());
+	CHECK(err == ERR_FILE_NO_PERMISSION);
+	CHECK(FileAccess::open("unittestro://a.txt", FileAccess::READ_WRITE, &err).is_null());
+	CHECK(err == ERR_FILE_NO_PERMISSION);
+	CHECK(DirAccess::make_dir_absolute("unittestro://new") == ERR_FILE_NO_PERMISSION);
+	CHECK(DirAccess::make_dir_recursive_absolute("unittestro://new/deep") == ERR_FILE_NO_PERMISSION);
+	CHECK(DirAccess::remove_absolute("unittestro://a.txt") == ERR_FILE_NO_PERMISSION);
+	CHECK(DirAccess::rename_absolute("unittestro://a.txt", "user://unittest_88_b.txt") == ERR_FILE_NO_PERMISSION);
+	CHECK(DirAccess::copy_absolute("user://unittest_88_ro/a.txt", "unittestro://b.txt") == ERR_FILE_NO_PERMISSION);
+	ERR_PRINT_ON;
+	CHECK(FileAccess::get_file_as_string("unittestro://a.txt") == "Shipped");
+	CHECK_FALSE(DirAccess::dir_exists_absolute("user://unittest_88_ro/new"));
+
+	CHECK(server->unregister_prefix("unittestro://") == OK);
+	DirAccess::remove_absolute("user://unittest_88_ro/a.txt");
+	DirAccess::remove_absolute("user://unittest_88_ro/sub");
+	DirAccess::remove_absolute("user://unittest_88_ro");
+}
+
 } // namespace TestPathPrefixServer
