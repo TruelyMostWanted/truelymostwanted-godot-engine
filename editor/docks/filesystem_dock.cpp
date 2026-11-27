@@ -1349,7 +1349,8 @@ void FileSystemDock::_select_file(const String &p_path, bool p_select_in_favorit
 			if (err == OK) {
 				if (config->has_section_key("remap", "importer")) {
 					String importer = config->get_value("remap", "importer");
-					if (importer == "keep" || importer == "skip") {
+					// Truely: kept files that a resource loader reads (CSV, JSON, ...) open like other resources.
+					if ((importer == "keep" && ResourceLoader::get_resource_type(fpath).is_empty()) || importer == "skip") {
 						EditorNode::get_singleton()->show_warning(TTRC("Importing has been disabled for this file, so it can't be opened for editing."));
 						return;
 					}

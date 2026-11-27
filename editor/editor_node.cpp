@@ -101,6 +101,7 @@
 #include "editor/import/fbx_importer_manager.h"
 #include "editor/import/resource_importer_bitmask.h"
 #include "editor/import/resource_importer_bmfont.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_dynamic_font.h"
 #include "editor/import/resource_importer_image.h"
@@ -8794,6 +8795,11 @@ EditorNode::EditorNode() {
 		Ref<ResourceImporterCSVTranslation> import_csv_translation;
 		import_csv_translation.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_csv_translation);
+
+		// Truely: data CSVs (#393).
+		Ref<ResourceImporterCSVDataset> import_csv_dataset;
+		import_csv_dataset.instantiate();
+		ResourceFormatImporter::get_singleton()->add_importer(import_csv_dataset);
 
 		Ref<ResourceImporterWAV> import_wav;
 		import_wav.instantiate();

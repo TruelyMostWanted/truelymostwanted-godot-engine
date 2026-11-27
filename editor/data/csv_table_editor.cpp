@@ -798,7 +798,12 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 	csv->connect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 
 	const String path = p_resource->get_path();
-	translation_mode = ResourceLoader::get_resource_type(path) == "Translation";
+	// The header decides, not the importer: a data CSV with a Keep File or CSV Translation import has no translations to check.
+	CSV::TranslationHeader translation_header;
+	Ref<DataValidation> header_issues;
+	header_issues.instantiate();
+	CSV::check_translation_header(csv->get_header(), translation_header, header_issues.ptr());
+	translation_mode = translation_header.has_known_language;
 	if (!translation_mode) {
 		schema = EditorDataSchemaLookup::find_schema(path);
 	}

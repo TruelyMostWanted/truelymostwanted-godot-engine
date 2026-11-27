@@ -67,6 +67,7 @@
 #include "editor/import/editor_import_plugin.h"
 #include "editor/import/resource_importer_bitmask.h"
 #include "editor/import/resource_importer_bmfont.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_dynamic_font.h"
 #include "editor/import/resource_importer_image.h"
@@ -227,6 +228,7 @@ void register_editor_types() {
 	// Required to document import options in the class reference.
 	GDREGISTER_CLASS(ResourceImporterBitMap);
 	GDREGISTER_CLASS(ResourceImporterBMFont);
+	GDREGISTER_CLASS(ResourceImporterCSVDataset);
 	GDREGISTER_CLASS(ResourceImporterCSVTranslation);
 	GDREGISTER_CLASS(ResourceImporterDynamicFont);
 	GDREGISTER_CLASS(ResourceImporterImage);
