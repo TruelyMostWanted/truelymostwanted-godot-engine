@@ -235,30 +235,10 @@ Error ResourceFormatSaverTextTree::save(const Ref<Resource> &p_resource, const S
 	return OK;
 }
 
-// True if the property tree of the resource reads back to the same tree, so a file of a text format loads
-// as the same resource. Only these resources are offered the text formats (the save dialog).
-static bool _round_trips(const Ref<Resource> &p_resource) {
-	const ResourceTextSerializer::Options options = ResourceTextSerializer::get_default_options();
-	Dictionary tree;
-	String error;
-	if (ResourceTextSerializer::encode_resource(p_resource, options, true, tree, error) != OK) {
-		return false;
-	}
-	Ref<Resource> decoded;
-	if (ResourceTextSerializer::decode_resource(tree, ResourceTextSerializer::get_type_name(p_resource.ptr()), decoded, error) != OK) {
-		return false;
-	}
-	Dictionary decoded_tree;
-	if (ResourceTextSerializer::encode_resource(decoded, options, true, decoded_tree, error) != OK) {
-		return false;
-	}
-	return decoded_tree == tree;
-}
-
 void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (recognize(p_resource) && _can_save(p_resource) && _round_trips(p_resource)) {
-		p_extensions->push_back(_get_extension());
-	}
+	// Nothing: the editor's save dialog offers a class only its native formats (its own savers, tres and res).
+	// The generic text formats stay available from code: ResourceSaver.save(resource, "x.json") goes through
+	// recognize_path(), which accepts the extension.
 }
 
 bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) const {
@@ -267,7 +247,6 @@ bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) con
 }
 
 bool ResourceFormatSaverTextTree::recognize_path(const Ref<Resource> &p_resource, const String &p_path) const {
-	// Also when _can_save() is false, so that save() can report why the resource does not fit.
 	return p_path.get_extension().nocasecmp_to(_get_extension()) == 0;
 }
 
@@ -315,12 +294,6 @@ Error ResourceFormatLoaderResourceCSV::_parse_text(const String &p_text, const S
 
 Error ResourceFormatSaverResourceCSV::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
 	return ResourceTextSerializer::write_csv(p_resource, ResourceTextSerializer::get_default_options(), r_text, r_error);
-}
-
-bool ResourceFormatSaverResourceCSV::_can_save(const Ref<Resource> &p_resource) const {
-	// Not offered in the save dialog: CSV has no type marker, so the file loads back as a CSV resource
-	// (load() without a type hint). An explicit ResourceSaver.save() to a .csv path still writes it.
-	return false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
