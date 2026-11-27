@@ -37,6 +37,8 @@
 #include "core/object/callable_mp.h"
 #include "core/string/translation_server.h"
 #include "editor/docks/editor_dock_manager.h"
+#include "editor/docks/filesystem_dock.h"
+#include "editor/docks/inspector_dock.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -403,15 +405,18 @@ void CSVTableEditor::_update() {
 	// No kept text: the data was changed by the table, undo/redo or a script, not by parsing the text.
 	// Show the change in the text editor, so neither side overwrites the other.
 	if (csv->get_parsed_text().is_empty()) {
+		const String text = csv->encode_to_text();
 		if (text_file.is_valid()) {
-			synced_text = csv->encode_to_text();
+			synced_text = text;
 			text_file->set_text(synced_text);
 		}
-		if (TextEditorBase *text_editor = _get_text_editor()) {
+		TextEditorBase *text_editor = _get_text_editor();
+		const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
+		// An empty file has no kept text either. Reloading the same text would validate (parse) it again,
+		// which emits `changed` and queues the next update: an endless loop.
+		if (text_edit && text_edit->get_text() != text) {
 			text_editor->reload_text();
-			if (const TextEdit *text_edit = Object::cast_to<TextEdit>(text_editor->get_base_editor())) {
-				reloaded_version = text_edit->get_version();
-			}
+			reloaded_version = text_edit->get_version();
 		}
 	}
 	_render();
@@ -743,7 +748,51 @@ void CSVTableEditor::_tree_gui_input(const Ref<InputEvent> &p_event) {
 	}
 }
 
+bool CSVTableEditor::can_edit(const Object *p_object) {
+	if (Object::cast_to<CSV>(p_object) || Object::cast_to<LocalizationCatalog>(p_object)) {
+		return true;
+	}
+	const TextFile *text_file = Object::cast_to<TextFile>(p_object);
+	return text_file && text_file->get_path().get_extension().to_lower() == "csv";
+}
+
+void CSVTableEditor::_inspector_object_changed() {
+	// Opened with "Open in Table", the dock is not closed by the editor when another file is inspected.
+	const Resource *inspected = Object::cast_to<Resource>(InspectorDock::get_inspector_singleton()->get_edited_object());
+	if (inspected && !inspected->get_path().is_empty() && !can_edit(inspected)) {
+		edit(Ref<Resource>());
+		close();
+	}
+}
+
+void CSVTableEditor::_file_moved(const String &p_old_file, const String &p_new_file) {
+	if (!edited_path.is_empty() && p_old_file == edited_path) {
+		edited_path = p_new_file;
+		file_label->set_text(p_new_file.get_file());
+	}
+}
+
+void CSVTableEditor::_file_removed(const String &p_file) {
+	if (!edited_path.is_empty() && p_file == edited_path) {
+		edit(Ref<Resource>());
+		close();
+	}
+}
+
+void CSVTableEditor::_notification(int p_what) {
+	if (p_what == NOTIFICATION_READY) {
+		if (InspectorDock::get_singleton()) {
+			InspectorDock::get_inspector_singleton()->connect(SNAME("edited_object_changed"), callable_mp(this, &CSVTableEditor::_inspector_object_changed));
+		}
+		if (FileSystemDock::get_singleton()) {
+			FileSystemDock::get_singleton()->connect(SNAME("files_moved"), callable_mp(this, &CSVTableEditor::_file_moved));
+			FileSystemDock::get_singleton()->connect(SNAME("file_removed"), callable_mp(this, &CSVTableEditor::_file_removed));
+		}
+	}
+}
+
 void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
+	edited_path = p_resource.is_valid() ? p_resource->get_path() : String();
 	if (csv.is_valid()) {
 		csv->disconnect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 	}
@@ -789,13 +838,19 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 		_sync_from_text_file();
 	}
 	if (csv.is_null()) {
+		file_label->set_text(String());
 		tree->clear();
 		return;
 	}
 	csv->connect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 
 	const String path = p_resource->get_path();
-	translation_mode = ResourceLoader::get_resource_type(path) == "Translation";
+	// The header decides, not the importer: a data CSV with a Keep File or CSV Translation import has no translations to check.
+	CSV::TranslationHeader translation_header;
+	Ref<DataValidation> header_issues;
+	header_issues.instantiate();
+	CSV::check_translation_header(csv->get_header(), translation_header, header_issues.ptr());
+	translation_mode = translation_header.has_known_language;
 	if (!translation_mode) {
 		schema = EditorDataSchemaLookup::find_schema(path);
 	}
@@ -904,11 +959,7 @@ void CSVTableEditorPlugin::edit(Object *p_object) {
 }
 
 bool CSVTableEditorPlugin::handles(Object *p_object) const {
-	if (Object::cast_to<CSV>(p_object) || Object::cast_to<LocalizationCatalog>(p_object)) {
-		return true;
-	}
-	const TextFile *text_file = Object::cast_to<TextFile>(p_object);
-	return text_file && text_file->get_path().get_extension().to_lower() == "csv";
+	return CSVTableEditor::can_edit(p_object);
 }
 
 void CSVTableEditorPlugin::make_visible(bool p_visible) {

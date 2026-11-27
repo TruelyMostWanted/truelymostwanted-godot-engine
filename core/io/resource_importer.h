@@ -125,6 +125,8 @@ public:
 	virtual String get_save_extension() const = 0;
 	virtual String get_resource_type() const = 0;
 	virtual float get_priority() const { return 1.0; }
+	// Truely: priority for one file, to pick the default importer by content (CSV Dataset or CSV Translation).
+	virtual float get_priority_for_file(const String &p_path) const { return get_priority(); }
 	virtual int get_import_order() const { return IMPORT_ORDER_DEFAULT; }
 	virtual int get_format_version() const { return 0; }
 

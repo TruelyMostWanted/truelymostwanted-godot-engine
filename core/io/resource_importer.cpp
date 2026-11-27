@@ -181,6 +181,15 @@ Ref<Resource> ResourceFormatImporter::load_internal(const String &p_path, Error 
 		return Ref<Resource>();
 	}
 
+	// Truely: nothing to load for Keep File or importers that write no file (CSV Dataset, CSV Translation
+	// without translations). Fail without an error, so the source file's own loader (CSV, JSON, ...) takes it.
+	if (pat.path.is_empty()) {
+		if (r_error) {
+			*r_error = ERR_FILE_UNRECOGNIZED;
+		}
+		return Ref<Resource>();
+	}
+
 	if (p_silence_errors) {
 		// Note: Some importers do not create files in the .godot folder, so we need to check if the path is empty.
 		if (!pat.path.is_empty() && !FileAccess::exists(pat.path)) {
@@ -527,9 +536,13 @@ Ref<ResourceImporter> ResourceFormatImporter::get_importer_by_file(const String 
 		List<String> local_exts;
 		importers[i]->get_recognized_extensions(&local_exts);
 		for (const String &F : local_exts) {
-			if (p_file.right(F.length()).nocasecmp_to(F) == 0 && importers[i]->get_priority() > priority) {
-				importer = importers[i];
-				priority = importers[i]->get_priority();
+			if (p_file.right(F.length()).nocasecmp_to(F) == 0) {
+				// Truely: get_priority_for_file() instead of get_priority(), see there.
+				const float file_priority = importers[i]->get_priority_for_file(p_file);
+				if (file_priority > priority) {
+					importer = importers[i];
+					priority = file_priority;
+				}
 				break;
 			}
 		}

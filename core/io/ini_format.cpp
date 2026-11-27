@@ -128,8 +128,9 @@ Error INI::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 }
 
 void INI::_get_extensions(List<String> *r_extensions) const {
-	// `.cfg` stays with ConfigFile files (project.godot, .import, presets).
+	// `.cfg` also: Godot's own ConfigFile files (export_presets.cfg, override.cfg) are left out by the loader.
 	r_extensions->push_back("ini");
+	r_extensions->push_back("cfg");
 }
 
 Dictionary INI::_get_sections_dictionary() const {

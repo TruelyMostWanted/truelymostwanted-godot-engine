@@ -37,10 +37,12 @@
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/io/image.h"
+#include "core/io/json.h"
 #include "core/io/missing_resource.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
+#include "core/io/text_data_format.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
@@ -101,6 +103,7 @@
 #include "editor/import/fbx_importer_manager.h"
 #include "editor/import/resource_importer_bitmask.h"
 #include "editor/import/resource_importer_bmfont.h"
+#include "editor/import/resource_importer_csv_dataset.h"
 #include "editor/import/resource_importer_csv_translation.h"
 #include "editor/import/resource_importer_dynamic_font.h"
 #include "editor/import/resource_importer_image.h"
@@ -1867,6 +1870,12 @@ void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const St
 	}
 }
 
+// Truely: a data file (CSV, ...) that was read from its own source file, not from an import, although the
+// file has a `.import` (Keep File, CSV Dataset). It is edited and saved like a file without import.
+static bool _is_data_source_file(const Resource *p_resource) {
+	return Object::cast_to<TextDataFormat>(p_resource) && p_resource->get_import_path().is_empty();
+}
+
 void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 	// If built-in resource, save the scene instead.
 	if (p_resource->is_built_in()) {
@@ -1886,7 +1895,8 @@ void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 
 	// If the resource has been imported, ask the user to use a different path in order to save it.
 	String path = p_resource->get_path();
-	if (path.is_resource_file() && !FileAccess::exists(path + ".import")) {
+	// Truely: a data file read from its own source file (Keep File, CSV Dataset) is saved in place.
+	if (path.is_resource_file() && (_is_data_source_file(p_resource.ptr()) || !FileAccess::exists(path + ".import"))) {
 		save_resource_in_path(p_resource, p_resource->get_path());
 	} else {
 		save_resource_as(p_resource);
@@ -1901,7 +1911,7 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 		// Early exit checks.
 
 		if (is_resource) {
-			if (FileAccess::exists(resource_path + ".import")) {
+			if (FileAccess::exists(resource_path + ".import") && !_is_data_source_file(p_resource.ptr())) {
 				show_warning(TTR("This resource can't be saved because it was imported from another file. Make it unique first."));
 				return;
 			}
@@ -1925,6 +1935,20 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 	List<String> extensions;
 	ResourceSaver::get_recognized_extensions(p_resource, &extensions);
 	file->clear_filters();
+
+	// Truely: data files (JSON, CSV, INI, XML, TOML, YAML) list their own extensions first, the first one preselected.
+	PackedStringArray own_extensions;
+	if (const TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_resource.ptr())) {
+		own_extensions = data_file->get_recognized_extensions();
+	} else if (p_resource->get_class_name() == JSON::get_class_static()) {
+		own_extensions.push_back("json");
+	}
+	for (int i = own_extensions.size() - 1; i >= 0; i--) {
+		List<String>::Element *own_element = extensions.find(own_extensions[i]);
+		if (own_element) {
+			extensions.move_to_front(own_element);
+		}
+	}
 
 	List<String> preferred;
 	for (const String &E : extensions) {
@@ -3262,7 +3286,7 @@ void EditorNode::_edit_current(bool p_skip_foreign, bool p_skip_inspector_update
 				editable_info = TTR("This resource belongs to a scene that was instantiated or inherited.\nChanges to it must be made inside the original scene.");
 			}
 		} else if (current_res->get_path().is_resource_file()) {
-			if (FileAccess::exists(current_res->get_path() + ".import")) {
+			if (FileAccess::exists(current_res->get_path() + ".import") && !_is_data_source_file(current_res)) {
 				editable_info = TTR("This resource was imported, so it's not editable. Change its settings in the import panel and then re-import.");
 			}
 		}
@@ -8794,6 +8818,11 @@ EditorNode::EditorNode() {
 		Ref<ResourceImporterCSVTranslation> import_csv_translation;
 		import_csv_translation.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_csv_translation);
+
+		// Truely: data CSVs (#393).
+		Ref<ResourceImporterCSVDataset> import_csv_dataset;
+		import_csv_dataset.instantiate();
+		ResourceFormatImporter::get_singleton()->add_importer(import_csv_dataset);
 
 		Ref<ResourceImporterWAV> import_wav;
 		import_wav.instantiate();

@@ -43,7 +43,6 @@
 #include "flow_port.h"
 
 #include "core/config/project_settings.h"
-#include "core/io/resource_format_text_tree.h"
 #include "core/object/class_db.h"
 
 #ifdef TOOLS_ENABLED
@@ -63,11 +62,6 @@ void initialize_flow_graph_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-	// Graphs save as .tres/.res or Mermaid (.mmd), their parts with the graph: no JSON, INI, CSV, ... in save dialogs.
-	for (const char *flow_class : { "FlowGraph", "FlowNode", "FlowFrame", "FlowVariable", "FlowBlackboard", "FlowGraphState", "FlowGraphMermaidOptions", "DialogueOption" }) {
-		ResourceFormatSaverTextTree::exclude_from_save_dialogs(flow_class);
-	}
-
 	GDREGISTER_CLASS(FlowPort);
 	GDREGISTER_CLASS(FlowConnection);
 	GDREGISTER_CLASS(FlowFrame);

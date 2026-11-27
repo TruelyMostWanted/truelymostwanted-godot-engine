@@ -68,6 +68,7 @@ class CSVTableEditor : public EditorDock {
 	int page = 0;
 	bool updating = false;
 	bool update_queued = false;
+	String edited_path; // Path of the edited file, followed when it is moved.
 
 	Label *file_label = nullptr;
 	EditorResourcePicker *schema_picker = nullptr;
@@ -106,9 +107,17 @@ class CSVTableEditor : public EditorDock {
 	void _change_page(int p_delta);
 	void _schema_changed(const Ref<Resource> &p_schema);
 	void _tree_gui_input(const Ref<InputEvent> &p_event);
+	void _inspector_object_changed();
+	void _file_moved(const String &p_old_file, const String &p_new_file);
+	void _file_removed(const String &p_file);
+
+protected:
+	void _notification(int p_what);
 
 public:
 	static CSVTableEditor *get_singleton() { return singleton; }
+	// CSV and LocalizationCatalog resources, and translation CSVs opened as TextFile.
+	static bool can_edit(const Object *p_object);
 
 	void edit(const Ref<Resource> &p_resource);
 
