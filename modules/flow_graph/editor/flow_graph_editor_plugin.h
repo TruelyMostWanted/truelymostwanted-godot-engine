@@ -77,6 +77,7 @@ class FlowGraphEditor : public EditorDock {
 	bool rebuild_queued = false;
 	bool editing_inline = false;
 	bool drag_queued = false;
+	bool frame_view_pending = false; // Show the contents when a graph is opened.
 	Vector2 menu_position;
 	Vector2 add_position;
 
@@ -90,6 +91,8 @@ class FlowGraphEditor : public EditorDock {
 	int link_frame = -1;
 
 	Clipboard clipboard;
+	Vector2 paste_target; // Where the last paste went; further pastes there are shifted by paste_shift.
+	Vector2 paste_shift;
 
 	// Playbacks of the running game, reported by the FlowGraph debugger.
 	struct DebugPlayback {
@@ -117,6 +120,8 @@ class FlowGraphEditor : public EditorDock {
 
 	void _queue_rebuild();
 	void _rebuild();
+	void _frame_view();
+	void _add_option(int p_id);
 	void _add_inline_properties(GraphNode *p_graph_node, const Ref<FlowNode> &p_node, int p_id);
 	Vector2 _to_graph_position(const Vector2 &p_local) const;
 	PackedInt32Array _get_selected_ids() const;
@@ -137,6 +142,7 @@ class FlowGraphEditor : public EditorDock {
 	void _commit_drag();
 	void _element_selected(Node *p_element);
 	void _element_deselected(Node *p_element);
+	void _show_graph_if_nothing_selected();
 	void _inline_property_changed(const String &p_property, const Variant &p_value, const String &p_field, bool p_changing, int p_id);
 
 	void _copy(bool p_cut);
@@ -147,6 +153,7 @@ class FlowGraphEditor : public EditorDock {
 	void _context_menu_id_pressed(int p_id);
 
 	void _open_add_dialog(const Vector2 &p_position);
+	Vector2 _free_position(Vector2 p_position) const;
 	void _update_add_tree();
 	void _add_dialog_confirmed();
 

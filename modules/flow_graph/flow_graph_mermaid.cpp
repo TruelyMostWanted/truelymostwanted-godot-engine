@@ -174,6 +174,7 @@ struct MermaidReader {
 	HashMap<String, int> frame_tree_lines;
 	Dictionary graph_tree;
 	int graph_tree_line = 0;
+	String direction; // From the header, e.g. "LR"; empty means top down.
 	String error;
 	int error_line = 0;
 
@@ -416,6 +417,7 @@ struct MermaidReader {
 					return fail(line_number, "Expected \"flowchart\" or \"graph\": only Mermaid flowcharts are supported.");
 				}
 				header = true;
+				direction = line.get_slicec(' ', 1).to_upper();
 				continue;
 			}
 			if (word == "subgraph") {
@@ -474,6 +476,53 @@ struct MermaidReader {
 			}
 		}
 		return StringName();
+	}
+
+	// A hand-written chart has no positions. Places the nodes in layers along the edges (breadth first from the nodes
+	// without incoming edges), in the direction of the chart, so they don't all lie on top of each other.
+	void layout() {
+		HashMap<String, LocalVector<String>> targets;
+		HashSet<String> has_input;
+		for (const MermaidEdge &edge : edges) {
+			targets[edge.from].push_back(edge.to);
+			has_input.insert(edge.to);
+		}
+		HashMap<String, int> layers;
+		LocalVector<String> queue;
+		for (const MermaidNode &node : nodes) {
+			if (!has_input.has(node.id)) {
+				layers[node.id] = 0;
+				queue.push_back(node.id);
+			}
+		}
+		uint32_t head = 0;
+		for (const MermaidNode &node : nodes) {
+			if (!layers.has(node.id)) {
+				// Only reachable through a cycle that no root leads into.
+				layers[node.id] = 0;
+				queue.push_back(node.id);
+			}
+			for (; head < queue.size(); head++) {
+				if (const LocalVector<String> *next = targets.getptr(queue[head])) {
+					for (const String &target : *next) {
+						if (!layers.has(target)) {
+							layers[target] = layers[queue[head]] + 1;
+							queue.push_back(target);
+						}
+					}
+				}
+			}
+		}
+
+		const bool horizontal = direction == "LR" || direction == "RL";
+		const float sign = (direction == "RL" || direction == "BT") ? -1.0f : 1.0f;
+		HashMap<int, int> rows;
+		for (MermaidNode &node : nodes) {
+			const int layer = layers[node.id];
+			const int row = rows[layer]++;
+			const Vector2 position = horizontal ? Vector2(sign * layer * 260, row * 160) : Vector2(row * 260, sign * layer * 160);
+			node.node->set_editor_position(position);
+		}
 	}
 
 	Ref<FlowGraph> build() {
@@ -549,6 +598,13 @@ struct MermaidReader {
 			}
 			node_ids.push_back(node.graph_id);
 			node_list.push_back(node.node);
+		}
+		bool hand_written = true;
+		for (const MermaidNode &node : nodes) {
+			hand_written = hand_written && node.tree_line == 0;
+		}
+		if (hand_written) {
+			layout();
 		}
 		graph->set("node_ids", node_ids);
 		graph->set("nodes", node_list);
