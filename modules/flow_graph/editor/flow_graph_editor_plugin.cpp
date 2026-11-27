@@ -155,10 +155,10 @@ void FlowGraphEditor::_queue_rebuild() {
 void FlowGraphEditor::_rebuild() {
 	rebuild_queued = false;
 	const Callable changed = callable_mp(this, &FlowGraphEditor::_queue_rebuild);
-	for (const Ref<FlowNode> &node : watched_nodes) {
-		node->disconnect_changed(changed);
+	for (const Ref<Resource> &resource : watched) {
+		resource->disconnect_changed(changed);
 	}
-	watched_nodes.clear();
+	watched.clear();
 
 	HashSet<StringName> selected;
 	for (int i = graph_edit->get_child_count() - 1; i >= 0; i--) {
@@ -198,6 +198,8 @@ void FlowGraphEditor::_rebuild() {
 		if (frame.is_null()) {
 			continue;
 		}
+		frame->connect_changed(changed);
+		watched.push_back(frame);
 		GraphFrame *graph_frame = memnew(GraphFrame);
 		graph_frame->set_name("f" + itos(i));
 		graph_frame->set_title(frame->get_title());
@@ -217,7 +219,7 @@ void FlowGraphEditor::_rebuild() {
 			continue;
 		}
 		node->connect_changed(changed);
-		watched_nodes.push_back(node);
+		watched.push_back(node);
 
 		GraphNode *graph_node = memnew(GraphNode);
 		graph_node->set_name("n" + itos(id));
@@ -303,7 +305,25 @@ void FlowGraphEditor::_rebuild() {
 		// After the new elements have their sizes.
 		callable_mp(this, &FlowGraphEditor::_frame_view).call_deferred();
 	}
+	if (fit_frame >= 0) {
+		callable_mp(this, &FlowGraphEditor::_fit_frame).call_deferred(fit_frame);
+		fit_frame = -1;
+	}
 	_debug_update();
+}
+
+// Stores the rect GraphEdit shows for a frame fitted around its nodes (autoshrink), once the nodes have their sizes.
+void FlowGraphEditor::_fit_frame(int p_index) {
+	GraphFrame *graph_frame = Object::cast_to<GraphFrame>(graph_edit->get_node_or_null(NodePath("f" + itos(p_index))));
+	if (graph.is_null() || graph_frame == nullptr || p_index >= graph->get_frames().size()) {
+		return;
+	}
+	const Ref<FlowFrame> frame = graph->get_frames()[p_index];
+	graph_frame->emit_signal(SNAME("autoshrink_changed"), graph_frame->get_size());
+	const Rect2 shown(graph_frame->get_position_offset(), graph_frame->get_size());
+	if (frame.is_valid() && shown != frame->get_rect()) {
+		frame->set_rect(shown); // Part of the Add Frame result, not an own undo step.
+	}
 }
 
 void FlowGraphEditor::_frame_view() {
@@ -630,7 +650,7 @@ void FlowGraphEditor::_inline_property_changed(const String &p_property, const V
 	ERR_FAIL_COND(graph.is_null() || !graph->has_node(p_id));
 	const Ref<FlowNode> node = graph->get_node(p_id);
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(vformat(TTR("Set %s"), p_property), UndoRedo::MERGE_ENDS, graph.ptr());
+	undo_redo->create_action(vformat(TTR("Set %s on Node %d"), p_property, p_id), UndoRedo::MERGE_ENDS, graph.ptr());
 	undo_redo->force_fixed_history();
 	undo_redo->add_do_property(node.ptr(), p_property, p_value);
 	undo_redo->add_undo_property(node.ptr(), p_property, node->get(p_property));
@@ -714,6 +734,16 @@ void FlowGraphEditor::_popup_request(const Vector2 &p_position) {
 		return;
 	}
 	menu_position = p_position;
+	bool in_frame = false;
+	const PackedInt32Array ids = _get_selected_ids();
+	const TypedArray<FlowFrame> frames = graph->get_frames();
+	for (int i = 0; i < frames.size() && !in_frame; i++) {
+		const Ref<FlowFrame> frame = frames[i];
+		for (int j = 0; frame.is_valid() && j < ids.size() && !in_frame; j++) {
+			in_frame = frame->get_node_ids().has(ids[j]);
+		}
+	}
+	context_menu->set_item_disabled(context_menu->get_item_index(MENU_DETACH_FROM_FRAME), !in_frame);
 	context_menu->set_position(graph_edit->get_screen_position() + p_position);
 	context_menu->reset_size();
 	context_menu->popup();
@@ -743,7 +773,6 @@ void FlowGraphEditor::_context_menu_id_pressed(int p_id) {
 			}
 		}
 		if (detached) {
-			graph->emit_changed(); // Frames are not watched; this rebuilds the view.
 			_commit_snapshot(TTR("Detach from Frame"), before);
 		}
 		return;
@@ -774,6 +803,9 @@ void FlowGraphEditor::_context_menu_id_pressed(int p_id) {
 		frames.append_array(graph->get_frames());
 		frames.push_back(frame);
 		graph->set_frames(frames);
+		if (!frame->get_node_ids().is_empty()) {
+			fit_frame = frames.size() - 1;
+		}
 		_commit_snapshot(TTR("Add Frame"), before);
 		return;
 	}
