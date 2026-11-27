@@ -401,18 +401,14 @@ TEST_CASE("[CSV] Blocks of cells for copy, paste and undo") {
 TEST_CASE("[CSV] Cells wider than the header survive a text round trip") {
 	Ref<CSV> csv;
 	csv.instantiate();
-	REQUIRE(csv->parse("name,hp
-knight,100
-") == OK);
+	REQUIRE(csv->parse("name,hp\nknight,100\n") == OK);
 	Array block;
 	block.push_back(PackedStringArray({ "90", "4", "fast" }));
 	csv->set_cells(0, 1, block);
 
 	// The text gets unnamed header columns, so parsing it again keeps every cell.
 	const String text = csv->encode_to_text();
-	CHECK(text == "name,hp,,
-knight,90,4,fast
-");
+	CHECK(text == "name,hp,,\nknight,90,4,fast\n");
 	REQUIRE(csv->parse(text) == OK);
 	CHECK(csv->get_row(0) == PackedStringArray({ "knight", "90", "4", "fast" }));
 }
