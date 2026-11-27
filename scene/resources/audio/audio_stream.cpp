@@ -554,12 +554,5 @@ void AudioStream::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "cover_data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_cover_data", "get_cover_data");
 	ADD_GROUP("Notes", "");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "comment", PROPERTY_HINT_MULTILINE_TEXT), "set_comment", "get_comment");
-	// Read-only, from the decoder: shown in the Inspector, not stored.
-	ADD_GROUP("Format", "");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "length", PROPERTY_HINT_NONE, "suffix:s", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_length");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "sample_rate", PROPERTY_HINT_NONE, "suffix:Hz", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_sample_rate");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "channel_count", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_channel_count");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bitrate", PROPERTY_HINT_NONE, "suffix:bit/s", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_bitrate");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "codec", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY), "", "get_codec");
 	ADD_GROUP("", "");
 }
