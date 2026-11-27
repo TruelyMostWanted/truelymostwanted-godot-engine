@@ -321,9 +321,15 @@ void FlowGraphEditor::_fit_frame(int p_index) {
 	}
 	const Ref<FlowFrame> frame = graph->get_frames()[p_index];
 	graph_frame->emit_signal(SNAME("autoshrink_changed"), graph_frame->get_size());
-	const Rect2 shown(graph_frame->get_position_offset(), graph_frame->get_size());
-	if (frame.is_valid() && shown != frame->get_rect()) {
-		frame->set_rect(shown); // Part of the Add Frame result, not an own undo step.
+	if (frame.is_null()) {
+		return;
+	}
+	// GraphEdit places the title bar; the end stays the one from the sized nodes (new nodes still grow their inline editors).
+	const Vector2 position = graph_frame->get_position_offset();
+	const Vector2 end = frame->get_rect().get_end().max(position + graph_frame->get_size());
+	const Rect2 fitted(position, end - position);
+	if (fitted != frame->get_rect()) {
+		frame->set_rect(fitted); // Part of the Add Frame result, not an own undo step.
 	}
 }
 
