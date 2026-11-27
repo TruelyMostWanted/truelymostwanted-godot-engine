@@ -242,7 +242,7 @@ TEST_CASE("[FilesManifest] Wildcard folders match one level, sorted by name") {
 	remove_tree(temp);
 	Ref<Resource> res;
 	res.instantiate();
-	for (const String &file : { "mods/b/tr/x.tres", "mods/a/tr/y.tres", "mods/a_extra/other/z.tres", "mods/c/tr/sub/w.tres" }) {
+	for (const char *file : { "mods/b/tr/x.tres", "mods/a/tr/y.tres", "mods/a_extra/other/z.tres", "mods/c/tr/sub/w.tres" }) {
 		REQUIRE(DirAccess::make_dir_recursive_absolute(temp.path_join(file).get_base_dir()) == OK);
 		REQUIRE(ResourceSaver::save(res, temp.path_join(file)) == OK);
 	}
