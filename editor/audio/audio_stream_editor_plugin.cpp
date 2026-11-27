@@ -305,7 +305,7 @@ void EditorInspectorPluginAudioStream::parse_begin(Object *p_object) {
 	}
 	if (!format.is_empty()) {
 		Label *format_label = memnew(Label);
-		format_label->set_text(String(" · ").join(format));
+		format_label->set_text(String(U" · ").join(format));
 		format_label->set_tooltip_text(TTR("Format of the audio data (AudioStream.get_codec(), get_sample_rate(), get_channel_count(), get_bitrate())."));
 		format_label->set_mouse_filter(Control::MOUSE_FILTER_PASS);
 		format_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
