@@ -512,7 +512,8 @@ void TileMapPathGraph::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_astar_grid"), &TileMapPathGraph::get_astar_grid);
 	ClassDB::bind_method(D_METHOD("get_astar"), &TileMapPathGraph::get_astar);
 
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "options", PROPERTY_HINT_RESOURCE_TYPE, "TileMapPathGraphOptions"), "set_options", "get_options");
+	// Never null and not stored (like Node.multiplayer): no default-value comparison.
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "options", PROPERTY_HINT_RESOURCE_TYPE, "TileMapPathGraphOptions", PROPERTY_USAGE_NONE), "set_options", "get_options");
 
 	ADD_SIGNAL(MethodInfo("updated"));
 

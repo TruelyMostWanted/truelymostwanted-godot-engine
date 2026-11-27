@@ -560,10 +560,12 @@ void FlowGraphEditor::_commit_drag() {
 		// Frames keep what GraphEdit shows: moved, or shrunk and grown around their moved nodes.
 		for (int i = 0; i < frames.size(); i++) {
 			const Ref<FlowFrame> frame = frames[i];
-			const GraphFrame *graph_frame = Object::cast_to<GraphFrame>(graph_edit->get_node_or_null(NodePath("f" + itos(i))));
+			GraphFrame *graph_frame = Object::cast_to<GraphFrame>(graph_edit->get_node_or_null(NodePath("f" + itos(i))));
 			if (frame.is_null() || graph_frame == nullptr) {
 				continue;
 			}
+			// A dragged frame is snapped, its nodes aren't: let GraphEdit fit it around them first (it does so later anyway).
+			graph_frame->emit_signal(SNAME("autoshrink_changed"), graph_frame->get_size());
 			const Rect2 shown(graph_frame->get_position_offset(), graph_frame->get_size());
 			if (shown != frame->get_rect()) {
 				undo_redo->add_do_property(frame.ptr(), "rect", shown);
