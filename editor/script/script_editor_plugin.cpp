@@ -43,6 +43,7 @@
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/string/fuzzy_search.h"
+#include "core/string/localization_catalog.h"
 #include "core/variant/dictionary.h"
 #include "core/version.h"
 #include "editor/debugger/editor_debugger_node.h"
@@ -3525,7 +3526,9 @@ void DocumentEditorContainer::set_window_layout(Ref<ConfigFile> p_layout) {
 
 		if (is_script) {
 			Ref<Resource> scr = ResourceLoader::load(path);
-			if (scr.is_null()) {
+			// Truely (#346): a data file listed in a catalog manifest loads as its catalog, which has no document
+			// editor (it opens in the inspector): the tab is not restored.
+			if (scr.is_null() || Object::cast_to<LocalizationCatalog>(scr.ptr())) {
 				continue;
 			}
 			if (!edit(scr, false)) {
