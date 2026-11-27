@@ -41,7 +41,7 @@ class ItemList;
 class Label;
 
 // Edits `folder_paths` or `file_paths` of a FilesManifest: one row per path (path field, browse, move up/down
-// inside the list, remove) and an add button. The list order is the load order; every change is one undo step.
+// inside the list, remove) and an add button. The list order is the load order; every change is its own undo step.
 class EditorPropertyFilesManifestPaths : public EditorProperty {
 	GDCLASS(EditorPropertyFilesManifestPaths, EditorProperty);
 
@@ -54,6 +54,7 @@ class EditorPropertyFilesManifestPaths : public EditorProperty {
 
 	PackedStringArray _get_paths() const;
 	void _set_paths(const PackedStringArray &p_paths);
+	void _add_row(int p_index);
 	void _browse(int p_index);
 	void _path_selected(const String &p_path);
 	void _path_edited(int p_index);
