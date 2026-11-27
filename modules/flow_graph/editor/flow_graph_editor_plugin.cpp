@@ -751,7 +751,7 @@ void FlowGraphEditor::_context_menu_id_pressed(int p_id) {
 		Rect2 rect(_to_graph_position(menu_position), Size2(200, 120) * EDSCALE);
 		bool first = true;
 		for (int i = 0; i < graph_edit->get_child_count(); i++) {
-			const GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
+			GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
 			if (graph_node != nullptr && graph_node->is_selected()) {
 				const Rect2 node_rect(graph_node->get_position_offset(), graph_node->get_size());
 				rect = first ? node_rect : rect.merge(node_rect);
@@ -788,7 +788,7 @@ Vector2 FlowGraphEditor::_free_position(Vector2 p_position) const {
 	for (int pass = 0; pass < graph_edit->get_child_count(); pass++) {
 		bool moved = false;
 		for (int i = 0; i < graph_edit->get_child_count(); i++) {
-			const GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
+			GraphNode *graph_node = Object::cast_to<GraphNode>(graph_edit->get_child(i));
 			if (graph_node == nullptr) {
 				continue;
 			}
