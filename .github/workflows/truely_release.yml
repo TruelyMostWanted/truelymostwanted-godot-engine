@@ -1,12 +1,12 @@
 name: 📦 Truely Release
-# truely-godot-engine: builds the editors (standard and Mono) and the export templates of all desktop
+# truely-godot-engine: builds the editors (standard and .NET) and the export templates of all desktop
 # platforms and the Web, packs them and publishes a GitHub release.
 # Starts by itself after a green "🔗 GHA" run on the release branch truely-godot-engine-releases
 # (fast-forwarded from truely-godot-engine by truely/release.ps1), built from the exact commit that
 # run tested, but only if files other than Markdown and .agents/ changed since the last release tag
 # (truely-v* or the older truely-godot*). By hand (workflow_dispatch) it always releases the selected commit.
 # Names: Truely-v<truely>_Godot<godot>-<status>_<hash>_<platform>, tag truely-v<truely>-godot<godot>-<status>,
-# e.g. Truely-v0.1.0_Godot4.8-beta5_f031fd0_win64.zip and tag truely-v0.1.0-godot4.8-beta5.
+# e.g. Truely-v0.2.0_Godot4.8-beta5_f031fd0_windows-x86_64.zip and tag truely-v0.1.0-godot4.8-beta5.
 # The Truely version (SemVer) comes from truely/version.txt, the status of the Godot base (e.g. beta5)
 # from truely/godot-status.txt. A tag that already exists on another commit stops the release: raise
 # truely/version.txt first. Releases before #265 keep their names (Truely_Godot..., truely-godot...).
@@ -133,7 +133,7 @@ jobs:
           fi
 
   linux:
-    name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    name: 🐧 Linux ${{ matrix.target }}${{ matrix.mono && ' (.NET)' || '' }}
     needs: setup
     if: needs.setup.outputs.release == 'true'
     runs-on: ubuntu-24.04
@@ -207,7 +207,7 @@ jobs:
           path: sharp/
 
   windows:
-    name: 🏁 Windows ${{ matrix.target }}${{ matrix.mono && ' (Mono)' || '' }}
+    name: 🏁 Windows ${{ matrix.target }}${{ matrix.mono && ' (.NET)' || '' }}
     needs: setup
     if: needs.setup.outputs.release == 'true'
     runs-on: windows-latest
@@ -255,9 +255,9 @@ jobs:
           path: bin/godot.*
 
   macos:
-    # One job per variant (standard, Mono) builds the editor and both templates: macOS runners are
+    # One job per variant (standard, .NET) builds the editor and both templates: macOS runners are
     # scarce, and six parallel jobs were often cancelled for capacity.
-    name: 🍎 macOS${{ matrix.mono && ' (Mono)' || '' }}
+    name: 🍎 macOS${{ matrix.mono && ' (.NET)' || '' }}
     needs: setup
     if: needs.setup.outputs.release == 'true'
     runs-on: macos-26
