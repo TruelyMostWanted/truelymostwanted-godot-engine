@@ -34,18 +34,40 @@
 #include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
+#include "scene/gui/box_container.h"
 #include "scene/gui/label.h"
 #include "scene/resources/localized_text.h"
 
 class ConfirmationDialog;
 class LocalizationCatalog;
+class Timer;
+class Tree;
+
+// The validation result and the missing keys per locale of a catalog, updated (debounced) when it changes.
+class LocalizationCatalogIssues : public VBoxContainer {
+	GDCLASS(LocalizationCatalogIssues, VBoxContainer);
+
+	static constexpr int MAX_LISTED_KEYS = 100;
+
+	Ref<LocalizationCatalog> catalog;
+	Label *status = nullptr;
+	Tree *missing_tree = nullptr;
+	Timer *update_timer = nullptr;
+
+	void _queue_update();
+	void _update();
+
+protected:
+	void _notification(int p_what);
+
+public:
+	LocalizationCatalogIssues(const Ref<LocalizationCatalog> &p_catalog = Ref<LocalizationCatalog>());
+};
 
 // Missing keys per locale, the validation result and "Save POT..." above the catalog's properties (#346).
 // Editing happens in the CSV Table dock, which opens with the catalog.
 class EditorInspectorPluginLocalizationCatalog : public EditorInspectorPlugin {
 	GDCLASS(EditorInspectorPluginLocalizationCatalog, EditorInspectorPlugin);
-
-	static constexpr int MAX_LISTED_KEYS = 100;
 
 	void _save_pot(const String &p_path, const Ref<LocalizationCatalog> &p_catalog);
 	static void _open_in_table(const Ref<LocalizationCatalog> &p_catalog);
