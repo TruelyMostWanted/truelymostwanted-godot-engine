@@ -835,8 +835,7 @@ void CSVTableEditor::_copy() {
 	if (last_row >= 0) {
 		// Without the line break after the last row, so one copied cell pastes as plain text elsewhere.
 		const String text = CSV::stringify(_get_cells(first_row, first_column, last_row - first_row + 1, last_column - first_column + 1), _tsv_options());
-		DisplayServer::get_singleton()->clipboard_set(text.trim_suffix("
-"));
+		DisplayServer::get_singleton()->clipboard_set(text.trim_suffix("\n").trim_suffix("\r"));
 	}
 }
 
