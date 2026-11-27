@@ -48,6 +48,7 @@
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "core/string/localization_catalog.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
 #include "core/truely_version.h"
@@ -1941,10 +1942,13 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 	ResourceSaver::get_recognized_extensions(p_resource, &extensions);
 	file->clear_filters();
 
-	// Truely: data files (JSON, CSV, INI, XML, TOML, YAML) list their own extensions first, the first one preselected.
+	// Truely: data files (JSON, CSV, INI, XML, TOML, YAML) and localization catalogs (`lcat` first, #403) list their
+	// own extensions first, the first one preselected.
 	PackedStringArray own_extensions;
 	if (const TextDataFormat *data_file = Object::cast_to<TextDataFormat>(p_resource.ptr())) {
 		own_extensions = data_file->get_recognized_extensions();
+	} else if (Object::cast_to<LocalizationCatalog>(p_resource.ptr())) {
+		own_extensions = LocalizationCatalog::get_file_extensions();
 	} else if (p_resource->get_class_name() == JSON::get_class_static()) {
 		own_extensions.push_back("json");
 	}
