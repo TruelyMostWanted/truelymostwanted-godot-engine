@@ -51,7 +51,8 @@ Ref<Resource> ResourceFormatLoaderJSON::load(const String &p_path, const String 
 
 	Error err = json->parse(FileAccess::get_file_as_string(p_path), Engine::get_singleton()->is_editor_hint());
 	if (err != OK) {
-		String err_text = "Error parsing JSON file at '" + p_path + "', on line " + itos(json->get_error_line()) + ": " + json->get_error_message();
+		// Truely: get_error_line() is 0-based; the message counts lines from 1 like the editor.
+		String err_text = "Error parsing JSON file at '" + p_path + "', on line " + itos(json->get_error_line() + 1) + ": " + json->get_error_message();
 
 		if (Engine::get_singleton()->is_editor_hint()) {
 			// If running on editor, still allow opening the JSON so the code editor can edit it.
@@ -92,6 +93,10 @@ Error ResourceFormatSaverJSON::save(const Ref<Resource> &p_resource, const Strin
 	ERR_FAIL_COND_V(json.is_null(), ERR_INVALID_PARAMETER);
 
 	String source = json->get_parsed_text().is_empty() ? JSON::stringify(json->get_data(), "\t", false, true) : json->get_parsed_text();
+	// Truely: a new JSON (no data) is saved as an empty object, not as "null".
+	if (json->get_parsed_text().is_empty() && json->get_data().get_type() == Variant::NIL) {
+		source = "{}\n";
+	}
 
 	Error err;
 	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);

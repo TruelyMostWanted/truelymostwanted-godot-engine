@@ -84,7 +84,9 @@ Ref<Resource> ResourceFormatLoaderTextData::load(const String &p_path, const Str
 	// Only the editor keeps the text (comments and formatting survive saving); games do not keep a second copy.
 	err = format->parse(text, editor);
 	if (err != OK) {
-		const String message = vformat("Error parsing %s file at '%s', on line %d: %s", format_class, p_path, format->get_error_line(), format->get_error_message());
+		// The line is 1-based, 0 means unknown.
+		const String line = format->get_error_line() > 0 ? vformat(", on line %d", format->get_error_line()) : String();
+		const String message = vformat("Error parsing %s file at '%s'%s: %s", format_class, p_path, line, format->get_error_message());
 		if (editor) {
 			// Still return the resource, so the text editor can open the file and fix it.
 			WARN_PRINT(message);
