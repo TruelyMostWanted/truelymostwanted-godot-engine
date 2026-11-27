@@ -1707,6 +1707,8 @@
 		<member name="ResourceLoader" type="ResourceLoader" setter="" getter="">
 			The [ResourceLoader] singleton.
 		</member>
+		<member name="ResourceLocalizationServer" type="ResourceLocalizationServer" setter="" getter="">
+		</member>
 		<member name="ResourceSaver" type="ResourceSaver" setter="" getter="">
 			The [ResourceSaver] singleton.
 		</member>
@@ -1739,6 +1741,10 @@
 		</member>
 		<member name="TTSServer" type="TTSServer" setter="" getter="">
 			The [TTSServer] singleton.
+		</member>
+		<member name="TextInsertionServer" type="TextInsertionServer" setter="" getter="">
+		</member>
+		<member name="TextLocalizationServer" type="TextLocalizationServer" setter="" getter="">
 		</member>
 		<member name="TextServerManager" type="TextServerManager" setter="" getter="">
 			The [TextServerManager] singleton.

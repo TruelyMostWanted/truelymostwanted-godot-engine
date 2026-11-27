@@ -191,6 +191,9 @@ public:
 	const Vector<Ref<SubtitleSegment>> &get_segment_list() const { return segments; }
 };
 
+// Hint of the `subtitle_path` properties of streams and players (`PROPERTY_HINT_FILE`): subtitle files and saved `Subtitle` resources.
+#define SUBTITLE_PATH_HINT "*.srt,*.vtt,*.ttml,*.dfxp,*.ass,*.ssa,*.sbv,*.tres,*.res"
+
 VARIANT_ENUM_CAST(SubtitleSegment::Kind);
 VARIANT_ENUM_CAST(SubtitleSegment::Placement);
 VARIANT_ENUM_CAST(Subtitle::Format);

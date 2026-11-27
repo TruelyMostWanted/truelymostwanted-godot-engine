@@ -31,6 +31,7 @@
 #pragma once
 
 #include "scene/2d/node_2d.h"
+#include "scene/audio/audio_mixer_server.h"
 #include "servers/audio/audio_server_enums.h"
 
 struct AudioFrame;
@@ -92,6 +93,8 @@ protected:
 public:
 	void set_stream(Ref<AudioStream> p_stream);
 	Ref<AudioStream> get_stream() const;
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
 
 	void set_volume_db(float p_volume);
 	float get_volume_db() const;
@@ -137,6 +140,19 @@ public:
 
 	AuSE::PlaybackType get_playback_type() const;
 	void set_playback_type(AuSE::PlaybackType p_playback_type);
+
+	// Fades, crossfade and track info, shared by the three players through AudioStreamPlayerInternal.
+	void fade_in(float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_LINEAR);
+	void fade_out(float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_LINEAR, bool p_stop_at_end = true);
+	void crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, AudioMixerServer::FadeCurve p_curve = AudioMixerServer::FADE_CURVE_EQUAL_POWER);
+	bool is_fading() const;
+	float get_fade_gain() const;
+	int get_current_track_index();
+	Ref<AudioStream> get_current_track_stream();
+	double get_track_position();
+	double get_position_in_playlist();
+	void set_position_signal_interval(float p_interval);
+	float get_position_signal_interval() const;
 
 	AudioStreamPlayer2D();
 	~AudioStreamPlayer2D();

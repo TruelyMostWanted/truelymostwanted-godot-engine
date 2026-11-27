@@ -58,6 +58,8 @@
 #include "core/os/time.h"
 #include "core/profiling/profiling.h"
 #include "core/register_core_types.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "core/truely_version.h"
 #include "core/variant/variant_parser.h"
@@ -3918,6 +3920,10 @@ Error Main::setup2(bool p_show_boot_logo) {
 		}
 	}
 	OS::get_singleton()->benchmark_end_measure("Startup", "Scene");
+
+	// After the scene types and modules: `.tres` catalogs and the TOML/YAML formats can be loaded.
+	TextLocalizationServer::get_singleton()->load_project_catalogs();
+	ResourceLocalizationServer::get_singleton()->load_project_catalogs();
 
 #ifdef TOOLS_ENABLED
 	ClassDB::set_current_api(ClassDB::API_EDITOR);

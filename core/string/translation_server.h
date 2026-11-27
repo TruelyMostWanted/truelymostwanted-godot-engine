@@ -38,6 +38,7 @@ class TranslationServer : public Object {
 
 	String locale = "en";
 	String fallback;
+	HashMap<StringName, String> channel_locales; // Channel -> its own locale; channels without one follow `locale`.
 
 	Ref<TranslationDomain> main_domain;
 #ifdef TOOLS_ENABLED
@@ -48,6 +49,8 @@ class TranslationServer : public Object {
 	HashMap<StringName, Ref<TranslationDomain>> custom_domains;
 
 	mutable HashMap<String, int> locale_compare_cache;
+
+	void _set_channel_locale(const StringName &p_channel, const String &p_locale);
 
 	static inline TranslationServer *singleton = nullptr;
 
@@ -111,6 +114,12 @@ public:
 	String get_locale() const;
 	void set_fallback_locale(const String &p_locale);
 	String get_fallback_locale() const;
+
+	// Locale channels (#357): `interface` (the main domain: tr(), controls), `audio`, `subtitles` and custom ones.
+	void set_locale_for(const StringName &p_channel, const String &p_locale);
+	String get_locale_for(const StringName &p_channel) const;
+	void clear_locale_for(const StringName &p_channel);
+	PackedStringArray get_locale_channels() const;
 
 #ifndef DISABLE_DEPRECATED
 	Ref<Translation> get_translation_object(const String &p_locale);

@@ -111,8 +111,12 @@
 #include "core/os/os.h"
 #include "core/os/time.h"
 #include "core/string/fuzzy_search.h"
+#include "core/string/localization_catalog.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/regex.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/text_insertion_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
 #ifndef DISABLE_DEPRECATED
@@ -125,6 +129,8 @@ static Ref<ResourceFormatImporter> resource_format_importer;
 static Ref<ResourceFormatImporterSaver> resource_format_importer_saver;
 static Ref<ResourceFormatLoaderImage> resource_format_image;
 static Ref<TranslationLoaderPO> resource_format_po;
+static Ref<ResourceFormatLoaderLocalizationCatalog> resource_loader_localization_catalog;
+static Ref<ResourceFormatSaverLocalizationCatalog> resource_saver_localization_catalog;
 static Ref<ResourceFormatSaverCrypto> resource_format_saver_crypto;
 static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<GDExtensionResourceLoader> resource_loader_gdextension;
@@ -178,6 +184,9 @@ extern void unregister_global_constants();
 
 static ResourceUID *resource_uid = nullptr;
 static SeedServer *seed_server = nullptr;
+static TextInsertionServer *text_insertion_server = nullptr;
+static TextLocalizationServer *text_localization_server = nullptr;
+static ResourceLocalizationServer *resource_localization_server = nullptr;
 
 static bool _is_core_extensions_registered = false;
 
@@ -355,7 +364,23 @@ void register_core_types() {
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
 	GDREGISTER_CLASS(TranslationDomain);
+	GDREGISTER_CLASS(TextInsertionValues);
+	GDREGISTER_CLASS(TextInsertionTemplate);
+	GDREGISTER_ABSTRACT_CLASS(TextInsertionServer);
+	text_insertion_server = memnew(TextInsertionServer);
 	GDREGISTER_CLASS(OptimizedTranslation);
+	GDREGISTER_ABSTRACT_CLASS(LocalizationCatalog);
+	GDREGISTER_CLASS(TextLocalizationCatalog);
+	GDREGISTER_CLASS(ResourceLocalizationCatalog);
+	resource_loader_localization_catalog.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_localization_catalog, true); // Before the text resource loaders (#357).
+	resource_saver_localization_catalog.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_localization_catalog, true); // Before the text resource savers (#346).
+	GDREGISTER_ABSTRACT_CLASS(LocalizationServer);
+	GDREGISTER_ABSTRACT_CLASS(TextLocalizationServer);
+	text_localization_server = memnew(TextLocalizationServer);
+	GDREGISTER_ABSTRACT_CLASS(ResourceLocalizationServer);
+	resource_localization_server = memnew(ResourceLocalizationServer);
 	GDREGISTER_CLASS(UndoRedo);
 	GDREGISTER_CLASS(TriangleMesh);
 
@@ -502,6 +527,8 @@ void register_core_settings() {
 	GLOBAL_DEF_RST("filesystem/path_prefixes/defaults", true);
 	ResourceTextSerializer::register_settings();
 	StreamingAssetsServer::register_settings();
+	TextInsertionServer::register_settings();
+	LocalizationServer::register_settings();
 }
 
 void register_early_core_singletons() {
@@ -523,6 +550,9 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceSaver", CoreBind::ResourceSaver::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", CoreBind::Marshalls::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextInsertionServer", TextInsertionServer::get_singleton(), "TextInsertionServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TextLocalizationServer", TextLocalizationServer::get_singleton(), "TextLocalizationServer"));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceLocalizationServer", ResourceLocalizationServer::get_singleton(), "ResourceLocalizationServer"));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
@@ -596,6 +626,9 @@ void unregister_core_types() {
 	memdelete(resource_uid);
 
 	memdelete(seed_server);
+	memdelete(resource_localization_server);
+	memdelete(text_localization_server);
+	memdelete(text_insertion_server);
 	memdelete(_resource_text_serializer);
 
 	memdelete(ip);
@@ -621,6 +654,12 @@ void unregister_core_types() {
 		ResourceLoader::remove_resource_format_loader(resource_format_po);
 		resource_format_po.unref();
 	}
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_localization_catalog);
+	resource_loader_localization_catalog.unref();
+	ResourceSaver::remove_resource_format_saver(resource_saver_localization_catalog);
+	resource_saver_localization_catalog.unref();
+	LocalizationCatalog::finish_plural_rules();
 
 	if constexpr (GD_IS_CLASS_ENABLED(Crypto)) {
 		ResourceSaver::remove_resource_format_saver(resource_format_saver_crypto);

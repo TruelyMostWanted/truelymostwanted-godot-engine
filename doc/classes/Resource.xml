@@ -155,6 +155,7 @@
 			<param index="0" name="path" type="String" />
 			<description>
 				Sets the [member resource_path] to [param path], potentially overriding an existing cache entry for this path. Further attempts to load an overridden resource by path will instead return this resource.
+				The resource that held [param path] before loses it: its [member resource_path] becomes empty.
 			</description>
 		</method>
 	</methods>
@@ -170,6 +171,8 @@
 		<member name="resource_path" type="String" setter="set_path" getter="get_path" default="&quot;&quot;">
 			The unique path to this resource. If it has been saved to disk, the value will be its filepath. If the resource is exclusively contained within a scene, the value will be the [PackedScene]'s filepath, followed by a unique identifier.
 			[b]Note:[/b] Setting this property manually may fail if a resource with the same path has already been previously loaded. If necessary, use [method take_over_path].
+				A path is held by at most one resource in the cache. [ResourceLoader] sets this property when it loads a resource (see [enum ResourceFormatLoader.CacheMode]): with [constant ResourceFormatLoader.CACHE_MODE_REUSE] the resource gets the path and is cached, with [constant ResourceFormatLoader.CACHE_MODE_REPLACE] an already cached resource is updated in place and keeps its path, and with [constant ResourceFormatLoader.CACHE_MODE_IGNORE] the resource reports the path but is not cached.
+				Setting the path of a resource while another loaded resource holds it fails with an error and leaves this resource without a path; [method take_over_path] moves the path instead, and the previous holder is left without a path. [method ResourceSaver.save] does not change the path (see [constant ResourceSaver.FLAG_CHANGE_PATH]). Methods that read a file into an existing instance, such as [method TextDataFormat.load], [method LocalizationCatalog.load_from_file] or [method ConfigFile.load], do not change this property either.
 		</member>
 		<member name="resource_scene_unique_id" type="String" setter="set_scene_unique_id" getter="get_scene_unique_id">
 			A unique identifier relative to this resource's scene. If left empty, the ID is automatically generated when this resource is saved inside a [PackedScene]. If the resource is not inside a scene, this property is empty by default.

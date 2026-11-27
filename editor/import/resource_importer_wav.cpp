@@ -31,6 +31,7 @@
 #include "resource_importer_wav.h"
 
 #include "core/io/resource_saver.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 #include "scene/resources/audio/audio_stream_wav.h"
 
 String ResourceImporterWAV::get_importer_name() const {
@@ -87,6 +88,7 @@ void ResourceImporterWAV::get_import_options(const String &p_path, List<ImportOp
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "edit/loop_end"), -1));
 	// Quite OK Audio is lightweight enough and supports virtually every significant AudioStreamWAV feature.
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "compress/mode", PROPERTY_HINT_ENUM, "PCM (Uncompressed),IMA ADPCM,Quite OK Audio"), 2));
+	AudioStreamTags::get_import_options(r_options);
 }
 
 Error ResourceImporterWAV::import(ResourceUID::ID p_source_id, const String &p_source_file, const String &p_save_path, const HashMap<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
@@ -96,6 +98,9 @@ Error ResourceImporterWAV::import(ResourceUID::ID p_source_id, const String &p_s
 	}
 
 	Ref<AudioStreamWAV> sample = AudioStreamWAV::load_from_file(p_source_file, options);
+	if (sample.is_valid()) {
+		AudioStreamTags::apply_import_options(sample.ptr(), p_source_file, p_options);
+	}
 	ResourceSaver::save(sample, p_save_path + ".sample");
 	return OK;
 }

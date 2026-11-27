@@ -39,6 +39,7 @@
 #include "editor/animation/animation_tree_editor_plugin.h"
 #include "editor/audio/audio_stream_randomizer_editor_plugin.h"
 #include "editor/data/csv_table_editor.h"
+#include "editor/data/localization_catalog_editor_plugin.h"
 #include "editor/debugger/debug_adapter/debug_adapter_server.h"
 #include "editor/debugger/editor_debugger_plugin.h"
 #include "editor/docks/filesystem_dock.h"
@@ -78,10 +79,12 @@
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
 #include "editor/inspector/audio_bus_list_settings_editor_plugin.h"
+#include "editor/inspector/data_file_inspector_plugin.h"
 #include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/inspector/editor_resource_picker.h"
 #include "editor/inspector/editor_resource_preview.h"
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
+#include "editor/inspector/files_manifest_editor_plugin.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
 #include "editor/inspector/pck_package_editor_plugin.h"
@@ -241,15 +244,18 @@ void register_editor_types() {
 	// This list is alphabetized, and plugins that depend on Node2D or Node3D are in their own section below.
 	EditorPlugins::add_by_type<AnimationTreeEditorPlugin>();
 	EditorPlugins::add_by_type<CSVTableEditorPlugin>();
+	EditorPlugins::add_by_type<LocalizationCatalogEditorPlugin>();
 	EditorPlugins::add_by_type<AudioBusListSettingsEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
 	EditorPlugins::add_by_type<BitMapEditorPlugin>();
 	EditorPlugins::add_by_type<ControlEditorPlugin>();
 	EditorPlugins::add_by_type<CurveEditorPlugin>();
+	EditorPlugins::add_by_type<DataFileInspectorEditorPlugin>();
 	if (!Engine::get_singleton()->is_recovery_mode_hint()) {
 		EditorPlugins::add_by_type<DebugAdapterServer>();
 	}
 	EditorPlugins::add_by_type<EditorScriptPlugin>();
+	EditorPlugins::add_by_type<FilesManifestEditorPlugin>();
 	EditorPlugins::add_by_type<FontEditorPlugin>();
 	EditorPlugins::add_by_type<GradientEditorPlugin>();
 	EditorPlugins::add_by_type<GradientTexture2DEditorPlugin>();

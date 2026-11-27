@@ -6,6 +6,11 @@
 	<description>
 		A [FilesManifest] describes a set of files as data instead of code: folders (optionally with their subfolders), the extensions and the type of the files to take from them, and single files. Create it in the Inspector or in code, save it as a resource, and load everything it describes with [method ResourceLoader.load_manifest] or [method ResourceLoader.load_threaded_request_manifest]. [method ResourceLoader.get_manifest_paths] returns the paths without loading them.
 		Paths may use any prefix of [PathPrefixServer], for example [code]res://[/code], [code]user://[/code], [code]exec://[/code] or [code]appdata://[/code]. Relative paths are relative to [code]res://[/code].
+		[b]Load order:[/b] the paths are returned and loaded in a defined order, so that consumers that layer data (later files override earlier ones) can rely on it:
+		- First the folders, in the order of [member folder_paths]. The files of one folder (with its subfolders if [member recursive] is [code]true[/code]) are sorted by path. A wildcard folder adds its matches in the order of their names.
+		- Then the single files, in the order of [member file_paths].
+		- A path that appears again keeps its first position.
+		In the Inspector, both lists can be reordered with the up and down buttons, and the "Preview" section lists the resolved files in this order.
 		[codeblocks]
 		[gdscript]
 		var manifest := FilesManifest.new()
@@ -54,10 +59,11 @@
 			The extensions of the files to take from [member folder_paths]. They are normalized with [method normalize_extension] and duplicates are removed. Multi-part extensions such as [code].tres.json[/code] are supported. If empty, all files that a resource loader recognizes are taken.
 		</member>
 		<member name="file_paths" type="PackedStringArray" setter="set_file_paths" getter="get_file_paths" default="PackedStringArray()">
-			Single files that belong to the manifest. They are always included, regardless of [member extensions] and [member type_hint]. Files that do not exist report an error and are skipped.
+			Single files that belong to the manifest, in load order after the files of [member folder_paths]. They are always included, regardless of [member extensions] and [member type_hint]. Files that do not exist report an error and are skipped.
 		</member>
 		<member name="folder_paths" type="PackedStringArray" setter="set_folder_paths" getter="get_folder_paths" default="PackedStringArray()">
-			The folders to take files from. Folders that do not exist report an error, unless [member create_missing_folders] is [code]true[/code].
+			The folders to take files from, in load order. Folders that do not exist report an error, unless [member create_missing_folders] is [code]true[/code].
+			A path segment with [code]*[/code] or [code]?[/code] matches one folder level, for example [code]user://mods/*/translations[/code] takes the [code]translations[/code] folder of every mod, in the order of the mod folder names. Patterns inside a segment, such as [code]mod_*[/code], work too. The part before the first wildcard must exist (or is created with [member create_missing_folders]); matches without the rest of the path are skipped, and no match at all is not an error. Wildcards work wherever folders can be listed: on desktop and mobile file systems, in [code]user://[/code] on the Web, and in [code]res://[/code] inside an exported PCK.
 		</member>
 		<member name="recursive" type="bool" setter="set_recursive" getter="is_recursive" default="true">
 			If [code]true[/code], the subfolders of [member folder_paths] are searched too. Hidden folders are skipped.

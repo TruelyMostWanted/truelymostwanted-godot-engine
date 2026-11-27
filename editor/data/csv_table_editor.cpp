@@ -35,6 +35,7 @@
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
+#include "core/string/translation_server.h"
 #include "editor/docks/editor_dock_manager.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
@@ -49,6 +50,7 @@
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
+#include "scene/gui/line_edit.h"
 #include "scene/gui/text_edit.h"
 #include "scene/gui/tree.h"
 #include "scene/main/timer.h"
@@ -65,6 +67,20 @@ static Ref<SerializerOptions> _tsv_options() {
 	options->set_csv_delimiter("\t");
 	options->set_csv_headers(false);
 	return options;
+}
+
+// The entry of a catalog row with its key and context (get_entry() lists them only for keys with a context).
+static Dictionary _get_catalog_entry(const Ref<LocalizationCatalog> &p_catalog, int p_row) {
+	const StringName key = p_catalog->get_key(p_row);
+	const StringName context = p_catalog->get_key_context(p_row);
+	Dictionary entry = p_catalog->get_entry(key, context);
+	entry["_key"] = String(key);
+	entry["_context"] = String(context);
+	return entry;
+}
+
+static bool _is_forms(const Variant &p_value) {
+	return p_value.get_type() == Variant::ARRAY || p_value.get_type() == Variant::PACKED_STRING_ARRAY;
 }
 
 TextEditorBase *CSVTableEditor::_get_text_editor() const {
@@ -92,6 +108,9 @@ void CSVTableEditor::_sync_from_text_file() {
 }
 
 bool CSVTableEditor::_can_edit() {
+	if (catalog.is_valid()) {
+		return true; // Edited as a resource, no text editor to keep in sync.
+	}
 	TextEditorBase *text_editor = _get_text_editor();
 	const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
 	if (text_file.is_valid()) {
@@ -115,7 +134,11 @@ bool CSVTableEditor::_can_edit() {
 	return true;
 }
 
-void CSVTableEditor::_commit_cells(const String &p_action, int p_row, int p_column, const Array &p_cells) {
+void CSVTableEditor::_commit_cells(const String &p_action, int p_row, int p_column, const Array &p_cells, int p_form) {
+	if (catalog.is_valid()) {
+		_commit_catalog_cells(p_action, p_row, p_column, p_cells, p_form);
+		return;
+	}
 	if (!_can_edit()) {
 		_render();
 		return;
@@ -137,6 +160,226 @@ void CSVTableEditor::_commit_cells(const String &p_action, int p_row, int p_colu
 	undo_redo->commit_action();
 }
 
+Array CSVTableEditor::_get_cells(int p_row, int p_column, int p_rows, int p_columns) const {
+	if (catalog.is_null()) {
+		return csv->get_cells(p_row, p_column, p_rows, p_columns);
+	}
+	Array cells;
+	for (int row = p_row; row < p_row + p_rows && row < catalog->get_key_count(); row++) {
+		const Dictionary entry = _get_catalog_entry(catalog, row);
+		PackedStringArray line;
+		for (int field = p_column; field < p_column + p_columns && field < catalog_fields.size(); field++) {
+			line.push_back(_get_catalog_cell(entry, field, 0));
+		}
+		cells.push_back(line);
+	}
+	return cells;
+}
+
+void CSVTableEditor::_update_catalog_fields() {
+	catalog_fields.clear();
+	catalog_fields.push_back("_key");
+	catalog_fields.push_back("_context");
+	catalog_fields.push_back(catalog->is_class("TextLocalizationCatalog") ? "_plural" : "_type");
+	catalog_fields.append_array(catalog->get_locales());
+	for (const String &note_column : catalog->get_note_columns()) {
+		catalog_fields.push_back("_" + note_column);
+	}
+}
+
+String CSVTableEditor::_get_catalog_cell(const Dictionary &p_entry, int p_field, int p_form) const {
+	const Variant value = p_entry.get(catalog_fields[p_field], String());
+	if (_is_forms(value)) {
+		const PackedStringArray forms = value;
+		return p_form < forms.size() ? forms[p_form] : String();
+	}
+	return p_form == 0 ? String(value) : String();
+}
+
+void CSVTableEditor::_commit_catalog_cells(const String &p_action, int p_row, int p_field, const Array &p_cells, int p_form) {
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action_for_history(p_action, EditorUndoRedoManager::GLOBAL_HISTORY);
+	for (int i = 0; i < p_cells.size() && p_row + i < catalog->get_key_count(); i++) {
+		const PackedStringArray cells = p_cells[i];
+		const Dictionary old_entry = _get_catalog_entry(catalog, p_row + i);
+		Dictionary entry = old_entry.duplicate(true);
+		for (int c = 0; c < cells.size() && p_field + c < catalog_fields.size(); c++) {
+			const String &field = catalog_fields[p_field + c];
+			const Variant value = entry.get(field, Variant());
+			if (_is_forms(value) || p_form > 0) {
+				// A plural form: the cell of a child row, or the first form of a key with plural forms.
+				PackedStringArray forms;
+				if (value.get_type() == Variant::STRING) {
+					forms.push_back(value);
+				} else if (_is_forms(value)) {
+					forms = value;
+				}
+				if (forms.size() <= p_form) {
+					forms.resize(p_form + 1);
+				}
+				forms.set(p_form, cells[c]);
+				entry[field] = forms;
+			} else if (cells[c].is_empty()) {
+				entry.erase(field);
+			} else {
+				entry[field] = cells[c];
+			}
+		}
+		const String old_key = old_entry["_key"];
+		const String old_context = old_entry["_context"];
+		const String key = entry["_key"];
+		const String context = entry["_context"];
+		if (key.is_empty()) {
+			status_label->set_text(TTR("A key can't be empty."));
+			continue;
+		}
+		if (key == old_key && context == old_context) {
+			undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
+			undo_redo->add_undo_method(catalog.ptr(), "set_entry", key, old_entry, context);
+			continue;
+		}
+		if (catalog->has_key(key, context)) {
+			status_label->set_text(vformat(TTR("The key \"%s\" with this context exists already."), key));
+			continue;
+		}
+		// A renamed key is a new row at the end.
+		undo_redo->add_do_method(catalog.ptr(), "remove_key", old_key, old_context);
+		undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
+		undo_redo->add_undo_method(catalog.ptr(), "remove_key", key, context);
+		undo_redo->add_undo_method(catalog.ptr(), "set_entry", old_key, old_entry, old_context);
+	}
+	undo_redo->commit_action();
+}
+
+void CSVTableEditor::_render_catalog() {
+	updating = true;
+	const int row_count = catalog->get_key_count();
+	const int column_count = catalog_fields.size();
+	const int page_count = MAX(1, (row_count + PAGE_SIZE - 1) / PAGE_SIZE);
+	page = CLAMP(page, 0, page_count - 1);
+	const int first = page * PAGE_SIZE;
+	const int last = MIN(first + PAGE_SIZE, row_count);
+
+	if (tree->get_columns() != column_count + 1) {
+		tree->clear();
+		tree->set_columns(column_count + 1);
+	}
+	tree->set_column_title(0, "#");
+	tree->set_column_expand(0, false);
+	tree->set_column_custom_minimum_width(0, 60 * EDSCALE);
+	for (int field = 0; field < column_count; field++) {
+		const String &name = catalog_fields[field];
+		String column_title;
+		String tooltip;
+		if (field == 0) {
+			column_title = TTR("Key");
+		} else if (field == 1) {
+			column_title = TTR("Context");
+		} else if (field == 2) {
+			column_title = name == "_plural" ? TTR("Plural Key") : TTR("Type");
+			tooltip = name == "_plural" ? TTR("The plural key (msgid_plural). Keys with plural forms show one child row per form.") : TTR("The resource type the localized paths must have.");
+		} else if (name.begins_with("_")) {
+			column_title = vformat(TTR("Note: %s"), name.substr(1));
+			tooltip = TTR("Translator note: for translators only, not used at runtime.");
+		} else {
+			column_title = name;
+			tooltip = vformat(TTR("%s: %d of %d translated"), TranslationServer::get_singleton()->get_locale_name(name), catalog->get_translated_count(name), row_count);
+		}
+		tree->set_column_title(field + 1, column_title);
+		tree->set_column_title_tooltip_text(field + 1, tooltip);
+		tree->set_column_custom_minimum_width(field + 1, 100 * EDSCALE);
+		tree->set_column_clip_content(field + 1, true);
+	}
+
+	TreeItem *root = tree->get_root() ? tree->get_root() : tree->create_item();
+	TreeItem *item = root->get_first_child();
+	const Color issue_color = get_theme_color(SNAME("error_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.35);
+	for (int row = first; row < last; row++) {
+		if (!item) {
+			item = tree->create_item(root);
+		}
+		while (TreeItem *child = item->get_first_child()) {
+			memdelete(child);
+		}
+		const Dictionary entry = _get_catalog_entry(catalog, row);
+		int form_count = 1;
+		for (const KeyValue<Variant, Variant> &kv : entry) {
+			if (_is_forms(kv.value)) {
+				form_count = MAX(form_count, (int)PackedStringArray(kv.value).size());
+			}
+		}
+		for (int form = 0; form < form_count; form++) {
+			TreeItem *form_item = form == 0 ? item : tree->create_item(item);
+			form_item->set_text(0, form == 0 ? itos(row + 1) : vformat(TTR("form %d"), form));
+			form_item->set_metadata(0, row);
+			form_item->set_metadata(1, form);
+			form_item->set_selectable(0, false);
+			for (int column = 0; column <= column_count; column++) {
+				const String *issue = form == 0 ? cell_issues.getptr(_cell_key(row, column)) : nullptr;
+				form_item->set_tooltip_text(column, issue ? *issue : String());
+				if (issue) {
+					form_item->set_custom_bg_color(column, issue_color);
+				} else {
+					form_item->clear_custom_bg_color(column);
+				}
+				if (column == 0) {
+					continue;
+				}
+				form_item->set_cell_mode(column, TreeItem::CELL_MODE_STRING);
+				form_item->set_text(column, _get_catalog_cell(entry, column - 1, form));
+				// Child rows hold plural forms: only the locale columns.
+				form_item->set_editable(column, form == 0 || (column > 3 && !catalog_fields[column - 1].begins_with("_")));
+			}
+		}
+		item = item->get_next();
+	}
+	while (item) {
+		TreeItem *next = item->get_next();
+		memdelete(item);
+		item = next;
+	}
+
+	page_label->set_text(row_count == 0 ? TTR("No keys") : vformat(TTR("Keys %d-%d of %d"), first + 1, last, row_count));
+	previous_button->set_disabled(page == 0);
+	next_button->set_disabled(page >= page_count - 1);
+	updating = false;
+}
+
+void CSVTableEditor::_add_catalog_column() {
+	const String name = column_edit->get_text().strip_edges();
+	if (catalog.is_null() || name.is_empty()) {
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	if (name.begins_with("_")) {
+		// Note columns exist through their notes: added with an empty note of the first key.
+		if (catalog->get_key_count() == 0) {
+			status_label->set_text(TTR("Add a key before adding a note column."));
+			return;
+		}
+		const StringName key = catalog->get_key(0);
+		const StringName context = catalog->get_key_context(0);
+		const Dictionary old_entry = catalog->get_entry(key, context);
+		Dictionary entry = old_entry.duplicate();
+		entry[name] = String();
+		undo_redo->create_action_for_history(TTR("Add Note Column"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
+		undo_redo->add_undo_method(catalog.ptr(), "set_entry", key, old_entry, context);
+		undo_redo->commit_action();
+	} else {
+		const String locale = TranslationServer::get_singleton()->standardize_locale(name);
+		if (locale.is_empty() || catalog->has_locale(locale)) {
+			status_label->set_text(vformat(TTR("\"%s\" is no locale code or exists already."), name));
+			return;
+		}
+		undo_redo->create_action_for_history(TTR("Add Locale"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		undo_redo->add_do_method(catalog.ptr(), "add_locale", locale);
+		undo_redo->add_undo_method(catalog.ptr(), "remove_locale", locale);
+		undo_redo->commit_action();
+	}
+	column_edit->clear();
+}
+
 void CSVTableEditor::_csv_changed() {
 	if (!update_queued) {
 		update_queued = true;
@@ -146,6 +389,14 @@ void CSVTableEditor::_csv_changed() {
 
 void CSVTableEditor::_update() {
 	update_queued = false;
+	if (catalog.is_valid()) {
+		_update_catalog_fields();
+		_render();
+		if (validate_timer->is_inside_tree()) {
+			validate_timer->start();
+		}
+		return;
+	}
 	if (csv.is_null()) {
 		return;
 	}
@@ -170,6 +421,10 @@ void CSVTableEditor::_update() {
 }
 
 void CSVTableEditor::_render() {
+	if (catalog.is_valid()) {
+		_render_catalog();
+		return;
+	}
 	if (csv.is_null()) {
 		tree->clear();
 		return;
@@ -254,12 +509,14 @@ void CSVTableEditor::_render() {
 }
 
 void CSVTableEditor::_validate() {
-	if (csv.is_null()) {
+	if (csv.is_null() && catalog.is_null()) {
 		return;
 	}
 	cell_issues.clear();
 	Ref<DataValidation> result;
-	if (translation_mode) {
+	if (catalog.is_valid()) {
+		result = catalog->validate();
+	} else if (translation_mode) {
 		result = csv->validate_translation();
 	} else if (schema.is_valid()) {
 		result = csv->validate(schema);
@@ -275,7 +532,9 @@ void CSVTableEditor::_validate() {
 		const int row = result->get_issue_row(i);
 		const int column = result->get_issue_column(i);
 		if (row != DataValidation::POSITION_NONE) {
-			const int64_t key = _cell_key(row, column == DataValidation::POSITION_NONE ? 0 : column + 1);
+			// Catalog issues name their locale as field; key issues have none (the row number column).
+			const int tree_column = catalog.is_valid() ? (int)catalog_fields.find(result->get_issue_field(i)) + 1 : (column == DataValidation::POSITION_NONE ? 0 : column + 1);
+			const int64_t key = _cell_key(row, tree_column);
 			const String *previous = cell_issues.getptr(key);
 			cell_issues[key] = previous ? *previous + "\n" + result->get_issue_message(i) : result->get_issue_message(i);
 		}
@@ -285,7 +544,16 @@ void CSVTableEditor::_validate() {
 	}
 
 	String status = result->is_valid() ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), result->get_issue_count(), result->get_issue_message(0));
-	if (translation_mode) {
+	if (catalog.is_valid()) {
+		// Counted per locale, not limited like the issues.
+		PackedStringArray counts;
+		for (const String &locale : catalog->get_locales()) {
+			counts.push_back(vformat("%s: %d", locale, catalog->get_key_count() - catalog->get_translated_count(locale)));
+		}
+		if (!counts.is_empty()) {
+			status = vformat(TTR("Missing translations: %s. %s"), String(", ").join(counts), status);
+		}
+	} else if (translation_mode) {
 		CSV::TranslationHeader columns;
 		Ref<DataValidation> header_issues;
 		header_issues.instantiate();
@@ -321,10 +589,24 @@ void CSVTableEditor::_cell_edited() {
 	}
 	Array cells;
 	cells.push_back(PackedStringArray({ value }));
-	_commit_cells(TTR("Set CSV Cell"), (int)item->get_metadata(0), tree_column - 1, cells);
+	_commit_cells(TTR("Set CSV Cell"), (int)item->get_metadata(0), tree_column - 1, cells, (int)item->get_metadata(1));
 }
 
 void CSVTableEditor::_add_row(bool p_insert) {
+	if (catalog.is_valid()) {
+		// Keys are always appended (a catalog has no row positions to insert at).
+		String key = "new_key";
+		for (int i = 2; catalog->has_key(key); i++) {
+			key = vformat("new_key_%d", i);
+		}
+		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+		undo_redo->create_action_for_history(TTR("Add Localization Key"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		undo_redo->add_do_method(catalog.ptr(), "add_key", key);
+		undo_redo->add_undo_method(catalog.ptr(), "remove_key", key);
+		undo_redo->commit_action();
+		page = (catalog->get_key_count() - 1) / PAGE_SIZE;
+		return;
+	}
 	if (csv.is_null() || !_can_edit()) {
 		return;
 	}
@@ -341,17 +623,32 @@ void CSVTableEditor::_add_row(bool p_insert) {
 }
 
 void CSVTableEditor::_remove_rows() {
-	if (csv.is_null() || !_can_edit()) {
+	if ((csv.is_null() && catalog.is_null()) || !_can_edit()) {
 		return;
 	}
 	Vector<int> rows;
 	for (TreeItem *item = tree->get_next_selected(nullptr); item; item = tree->get_next_selected(item)) {
-		rows.push_back((int)item->get_metadata(0));
+		if (!rows.has((int)item->get_metadata(0))) {
+			rows.push_back((int)item->get_metadata(0)); // Child rows (plural forms) share the row of their key.
+		}
 	}
 	if (rows.is_empty()) {
 		return;
 	}
 	rows.sort();
+	if (catalog.is_valid()) {
+		// Undo adds the keys again at the end.
+		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+		undo_redo->create_action_for_history(TTR("Remove Localization Keys"), EditorUndoRedoManager::GLOBAL_HISTORY);
+		for (int row : rows) {
+			const StringName key = catalog->get_key(row);
+			const StringName context = catalog->get_key_context(row);
+			undo_redo->add_do_method(catalog.ptr(), "remove_key", key, context);
+			undo_redo->add_undo_method(catalog.ptr(), "set_entry", key, catalog->get_entry(key, context), context);
+		}
+		undo_redo->commit_action();
+		return;
+	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action_for_history(TTR("Remove CSV Rows"), EditorUndoRedoManager::GLOBAL_HISTORY);
 	for (int i = rows.size() - 1; i >= 0; i--) {
@@ -381,23 +678,27 @@ void CSVTableEditor::_copy() {
 		}
 	}
 	if (last_row >= 0) {
-		DisplayServer::get_singleton()->clipboard_set(CSV::stringify(csv->get_cells(first_row, first_column, last_row - first_row + 1, last_column - first_column + 1), _tsv_options()));
+		DisplayServer::get_singleton()->clipboard_set(CSV::stringify(_get_cells(first_row, first_column, last_row - first_row + 1, last_column - first_column + 1), _tsv_options()));
 	}
 }
 
 void CSVTableEditor::_paste() {
 	TreeItem *item = tree->get_selected();
 	const int tree_column = tree->get_selected_column();
-	if (csv.is_null() || !item || tree_column < 1) {
+	if ((csv.is_null() && catalog.is_null()) || !item || tree_column < 1) {
 		return;
 	}
 	const Array cells = CSV::parse_string(DisplayServer::get_singleton()->clipboard_get(), _tsv_options());
 	if (!cells.is_empty()) {
-		_commit_cells(TTR("Paste CSV Cells"), (int)item->get_metadata(0), tree_column - 1, cells);
+		_commit_cells(TTR("Paste CSV Cells"), (int)item->get_metadata(0), tree_column - 1, cells, (int)item->get_metadata(1));
 	}
 }
 
 void CSVTableEditor::_save() {
+	if (catalog.is_valid()) {
+		EditorNode::get_singleton()->save_resource(catalog);
+		return;
+	}
 	if (csv.is_null() || !_can_edit()) {
 		return;
 	}
@@ -446,6 +747,27 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 	if (csv.is_valid()) {
 		csv->disconnect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 	}
+	if (catalog.is_valid()) {
+		catalog->disconnect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
+	}
+	catalog = p_resource;
+	column_edit->set_visible(catalog.is_valid());
+	add_column_button->set_visible(catalog.is_valid());
+	if (catalog.is_valid()) {
+		csv.unref();
+		text_file.unref();
+		schema.unref();
+		cell_issues.clear();
+		page = 0;
+		translation_mode = false;
+		catalog->connect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
+		schema_picker->set_visible(false);
+		file_label->set_text(catalog->get_path().get_file());
+		tree->clear();
+		_update_catalog_fields();
+		_validate();
+		return;
+	}
 	text_file = p_resource;
 	csv = p_resource;
 	schema.unref();
@@ -484,6 +806,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 }
 
 CSVTableEditor::CSVTableEditor() {
+	singleton = this;
 	set_name(TTRC("CSV Table"));
 	set_icon_name("TextFile");
 	set_dock_shortcut(ED_SHORTCUT_AND_COMMAND("bottom_panels/toggle_csv_table_bottom_panel", TTRC("Toggle CSV Table Dock")));
@@ -514,6 +837,18 @@ CSVTableEditor::CSVTableEditor() {
 	Button *save_button = memnew(Button(TTR("Save")));
 	save_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_save));
 	toolbar->add_child(save_button);
+
+	column_edit = memnew(LineEdit);
+	column_edit->set_placeholder(TTR("Locale or _note"));
+	column_edit->set_tooltip_text(TTR("A locale code adds a locale column, a name starting with \"_\" a translator note column."));
+	column_edit->set_custom_minimum_size(Size2(120 * EDSCALE, 0));
+	column_edit->set_visible(false);
+	column_edit->connect(SceneStringName(text_submitted), callable_mp(this, &CSVTableEditor::_add_catalog_column).unbind(1));
+	toolbar->add_child(column_edit);
+	add_column_button = memnew(Button(TTR("Add Column")));
+	add_column_button->set_visible(false);
+	add_column_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_add_catalog_column));
+	toolbar->add_child(add_column_button);
 
 	toolbar->add_child(memnew(Label(TTR("Schema:"))));
 	schema_picker = memnew(EditorResourcePicker);
@@ -558,12 +893,18 @@ CSVTableEditor::CSVTableEditor() {
 	add_child(validate_timer);
 }
 
+CSVTableEditor::~CSVTableEditor() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
+}
+
 void CSVTableEditorPlugin::edit(Object *p_object) {
 	table_editor->edit(Ref<Resource>(Object::cast_to<Resource>(p_object)));
 }
 
 bool CSVTableEditorPlugin::handles(Object *p_object) const {
-	if (Object::cast_to<CSV>(p_object)) {
+	if (Object::cast_to<CSV>(p_object) || Object::cast_to<LocalizationCatalog>(p_object)) {
 		return true;
 	}
 	const TextFile *text_file = Object::cast_to<TextFile>(p_object);

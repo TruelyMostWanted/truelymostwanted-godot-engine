@@ -32,6 +32,7 @@
 
 #include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 
 #ifdef TOOLS_ENABLED
 #include "editor/import/audio_stream_import_settings.h"
@@ -78,6 +79,7 @@ void ResourceImporterOggVorbis::get_import_options(const String &p_path, List<Im
 	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "bpm", PROPERTY_HINT_RANGE, "0,400,0.01,or_greater"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "beat_count", PROPERTY_HINT_RANGE, "0,512,or_greater"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "bar_beats", PROPERTY_HINT_RANGE, "2,32,or_greater"), 4));
+	AudioStreamTags::get_import_options(r_options);
 }
 
 #ifdef TOOLS_ENABLED
@@ -110,6 +112,7 @@ Error ResourceImporterOggVorbis::import(ResourceUID::ID p_source_id, const Strin
 	ogg_vorbis_stream->set_bpm(bpm);
 	ogg_vorbis_stream->set_beat_count(beat_count);
 	ogg_vorbis_stream->set_bar_beats(bar_beats);
+	AudioStreamTags::apply_import_options(ogg_vorbis_stream.ptr(), p_source_file, p_options);
 
 	return ResourceSaver::save(ogg_vorbis_stream, p_save_path + ".oggvorbisstr");
 }

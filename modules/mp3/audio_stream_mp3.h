@@ -100,6 +100,7 @@ class AudioStreamMP3 : public AudioStream {
 	float sample_rate = 1.0;
 	int channels = 1;
 	float length = 0.0;
+	int bitrate = 0; // Average, without tags.
 	bool loop = false;
 	float loop_offset = 0.0;
 
@@ -135,6 +136,10 @@ public:
 	Vector<uint8_t> get_data() const;
 
 	virtual double get_length() const override;
+	virtual int get_sample_rate() const override;
+	virtual int get_channel_count() const override;
+	virtual int get_bitrate() const override;
+	virtual String get_codec() const override { return "MP3"; }
 
 	virtual bool is_monophonic() const override;
 

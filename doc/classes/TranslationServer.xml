@@ -5,6 +5,24 @@
 	</brief_description>
 	<description>
 		The translation server is the API backend that manages all language translations.
+		[b]Note:[/b] In this engine, the locale API of [TranslationServer] is the official one: [method set_locale] sets the general locale and [method set_locale_for] the locale of a [i]channel[/i]. The text content methods ([method add_translation], [method translate], ...) are deprecated in favor of [TextLocalizationServer] and [TextLocalizationCatalog]s; they stay functional because the editor uses them, and [method Object.tr] keeps working through one adapter translation of [TextLocalizationServer] per channel domain.
+		[b]Locale channels:[/b] a channel is a part of the game with its own language, for example English menus with Japanese voices and German subtitles. A channel without its own locale follows the general locale. A channel is a [TranslationDomain]: [code]interface[/code] is the main domain (menus, [method Object.tr], auto translation, the shaping language of controls), [code]subtitles[/code] is the domain [code]"subtitles"[/code], and custom channels are the domains of their name. Nodes choose a channel with [method Object.set_translation_domain]. [code]audio[/code] has no domain: it chooses the localized voice files of [ResourceLocalizationServer]. Every [LocalizationCatalog] has a [member LocalizationCatalog.channel].
+		[codeblocks]
+		[gdscript]
+		TranslationServer.set_locale("en")
+		TranslationServer.set_locale_for(&amp;"audio", "ja")
+		TranslationServer.set_locale_for(&amp;"subtitles", "de")
+		$SubtitleBox.translation_domain = &amp;"subtitles" # The labels below follow the subtitles channel.
+		print(TranslationServer.get_locale_for(&amp;"interface")) # en
+		[/gdscript]
+		[csharp]
+		TranslationServer.SetLocale("en");
+		TranslationServer.SetLocaleFor("audio", "ja");
+		TranslationServer.SetLocaleFor("subtitles", "de");
+		GetNode&lt;Control&gt;("SubtitleBox").TranslationDomain = "subtitles"; // The labels below follow the subtitles channel.
+		GD.Print(TranslationServer.GetLocaleFor("interface")); // en
+		[/csharp]
+		[/codeblocks]
 		Translations are stored in [TranslationDomain]s, which can be accessed by name. The most commonly used translation domain is the main translation domain. It always exists and can be accessed using an empty [StringName]. The translation server provides wrapper methods for accessing the main translation domain directly, without having to fetch the translation domain first. Custom translation domains are mainly for advanced usages like editor plugins. Names starting with [code]godot.[/code] are reserved for engine internals.
 	</description>
 	<tutorials>
@@ -12,17 +30,24 @@
 		<link title="Locales">$DOCS_URL/tutorials/i18n/locales.html</link>
 	</tutorials>
 	<methods>
-		<method name="add_translation">
+		<method name="add_translation" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="void" />
 			<param index="0" name="translation" type="Translation" />
 			<description>
 				Adds a translation to the main translation domain.
 			</description>
 		</method>
-		<method name="clear">
+		<method name="clear" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="void" />
 			<description>
 				Removes all translations from the main translation domain.
+			</description>
+		</method>
+		<method name="clear_locale_for">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Removes the own locale of [param channel]: it follows the general locale again (see [method set_locale_for]). Emits [signal locale_changed] if the locale of the channel changes.
 			</description>
 		</method>
 		<method name="compare_locales" qualifiers="const">
@@ -33,7 +58,7 @@
 				Compares two locales and returns a similarity score between [code]0[/code] (no match) and [code]10[/code] (full match).
 			</description>
 		</method>
-		<method name="find_translations" qualifiers="const">
+		<method name="find_translations" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="Translation[]" />
 			<param index="0" name="locale" type="String" />
 			<param index="1" name="exact" type="bool" />
@@ -74,6 +99,12 @@
 				Returns a readable country name for the [param country] code.
 			</description>
 		</method>
+		<method name="get_fallback_locale" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the fallback locale: the locale used for a text when the current locale (and its parent locales) have none. Defaults to [member ProjectSettings.internationalization/locale/fallback]. Changing it emits [signal fallback_locale_changed].
+			</description>
+		</method>
 		<method name="get_language_name" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="language" type="String" />
@@ -92,6 +123,19 @@
 			<description>
 				Returns the current locale of the project.
 				See also [method OS.get_locale] and [method OS.get_locale_language] to query the locale of the user system.
+			</description>
+		</method>
+		<method name="get_locale_channels" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns the channels: the built-in [code]interface[/code], [code]audio[/code] and [code]subtitles[/code], then the custom channels that have their own locale.
+			</description>
+		</method>
+		<method name="get_locale_for" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the locale of [param channel]: its own locale set with [method set_locale_for], otherwise the general locale ([method get_locale]). An empty [param channel] returns the general locale.
 			</description>
 		</method>
 		<method name="get_locale_name" qualifiers="const">
@@ -143,7 +187,7 @@
 				Returns the [Translation] instance that best matches [param locale] in the main translation domain. Returns [code]null[/code] if there are no matches.
 			</description>
 		</method>
-		<method name="get_translations" qualifiers="const">
+		<method name="get_translations" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="Translation[]" />
 			<description>
 				Returns all available [Translation] instances in the main translation domain as added by [method add_translation].
@@ -156,14 +200,14 @@
 				Returns [code]true[/code] if a translation domain with the specified name exists.
 			</description>
 		</method>
-		<method name="has_translation" qualifiers="const">
+		<method name="has_translation" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="bool" />
 			<param index="0" name="translation" type="Translation" />
 			<description>
 				Returns [code]true[/code] if the main translation domain contains the given [param translation].
 			</description>
 		</method>
-		<method name="has_translation_for_locale" qualifiers="const">
+		<method name="has_translation_for_locale" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="bool" />
 			<param index="0" name="locale" type="String" />
 			<param index="1" name="exact" type="bool" />
@@ -201,11 +245,18 @@
 				[b]Note:[/b] Trying to remove the main translation domain is an error.
 			</description>
 		</method>
-		<method name="remove_translation">
+		<method name="remove_translation" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="void" />
 			<param index="0" name="translation" type="Translation" />
 			<description>
 				Removes the given translation from the main translation domain.
+			</description>
+		</method>
+		<method name="set_fallback_locale">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Sets the fallback locale (see [method get_fallback_locale]) and emits [signal fallback_locale_changed] if it changed. The project setting [member ProjectSettings.internationalization/locale/fallback] is not changed.
 			</description>
 		</method>
 		<method name="set_locale">
@@ -214,6 +265,17 @@
 			<description>
 				Sets the locale of the project. The [param locale] string will be standardized to match known locales (e.g. [code]en-US[/code] would be matched to [code]en_US[/code]).
 				If translations have been loaded beforehand for the new locale, they will be applied.
+				This is the general locale: every channel without its own locale follows it (see [method set_locale_for]). Emits [signal locale_changed] with an empty channel before the nodes re-translate.
+			</description>
+		</method>
+		<method name="set_locale_for">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<description>
+				Sets the own locale of [param channel], standardized like [method set_locale]. An empty [param channel] sets the general locale.
+				For a channel with a translation domain ([code]interface[/code] = the main domain, [code]subtitles[/code] and custom channels = the domain of their name), the locale becomes the domain's locale override ([method TranslationDomain.set_locale_override]), so [method Object.tr] and the controls of that domain follow it (also their shaping language), and the nodes re-translate. An [code]audio[/code] change only reaches the localization servers: voice files are loaded again, controls are not re-translated.
+				Emits [signal locale_changed] when the locale of the channel changes.
 			</description>
 		</method>
 		<method name="standardize_locale" qualifiers="const">
@@ -224,7 +286,7 @@
 				Returns a [param locale] string standardized to match known locales (e.g. [code]en-US[/code] would be matched to [code]en_US[/code]). If [param add_defaults] is [code]true[/code], the locale may have a default script or country added.
 			</description>
 		</method>
-		<method name="translate" qualifiers="const">
+		<method name="translate" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="StringName" />
 			<param index="0" name="message" type="StringName" />
 			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
@@ -233,7 +295,7 @@
 				[b]Note:[/b] This method always uses the main translation domain.
 			</description>
 		</method>
-		<method name="translate_plural" qualifiers="const">
+		<method name="translate_plural" qualifiers="const" deprecated="Use [TextLocalizationServer] and [TextLocalizationCatalog] for texts in game code.">
 			<return type="StringName" />
 			<param index="0" name="message" type="StringName" />
 			<param index="1" name="plural_message" type="StringName" />
@@ -251,4 +313,20 @@
 			If [code]true[/code], enables the use of pseudolocalization on the main translation domain. See [member ProjectSettings.internationalization/pseudolocalization/use_pseudolocalization] for details.
 		</member>
 	</members>
+	<signals>
+		<signal name="fallback_locale_changed">
+			<param index="0" name="locale" type="String" />
+			<description>
+				Emitted when the fallback locale changed, the last part of every locale chain of the localization servers.
+			</description>
+		</signal>
+		<signal name="locale_changed">
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="previous_locale" type="String" />
+			<description>
+				Emitted when the locale of [param channel] changed: with an empty [param channel] for the general locale ([method set_locale]), otherwise for a channel ([method set_locale_for], [method clear_locale_for]). A general change also changes every channel without its own locale; [method get_locale_for] gives the new locale of each. The localization servers rebuild here, before the nodes re-translate.
+			</description>
+		</signal>
+	</signals>
 </class>

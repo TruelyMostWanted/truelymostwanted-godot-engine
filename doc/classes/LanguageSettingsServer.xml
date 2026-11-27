@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="LanguageSettingsServer" inherits="SettingsServer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		Settings server for the language: locale, pseudolocalization, layout direction and auto-translate mode.
+		Settings server for the language: locale, locale channels, pseudolocalization, layout direction and auto-translate mode.
 	</brief_description>
 	<description>
 		[LanguageSettingsServer] is the settings domain [code]"language"[/code]: it stores the locale chosen by the player and related options, loads them when the game starts and applies them to [TranslationServer] and the root window. The settings resource is a [LanguageSettings]. The file is [code]user://settings/language.ini[/code] by default; as a single record it is never stored as CSV.
 		The domain is applied in [constant SettingsServer.APPLY_PHASE_SERVERS], after the project translations are loaded and before the main loop, the autoloads and the main scene exist, so the first text the player sees is already in the stored language. The layout direction and the auto-translate mode of the root window are pushed as soon as the root window exists, at the latest in [constant SettingsServer.APPLY_PHASE_SCENE], before the main scene is loaded.
 		The locale is chosen in this order: the command line argument [code]--language[/code] (or [code]-l[/code]), then [member ProjectSettings.internationalization/locale/test], then the stored locale, then the locale of the operating system. The first two are set as a session override (see [method SettingsServer.set_session_override]) when the game starts: they are applied but never saved, and a call to [method set_locale] replaces them.
 		An empty locale follows the operating system. A stored locale for which no translation is loaded (for example a language removed in a game update) is replaced by [method get_project_locale] when it is applied, with a verbose message only and no error; the stored value stays, so it is used again once the translation exists. If the project has no translations at all, the locale is set as it is.
+		[b]Locale channels:[/b] besides the language ([member LanguageSettings.locale]) the player can choose a locale for the channels [code]"interface"[/code], [code]"audio"[/code] and [code]"subtitles"[/code] (see [method TranslationServer.set_locale_for]), for example English voices with German menus and subtitles. Each is stored as [code]&lt;channel&gt;_locale[/code] in [LanguageSettings]; an empty value ("same as language") follows the language. They are applied with [method TranslationServer.set_locale_for] and [method TranslationServer.clear_locale_for]. A channel locale for which no catalog of the channel is loaded (see [method get_available_locales_for]) lets the channel follow the language, with a verbose message only; the stored value stays. [code]--language[/code] and the test locale make every channel follow the language for the session. Settings files written before the channels existed load as they are: the channels follow the language. Custom channels are not stored; set them with [method TranslationServer.set_locale_for].
 		A change of the locale or of pseudolocalization sends [constant MainLoop.NOTIFICATION_TRANSLATION_CHANGED], so auto-translated nodes update themselves. Texts that a script translated with [method Object.tr] and stored must be translated again.
 		[codeblocks]
 		[gdscript]
@@ -57,7 +58,46 @@
 		<method name="get_available_locales" qualifiers="static">
 			<return type="PackedStringArray" />
 			<description>
-				Returns the locales of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
+				Returns the locales of the localization catalogs (see [method LocalizationServer.get_available_locales]) and of the loaded translations (see [method TranslationServer.get_loaded_locales]), sorted and without duplicates. Use [method TranslationServer.get_locale_name] for the names shown in a menu.
+			</description>
+		</method>
+		<method name="get_available_locales_for" qualifiers="static">
+			<return type="PackedStringArray" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the locales a player can choose for the locale [param channel], sorted: the locales of the catalogs with keys of the channel (see [method LocalizationServer.get_available_locales_for]), for [code]"interface"[/code] also those of the loaded translations. If no catalog has keys of the channel, for example no voice catalog for [code]"audio"[/code], returns [method get_available_locales]. An empty [param channel] returns [method get_available_locales].
+				[codeblocks]
+				[gdscript]
+				func fill_channel_list(list: OptionButton, channel: StringName):
+					list.clear()
+					list.add_item("Same as language")
+					list.set_item_metadata(0, "")
+					for locale in LanguageSettingsServer.get_available_locales_for(channel):
+						list.add_item(TranslationServer.get_locale_name(locale))
+						list.set_item_metadata(list.item_count - 1, locale)
+						if locale == LanguageSettingsServer.get_locale_for(channel):
+							list.select(list.item_count - 1)
+					list.item_selected.connect(func(index): LanguageSettingsServer.set_locale_for(channel, list.get_item_metadata(index)))
+				[/gdscript]
+				[csharp]
+				private static void FillChannelList(OptionButton list, StringName channel)
+				{
+				    list.Clear();
+				    list.AddItem("Same as language");
+				    list.SetItemMetadata(0, "");
+				    foreach (string locale in LanguageSettingsServer.GetAvailableLocalesFor(channel))
+				    {
+				        list.AddItem(TranslationServer.GetLocaleName(locale));
+				        list.SetItemMetadata(list.ItemCount - 1, locale);
+				        if (locale == LanguageSettingsServer.GetLocaleFor(channel))
+				        {
+				            list.Select(list.ItemCount - 1);
+				        }
+				    }
+				    list.ItemSelected += index =&gt; LanguageSettingsServer.SetLocaleFor(channel, list.GetItemMetadata((int)index).AsString());
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_command_line_locale" qualifiers="static">
@@ -76,6 +116,13 @@
 			<return type="String" />
 			<description>
 				Returns the pending locale chosen by the player, or an empty string if the game follows the operating system. The locale that is active now is [method TranslationServer.get_locale]; it differs while a session override is set or when no translation is loaded for the stored locale.
+			</description>
+		</method>
+		<method name="get_locale_for" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="channel" type="StringName" />
+			<description>
+				Returns the pending locale stored for the locale [param channel] ([code]"interface"[/code], [code]"audio"[/code] or [code]"subtitles"[/code]), or an empty string if the channel is the same as the language. An empty [param channel] returns [method get_locale]. The locale that is active now is [method TranslationServer.get_locale_for].
 			</description>
 		</method>
 		<method name="get_project_locale" qualifiers="static">
@@ -110,6 +157,14 @@
 				Sets the locale, for example [code]"fr"[/code] or [code]"pt-BR"[/code]. The locale is standardized (see [method TranslationServer.standardize_locale]), so [code]"pt-BR"[/code] is stored as [code]"pt_BR"[/code]. An empty string follows the operating system. Replaces a session override from the command line or the test locale.
 			</description>
 		</method>
+		<method name="set_locale_for">
+			<return type="void" />
+			<param index="0" name="channel" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<description>
+				Sets the locale of the locale [param channel]: [code]"interface"[/code], [code]"audio"[/code] or [code]"subtitles"[/code] ([member LanguageSettings.interface_locale], [member LanguageSettings.audio_locale], [member LanguageSettings.subtitles_locale]). The locale is standardized; an empty string makes the channel the same as the language. An empty [param channel] is the same as [method set_locale]. Other channels are refused with an error. [signal SettingsServer.value_changed] reports the stored value, [signal TranslationServer.locale_changed] the locale in use.
+			</description>
+		</method>
 		<method name="set_pseudolocalization_enabled">
 			<return type="void" />
 			<param index="0" name="enabled" type="bool" />
@@ -133,7 +188,7 @@
 				Use it for layouts that are not under the root window.
 			</description>
 		</signal>
-		<signal name="locale_changed">
+		<signal name="locale_changed" deprecated="Use [signal TranslationServer.locale_changed], which reports the language (an empty [code]channel[/code]) and every locale channel with the locale in use.">
 			<param index="0" name="locale" type="String" />
 			<description>
 				Emitted once when a changed [member LanguageSettings.locale] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
