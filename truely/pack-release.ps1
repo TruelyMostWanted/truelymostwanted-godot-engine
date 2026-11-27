@@ -10,10 +10,10 @@
 
     Der Name kommt aus "<exe> --truely-version" (z. B. 0.1.0) und "<exe> --version"
     (z. B. 4.8.beta5.truely.a1b2c3d4e):
-      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_win64.zip
-      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_mono_win64.zip
-      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_export_templates.tpz        (nur Windows-Templates)
-      Truely-v0.1.0_Godot4.8-beta5_a1b2c3d_mono_export_templates.tpz   (nur Windows-Templates)
+      Truely-v0.2.0_Godot4.8-beta5_a1b2c3d_windows-x86_64.zip
+      Truely-v0.2.0_Godot4.8-beta5_a1b2c3d_windows-x86_64_dotnet.zip
+      Truely-v0.2.0_Godot4.8-beta5_a1b2c3d_export-templates.tpz        (nur Windows-Templates)
+      Truely-v0.2.0_Godot4.8-beta5_a1b2c3d_export-templates_dotnet.tpz  (nur Windows-Templates)
 
     Jede Editor-Zip enthaelt einen Ordner mit den Exes und ._sc_ (Self-contained-Modus:
     Einstellungen und Export-Templates bleiben neben der Exe). Die .tpz enthalten templates/
@@ -138,8 +138,8 @@ Write-Host "==> $name -> $OutDir" -ForegroundColor Cyan
 try {
     # Editors: one folder per zip with the exes and ._sc_ (self-contained mode).
     foreach ($e in @(
-            @{ Exe = $stdEditor; Suffix = 'win64'; Mono = $false },
-            @{ Exe = $monoEditor; Suffix = 'mono_win64'; Mono = $true })) {
+            @{ Exe = $stdEditor; Suffix = 'windows-x86_64'; Mono = $false },
+            @{ Exe = $monoEditor; Suffix = 'windows-x86_64_dotnet'; Mono = $true })) {
         if (-not $e.Exe) { Write-Host "    skip $($e.Suffix) editor (not built)"; continue }
         $folder = "${name}_$($e.Suffix)"
         $dir = Join-Path (Join-Path $stage $e.Suffix) $folder
@@ -158,8 +158,8 @@ try {
 
     # Export templates (Windows only): templates/ with version.txt, named like the official ones.
     foreach ($t in @(
-            @{ Probe = $stdTemplate; Mono = ''; Prefix = ''; Info = $std },
-            @{ Probe = $monoTemplate; Mono = '.mono'; Prefix = 'mono_'; Info = $mono })) {
+            @{ Probe = $stdTemplate; Mono = ''; Prefix = ''; Tail = ''; Info = $std },
+            @{ Probe = $monoTemplate; Mono = '.mono'; Prefix = 'dotnet_'; Tail = '_dotnet'; Info = $mono })) {
         if (-not $t.Probe) { Write-Host "    skip $($t.Prefix)export templates (not built)"; continue }
         $config = if ($t.Info) { $t.Info.Config } elseif ($t.Mono) { "$($std.Config).mono" } else { $mono.Config -replace '\.mono$', '' }
         $dir = Join-Path (Join-Path $stage "$($t.Prefix)tpz") 'templates'
@@ -172,7 +172,7 @@ try {
             }
         }
         [System.IO.File]::WriteAllText((Join-Path $dir 'version.txt'), $config)
-        New-Zip (Join-Path $stage "$($t.Prefix)tpz") (Join-Path $OutDir "${name}_$($t.Prefix)export_templates.tpz")
+        New-Zip (Join-Path $stage "$($t.Prefix)tpz") (Join-Path $OutDir "${name}_export-templates$($t.Tail).tpz")
     }
 } finally {
     Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
