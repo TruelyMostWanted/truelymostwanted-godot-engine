@@ -144,6 +144,7 @@ class ResourceFormatSaverResourceCSV : public ResourceFormatSaverTextTree {
 protected:
 	virtual String _get_extension() const override { return "csv"; }
 	virtual Error _write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const override;
+	// Always false, see there.
 	virtual bool _can_save(const Ref<Resource> &p_resource) const override;
 };
 

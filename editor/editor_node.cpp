@@ -1870,6 +1870,12 @@ void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const St
 	}
 }
 
+// Truely: a data file (CSV, ...) that was read from its own source file, not from an import, although the
+// file has a `.import` (Keep File, CSV Dataset). It is edited and saved like a file without import.
+static bool _is_data_source_file(const Resource *p_resource) {
+	return Object::cast_to<TextDataFormat>(p_resource) && p_resource->get_import_path().is_empty();
+}
+
 void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 	// If built-in resource, save the scene instead.
 	if (p_resource->is_built_in()) {
@@ -1889,7 +1895,8 @@ void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 
 	// If the resource has been imported, ask the user to use a different path in order to save it.
 	String path = p_resource->get_path();
-	if (path.is_resource_file() && !FileAccess::exists(path + ".import")) {
+	// Truely: a data file read from its own source file (Keep File, CSV Dataset) is saved in place.
+	if (path.is_resource_file() && (_is_data_source_file(p_resource.ptr()) || !FileAccess::exists(path + ".import"))) {
 		save_resource_in_path(p_resource, p_resource->get_path());
 	} else {
 		save_resource_as(p_resource);
@@ -1904,7 +1911,7 @@ void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String 
 		// Early exit checks.
 
 		if (is_resource) {
-			if (FileAccess::exists(resource_path + ".import")) {
+			if (FileAccess::exists(resource_path + ".import") && !_is_data_source_file(p_resource.ptr())) {
 				show_warning(TTR("This resource can't be saved because it was imported from another file. Make it unique first."));
 				return;
 			}
@@ -3279,7 +3286,7 @@ void EditorNode::_edit_current(bool p_skip_foreign, bool p_skip_inspector_update
 				editable_info = TTR("This resource belongs to a scene that was instantiated or inherited.\nChanges to it must be made inside the original scene.");
 			}
 		} else if (current_res->get_path().is_resource_file()) {
-			if (FileAccess::exists(current_res->get_path() + ".import")) {
+			if (FileAccess::exists(current_res->get_path() + ".import") && !_is_data_source_file(current_res)) {
 				editable_info = TTR("This resource was imported, so it's not editable. Change its settings in the import panel and then re-import.");
 			}
 		}

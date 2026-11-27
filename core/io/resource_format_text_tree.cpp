@@ -318,8 +318,9 @@ Error ResourceFormatSaverResourceCSV::_write_text(const Ref<Resource> &p_resourc
 }
 
 bool ResourceFormatSaverResourceCSV::_can_save(const Ref<Resource> &p_resource) const {
-	String error;
-	return ResourceTextSerializer::check_csv(p_resource, error) == OK;
+	// Not offered in the save dialog: CSV has no type marker, so the file loads back as a CSV resource
+	// (load() without a type hint). An explicit ResourceSaver.save() to a .csv path still writes it.
+	return false;
 }
 
 /////////////////////////////////////////////////////////////////////////////
