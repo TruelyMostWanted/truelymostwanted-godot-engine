@@ -62,7 +62,7 @@ static void _append_with_parents(const String &p_locale, PackedStringArray &r_ch
 
 // A copy of a catalog manifest for listing its files. Its type hint names the catalog kind and is not used as a
 // filter (text formats have no resource type before they are loaded); without extensions, the catalog formats.
-static Ref<FilesManifest> _get_catalog_files(const Ref<FilesManifest> &p_manifest) {
+Ref<FilesManifest> LocalizationServer::get_catalog_files(const Ref<FilesManifest> &p_manifest) {
 	Ref<FilesManifest> files = p_manifest->duplicate();
 	files->set_type_hint(StringName());
 	if (files->get_extensions().is_empty()) {
@@ -76,6 +76,7 @@ static Ref<FilesManifest> _get_catalog_files(const Ref<FilesManifest> &p_manifes
 
 void LocalizationServer::register_settings() {
 	GLOBAL_DEF(PropertyInfo(Variant::ARRAY, SETTING_CATALOG_MANIFESTS, PROPERTY_HINT_ARRAY_TYPE, "FilesManifest"), Array());
+	GLOBAL_DEF(SETTING_EXPORT_CONVERT_TEXT_TO_BINARY, true);
 }
 
 PackedStringArray LocalizationServer::build_locale_chain(const String &p_locale, const PackedStringArray &p_available, bool p_fallback) {
@@ -461,7 +462,7 @@ int LocalizationServer::add_catalog_manifest(const Ref<FilesManifest> &p_manifes
 	ERR_FAIL_COND_V(p_manifest.is_null(), 0);
 	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), 0, "Catalog manifests can only be added on the main thread.");
 	ERR_FAIL_COND_V_MSG(!_takes_manifest(p_manifest), 0, vformat("The manifest's type_hint \"%s\" is not %s.", p_manifest->get_type_hint(), _get_catalog_class()));
-	const int added = _add_catalog_paths(_get_catalog_files(p_manifest)->get_paths(), p_priority, false);
+	const int added = _add_catalog_paths(get_catalog_files(p_manifest)->get_paths(), p_priority, false);
 	if (added > 0) {
 		_catalogs_changed();
 	}
@@ -493,7 +494,7 @@ int LocalizationServer::load_project_catalogs() {
 		if (manifest.is_null() || !_takes_manifest(manifest)) {
 			continue;
 		}
-		const Ref<FilesManifest> files = _get_catalog_files(manifest);
+		const Ref<FilesManifest> files = get_catalog_files(manifest);
 		const String name = vformat("localization_catalogs_%d", i);
 		manifest_names.push_back(name);
 		PackedStringArray paths;
