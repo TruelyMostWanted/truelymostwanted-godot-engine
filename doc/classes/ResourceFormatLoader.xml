@@ -88,12 +88,11 @@
 			<param index="0" name="path" type="String" />
 			<param index="1" name="original_path" type="String" />
 			<param index="2" name="use_sub_threads" type="bool" />
-			<param index="3" name="cache_mode" type="int" enum="ResourceFormatLoader.CacheMode" />
+			<param index="3" name="cache_mode" type="int" />
 			<description>
 				Loads a resource when the engine finds this loader to be compatible. If the loaded resource is the result of an import, [param original_path] will target the source file. Returns a [Resource] object on success, or an [enum Error] constant in case of failure.
-				The [param cache_mode] property defines whether and how the cache should be used or updated when loading the resource. See [enum CacheMode] for details.
+				[param cache_mode] is a [enum CacheMode] value passed as [int] (for example [code]cache_mode == ResourceFormatLoader.CACHE_MODE_IGNORE[/code], in C# [code](ResourceFormatLoader.CacheMode)cacheMode[/code]). It defines whether and how the cache should be used or updated when loading the resource. See [enum CacheMode] for details.
 				The loader does not need to set [member Resource.resource_path] on the returned resource: [ResourceLoader] sets it and handles the cache according to [param cache_mode]. Paths of subresources that the loader creates itself are up to the loader (see [method Resource.set_path_cache]).
-				[b]Note:[/b] [param cache_mode] used to be declared as [int]. GDScript overrides that declare it as [int] keep working without a warning, and compiled GDExtensions that implement the old signature keep working through a compatibility hash. In C#, the override takes [enum CacheMode].
 				[b]Why the return type is [Variant]:[/b] one script function has to return "a resource [i]or[/i] an error". GDScript has no out-parameters and no generics, and the binding layer (GDScript, C#, GDExtension) cannot expose a C++ struct, so a [Variant] holding either a [Resource] or an [enum Error] code as [int] is the only form that works in every language. Changing it to [Resource] would break every existing loader written in GDScript, C# or GDExtension (and the GDExtension ABI), so it stays as it is. Push an error with a message ([method @GlobalScope.push_error]) before returning the code: [method ResourceLoader.load_result] passes that message on to the caller in [member ResourceLoadResult.error_message].
 			</description>
 		</method>
