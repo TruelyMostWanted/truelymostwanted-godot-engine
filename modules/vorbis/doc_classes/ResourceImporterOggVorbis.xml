@@ -91,5 +91,8 @@
 			Only has an effect if [member loop] is [code]true[/code].
 			A more convenient editor for [member loop_offset] is provided in the [b]Advanced Import Settings[/b] dialog, as it lets you preview your changes without having to reimport the audio.
 		</member>
+		<member name="subtitle_path" type="String" setter="" getter="" default="&quot;&quot;">
+			Sets [member AudioStream.subtitle_path] of the imported stream: the path of a subtitle file or [Subtitle] resource that a [SubtitlePlayer] plays with it. If empty, no subtitle path is set.
+		</member>
 	</members>
 </class>

@@ -41,6 +41,7 @@
 #include "scene/main/viewport.h"
 #include "scene/resources/audio/audio_stream.h"
 #include "servers/audio/audio_server.h"
+#include "servers/subtitle/subtitle.h"
 
 #ifndef PHYSICS_3D_DISABLED
 #include "scene/3d/physics/area_3d.h"
@@ -604,6 +605,14 @@ Ref<AudioStream> AudioStreamPlayer3D::get_stream() const {
 	return internal->stream;
 }
 
+void AudioStreamPlayer3D::set_subtitle_path(const String &p_subtitle_path) {
+	internal->subtitle_path = p_subtitle_path;
+}
+
+String AudioStreamPlayer3D::get_subtitle_path() const {
+	return internal->subtitle_path;
+}
+
 void AudioStreamPlayer3D::set_volume_db(float p_volume) {
 	ERR_FAIL_COND_MSG(Math::is_nan(p_volume), "Volume can't be set to NaN.");
 	internal->volume_db = p_volume;
@@ -662,6 +671,7 @@ void AudioStreamPlayer3D::play(float p_from_pos) {
 
 		AudioServer::get_singleton()->start_sample_playback(sample_playback, !can_process());
 	}
+	internal->update_playing_state(); // After the start, so is_playing() is true in handlers.
 }
 
 void AudioStreamPlayer3D::seek(float p_seconds) {
@@ -900,6 +910,8 @@ float AudioStreamPlayer3D::get_position_signal_interval() const {
 void AudioStreamPlayer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stream", "stream"), &AudioStreamPlayer3D::set_stream);
 	ClassDB::bind_method(D_METHOD("get_stream"), &AudioStreamPlayer3D::get_stream);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &AudioStreamPlayer3D::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &AudioStreamPlayer3D::get_subtitle_path);
 
 	ClassDB::bind_method(D_METHOD("set_volume_db", "volume_db"), &AudioStreamPlayer3D::set_volume_db);
 	ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioStreamPlayer3D::get_volume_db);
@@ -986,6 +998,7 @@ void AudioStreamPlayer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_position_signal_interval"), &AudioStreamPlayer3D::get_position_signal_interval);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static()), "set_stream", "get_stream");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "attenuation_model", PROPERTY_HINT_ENUM, "Inverse,Inverse Square,Logarithmic,Disabled"), "set_attenuation_model", "get_attenuation_model");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,or_greater,suffix:dB"), "set_volume_db", "get_volume_db");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_linear", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_volume_linear", "get_volume_linear");
@@ -1022,6 +1035,7 @@ void AudioStreamPlayer3D::_bind_methods() {
 	BIND_ENUM_CONSTANT(DOPPLER_TRACKING_PHYSICS_STEP);
 
 	ADD_SIGNAL(MethodInfo("finished"));
+	ADD_SIGNAL(MethodInfo("playing_changed", PropertyInfo(Variant::BOOL, "playing")));
 	ADD_SIGNAL(MethodInfo("stream_changed", PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
 	ADD_SIGNAL(MethodInfo("track_changed", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::OBJECT, "stream", PROPERTY_HINT_RESOURCE_TYPE, AudioStream::get_class_static())));
 	ADD_SIGNAL(MethodInfo("fade_finished"));

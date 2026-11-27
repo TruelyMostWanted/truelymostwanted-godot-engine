@@ -24,5 +24,9 @@
 			For [VideoStreamTheora], this filename should be an Ogg Theora video file with the [code].ogv[/code] extension.
 			For [VideoStreamWebm], this filename should be a WebM video file with the [code].webm[/code] extension.
 		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Path of the subtitle file for this video: a [code].srt[/code], [code].vtt[/code], [code].ttml[/code], [code].dfxp[/code], [code].ass[/code], [code].ssa[/code] or [code].sbv[/code] file, or a saved [Subtitle] resource. The Inspector stores it as a [code]uid://[/code] path if the file has a UID. This is only a path: a [SubtitlePlayer] loads it when the video plays.
+			Changing it does not emit [signal Resource.changed].
+		</member>
 	</members>
 </class>
