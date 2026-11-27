@@ -309,7 +309,7 @@ TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Track change, crossfade, sidecar, 
 
 	// Without subtitle_path: a sidecar file with the same base name next to the stream file.
 	const Ref<AudioStreamWAV> voice = make_stream(String());
-	save_subtitle("subtitle_player_voice.srt", "V");
+	(void)save_subtitle("subtitle_player_voice.srt", "V");
 	voice->set_path_cache(TestUtils::get_temp_path("subtitle_player_voice.wav"));
 	audio->set_stream(voice);
 	CHECK(get_source_text(player) == "V1");
