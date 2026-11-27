@@ -32,12 +32,17 @@
 
 TEST_FORCE_LINK(test_subtitle_player)
 
+#include "core/io/resource_saver.h"
 #include "core/object/callable_mp.h"
 #include "scene/animation/animation_player.h"
+#include "scene/audio/audio_stream_player.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/window.h"
 #include "scene/resources/animation_library.h"
+#include "scene/resources/audio/audio_stream_wav.h"
+#include "tests/signal_watcher.h"
+#include "tests/test_utils.h"
 
 namespace TestSubtitlePlayer {
 
@@ -173,6 +178,146 @@ TEST_CASE("[SceneTree][SubtitlePlayer] Unsupported sync node") {
 
 	memdelete(player);
 	memdelete(other);
+}
+
+// Saves a subtitle with 0-1 "<prefix>1" and 2-60 "<prefix>2" and returns its path.
+static String save_subtitle(const String &p_file, const String &p_prefix) {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	subtitle->add_segment(make_segment(0.0, 1.0, p_prefix + "1"));
+	subtitle->add_segment(make_segment(2.0, 60.0, p_prefix + "2"));
+	const String path = TestUtils::get_temp_path(p_file);
+	CHECK(ResourceSaver::save(subtitle, path) == OK);
+	return path;
+}
+
+// A silent 10 s stream with a subtitle path.
+static Ref<AudioStreamWAV> make_stream(const String &p_subtitle_path) {
+	Ref<AudioStreamWAV> wav;
+	wav.instantiate();
+	wav->set_format(AudioStreamWAV::FORMAT_16_BITS);
+	wav->set_mix_rate(44100);
+	Vector<uint8_t> data;
+	data.resize(10 * 44100 * 2);
+	memset(data.ptrw(), 0, data.size());
+	wav->set_data(data);
+	wav->set_subtitle_path(p_subtitle_path);
+	return wav;
+}
+
+// The first segment of the subtitle the player plays, "" without one.
+static String get_source_text(SubtitlePlayer *p_player) {
+	const Ref<Subtitle> subtitle = p_player->get_playback()->get_subtitle();
+	return subtitle.is_valid() && subtitle->get_segment_count() > 0 ? subtitle->get_segment(0)->get_text() : String();
+}
+
+TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Subtitle of the synced AudioStreamPlayer: play, pause, seek, stop") {
+	AudioStreamPlayer *audio = memnew(AudioStreamPlayer);
+	audio->set_stream(make_stream(save_subtitle("subtitle_player_sync_a.srt", "A")));
+	SceneTree::get_singleton()->get_root()->add_child(audio);
+	SubtitlePlayer *player = memnew(SubtitlePlayer);
+	ChangeLog *log = memnew(ChangeLog);
+	player->connect("segment_changed", callable_mp(log, &ChangeLog::on_changed));
+	player->set_sync_node(NodePath(".."));
+	audio->add_child(player);
+	SIGNAL_WATCH(audio, "playing_changed");
+	Array started;
+	started.push_back(Array({ true }));
+	Array stopped;
+	stopped.push_back(Array({ false }));
+
+	SceneTree::get_singleton()->process(0.0); // Resolves the sync node and loads its subtitle.
+	CHECK(player->get_subtitle().is_null());
+	CHECK(get_source_text(player) == "A1");
+	CHECK_FALSE(player->is_playing());
+
+	audio->play();
+	SIGNAL_CHECK("playing_changed", started);
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(player->is_playing());
+	CHECK(log->take() == "A1");
+
+	audio->seek(2.5); // Stops and starts internally, without playing_changed.
+	SIGNAL_CHECK_FALSE("playing_changed");
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "A2");
+
+	audio->set_stream_paused(true);
+	SIGNAL_CHECK("playing_changed", stopped);
+	CHECK_FALSE(player->is_playing());
+	CHECK(log->texts.size() == 1);
+	CHECK(log->take().is_empty());
+
+	audio->set_stream_paused(false);
+	SIGNAL_CHECK("playing_changed", started);
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "A2");
+
+	audio->stop();
+	SIGNAL_CHECK("playing_changed", stopped);
+	CHECK_FALSE(player->is_playing());
+	CHECK(log->texts.size() == 1);
+	CHECK(log->take().is_empty());
+
+	SIGNAL_UNWATCH(audio, "playing_changed");
+	memdelete(player);
+	memdelete(audio);
+	memdelete(log);
+}
+
+TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Track change, crossfade, sidecar, player override and explicit subtitle") {
+	const Ref<AudioStreamWAV> stream_a = make_stream(save_subtitle("subtitle_player_track_a.srt", "A"));
+	const Ref<AudioStreamWAV> stream_b = make_stream(save_subtitle("subtitle_player_track_b.srt", "B"));
+	AudioStreamPlayer *audio = memnew(AudioStreamPlayer);
+	audio->set_stream(stream_a);
+	SceneTree::get_singleton()->get_root()->add_child(audio);
+	SubtitlePlayer *player = memnew(SubtitlePlayer);
+	ChangeLog *log = memnew(ChangeLog);
+	player->connect("segment_changed", callable_mp(log, &ChangeLog::on_changed));
+	player->set_sync_node(NodePath(".."));
+	audio->add_child(player);
+	audio->play();
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "A1");
+
+	// A playlist reports its next track; its own subtitle replaces the shown one.
+	audio->emit_signal(SNAME("track_changed"), 1, stream_b);
+	CHECK(get_source_text(player) == "B1");
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "|B1"); // The old text ends, the new track's text starts.
+
+	// A crossfade switches with the new stream.
+	audio->crossfade_to(stream_a, 0.5f);
+	CHECK(get_source_text(player) == "A1");
+	SceneTree::get_singleton()->process(0.0);
+	CHECK(log->take() == "|A1");
+
+	// Without subtitle_path: a sidecar file with the same base name next to the stream file.
+	const Ref<AudioStreamWAV> voice = make_stream(String());
+	save_subtitle("subtitle_player_voice.srt", "V");
+	voice->set_path_cache(TestUtils::get_temp_path("subtitle_player_voice.wav"));
+	audio->set_stream(voice);
+	CHECK(get_source_text(player) == "V1");
+
+	// The player's override wins over the stream; it is picked up when the player starts.
+	audio->set_subtitle_path(save_subtitle("subtitle_player_override.srt", "O"));
+	audio->play();
+	CHECK(get_source_text(player) == "O1");
+
+	// An explicit subtitle wins over everything and stays on track changes.
+	const Ref<Subtitle> explicit_subtitle = make_subtitle();
+	player->set_subtitle(explicit_subtitle);
+	audio->emit_signal(SNAME("track_changed"), 1, stream_b);
+	CHECK(player->get_subtitle() == explicit_subtitle);
+	CHECK(player->get_playback()->get_subtitle() == explicit_subtitle);
+
+	// Cleared again: back to the player's override.
+	player->set_subtitle(Ref<Subtitle>());
+	CHECK(get_source_text(player) == "O1");
+
+	memdelete(player);
+	memdelete(audio);
+	memdelete(log);
 }
 
 } // namespace TestSubtitlePlayer
