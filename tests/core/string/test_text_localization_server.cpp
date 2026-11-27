@@ -451,7 +451,7 @@ TEST_CASE("[TextLocalizationServer] Catalog manifests, mods and on-demand locale
 	manifest_server->set_watching("localization_catalogs_1", false);
 
 	ProjectSettings::get_singleton()->set_setting(LocalizationServer::SETTING_CATALOG_MANIFESTS, previous_manifests);
-	for (const String &path : { "game.lcat", "mods/a/translations/mod.json", "mods/b/translations/mod.yaml" }) {
+	for (const char *path : { "game.lcat", "mods/a/translations/mod.json", "mods/b/translations/mod.yaml" }) {
 		DirAccess::remove_absolute(folder.path_join(path));
 	}
 }
