@@ -44,7 +44,7 @@ class EditorPropertyAudioStreamList : public EditorProperty {
 	VBoxContainer *rows = nullptr;
 	Button *add_button = nullptr;
 
-	void _set_streams(const Array &p_streams);
+	void _set_streams(const String &p_action, const Array &p_streams);
 	void _stream_changed(const Ref<Resource> &p_stream, int p_index);
 	void _stream_selected(const Ref<Resource> &p_stream, bool p_inspect);
 	void _move(int p_index, int p_offset);

@@ -34,6 +34,7 @@
 
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/inspector/editor_resource_picker.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
@@ -41,16 +42,24 @@
 #include "scene/gui/label.h"
 #include "scene/scene_string_names.h"
 
-void EditorPropertyAudioStreamList::_set_streams(const Array &p_streams) {
-	// The Inspector applies the value as one undo step.
-	emit_changed(get_edited_property(), p_streams);
+void EditorPropertyAudioStreamList::_set_streams(const String &p_action, const Array &p_streams) {
+	// One undo step per row action: the Inspector's "Set streams" would merge actions within a second.
+	Object *object = get_edited_object();
+	const StringName property = get_edited_property();
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(p_action, UndoRedo::MERGE_DISABLE, object);
+	undo_redo->add_do_property(object, property, p_streams);
+	undo_redo->add_do_method(this, "update_property");
+	undo_redo->add_undo_property(object, property, get_edited_property_value());
+	undo_redo->add_undo_method(this, "update_property");
+	undo_redo->commit_action();
 }
 
 void EditorPropertyAudioStreamList::_stream_changed(const Ref<Resource> &p_stream, int p_index) {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	if (p_index >= 0 && p_index < streams.size()) {
 		streams.set(p_index, p_stream);
-		_set_streams(streams);
+		_set_streams(TTR("Set Playlist Stream"), streams);
 	}
 }
 
@@ -67,21 +76,21 @@ void EditorPropertyAudioStreamList::_move(int p_index, int p_offset) {
 	const Variant stream = streams.get(p_index);
 	streams.set(p_index, streams.get(target));
 	streams.set(target, stream);
-	_set_streams(streams);
+	_set_streams(TTR("Move Playlist Stream"), streams);
 }
 
 void EditorPropertyAudioStreamList::_remove(int p_index) {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	if (p_index >= 0 && p_index < streams.size()) {
 		streams.remove_at(p_index);
-		_set_streams(streams);
+		_set_streams(TTR("Remove Playlist Stream"), streams);
 	}
 }
 
 void EditorPropertyAudioStreamList::_add() {
 	Array streams = Array(get_edited_property_value()).duplicate();
 	streams.push_back(Variant());
-	_set_streams(streams);
+	_set_streams(TTR("Add Playlist Stream"), streams);
 }
 
 void EditorPropertyAudioStreamList::update_property() {
