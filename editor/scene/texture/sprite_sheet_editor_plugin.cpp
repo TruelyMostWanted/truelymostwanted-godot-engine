@@ -506,6 +506,7 @@ void SpriteSheetCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
 void SpriteSheetCanvas::fit() {
 	const Ref<SpriteSheet> atlas = editor->get_atlas();
 	const Size2 texture_size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? atlas->get_sheet_texture()->get_size() : Size2();
+	fit_pending = texture_size.x > 0 && texture_size.y > 0 && (get_size().x <= 0 || get_size().y <= 0);
 	if (texture_size.x <= 0 || texture_size.y <= 0 || get_size().x <= 0 || get_size().y <= 0) {
 		zoom = 1.0f;
 		view_offset = Vector2(8, 8) * EDSCALE;
@@ -587,6 +588,11 @@ void SpriteSheetCanvas::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_DRAW: {
 			_draw_canvas();
+		} break;
+		case NOTIFICATION_RESIZED: {
+			if (fit_pending) {
+				fit();
+			}
 		} break;
 	}
 }
@@ -967,6 +973,11 @@ void SpriteSheetEditor::_auto_slice() {
 
 void SpriteSheetEditor::_add_from_grid() {
 	if (atlas.is_null()) {
+		return;
+	}
+	const String warning_text = SpriteSheetEditing::get_texture_warning(atlas);
+	if (!warning_text.is_empty()) {
+		EditorNode::get_singleton()->show_warning(warning_text);
 		return;
 	}
 	grid_dialog->popup_centered();

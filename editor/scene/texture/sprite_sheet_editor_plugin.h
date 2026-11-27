@@ -118,6 +118,7 @@ class SpriteSheetCanvas : public Control {
 	SpriteSheetEditor *editor = nullptr;
 	float zoom = 1.0f;
 	Vector2 view_offset; // Screen position of the texture origin.
+	bool fit_pending = false; // fit() ran while the dock was hidden: fit again at the first real size.
 	DragMode drag_mode = DRAG_NONE;
 	int drag_handle = -1;
 	Vector2 drag_from; // In texture pixels (DRAG_PAN: in screen pixels).
