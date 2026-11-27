@@ -136,6 +136,7 @@ class FlowGraphEditor : public EditorDock {
 	void _queue_drag_commit();
 	void _commit_drag();
 	void _element_selected(Node *p_element);
+	void _element_deselected(Node *p_element);
 	void _inline_property_changed(const String &p_property, const Variant &p_value, const String &p_field, bool p_changing, int p_id);
 
 	void _copy(bool p_cut);
@@ -205,6 +206,7 @@ public:
 	virtual void edit(Object *p_object) override;
 	virtual bool handles(Object *p_object) const override;
 	virtual void make_visible(bool p_visible) override;
+	virtual bool can_auto_hide() const override;
 
 	FlowGraphEditorPlugin();
 };

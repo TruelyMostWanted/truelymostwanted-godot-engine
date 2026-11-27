@@ -540,8 +540,15 @@ void FlowGraphEditor::_element_selected(Node *p_element) {
 		resource = graph->get_frames()[id];
 	}
 	if (resource.is_valid()) {
-		// Inspector only, so the graph stays the edited object and the dock stays open.
+		// Inspector only, so the graph stays the edited object. can_auto_hide() keeps the dock open.
 		EditorNode::get_singleton()->push_item(resource.ptr(), "", true);
+	}
+}
+
+void FlowGraphEditor::_element_deselected(Node *p_element) {
+	if (graph.is_valid()) {
+		// Back to the graph in the inspector; a following node_selected shows the new element.
+		EditorNode::get_singleton()->push_item(graph.ptr(), "", true);
 	}
 }
 
@@ -766,6 +773,8 @@ FlowGraphEditor::FlowGraphEditor() {
 	graph_edit = memnew(GraphEdit);
 	graph_edit->set_v_size_flags(SIZE_EXPAND_FILL);
 	graph_edit->set_show_zoom_label(true);
+	// Dragging a connection end away from an input removes the connection.
+	graph_edit->set_right_disconnects(true);
 	vbox->add_child(graph_edit);
 	// Same rules as FlowPort.is_type_compatible(): "Any" (NIL) fits every type, int fits float. Pairs are (output, input).
 	for (int type = 0; type < Variant::VARIANT_MAX; type++) {
@@ -783,6 +792,7 @@ FlowGraphEditor::FlowGraphEditor() {
 	graph_edit->connect("paste_nodes_request", callable_mp(this, &FlowGraphEditor::_paste));
 	graph_edit->connect("duplicate_nodes_request", callable_mp(this, &FlowGraphEditor::_duplicate));
 	graph_edit->connect("node_selected", callable_mp(this, &FlowGraphEditor::_element_selected));
+	graph_edit->connect("node_deselected", callable_mp(this, &FlowGraphEditor::_element_deselected));
 	graph_edit->connect("popup_request", callable_mp(this, &FlowGraphEditor::_popup_request));
 	graph_edit->connect("graph_elements_linked_to_frame_request", callable_mp(this, &FlowGraphEditor::_linked_to_frame_request));
 
@@ -1020,6 +1030,11 @@ void FlowGraphEditorPlugin::make_visible(bool p_visible) {
 	} else {
 		editor->close();
 	}
+}
+
+bool FlowGraphEditorPlugin::can_auto_hide() const {
+	// While a graph is open, the inspector shows its nodes; that must not close the dock (same as ThemeEditorPlugin).
+	return editor->get_edited_graph().is_null();
 }
 
 FlowGraphEditorPlugin::FlowGraphEditorPlugin() {
