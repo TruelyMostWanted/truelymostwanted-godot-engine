@@ -3821,9 +3821,6 @@
 		<member name="settings/camera_3d/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]) stores its file in [member settings/camera_3d/format] instead of [member settings/general/default_format].
 		</member>
-		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
-		</member>
 		<member name="settings/defaults/accessibility" type="String" setter="" getter="" default="&quot;&quot;">
 			An optional resource with the project defaults of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
 		</member>
@@ -3874,6 +3871,9 @@
 		</member>
 		<member name="settings/defaults/xr" type="String" setter="" getter="" default="&quot;&quot;">
 			An optional resource with the project defaults of the [code]"xr"[/code] domain ([XRSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].
 		</member>
 		<member name="settings/engine/file_name" type="String" setter="" getter="" default="&quot;engine&quot;">
 			The name of the settings file of the [code]"engine"[/code] domain ([EngineSettingsServer]) without extension, relative to [member settings/general/folder]. The extension follows the format ([member settings/general/default_format], or [member settings/engine/format] with [member settings/engine/override_format]). It may contain a relative subfolder, for example [code]profiles/engine[/code] for [code]user://settings/profiles/engine.ini[/code]; the folder is created on save. An absolute path, a path with [code]..[/code] or an empty folder name is rejected with an error and the domain name is used. [member SettingsServer.file_path] set at runtime takes precedence.
