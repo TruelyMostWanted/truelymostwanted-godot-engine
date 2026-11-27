@@ -483,6 +483,22 @@ void TextInsertionServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(ESCAPE_BBCODE);
 }
 
+void TextInsertionServer::finish() {
+	HashMap<StringName, Callable> old_providers;
+	HashMap<StringName, Callable> old_modifiers;
+	HashMap<StringName, Variant> old_values;
+	LocalVector<ValuesEntry> old_values_resources;
+	{
+		MutexLock lock(mutex);
+		old_providers = std::move(providers);
+		old_modifiers = std::move(modifiers);
+		old_values = std::move(values);
+		old_values_resources = std::move(values_resources);
+		cache.clear();
+	}
+	// Freed here, outside of the lock: releasing a script object may call back into the server.
+}
+
 TextInsertionServer::TextInsertionServer() {
 	singleton = this;
 	warn_missing.set();

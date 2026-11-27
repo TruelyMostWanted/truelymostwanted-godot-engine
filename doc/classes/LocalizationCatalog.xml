@@ -9,7 +9,7 @@
 		[b]Files:[/b] [method load_from_file] and [method save_to_file] choose the format by the file extension. The binary [code].lcat[/code] format stores one block per locale: a catalog loaded from it (also with [method @GDScript.load]) reads only the keys and the locale table; the text of a locale is read when it is first used, or with [method load_locale]. This keeps unused locales out of memory and works from the PCK and [code]user://[/code] on every platform, including the Web.
 		[b]Text formats[/b] ([method load_from_text], [method to_text], [enum ResourceTextSerializer.Format]):
 		- CSV: the layout of Godot's CSV translation importer. Column 0 holds the keys, every other column a locale. A [code]?context[/code] column holds the context, a [code]?plural[/code] column the plural key (text catalogs) and starts plural rows, a [code]?type[/code] column holds the expected type (resource catalogs). Columns starting with [code]_[/code] are translator notes (the importer ignores them), a row starting with [code]?pluralrule[/code] holds the plural rule per locale. Translations are unescaped with [method String.c_unescape], keys are not. Without [SerializerOptions], the delimiter ([code],[/code], [code];[/code] or tab) is the one found most often in the header row.
-		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs); other fields starting with [code]_[/code] are translator notes. The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code] and [code skip-lint]channel[/code]. In INI, every key is a [code][section][/code].
+		- JSON, YAML, TOML, INI: one entry per key, [code]key: {locale: text}[/code]; plural forms are an array. Fields starting with [code]_[/code] are not locales: [code]_context[/code], [code]_key[/code] (the key, when the entry name differs from it, as for [code]"BACK@menu"[/code]), [code]_plural[/code] (text catalogs) or [code]_type[/code] (resource catalogs); other fields starting with [code]_[/code] are translator notes. The entry [code]?catalog[/code] holds [code skip-lint]locales[/code] (their order), [code]plural_rules[/code], [code skip-lint]channel[/code] and [code skip-lint]notes[/code] (the note columns, also those without notes yet). In INI, every key is a [code][section][/code].
 		- XML: [code]&lt;catalog locales="en,de"&gt;&lt;message key="HELLO" context="menu"&gt;&lt;text locale="de"&gt;Hallo&lt;/text&gt;&lt;/message&gt;&lt;/catalog&gt;[/code], one [code]&lt;text&gt;[/code] per plural form, [code]&lt;plural_rule locale="de"&gt;[/code] elements for the plural rules, [code]&lt;note name="notes"&gt;[/code] elements in a message for translator notes.
 		[b]Translator notes:[/b] columns or fields such as [code]_notes[/code] or [code]_max_length[/code] hold notes per key for translators and tools (see [method get_note]). They are kept by every text format and in [code].tres[/code], but never written to [code].lcat[/code], and a catalog loaded through [ResourceLoader] outside the editor (as the localization servers do) skips them, so they cost no memory in a game. [method load_from_file] and [method load_from_text] always keep them.
 		Saved as [code].tres[/code] or [code].res[/code], a catalog stores all locales in one block (no loading per locale).
@@ -187,6 +187,16 @@
 			<param index="0" name="locale" type="String" />
 			<description>
 				Removes the column of [param locale].
+			</description>
+		</method>
+		<method name="rename_key">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="new_key" type="StringName" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<param index="3" name="new_context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Renames the row of [param key] with [param context] to [param new_key] with [param new_context]. The row keeps its position, texts, plural forms, plural key and notes. Fails if [param key] is missing or [param new_key] with [param new_context] exists already.
 			</description>
 		</method>
 		<method name="save_to_file">

@@ -119,6 +119,29 @@ TEST_CASE("[LocalizationCatalog] Keys, locales and cells") {
 	}
 	CHECK(catalog->get_text("KEY_777", "de") == "777");
 	CHECK(catalog->get_text("C", "de") == "c");
+
+	// Renaming keeps the row and its texts (#391).
+	const int row = catalog->find_key("KEY_5");
+	catalog->rename_key("KEY_5", "KEY_FIVE", StringName(), "ctx");
+	CHECK(catalog->find_key("KEY_FIVE", "ctx") == row);
+	CHECK_FALSE(catalog->has_key("KEY_5"));
+	CHECK(catalog->get_text("KEY_FIVE", "de", "ctx") == "5");
+	ERR_PRINT_OFF;
+	catalog->rename_key("KEY_FIVE", "KEY_6", "ctx"); // Exists already.
+	ERR_PRINT_ON;
+	CHECK(catalog->find_key("KEY_FIVE", "ctx") == row);
+}
+
+TEST_CASE("[LocalizationCatalog] Note columns without notes are kept") {
+	Ref<TextLocalizationCatalog> catalog;
+	catalog.instantiate();
+	catalog->set_text("A", "en", "a");
+	catalog->set_note("A", "", StringName(), "max_length");
+	REQUIRE(catalog->get_note_columns() == PackedStringArray({ "max_length" }));
+	Ref<TextLocalizationCatalog> copy;
+	copy.instantiate();
+	REQUIRE(copy->load_from_text(catalog->to_text(ResourceTextSerializer::FORMAT_JSON), ResourceTextSerializer::FORMAT_JSON) == OK);
+	CHECK(copy->get_note_columns() == PackedStringArray({ "max_length" }));
 }
 
 TEST_CASE("[LocalizationCatalog] Text formats round trip") {

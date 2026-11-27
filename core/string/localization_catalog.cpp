@@ -31,6 +31,7 @@
 #include "localization_catalog.h"
 
 #include "core/config/engine.h"
+#include "core/io/config_file.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -471,6 +472,21 @@ void LocalizationCatalog::remove_key(const StringName &p_key, const StringName &
 	emit_changed();
 }
 
+void LocalizationCatalog::rename_key(const StringName &p_key, const StringName &p_new_key, const StringName &p_context, const StringName &p_new_context) {
+	const int row = find_key(p_key, p_context);
+	ERR_FAIL_COND_MSG(row < 0, vformat("The localization catalog has no key \"%s\" with the context \"%s\".", p_key, p_context));
+	ERR_FAIL_COND_MSG(p_new_key == StringName(), "A key can't be empty.");
+	if (p_new_key == p_key && p_new_context == p_context) {
+		return;
+	}
+	ERR_FAIL_COND_MSG(has_key(p_new_key, p_new_context), vformat("The localization catalog has the key \"%s\" with the context \"%s\" already.", p_new_key, p_new_context));
+	// Only the id changes: the rows of the locale columns (also unloaded ones) stay the same.
+	const CharString id = _make_id(p_new_key, p_new_context);
+	ids.set(row, id.get_data(), id.length());
+	_rebuild_index();
+	emit_changed();
+}
+
 bool LocalizationCatalog::has_key(const StringName &p_key, const StringName &p_context) const {
 	return find_key(p_key, p_context) >= 0;
 }
@@ -651,6 +667,9 @@ Dictionary LocalizationCatalog::_get_data() const {
 		meta["plural_rules"] = rules;
 	}
 	meta["channel"] = channel;
+	if (!note_columns.is_empty()) {
+		meta["notes"] = get_note_columns(); // Also the columns without notes yet (#403).
+	}
 	data[CATALOG_ENTRY] = meta;
 
 	for (uint32_t row = 0; row < ids.size(); row++) {
@@ -872,6 +891,10 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 			column->plural_rule = kv.value;
 		}
 	}
+	const PackedStringArray note_names = meta.get("notes", PackedStringArray());
+	for (const String &note_name : note_names) {
+		_get_note_column("_" + note_name);
+	}
 
 	for (const KeyValue<Variant, Variant> &kv : p_data) {
 		const String entry_name = kv.key;
@@ -946,6 +969,10 @@ static Dictionary _xml_to_data(const Dictionary &p_root, const String &p_extra_n
 	Dictionary meta;
 	meta["locales"] = locales.is_empty() ? Variant(Array()) : Variant(locales.split(","));
 	meta["plural_rules"] = rules;
+	const String notes = root_attributes.get("notes", String());
+	if (!notes.is_empty()) {
+		meta["notes"] = notes.split(",");
+	}
 	data[CATALOG_ENTRY] = meta;
 	return data;
 }
@@ -1016,6 +1043,10 @@ static Dictionary _data_to_xml(const Dictionary &p_data, const String &p_extra_n
 	Dictionary root_attributes;
 	const PackedStringArray locales = meta.get("locales", Array());
 	root_attributes["locales"] = String(",").join(locales);
+	const PackedStringArray notes = meta.get("notes", PackedStringArray());
+	if (!notes.is_empty()) {
+		root_attributes["notes"] = String(",").join(notes);
+	}
 	Dictionary root = _make_xml_element("catalog", root_attributes);
 	root[XML::KEY_CHILDREN] = children;
 	return root;
@@ -1440,6 +1471,7 @@ void LocalizationCatalog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_key_count"), &LocalizationCatalog::get_key_count);
 	ClassDB::bind_method(D_METHOD("add_key", "key", "context"), &LocalizationCatalog::add_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("remove_key", "key", "context"), &LocalizationCatalog::remove_key, DEFVAL(StringName()));
+	ClassDB::bind_method(D_METHOD("rename_key", "key", "new_key", "context", "new_context"), &LocalizationCatalog::rename_key, DEFVAL(StringName()), DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("has_key", "key", "context"), &LocalizationCatalog::has_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("find_key", "key", "context"), &LocalizationCatalog::find_key, DEFVAL(StringName()));
 	ClassDB::bind_method(D_METHOD("get_key", "row"), &LocalizationCatalog::get_key);
@@ -1863,12 +1895,26 @@ String ResourceFormatLoaderLocalizationCatalog::get_resource_type(const String &
 Error ResourceFormatSaverLocalizationCatalog::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
 	Ref<LocalizationCatalog> catalog = p_resource;
 	ERR_FAIL_COND_V(catalog.is_null(), ERR_INVALID_PARAMETER);
-	return catalog->save_to_file(p_path);
+	const Error err = catalog->save_to_file(p_path);
+	if (err == OK && Engine::get_singleton()->is_editor_hint() && p_path.get_extension().to_lower() == "csv") {
+		// The editor would import a new CSV as Translation (#403): a catalog CSV is kept as it is, like "Keep File".
+		Ref<ConfigFile> import_config;
+		import_config.instantiate();
+		if (import_config->load(p_path + ".import") != OK || String(import_config->get_value("remap", "importer", String())) != "keep") {
+			import_config->clear();
+			import_config->set_value("remap", "importer", "keep");
+			import_config->save(p_path + ".import");
+		}
+	}
+	return err;
 }
 
 void ResourceFormatSaverLocalizationCatalog::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
 	if (recognize(p_resource)) {
-		p_extensions->push_back(LocalizationCatalog::BINARY_EXTENSION);
+		// `lcat` first: the default of save dialogs.
+		for (const String &extension : LocalizationCatalog::get_file_extensions()) {
+			p_extensions->push_back(extension);
+		}
 	}
 }
 

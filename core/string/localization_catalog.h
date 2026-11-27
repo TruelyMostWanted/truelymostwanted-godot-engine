@@ -175,6 +175,8 @@ public:
 	int get_key_count() const { return ids.size(); }
 	int add_key(const StringName &p_key, const StringName &p_context = StringName());
 	void remove_key(const StringName &p_key, const StringName &p_context = StringName());
+	// Keeps the row (position, texts, notes).
+	void rename_key(const StringName &p_key, const StringName &p_new_key, const StringName &p_context = StringName(), const StringName &p_new_context = StringName());
 	bool has_key(const StringName &p_key, const StringName &p_context = StringName()) const;
 	int find_key(const StringName &p_key, const StringName &p_context = StringName()) const;
 	StringName get_key(int p_row) const;

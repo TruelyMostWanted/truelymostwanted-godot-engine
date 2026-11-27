@@ -31,10 +31,12 @@
 #include "csv_table_editor.h"
 
 #include "core/config/project_settings.h"
+#include "core/input/input_event.h"
 #include "core/io/config_file.h"
 #include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
+#include "core/string/plural_rules.h"
 #include "core/string/translation_server.h"
 #include "editor/docks/editor_dock_manager.h"
 #include "editor/docks/filesystem_dock.h"
@@ -49,15 +51,20 @@
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_command_palette.h"
 #include "editor/themes/editor_scale.h"
+#include "editor/translations/editor_locale_dialog.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
+#include "scene/gui/popup_menu.h"
 #include "scene/gui/text_edit.h"
 #include "scene/gui/tree.h"
 #include "scene/main/timer.h"
 #include "scene/resources/text_file.h"
 #include "servers/display/display_server.h"
+
+// The row of column issues in `cell_issues` (shown in the column header).
+static constexpr int HEADER_ROW = INT32_MAX;
 
 static int64_t _cell_key(int p_row, int p_tree_column) {
 	return ((int64_t)p_row << 32) | (uint32_t)p_tree_column;
@@ -199,8 +206,17 @@ String CSVTableEditor::_get_catalog_cell(const Dictionary &p_entry, int p_field,
 }
 
 void CSVTableEditor::_commit_catalog_cells(const String &p_action, int p_row, int p_field, const Array &p_cells, int p_form) {
-	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action_for_history(p_action, EditorUndoRedoManager::GLOBAL_HISTORY);
+	// Collected first: an action is only created when something changes.
+	struct Change {
+		String old_key;
+		String old_context;
+		String key;
+		String context;
+		Dictionary old_entry;
+		Dictionary entry;
+	};
+	LocalVector<Change> changes;
+	bool refused = false;
 	for (int i = 0; i < p_cells.size() && p_row + i < catalog->get_key_count(); i++) {
 		const PackedStringArray cells = p_cells[i];
 		const Dictionary old_entry = _get_catalog_entry(catalog, p_row + i);
@@ -227,28 +243,46 @@ void CSVTableEditor::_commit_catalog_cells(const String &p_action, int p_row, in
 				entry[field] = cells[c];
 			}
 		}
-		const String old_key = old_entry["_key"];
-		const String old_context = old_entry["_context"];
-		const String key = entry["_key"];
-		const String context = entry["_context"];
-		if (key.is_empty()) {
+		Change change;
+		change.old_entry = old_entry;
+		change.old_key = old_entry.get("_key", String());
+		change.old_context = old_entry.get("_context", String());
+		// A cleared key or context cell erased its field: read with a default, not as NIL ("<null>").
+		change.key = entry.get("_key", String());
+		change.context = entry.get("_context", String());
+		if (change.key.is_empty()) {
 			status_label->set_text(TTR("A key can't be empty."));
+			refused = true;
 			continue;
 		}
-		if (key == old_key && context == old_context) {
-			undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
-			undo_redo->add_undo_method(catalog.ptr(), "set_entry", key, old_entry, context);
+		if ((change.key != change.old_key || change.context != change.old_context) && catalog->has_key(change.key, change.context)) {
+			status_label->set_text(vformat(TTR("The key \"%s\" with this context exists already."), change.key));
+			refused = true;
 			continue;
 		}
-		if (catalog->has_key(key, context)) {
-			status_label->set_text(vformat(TTR("The key \"%s\" with this context exists already."), key));
+		change.entry = entry;
+		changes.push_back(change);
+	}
+	if (refused) {
+		// The tree still shows the refused text.
+		callable_mp(this, &CSVTableEditor::_render).call_deferred();
+	}
+	if (changes.is_empty()) {
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action_for_history(p_action, EditorUndoRedoManager::GLOBAL_HISTORY);
+	for (const Change &change : changes) {
+		if (change.key == change.old_key && change.context == change.old_context) {
+			undo_redo->add_do_method(catalog.ptr(), "set_entry", change.key, change.entry, change.context);
+			undo_redo->add_undo_method(catalog.ptr(), "set_entry", change.key, change.old_entry, change.context);
 			continue;
 		}
-		// A renamed key is a new row at the end.
-		undo_redo->add_do_method(catalog.ptr(), "remove_key", old_key, old_context);
-		undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
-		undo_redo->add_undo_method(catalog.ptr(), "remove_key", key, context);
-		undo_redo->add_undo_method(catalog.ptr(), "set_entry", old_key, old_entry, old_context);
+		// Renamed in place: the row keeps its position (and page).
+		undo_redo->add_do_method(catalog.ptr(), "rename_key", change.old_key, change.key, change.old_context, change.context);
+		undo_redo->add_do_method(catalog.ptr(), "set_entry", change.key, change.entry, change.context);
+		undo_redo->add_undo_method(catalog.ptr(), "set_entry", change.key, change.old_entry, change.context);
+		undo_redo->add_undo_method(catalog.ptr(), "rename_key", change.key, change.old_key, change.context, change.old_context);
 	}
 	undo_redo->commit_action();
 }
@@ -287,10 +321,26 @@ void CSVTableEditor::_render_catalog() {
 			column_title = name;
 			tooltip = vformat(TTR("%s: %d of %d translated"), TranslationServer::get_singleton()->get_locale_name(name), catalog->get_translated_count(name), row_count);
 		}
+		// Column issues without a row, such as an invalid locale (#403).
+		const String *column_issue = cell_issues.getptr(_cell_key(HEADER_ROW, field + 1));
+		if (column_issue) {
+			column_title = "(!) " + column_title;
+			tooltip = *column_issue + "\n" + tooltip;
+		}
 		tree->set_column_title(field + 1, column_title);
 		tree->set_column_title_tooltip_text(field + 1, tooltip);
 		tree->set_column_custom_minimum_width(field + 1, 100 * EDSCALE);
 		tree->set_column_clip_content(field + 1, true);
+	}
+
+	// The most plural forms of the locales (their plural rules).
+	int plural_form_count = 1;
+	const Ref<TextLocalizationCatalog> text_catalog = catalog;
+	if (text_catalog.is_valid()) {
+		for (const String &locale : text_catalog->get_locales()) {
+			const PluralRules *rules = LocalizationCatalog::get_plural_rules(text_catalog->get_plural_rule(locale), locale);
+			plural_form_count = MAX(plural_form_count, rules ? rules->get_nplurals() : 2);
+		}
 	}
 
 	TreeItem *root = tree->get_root() ? tree->get_root() : tree->create_item();
@@ -304,7 +354,8 @@ void CSVTableEditor::_render_catalog() {
 			memdelete(child);
 		}
 		const Dictionary entry = _get_catalog_entry(catalog, row);
-		int form_count = 1;
+		// A key with a plural key gets the form rows its locales need, so the forms can be filled in (#403).
+		int form_count = String(entry.get("_plural", String())).is_empty() ? 1 : plural_form_count;
 		for (const KeyValue<Variant, Variant> &kv : entry) {
 			if (_is_forms(kv.value)) {
 				form_count = MAX(form_count, (int)PackedStringArray(kv.value).size());
@@ -348,38 +399,123 @@ void CSVTableEditor::_render_catalog() {
 }
 
 void CSVTableEditor::_add_catalog_column() {
-	const String name = column_edit->get_text().strip_edges();
+	// A translator note column; the `_` is optional. Locales come from the locale dialog.
+	const String name = column_edit->get_text().strip_edges().trim_prefix("_");
 	if (catalog.is_null() || name.is_empty()) {
 		return;
 	}
-	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	if (name.begins_with("_")) {
-		// Note columns exist through their notes: added with an empty note of the first key.
-		if (catalog->get_key_count() == 0) {
-			status_label->set_text(TTR("Add a key before adding a note column."));
-			return;
-		}
-		const StringName key = catalog->get_key(0);
-		const StringName context = catalog->get_key_context(0);
-		const Dictionary old_entry = catalog->get_entry(key, context);
-		Dictionary entry = old_entry.duplicate();
-		entry[name] = String();
-		undo_redo->create_action_for_history(TTR("Add Note Column"), EditorUndoRedoManager::GLOBAL_HISTORY);
-		undo_redo->add_do_method(catalog.ptr(), "set_entry", key, entry, context);
-		undo_redo->add_undo_method(catalog.ptr(), "set_entry", key, old_entry, context);
-		undo_redo->commit_action();
-	} else {
-		const String locale = TranslationServer::get_singleton()->standardize_locale(name);
-		if (locale.is_empty() || catalog->has_locale(locale)) {
-			status_label->set_text(vformat(TTR("\"%s\" is no locale code or exists already."), name));
-			return;
-		}
-		undo_redo->create_action_for_history(TTR("Add Locale"), EditorUndoRedoManager::GLOBAL_HISTORY);
-		undo_redo->add_do_method(catalog.ptr(), "add_locale", locale);
-		undo_redo->add_undo_method(catalog.ptr(), "remove_locale", locale);
-		undo_redo->commit_action();
+	if (catalog->get_note_columns().has(name) || name == "key" || name == "context" || name == "plural" || name == "type") {
+		status_label->set_text(vformat(TTR("\"%s\" is a note column or a reserved name already."), name));
+		return;
 	}
+	// Note columns exist through the notes of keys: added with an empty note of the first key.
+	if (catalog->get_key_count() == 0) {
+		status_label->set_text(TTR("Add a key before adding a note column."));
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action_for_history(TTR("Add Note Column"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->add_do_method(catalog.ptr(), "set_note", catalog->get_key(0), String(), catalog->get_key_context(0), name);
+	undo_redo->add_undo_property(catalog.ptr(), "data", catalog->get("data"));
+	undo_redo->commit_action();
 	column_edit->clear();
+}
+
+void CSVTableEditor::_add_catalog_locale(const String &p_locale) {
+	if (catalog.is_null() || p_locale.is_empty()) {
+		return;
+	}
+	if (catalog->has_locale(p_locale)) {
+		status_label->set_text(vformat(TTR("The catalog has the locale \"%s\" already."), p_locale));
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action_for_history(TTR("Add Locale"), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->add_do_method(catalog.ptr(), "add_locale", p_locale);
+	undo_redo->add_undo_method(catalog.ptr(), "remove_locale", p_locale);
+	undo_redo->commit_action();
+}
+
+void CSVTableEditor::_remove_catalog_locale(const String &p_locale) {
+	if (catalog.is_null() || !catalog->has_locale(p_locale)) {
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action_for_history(vformat(TTR("Remove Locale %s"), p_locale), EditorUndoRedoManager::GLOBAL_HISTORY);
+	undo_redo->add_do_method(catalog.ptr(), "remove_locale", p_locale);
+	// The whole catalog: its texts and plural forms of the locale come back in their place.
+	undo_redo->add_undo_property(catalog.ptr(), "data", catalog->get("data"));
+	undo_redo->commit_action();
+}
+
+String CSVTableEditor::_get_locale_of_column(int p_tree_column) const {
+	const int field = p_tree_column - 1;
+	if (catalog.is_null() || field < 3 || field >= catalog_fields.size() || catalog_fields[field].begins_with("_")) {
+		return String();
+	}
+	return catalog_fields[field];
+}
+
+void CSVTableEditor::_remove_selected_locale() {
+	const String locale = _get_locale_of_column(tree->get_selected_column());
+	if (locale.is_empty()) {
+		status_label->set_text(TTR("Select a cell of the locale column to remove."));
+		return;
+	}
+	_remove_catalog_locale(locale);
+}
+
+void CSVTableEditor::_column_title_clicked(int p_column, int p_mouse_button) {
+	const String locale = _get_locale_of_column(p_column);
+	if (p_mouse_button != (int)MouseButton::RIGHT || locale.is_empty()) {
+		return;
+	}
+	header_menu->clear();
+	header_menu->add_item(vformat(TTR("Remove Locale \"%s\" from Catalog"), locale));
+	header_menu->set_item_metadata(0, locale);
+	header_menu->set_position(get_screen_position() + get_local_mouse_position());
+	header_menu->reset_size();
+	header_menu->popup();
+}
+
+void CSVTableEditor::_header_menu_id_pressed(int p_id) {
+	_remove_catalog_locale(header_menu->get_item_metadata(0));
+}
+
+bool CSVTableEditor::_can_drop_resource(const Point2 &p_point, const Variant &p_data) const {
+	// Resource catalogs: a resource dropped on a key or locale cell writes its path (#391).
+	if (catalog.is_null() || !catalog->is_class("ResourceLocalizationCatalog")) {
+		return false;
+	}
+	TreeItem *item = tree->get_item_at_position(p_point);
+	const int column = tree->get_column_at_position(p_point);
+	if (!item || column < 1 || !item->is_editable(column)) {
+		return false;
+	}
+	const Dictionary data = p_data;
+	const String type = data.get("type", String());
+	return (type == "files" && !PackedStringArray(data.get("files", PackedStringArray())).is_empty()) || (type == "resource" && Ref<Resource>(data.get("resource", Variant())).is_valid());
+}
+
+void CSVTableEditor::_drop_resource(const Point2 &p_point, const Variant &p_data) {
+	if (!_can_drop_resource(p_point, p_data)) {
+		return;
+	}
+	const Dictionary data = p_data;
+	String path;
+	if (String(data.get("type", String())) == "files") {
+		path = PackedStringArray(data["files"])[0];
+	} else {
+		path = Ref<Resource>(data["resource"])->get_path();
+	}
+	if (path.is_empty() || !path.is_resource_file()) {
+		status_label->set_text(TTR("Only a resource saved in a file has a path."));
+		return;
+	}
+	const TreeItem *item = tree->get_item_at_position(p_point);
+	Array cells;
+	cells.push_back(PackedStringArray({ path }));
+	_commit_cells(TTR("Drop Resource Path"), (int)item->get_metadata(0), tree->get_column_at_position(p_point) - 1, cells, (int)item->get_metadata(1));
 }
 
 void CSVTableEditor::_csv_changed() {
@@ -536,7 +672,12 @@ void CSVTableEditor::_validate() {
 	for (int i = 0; i < result->get_issue_count(); i++) {
 		const int row = result->get_issue_row(i);
 		const int column = result->get_issue_column(i);
-		if (row != DataValidation::POSITION_NONE) {
+		if (row == DataValidation::POSITION_NONE && catalog.is_valid() && catalog_fields.has(result->get_issue_field(i))) {
+			// A column issue (an invalid locale): shown in the column header (#403).
+			const int64_t key = _cell_key(HEADER_ROW, (int)catalog_fields.find(result->get_issue_field(i)) + 1);
+			const String *previous = cell_issues.getptr(key);
+			cell_issues[key] = previous ? *previous + "\n" + result->get_issue_message(i) : result->get_issue_message(i);
+		} else if (row != DataValidation::POSITION_NONE) {
 			// Catalog issues name their locale as field; key issues have none (the row number column).
 			const int tree_column = catalog.is_valid() ? (int)catalog_fields.find(result->get_issue_field(i)) + 1 : (column == DataValidation::POSITION_NONE ? 0 : column + 1);
 			const int64_t key = _cell_key(row, tree_column);
@@ -702,6 +843,10 @@ void CSVTableEditor::_paste() {
 void CSVTableEditor::_save() {
 	if (catalog.is_valid()) {
 		EditorNode::get_singleton()->save_resource(catalog);
+		catalog_modified_time = FileAccess::get_modified_time(catalog->get_path());
+		if (catalog->get_path().get_extension().to_lower() == LocalizationCatalog::BINARY_EXTENSION && !catalog->get_note_columns().is_empty()) {
+			status_label->set_text(TTR("Saved. Translator notes are not stored in .lcat: save the catalog as CSV, JSON or another text format to keep them."));
+		}
 		return;
 	}
 	if (csv.is_null() || !_can_edit()) {
@@ -728,6 +873,26 @@ void CSVTableEditor::_save() {
 	}
 }
 
+void CSVTableEditor::_filesystem_changed() {
+	if (catalog.is_null() || !catalog->get_path().is_resource_file()) {
+		return;
+	}
+	const String path = catalog->get_path();
+	if (!FileAccess::exists(path)) {
+		// Deleted or moved outside of the editor: Save would write the old file again (#403).
+		edit(Ref<Resource>());
+		status_label->set_text(vformat(TTR("\"%s\" was deleted or moved. The table is closed."), path));
+		return;
+	}
+	file_label->set_text(path.get_file()); // Moved in the FileSystem dock: the catalog has the new path.
+	const uint64_t modified_time = FileAccess::get_modified_time(path);
+	if (modified_time != catalog_modified_time) {
+		// Changed outside of the table: the file wins.
+		catalog_modified_time = modified_time;
+		catalog->reload_from_file();
+	}
+}
+
 void CSVTableEditor::_change_page(int p_delta) {
 	page += p_delta;
 	_render();
@@ -745,6 +910,13 @@ void CSVTableEditor::_tree_gui_input(const Ref<InputEvent> &p_event) {
 	} else if (p_event->is_action_pressed(SNAME("ui_paste"), false, true)) {
 		_paste();
 		tree->accept_event();
+	} else if (catalog.is_valid()) {
+		// Delete removes the keys of the selected cells (#391).
+		const Ref<InputEventKey> key_event = p_event;
+		if (key_event.is_valid() && key_event->is_pressed() && !key_event->is_echo() && key_event->get_keycode() == Key::KEY_DELETE) {
+			_remove_rows();
+			tree->accept_event();
+		}
 	}
 }
 
@@ -800,8 +972,17 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 		catalog->disconnect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 	}
 	catalog = p_resource;
-	column_edit->set_visible(catalog.is_valid());
-	add_column_button->set_visible(catalog.is_valid());
+	// Catalog mode: keys and locales instead of rows and columns (#391); keys are always appended.
+	const bool catalog_mode = catalog.is_valid();
+	add_button->set_text(catalog_mode ? TTR("Add Key") : TTR("Add Row"));
+	insert_button->set_visible(!catalog_mode);
+	remove_button->set_text(catalog_mode ? TTR("Remove Keys") : TTR("Remove Rows"));
+	remove_button->set_tooltip_text(catalog_mode ? TTR("Remove the keys of the selected cells (Delete).") : TTR("Remove the rows of the selected cells."));
+	add_locale_button->set_visible(catalog_mode);
+	remove_locale_button->set_visible(catalog_mode);
+	column_edit->set_visible(catalog_mode);
+	add_column_button->set_visible(catalog_mode);
+	tree->set_drop_mode_flags(catalog_mode && catalog->is_class("ResourceLocalizationCatalog") ? Tree::DROP_MODE_ON_ITEM : Tree::DROP_MODE_DISABLED);
 	if (catalog.is_valid()) {
 		csv.unref();
 		text_file.unref();
@@ -812,6 +993,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 		catalog->connect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
 		schema_picker->set_visible(false);
 		file_label->set_text(catalog->get_path().get_file());
+		catalog_modified_time = catalog->get_path().is_resource_file() ? FileAccess::get_modified_time(catalog->get_path()) : 0;
 		tree->clear();
 		_update_catalog_fields();
 		_validate();
@@ -878,14 +1060,14 @@ CSVTableEditor::CSVTableEditor() {
 	file_label = memnew(Label);
 	toolbar->add_child(file_label);
 
-	Button *add_button = memnew(Button(TTR("Add Row")));
+	add_button = memnew(Button(TTR("Add Row")));
 	add_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_add_row).bind(false));
 	toolbar->add_child(add_button);
-	Button *insert_button = memnew(Button(TTR("Insert Row")));
+	insert_button = memnew(Button(TTR("Insert Row")));
 	insert_button->set_tooltip_text(TTR("Insert an empty row above the selected row."));
 	insert_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_add_row).bind(true));
 	toolbar->add_child(insert_button);
-	Button *remove_button = memnew(Button(TTR("Remove Rows")));
+	remove_button = memnew(Button(TTR("Remove Rows")));
 	remove_button->set_tooltip_text(TTR("Remove the rows of the selected cells."));
 	remove_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_remove_rows));
 	toolbar->add_child(remove_button);
@@ -893,14 +1075,32 @@ CSVTableEditor::CSVTableEditor() {
 	save_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_save));
 	toolbar->add_child(save_button);
 
+	// Catalog mode: locales from the editor's locale dialog, translator note columns by name (#391).
+	locale_dialog = memnew(EditorLocaleDialog);
+	locale_dialog->connect("locale_selected", callable_mp(this, &CSVTableEditor::_add_catalog_locale));
+	add_child(locale_dialog);
+	add_locale_button = memnew(Button(TTR("Add Locale...")));
+	add_locale_button->set_tooltip_text(TTR("Pick a language and optionally a script and country; the locale becomes a column."));
+	add_locale_button->set_visible(false);
+	add_locale_button->connect(SceneStringName(pressed), callable_mp(locale_dialog, &EditorLocaleDialog::popup_locale_dialog));
+	toolbar->add_child(add_locale_button);
+	remove_locale_button = memnew(Button(TTR("Remove Locale Column")));
+	remove_locale_button->set_tooltip_text(TTR("Remove the locale of the selected cell's column from the catalog. Also in the context menu of a locale column header."));
+	remove_locale_button->set_visible(false);
+	remove_locale_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_remove_selected_locale));
+	toolbar->add_child(remove_locale_button);
+	header_menu = memnew(PopupMenu);
+	header_menu->connect(SceneStringName(id_pressed), callable_mp(this, &CSVTableEditor::_header_menu_id_pressed));
+	add_child(header_menu);
+
 	column_edit = memnew(LineEdit);
-	column_edit->set_placeholder(TTR("Locale or _note"));
-	column_edit->set_tooltip_text(TTR("A locale code adds a locale column, a name starting with \"_\" a translator note column."));
-	column_edit->set_custom_minimum_size(Size2(120 * EDSCALE, 0));
+	column_edit->set_placeholder(TTR("Note column"));
+	column_edit->set_tooltip_text(TTR("The name of a translator note column, such as \"max_length\"."));
+	column_edit->set_custom_minimum_size(Size2(100 * EDSCALE, 0));
 	column_edit->set_visible(false);
 	column_edit->connect(SceneStringName(text_submitted), callable_mp(this, &CSVTableEditor::_add_catalog_column).unbind(1));
 	toolbar->add_child(column_edit);
-	add_column_button = memnew(Button(TTR("Add Column")));
+	add_column_button = memnew(Button(TTR("Add Note Column")));
 	add_column_button->set_visible(false);
 	add_column_button->connect(SceneStringName(pressed), callable_mp(this, &CSVTableEditor::_add_catalog_column));
 	toolbar->add_child(add_column_button);
@@ -933,6 +1133,8 @@ CSVTableEditor::CSVTableEditor() {
 	tree->connect("item_edited", callable_mp(this, &CSVTableEditor::_cell_edited));
 	tree->connect(SceneStringName(gui_input), callable_mp(this, &CSVTableEditor::_tree_gui_input));
 	tree->connect(SceneStringName(mouse_entered), callable_mp(this, &CSVTableEditor::_sync_from_text_file));
+	tree->connect("column_title_clicked", callable_mp(this, &CSVTableEditor::_column_title_clicked));
+	tree->set_drag_forwarding(Callable(), callable_mp(this, &CSVTableEditor::_can_drop_resource), callable_mp(this, &CSVTableEditor::_drop_resource));
 	main_vbox->add_child(tree);
 
 	status_label = memnew(Label);
@@ -946,6 +1148,9 @@ CSVTableEditor::CSVTableEditor() {
 	validate_timer->set_wait_time(0.5);
 	validate_timer->connect("timeout", callable_mp(this, &CSVTableEditor::_validate));
 	add_child(validate_timer);
+
+	// An open catalog follows external changes of its file (#403).
+	EditorFileSystem::get_singleton()->connect("filesystem_changed", callable_mp(this, &CSVTableEditor::_filesystem_changed));
 }
 
 CSVTableEditor::~CSVTableEditor() {
@@ -960,6 +1165,11 @@ void CSVTableEditorPlugin::edit(Object *p_object) {
 
 bool CSVTableEditorPlugin::handles(Object *p_object) const {
 	return CSVTableEditor::can_edit(p_object);
+}
+
+bool CSVTableEditorPlugin::can_auto_hide() const {
+	// An open catalog keeps the dock while other objects are edited (like #396); it closes with the dock.
+	return !table_editor->is_editing_catalog();
 }
 
 void CSVTableEditorPlugin::make_visible(bool p_visible) {
