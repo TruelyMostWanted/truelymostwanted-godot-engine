@@ -37,6 +37,7 @@
 #include "core/io/resource_loader.h"
 #include "core/object/class_db.h"
 #include "scene/resources/image_texture.h"
+#include "servers/subtitle/subtitle.h"
 
 namespace {
 
@@ -737,6 +738,7 @@ void AudioStreamTags::get_import_options(List<ResourceImporter::ImportOption> *r
 		const bool is_number = i >= 4 && i <= 8;
 		r_options->push_back(ResourceImporter::ImportOption(PropertyInfo(is_number ? Variant::INT : Variant::STRING, String("info/") + info_fields[i]), is_number ? Variant(0) : Variant(String())));
 	}
+	r_options->push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), String()));
 }
 
 void AudioStreamTags::apply_import_options(AudioStream *p_stream, const String &p_source_file, const HashMap<StringName, Variant> &p_options) {
@@ -752,5 +754,9 @@ void AudioStreamTags::apply_import_options(AudioStream *p_stream, const String &
 		if (value && value->booleanize()) {
 			p_stream->set(field, *value);
 		}
+	}
+	const Variant *subtitle_path = p_options.getptr("subtitle_path");
+	if (subtitle_path) {
+		p_stream->set_subtitle_path(*subtitle_path);
 	}
 }

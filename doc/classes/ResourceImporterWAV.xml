@@ -94,5 +94,8 @@
 		<member name="info/year" type="int" setter="" getter="" default="0">
 			Overrides [member AudioStream.year] of the imported stream. If [code]0[/code], the value read from the file is kept.
 		</member>
+		<member name="subtitle_path" type="String" setter="" getter="" default="&quot;&quot;">
+			Sets [member AudioStream.subtitle_path] of the imported stream: the path of a subtitle file or [Subtitle] resource that a [SubtitlePlayer] plays with it. If empty, no subtitle path is set.
+		</member>
 	</members>
 </class>

@@ -198,6 +198,10 @@
 		<member name="genre" type="String" setter="set_genre" getter="get_genre" default="&quot;&quot;">
 			The genre of this track. Read from ID3 [code]TCON[/code], RIFF [code]IGNR[/code] or the Vorbis comment [code]GENRE[/code]. ID3 genre codes such as [code]"(17)"[/code] or [code]"17"[/code] are converted to their name (here [code]"Rock"[/code]). Empty if unknown.
 		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Path of the subtitle file for this stream: a [code].srt[/code], [code].vtt[/code], [code].ttml[/code], [code].dfxp[/code], [code].ass[/code], [code].ssa[/code] or [code].sbv[/code] file, or a saved [Subtitle] resource. The Inspector stores it as a [code]uid://[/code] path if the file has a UID. This is only a path: a [SubtitlePlayer] loads it when the stream plays.
+			The path is kept in the track information of the stream, which is allocated on first use, so streams without a subtitle path need no memory. [code]clear_track_info()[/code] clears it too. Imported audio sets it with the import option [code skip-lint]subtitle_path[/code].
+		</member>
 		<member name="title" type="String" setter="set_title" getter="get_title" default="&quot;&quot;">
 			The title of this track. Read from ID3 [code]TIT2[/code] (or the ID3v1 tag), RIFF [code]INAM[/code] or the Vorbis comment [code]TITLE[/code]. Empty if unknown. To show a localized title, use it as a key, for example with [method Object.tr].
 		</member>
