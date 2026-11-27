@@ -47,6 +47,7 @@ class TextEditor : public TextEditorBase {
 
 	void _caret_changed();
 	bool _requires_space_indent() const;
+	void _apply_space_indent();
 
 protected:
 	class EditMenusTEB : public EditMenus {

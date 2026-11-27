@@ -37,6 +37,7 @@
 #include "editor/script/data_schema_lookup.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
+#include "scene/scene_string_names.h"
 
 void TextEditor::_validate_script() {
 	TextEditorBase::_validate_script();
@@ -158,24 +159,29 @@ bool TextEditor::_requires_space_indent() const {
 	return extension == "yaml" || extension == "yml" || edited_res->is_class("YAML");
 }
 
-void TextEditor::set_edited_resource(const Ref<Resource> &p_res) {
-	TextEditorBase::set_edited_resource(p_res);
+void TextEditor::_apply_space_indent() {
 	if (_requires_space_indent()) {
 		code_editor->set_indent_using_spaces(true);
+	}
+}
+
+void TextEditor::set_edited_resource(const Ref<Resource> &p_res) {
+	TextEditorBase::set_edited_resource(p_res);
+	_apply_space_indent();
+	// CodeTextEditor applies the indent type setting again on each theme change: apply the override after it.
+	const Callable apply = callable_mp(this, &TextEditor::_apply_space_indent);
+	if (!code_editor->is_connected(SceneStringName(theme_changed), apply)) {
+		code_editor->connect(SceneStringName(theme_changed), apply, CONNECT_DEFERRED);
 	}
 }
 
 void TextEditor::update_settings() {
 	TextEditorBase::update_settings();
-	if (_requires_space_indent()) {
-		code_editor->set_indent_using_spaces(true);
-	}
+	_apply_space_indent();
 }
 
 void TextEditor::convert_indent() {
-	if (_requires_space_indent()) {
-		code_editor->set_indent_using_spaces(true);
-	}
+	_apply_space_indent();
 	TextEditorBase::convert_indent();
 }
 
