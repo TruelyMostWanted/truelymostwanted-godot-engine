@@ -181,6 +181,15 @@ Ref<Resource> ResourceFormatImporter::load_internal(const String &p_path, Error 
 		return Ref<Resource>();
 	}
 
+	// Truely: nothing to load for Keep File or importers that write no file (CSV Dataset, CSV Translation
+	// without translations). Fail without an error, so the source file's own loader (CSV, JSON, ...) takes it.
+	if (pat.path.is_empty()) {
+		if (r_error) {
+			*r_error = ERR_FILE_UNRECOGNIZED;
+		}
+		return Ref<Resource>();
+	}
+
 	if (p_silence_errors) {
 		// Note: Some importers do not create files in the .godot folder, so we need to check if the path is empty.
 		if (!pat.path.is_empty() && !FileAccess::exists(pat.path)) {
