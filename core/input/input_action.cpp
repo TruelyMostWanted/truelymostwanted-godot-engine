@@ -403,10 +403,20 @@ float InputAction::get_deadzone() const {
 
 void InputAction::set_events(const TypedArray<InputEvent> &p_events) {
 	events.clear();
+	event_slots.clear();
+	bool has_empty_slot = false;
 	for (int i = 0; i < p_events.size(); i++) {
 		const Ref<InputEvent> event = p_events[i];
 		if (event.is_valid()) {
 			events.push_back(event);
+		} else {
+			has_empty_slot = true;
+		}
+	}
+	if (has_empty_slot) {
+		// Kept for the Inspector, which sets the whole array again once the slot has an event.
+		for (int i = 0; i < p_events.size(); i++) {
+			event_slots.push_back(p_events[i]);
 		}
 	}
 	emit_changed();
@@ -414,7 +424,7 @@ void InputAction::set_events(const TypedArray<InputEvent> &p_events) {
 
 TypedArray<InputEvent> InputAction::get_events() const {
 	TypedArray<InputEvent> result;
-	for (const Ref<InputEvent> &event : events) {
+	for (const Ref<InputEvent> &event : event_slots.is_empty() ? events : event_slots) {
 		result.push_back(event);
 	}
 	return result;
@@ -426,6 +436,7 @@ void InputAction::add_event(const Ref<InputEvent> &p_event) {
 		return;
 	}
 	events.push_back(p_event);
+	event_slots.clear();
 	emit_changed();
 }
 
@@ -448,6 +459,7 @@ bool InputAction::remove_event(const Ref<InputEvent> &p_event) {
 	for (int i = 0; i < events.size(); i++) {
 		if (events[i] == p_event || events[i]->is_match(p_event, true)) {
 			events.remove_at(i);
+			event_slots.clear();
 			emit_changed();
 			return true;
 		}
@@ -458,20 +470,23 @@ bool InputAction::remove_event(const Ref<InputEvent> &p_event) {
 void InputAction::push_event(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND_MSG(p_event.is_null(), "InputAction: the event is null.");
 	events.push_back(p_event);
+	event_slots.clear();
 	emit_changed();
 }
 
 void InputAction::remove_event_at(int p_index) {
 	ERR_FAIL_INDEX(p_index, events.size());
 	events.remove_at(p_index);
+	event_slots.clear();
 	emit_changed();
 }
 
 void InputAction::clear_events() {
-	if (events.is_empty()) {
+	if (events.is_empty() && event_slots.is_empty()) {
 		return;
 	}
 	events.clear();
+	event_slots.clear();
 	emit_changed();
 }
 
@@ -508,7 +523,8 @@ void InputAction::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_event_count"), &InputAction::get_event_count);
 	ClassDB::bind_method(D_METHOD("get_device_events", "device"), &InputAction::get_device_events);
 
-	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "action"), "set_action", "get_action");
+	// The Inspector suggests the actions of the project (#398); other names can still be typed.
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "action", PROPERTY_HINT_INPUT_NAME, "show_builtin,loose_mode"), "set_action", "get_action");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "deadzone", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_deadzone", "get_deadzone");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "events", PROPERTY_HINT_ARRAY_TYPE, "InputEvent"), "set_events", "get_events");
 

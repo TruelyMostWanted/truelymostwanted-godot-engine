@@ -86,6 +86,7 @@
 #include "editor/inspector/editor_resource_tooltip_plugins.h"
 #include "editor/inspector/files_manifest_editor_plugin.h"
 #include "editor/inspector/http_request_target_editor_plugin.h"
+#include "editor/inspector/input_action_editor_plugin.h"
 #include "editor/inspector/input_event_editor_plugin.h"
 #include "editor/inspector/pck_package_editor_plugin.h"
 #include "editor/inspector/sub_viewport_preview_editor_plugin.h"
@@ -246,6 +247,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<CSVTableEditorPlugin>();
 	EditorPlugins::add_by_type<LocalizationCatalogEditorPlugin>();
 	EditorPlugins::add_by_type<AudioBusListSettingsEditorPlugin>();
+	EditorPlugins::add_by_type<InputActionEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
 	EditorPlugins::add_by_type<BitMapEditorPlugin>();
 	EditorPlugins::add_by_type<ControlEditorPlugin>();
