@@ -203,3 +203,7 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 - Auf P: waren am 2026-11-23 nur 115 GB frei; höchstens ein Engine-Build gleichzeitig.
 
 **Wache und Eingriffe:** –
+
+**Stand (2026-11-28, Nacht, autonom):** Für 0.2.0 gemergt: #357 (Teil 1+2), #344, #345, #354, #361 (+Follow-ups), #362 (+Zeit-Helfer, Track-Namen), #346, #365 SystemFont, #367 (typisierte Virtuals **zurückgenommen** auf Wunsch des Besitzers: keine Signatur-Änderungen an Godot-APIs, nur Doku), #363 (Felder direkt am AudioStream, Format-Zeile im Inspector statt Properties), #322 (subtitle_path, SubtitlePlayer folgt dem Stream, „Add SubtitlePlayer“, Signale playing_changed/stream_changed), #375 (CI: GCC range-for, AudioServer::finish-Leak, Tests ohne YAML/Ogg), #337 (Release-Dateien „dotnet“, Schema `<platform>-<arch>[_dotnet]`; Engine-interne `.mono` bleibt), #334 (Release-Workflow aktualisiert vorhandenen Post). Volle CI grün auf `e3cb20d4cc`. Release 0.2.0: `truely-godot-engine-releases` = `61d68d72e6`; der alte 0.1.0-Post wird auf `truely-v0.2.0-godot4.8-beta5` verschoben, sobald der Release-Workflow seine Prüfung hinter sich hat (vorher verschieben = „already released“ → Skip). Patch Notes: `P:/wt/rel-body.md` (auf dem Post). Wiki: alle neuen Guides hands-on, Localized-Text + Locale-Channels neu.
+- **Aufgeräumt:** 117 Agent-Worktrees entfernt (Branches bleiben), alte Binaries in `bin/`.
+- **Nach 0.2.0:** #379 Timer (Design offen: volle API am `Timer` oder Uhren + Endzeitpunkte + Heap), #323–#325 Untertitel, #12/#8 manuelle Prüfungen des Besitzers.
