@@ -283,6 +283,7 @@ TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Subtitle of the synced AudioStream
 TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Track change, crossfade, sidecar, player override and explicit subtitle") {
 	const Ref<AudioStreamWAV> stream_a = make_stream(save_subtitle("subtitle_player_track_a.srt", "A"));
 	const Ref<AudioStreamWAV> stream_b = make_stream(save_subtitle("subtitle_player_track_b.srt", "B"));
+	const Ref<AudioStreamWAV> stream_c = make_stream(save_subtitle("subtitle_player_track_c.srt", "C"));
 	AudioStreamPlayer *audio = memnew(AudioStreamPlayer);
 	audio->set_stream(stream_a);
 	SceneTree::get_singleton()->get_root()->add_child(audio);
@@ -302,10 +303,10 @@ TEST_CASE("[SceneTree][Audio][SubtitlePlayer] Track change, crossfade, sidecar, 
 	CHECK(log->take() == "|B1"); // The old text ends, the new track's text starts.
 
 	// A crossfade switches with the new stream.
-	audio->crossfade_to(stream_a, 0.5f);
-	CHECK(get_source_text(player) == "A1");
+	audio->crossfade_to(stream_c, 0.5f);
+	CHECK(get_source_text(player) == "C1");
 	SceneTree::get_singleton()->process(0.0);
-	CHECK(log->take() == "|A1");
+	CHECK(log->take() == "|C1");
 
 	// Without subtitle_path: a sidecar file with the same base name next to the stream file.
 	const Ref<AudioStreamWAV> voice = make_stream(String());
