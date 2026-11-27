@@ -48,16 +48,16 @@ PackedStringArray EditorPropertyFilesManifestPaths::_get_paths() const {
 
 void EditorPropertyFilesManifestPaths::_set_paths(const PackedStringArray &p_paths) {
 	// An own undo action: the Inspector merges quick edits of the same property into one step.
-	Object *object = get_edited_object();
-	const StringName property = get_edited_property();
+	Object *edited_object = get_edited_object();
+	const StringName edited_property = get_edited_property();
 	EditorInspector *inspector = get_parent_inspector();
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(vformat(TTR("Set %s"), property), UndoRedo::MERGE_DISABLE, object);
-	undo_redo->add_do_property(object, property, p_paths);
-	undo_redo->add_undo_property(object, property, _get_paths());
+	undo_redo->create_action(vformat(TTR("Set %s"), edited_property), UndoRedo::MERGE_DISABLE, edited_object);
+	undo_redo->add_do_property(edited_object, edited_property, p_paths);
+	undo_redo->add_undo_property(edited_object, edited_property, _get_paths());
 	if (inspector != nullptr) {
-		undo_redo->add_do_method(inspector, "_edit_request_change", object, String(property));
-		undo_redo->add_undo_method(inspector, "_edit_request_change", object, String(property));
+		undo_redo->add_do_method(inspector, "_edit_request_change", edited_object, String(edited_property));
+		undo_redo->add_undo_method(inspector, "_edit_request_change", edited_object, String(edited_property));
 	}
 	undo_redo->commit_action();
 }
