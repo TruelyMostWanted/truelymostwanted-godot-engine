@@ -492,21 +492,21 @@ bool CSVTableEditor::_can_drop_resource(const Point2 &p_point, const Variant &p_
 	if (!item || column < 1 || !item->is_editable(column)) {
 		return false;
 	}
-	const Dictionary data = p_data;
-	const String type = data.get("type", String());
-	return (type == "files" && !PackedStringArray(data.get("files", PackedStringArray())).is_empty()) || (type == "resource" && Ref<Resource>(data.get("resource", Variant())).is_valid());
+	const Dictionary drop_data = p_data;
+	const String type = drop_data.get("type", String());
+	return (type == "files" && !PackedStringArray(drop_data.get("files", PackedStringArray())).is_empty()) || (type == "resource" && Ref<Resource>(drop_data.get("resource", Variant())).is_valid());
 }
 
 void CSVTableEditor::_drop_resource(const Point2 &p_point, const Variant &p_data) {
 	if (!_can_drop_resource(p_point, p_data)) {
 		return;
 	}
-	const Dictionary data = p_data;
+	const Dictionary drop_data = p_data;
 	String path;
-	if (String(data.get("type", String())) == "files") {
-		path = PackedStringArray(data["files"])[0];
+	if (String(drop_data.get("type", String())) == "files") {
+		path = PackedStringArray(drop_data["files"])[0];
 	} else {
-		path = Ref<Resource>(data["resource"])->get_path();
+		path = Ref<Resource>(drop_data["resource"])->get_path();
 	}
 	if (path.is_empty() || !path.is_resource_file()) {
 		status_label->set_text(TTR("Only a resource saved in a file has a path."));

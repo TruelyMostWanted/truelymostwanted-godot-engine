@@ -44,13 +44,13 @@
 
 void EditorPropertyAudioStreamList::_set_streams(const String &p_action, const Array &p_streams) {
 	// One undo step per row action: the Inspector's "Set streams" would merge actions within a second.
-	Object *object = get_edited_object();
-	const StringName property = get_edited_property();
+	Object *edited_object = get_edited_object();
+	const StringName edited_property = get_edited_property();
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(p_action, UndoRedo::MERGE_DISABLE, object);
-	undo_redo->add_do_property(object, property, p_streams);
+	undo_redo->create_action(p_action, UndoRedo::MERGE_DISABLE, edited_object);
+	undo_redo->add_do_property(edited_object, edited_property, p_streams);
 	undo_redo->add_do_method(this, "update_property");
-	undo_redo->add_undo_property(object, property, get_edited_property_value());
+	undo_redo->add_undo_property(edited_object, edited_property, get_edited_property_value());
 	undo_redo->add_undo_method(this, "update_property");
 	undo_redo->commit_action();
 }
