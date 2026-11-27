@@ -137,8 +137,8 @@ TEST_CASE("[ResourceLocalizationServer] Channels by type and a channel change") 
 
 	Ref<ResourceLocalizationCatalog> catalog;
 	catalog.instantiate();
-	catalog->set_localized_path("res://voice/intro.ogg", "ja", "res://voice/ja/intro.ogg");
-	catalog->set_expected_type("res://voice/intro.ogg", "AudioStreamOggVorbis");
+	catalog->set_localized_path("res://voice/intro.wav", "ja", "res://voice/ja/intro.wav");
+	catalog->set_expected_type("res://voice/intro.wav", "AudioStreamWAV");
 	catalog->set_localized_path("res://ui/logo.png", "ja", "res://ui/logo_ja.png");
 	catalog->set_expected_type("res://ui/logo.png", "Texture2D");
 	CHECK(catalog->get_channel() == StringName()); // By type.
@@ -146,16 +146,16 @@ TEST_CASE("[ResourceLocalizationServer] Channels by type and a channel change") 
 
 	// Only the audio channel in Japanese: the voice follows it, the logo stays with the general locale.
 	translation_server->set_locale_for("audio", "ja");
-	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/ja/intro.ogg");
+	CHECK(server->get_localized_path("res://voice/intro.wav") == "res://voice/ja/intro.wav");
 	CHECK(server->get_localized_path("res://ui/logo.png") == "res://ui/logo.png");
 	translation_server->clear_locale_for("audio");
-	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/intro.ogg");
+	CHECK(server->get_localized_path("res://voice/intro.wav") == "res://voice/intro.wav");
 
 	// A fixed channel overrides the type.
 	catalog->set_channel("interface");
 	MessageQueue::get_singleton()->flush();
 	translation_server->set_locale_for("interface", "ja");
-	CHECK(server->get_localized_path("res://voice/intro.ogg") == "res://voice/ja/intro.ogg");
+	CHECK(server->get_localized_path("res://voice/intro.wav") == "res://voice/ja/intro.wav");
 	CHECK(server->get_localized_path("res://ui/logo.png") == "res://ui/logo_ja.png");
 	translation_server->clear_locale_for("interface");
 }
