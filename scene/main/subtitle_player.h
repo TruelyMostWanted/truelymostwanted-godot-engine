@@ -35,10 +35,13 @@
 
 // A thin scene front end for `SubtitlePlayback`: it follows an audio, video or animation player
 // (or its own clock), honors `process_mode` and pause, and forwards the segment signals.
+// Without `subtitle` it plays the `subtitle_path` of the synced player or its current stream (or a sidecar file).
 class SubtitlePlayer : public Node {
 	GDCLASS(SubtitlePlayer, Node);
 
 	Ref<SubtitlePlayback> playback;
+	Ref<Subtitle> subtitle; // Set explicitly; empty = from the sync node.
+	String source_path; // Path of the subtitle taken from the sync node.
 	NodePath sync_node;
 	double time_offset = 0.0;
 	bool autoplay = false;
@@ -48,8 +51,15 @@ class SubtitlePlayer : public Node {
 
 	ObjectID sync_id;
 	StringName sync_position_method; // Empty when the sync node is not supported.
+	bool sync_signals = false; // The sync node has `playing_changed`: process only while it plays.
 
 	Node *_get_sync_node();
+	void _connect_sync(bool p_connect);
+	void _release_sync();
+	void _update_source(const Ref<Resource> &p_stream = Ref<Resource>());
+	void _sync_playing_changed(bool p_playing);
+	void _sync_stream_changed(const Ref<Resource> &p_stream);
+	void _sync_track_changed(int p_index, const Ref<Resource> &p_stream);
 	void _advance(double p_delta);
 	void _segment_changed(const Ref<SubtitleSegment> &p_segment);
 	void _segment_started(const Ref<SubtitleSegment> &p_segment);

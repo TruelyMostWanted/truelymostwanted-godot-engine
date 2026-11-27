@@ -36,6 +36,7 @@
 #include "scene/resources/texture.h"
 #include "servers/audio/audio_driver.h"
 #include "servers/audio/audio_server.h"
+#include "servers/subtitle/subtitle.h"
 
 struct AudioStream::StreamInfo {
 	String title;
@@ -53,6 +54,7 @@ struct AudioStream::StreamInfo {
 	int year = 0;
 	Ref<Texture2D> cover;
 	Vector<uint8_t> cover_data; // Encoded picture as stored in the file, decoded into `cover` on first access.
+	String subtitle_path;
 	// Format of streams without audio data (`load_info()`).
 	double length = 0.0;
 	int sample_rate = 0;
@@ -427,6 +429,7 @@ AUDIO_STREAM_INFO_FIELD(int, int, track_count)
 AUDIO_STREAM_INFO_FIELD(int, int, disc_number)
 AUDIO_STREAM_INFO_FIELD(int, int, disc_count)
 AUDIO_STREAM_INFO_FIELD(int, int, year)
+AUDIO_STREAM_INFO_FIELD(String, const String &, subtitle_path)
 
 #undef AUDIO_STREAM_INFO_FIELD
 
@@ -534,6 +537,8 @@ void AudioStream::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_cover"), &AudioStream::get_cover);
 	ClassDB::bind_method(D_METHOD("set_cover_data", "cover_data"), &AudioStream::set_cover_data);
 	ClassDB::bind_method(D_METHOD("get_cover_data"), &AudioStream::get_cover_data);
+	ClassDB::bind_method(D_METHOD("set_subtitle_path", "subtitle_path"), &AudioStream::set_subtitle_path);
+	ClassDB::bind_method(D_METHOD("get_subtitle_path"), &AudioStream::get_subtitle_path);
 
 	ADD_GROUP("Track", "");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "title"), "set_title", "get_title");
@@ -555,4 +560,5 @@ void AudioStream::_bind_methods() {
 	ADD_GROUP("Notes", "");
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "comment", PROPERTY_HINT_MULTILINE_TEXT), "set_comment", "get_comment");
 	ADD_GROUP("", "");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "subtitle_path", PROPERTY_HINT_FILE, SUBTITLE_PATH_HINT), "set_subtitle_path", "get_subtitle_path");
 }

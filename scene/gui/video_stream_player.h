@@ -54,6 +54,7 @@ class VideoStreamPlayer : public Control {
 
 	bool paused = false;
 	bool paused_from_tree = false;
+	bool playing_state = false; // Last value of `playing_changed`.
 	bool autoplay = false;
 	float volume = 1.0;
 	float speed_scale = 1.0;
@@ -65,7 +66,9 @@ class VideoStreamPlayer : public Control {
 	int bus_index = 0;
 
 	StringName bus;
+	String subtitle_path;
 
+	void _update_playing_state();
 	void _mix_audio();
 	static int _audio_mix_callback(void *p_udata, const float *p_data, int p_frames);
 	static void _mix_audios(void *p_self);
@@ -83,6 +86,9 @@ public:
 
 	void set_stream(const Ref<VideoStream> &p_stream);
 	Ref<VideoStream> get_stream() const;
+
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
 
 	void play();
 	void stop();
