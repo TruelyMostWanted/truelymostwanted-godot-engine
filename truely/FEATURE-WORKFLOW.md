@@ -44,7 +44,7 @@ git switch -c 03-feature-path-prefix-server
 ### 2.2 Committen
 
 - **Beliebig oft** in den Feature-Branch committen.
-- Der pre-commit-Hook (clang-format, codespell, doc-status, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen.
+- Der pre-commit-Hook (clang-format, codespell, doc-status, `truely-pipeline-lint`, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen. Welche CI-Regeln lokal nicht auffallen und wie man sie trotzdem prüft: [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md).
 
 ### 2.3 Lokal prüfen und pushen
 

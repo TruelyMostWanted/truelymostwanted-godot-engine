@@ -1,6 +1,6 @@
 # Konventionen der Truely-Engine
 
-Regeln für Code und Issues in dieser Engine-Fork. Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
+Regeln für Code und Issues in dieser Engine-Fork. Was zusätzlich die CI verlangt (GCC/Clang, SCU, Sanitizer, Minimal-Template, doctool, C#): [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md). Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
 Branches und Remotes in [`README.md`](README.md).
 
 ---
