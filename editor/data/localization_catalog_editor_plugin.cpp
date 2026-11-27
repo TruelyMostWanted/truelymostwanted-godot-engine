@@ -57,6 +57,7 @@
 #include "scene/gui/dialogs.h"
 #include "scene/gui/label.h"
 #include "scene/gui/tree.h"
+#include "scene/main/timer.h"
 #include "scene/resources/localized_text.h"
 
 static const char *SETTING_TRANSLATIONS = "internationalization/locale/translations";
@@ -106,6 +107,69 @@ static PackedStringArray _keep_csv_file(const String &p_path) {
 /////////////////////////////////////////////////////////////////////////////
 // Inspector.
 
+void LocalizationCatalogIssues::_queue_update() {
+	if (update_timer->is_inside_tree()) {
+		update_timer->start();
+	}
+}
+
+void LocalizationCatalogIssues::_update() {
+	const Ref<DataValidation> result = catalog->validate();
+	status->set_text(result->is_valid() ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), result->get_issue_count(), result->get_issue_message(0)));
+
+	// Missing keys per locale, collapsed; the CSV Table dock shows them in place.
+	missing_tree->clear();
+	TreeItem *root = missing_tree->create_item();
+	const int key_count = catalog->get_key_count();
+	for (const String &locale : catalog->get_locales()) {
+		const int missing = key_count - catalog->get_translated_count(locale);
+		TreeItem *locale_item = missing_tree->create_item(root);
+		locale_item->set_text(0, vformat(TTR("%s: %d missing"), locale, missing));
+		locale_item->set_collapsed(true);
+		if (missing == 0) {
+			continue;
+		}
+		const PackedInt32Array rows = catalog->get_missing_rows(locale);
+		for (int i = 0; i < rows.size() && i < MAX_LISTED_KEYS; i++) {
+			const String key = catalog->get_key(rows[i]);
+			const String context = catalog->get_key_context(rows[i]);
+			missing_tree->create_item(locale_item)->set_text(0, context.is_empty() ? key : vformat("%s @ %s", key, context));
+		}
+		if (rows.size() > MAX_LISTED_KEYS) {
+			missing_tree->create_item(locale_item)->set_text(0, vformat(TTR("... and %d more"), rows.size() - MAX_LISTED_KEYS));
+		}
+	}
+}
+
+void LocalizationCatalogIssues::_notification(int p_what) {
+	if (p_what == NOTIFICATION_ENTER_TREE && catalog.is_valid()) {
+		_update();
+	}
+}
+
+LocalizationCatalogIssues::LocalizationCatalogIssues(const Ref<LocalizationCatalog> &p_catalog) {
+	catalog = p_catalog;
+	ERR_FAIL_COND(catalog.is_null());
+
+	status = memnew(Label);
+	status->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	add_child(status);
+
+	missing_tree = memnew(Tree);
+	missing_tree->set_hide_root(true);
+	missing_tree->set_custom_minimum_size(Size2(0, 120 * EDSCALE));
+	missing_tree->set_tooltip_text(TTR("Missing translations per locale. Edit them in the CSV Table dock."));
+	add_child(missing_tree);
+
+	// Large catalogs: validated once after a burst of edits, like the CSV Table dock.
+	update_timer = memnew(Timer);
+	update_timer->set_one_shot(true);
+	update_timer->set_wait_time(0.5);
+	update_timer->connect("timeout", callable_mp(this, &LocalizationCatalogIssues::_update));
+	add_child(update_timer);
+	catalog->connect_changed(callable_mp(this, &LocalizationCatalogIssues::_queue_update));
+}
+
 bool EditorInspectorPluginLocalizationCatalog::can_handle(Object *p_object) {
 	return Object::cast_to<LocalizationCatalog>(p_object) != nullptr;
 }
@@ -136,38 +200,7 @@ void EditorInspectorPluginLocalizationCatalog::parse_begin(Object *p_object) {
 	table_button->connect(SceneStringName(pressed), callable_mp_static(&EditorInspectorPluginLocalizationCatalog::_open_in_table).bind(catalog));
 	box->add_child(table_button);
 
-	const Ref<DataValidation> result = catalog->validate();
-	Label *status = memnew(Label);
-	status->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	status->set_text(result->is_valid() ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), result->get_issue_count(), result->get_issue_message(0)));
-	box->add_child(status);
-
-	// Missing keys per locale, collapsed; the CSV Table dock shows them in place.
-	Tree *missing_tree = memnew(Tree);
-	missing_tree->set_hide_root(true);
-	missing_tree->set_custom_minimum_size(Size2(0, 120 * EDSCALE));
-	missing_tree->set_tooltip_text(TTR("Missing translations per locale. Edit them in the CSV Table dock."));
-	TreeItem *root = missing_tree->create_item();
-	const int key_count = catalog->get_key_count();
-	for (const String &locale : catalog->get_locales()) {
-		const int missing = key_count - catalog->get_translated_count(locale);
-		TreeItem *locale_item = missing_tree->create_item(root);
-		locale_item->set_text(0, vformat(TTR("%s: %d missing"), locale, missing));
-		locale_item->set_collapsed(true);
-		if (missing == 0) {
-			continue;
-		}
-		const PackedInt32Array rows = catalog->get_missing_rows(locale);
-		for (int i = 0; i < rows.size() && i < MAX_LISTED_KEYS; i++) {
-			const String key = catalog->get_key(rows[i]);
-			const String context = catalog->get_key_context(rows[i]);
-			missing_tree->create_item(locale_item)->set_text(0, context.is_empty() ? key : vformat("%s @ %s", key, context));
-		}
-		if (rows.size() > MAX_LISTED_KEYS) {
-			missing_tree->create_item(locale_item)->set_text(0, vformat(TTR("... and %d more"), rows.size() - MAX_LISTED_KEYS));
-		}
-	}
-	box->add_child(missing_tree);
+	box->add_child(memnew(LocalizationCatalogIssues(catalog))); // Follows edits in the CSV Table dock.
 
 	if (Object::cast_to<TextLocalizationCatalog>(p_object)) {
 		EditorFileDialog *dialog = memnew(EditorFileDialog);
@@ -284,8 +317,8 @@ void LocalizationCatalogExportPlugin::_export_file(const String &p_path, const S
 void EditorContextMenuPluginLocalizationCatalog::_use_as_catalog(const Dictionary &p_data, const StringName &p_class) {
 	const PackedStringArray selected = p_data.get("selected_files", PackedStringArray());
 	LocalizationCatalogEditorPlugin::add_catalog_files(selected, p_class);
-	if (selected.size() != 1) {
-		return;
+	if (selected.size() != 1 || LocalizationCatalogEditorPlugin::get_manifest_catalog_class(selected[0]) != p_class) {
+		return; // Several files, or refused.
 	}
 	const Ref<Resource> catalog = LocalizationCatalogEditorPlugin::load_catalog(selected[0], p_class);
 	if (catalog.is_valid()) {
@@ -371,6 +404,9 @@ void LocalizationCatalogEditorPlugin::add_catalog_files(const PackedStringArray 
 	PackedStringArray csv_files;
 	PackedStringArray removed_translations;
 	for (const String &path : p_paths) {
+		if (in_other_manifests.has(path)) {
+			continue; // Exported with one class only (#346): refused, see the warning below.
+		}
 		if (!listed.has(path) && !files.has(path)) {
 			files.push_back(path);
 		}
@@ -397,7 +433,7 @@ void LocalizationCatalogEditorPlugin::add_catalog_files(const PackedStringArray 
 		EditorFileSystem::get_singleton()->scan_changes();
 	}
 	if (!in_other_manifests.is_empty()) {
-		EditorToaster::get_singleton()->popup_str(vformat(TTR("Also listed in a catalog manifest of the other class, so loaded as both kinds of catalog: %s"), String(", ").join(in_other_manifests)), EditorToaster::SEVERITY_WARNING);
+		EditorToaster::get_singleton()->popup_str(vformat(TTR("Not added: listed in a catalog manifest of the other class. Remove it there first: %s"), String(", ").join(in_other_manifests)), EditorToaster::SEVERITY_WARNING);
 	}
 }
 
@@ -462,6 +498,9 @@ void LocalizationCatalogEditorPlugin::_convert_project_translations() {
 		const String resources_path = "res://localization/resource_remaps.csv";
 		Ref<ResourceLocalizationCatalog> resources;
 		resources.instantiate();
+		if (FileAccess::exists(resources_path)) {
+			resources->load_from_file(resources_path); // Converted before: add to it.
+		}
 		resources->add_translation_remaps(remaps);
 		if (resources->save_to_file(resources_path) == OK) {
 			add_catalog_files(PackedStringArray({ resources_path }), "ResourceLocalizationCatalog");
