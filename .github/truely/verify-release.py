@@ -157,14 +157,14 @@ def main() -> int:
     for path in files:
         print(f"== {path.name}")
         rest = path.name[len(name) + 1 :]
-        mono = rest.startswith("mono_")
+        mono = path.stem.endswith("_dotnet")
         if path.suffix == ".tpz":
             check_templates(path, config + (".mono" if mono else ""))
-        elif "win64" in rest:
+        elif rest.startswith("windows"):
             check_editor(path, "win64", mono, version)
-        elif "linux" in rest:
+        elif rest.startswith("linux"):
             check_editor(path, "linux", mono, version)
-        elif "macos" in rest:
+        elif rest.startswith("macos"):
             check_editor(path, "macos", mono, version)
         else:
             print("  skipped")
