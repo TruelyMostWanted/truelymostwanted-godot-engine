@@ -31,6 +31,7 @@
 #include "subtitle_editor_plugin.h"
 
 #include "core/object/callable_mp.h"
+#include "editor/editor_data.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -187,6 +188,11 @@ void SubtitleEditor::_update() {
 	offset_label->set_text(TTR("The first segment starts after one hour, as in files exported from video editors."));
 	offset_button->set_text(vformat(TTR("Set Time Offset to -%s"), SubtitleFormatSRT::format_time(-suggested).get_slice(",", 0)));
 
+	// Subtitle files have no offset field: saving them moves the offset into the written times.
+	const String extension = subtitle->get_path().get_extension().to_lower();
+	save_note_label->set_visible(subtitle->get_time_offset() != 0.0 && Subtitle::get_recognized_extensions().has(extension));
+	save_note_label->set_text(vformat(TTR("Saving as .%s adds the time offset to the written times, because the format has no offset field."), extension));
+
 	HashMap<int, PackedStringArray> problems;
 	const String invalid_time = TTR("The end is not after the start, or the start is negative.");
 	const String empty_text = TTR("The text is empty.");
@@ -299,6 +305,12 @@ SubtitleEditor::SubtitleEditor(const Ref<Subtitle> &p_subtitle) {
 	offset_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitleEditor::_apply_suggested_offset));
 	offset_box->add_child(offset_button);
 
+	save_note_label = memnew(Label);
+	save_note_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	save_note_label->set_custom_minimum_size(Size2(100, 0) * EDSCALE);
+	save_note_label->hide();
+	add_child(save_note_label);
+
 	HFlowContainer *toolbar = memnew(HFlowContainer);
 	add_child(toolbar);
 	add_button = memnew(Button(TTR("Add Segment")));
@@ -326,7 +338,8 @@ SubtitleEditor::SubtitleEditor(const Ref<Subtitle> &p_subtitle) {
 	tree->set_column_clip_content(COLUMN_TEXT, true);
 	tree->set_custom_minimum_size(Size2(0, 240) * EDSCALE);
 	tree->set_tooltip_text(TTR("Double-click a row to edit the segment."));
-	tree->connect("item_activated", callable_mp(this, &SubtitleEditor::_item_activated));
+	// Deferred: editing the segment rebuilds the Inspector, which frees this tree while it emits.
+	tree->connect("item_activated", callable_mp(this, &SubtitleEditor::_item_activated), CONNECT_DEFERRED);
 	add_child(tree);
 
 	subtitle->connect_changed(callable_mp(this, &SubtitleEditor::_queue_update));
@@ -377,13 +390,27 @@ bool EditorInspectorPluginSubtitleSync::can_handle(Object *p_object) {
 	return false;
 }
 
+// The child SubtitlePlayer that already follows `p_player`, if any.
+static SubtitlePlayer *_find_subtitle_player(Node *p_player) {
+	for (int i = 0; i < p_player->get_child_count(); i++) {
+		SubtitlePlayer *subtitle_player = Object::cast_to<SubtitlePlayer>(p_player->get_child(i));
+		if (subtitle_player != nullptr && subtitle_player->get_node_or_null(subtitle_player->get_sync_node()) == p_player) {
+			return subtitle_player;
+		}
+	}
+	return nullptr;
+}
+
 void EditorInspectorPluginSubtitleSync::parse_category(Object *p_object, const String &p_category) {
 	for (const char *class_name : _subtitle_sync_classes) {
 		if (p_category == class_name) {
+			Node *player = Object::cast_to<Node>(p_object);
+			const bool has_player = player != nullptr && _find_subtitle_player(player) != nullptr;
 			Button *button = memnew(Button);
-			button->set_text(TTR("Add SubtitlePlayer"));
-			button->set_tooltip_text(TTR("Adds a child SubtitlePlayer that follows this player and plays the subtitle_path of this player or of its stream."));
-			button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginSubtitleSync::_add_subtitle_player).bind(p_object->get_instance_id()));
+			button->set_text(has_player ? TTR("Select SubtitlePlayer") : TTR("Add SubtitlePlayer"));
+			button->set_tooltip_text(has_player ? TTR("Selects the child SubtitlePlayer that follows this player.") : TTR("Adds a child SubtitlePlayer that follows this player and plays the subtitle_path of this player or of its stream."));
+			// Deferred: selecting a node rebuilds the Inspector, which frees this button while it emits.
+			button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginSubtitleSync::_add_subtitle_player).bind(p_object->get_instance_id()), CONNECT_DEFERRED);
 			add_custom_control(button);
 			return;
 		}
@@ -394,6 +421,15 @@ void EditorInspectorPluginSubtitleSync::_add_subtitle_player(ObjectID p_player) 
 	Node *player = ObjectDB::get_instance<Node>(p_player);
 	Node *scene_root = EditorInterface::get_singleton()->get_edited_scene_root();
 	ERR_FAIL_COND(player == nullptr || scene_root == nullptr);
+	// One SubtitlePlayer per player: a second press selects the one there is.
+	SubtitlePlayer *existing = _find_subtitle_player(player);
+	if (existing != nullptr) {
+		EditorSelection *selection = EditorInterface::get_singleton()->get_selection();
+		selection->clear();
+		selection->add_node(existing);
+		EditorInterface::get_singleton()->edit_node(existing);
+		return;
+	}
 	SubtitlePlayer *subtitle_player = memnew(SubtitlePlayer);
 	subtitle_player->set_name("SubtitlePlayer");
 	subtitle_player->set_sync_node(NodePath(".."));

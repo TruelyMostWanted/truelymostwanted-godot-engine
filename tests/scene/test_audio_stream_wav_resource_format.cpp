@@ -154,6 +154,16 @@ TEST_CASE("[Audio][AudioStreamWAVResourceFormat] Compressed streams cannot be sa
 	CHECK_FALSE(FileAccess::exists(path));
 }
 
+TEST_CASE("[Audio][AudioStreamWAVResourceFormat] Empty streams cannot be saved as WAV") {
+	Ref<AudioStreamWAV> stream;
+	stream.instantiate();
+	const String path = _temp_dir().path_join("empty.wav");
+	ERR_PRINT_OFF;
+	CHECK(ResourceSaver::save(stream, path) == ERR_INVALID_DATA);
+	ERR_PRINT_ON;
+	CHECK_FALSE(FileAccess::exists(path));
+}
+
 TEST_CASE("[Audio][AudioStreamWAVResourceFormat] Imported paths are left to the importer") {
 	const String dir = _temp_dir();
 	const String source = dir.path_join("imported.wav");
