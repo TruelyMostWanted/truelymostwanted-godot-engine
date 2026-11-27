@@ -98,6 +98,17 @@ public:
 	virtual void parse_category(Object *p_object, const String &p_category) override;
 };
 
+// A button "Add SubtitlePlayer" under the class header of the audio and video players.
+class EditorInspectorPluginSubtitleSync : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginSubtitleSync, EditorInspectorPlugin);
+
+	void _add_subtitle_player(ObjectID p_player);
+
+public:
+	virtual bool can_handle(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
+};
+
 class SubtitleEditorPlugin : public EditorPlugin {
 	GDCLASS(SubtitleEditorPlugin, EditorPlugin);
 

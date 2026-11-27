@@ -97,11 +97,14 @@ protected:
 	GDVIRTUAL0R_REQUIRED(Ref<VideoStreamPlayback>, _instantiate_playback);
 
 	String file;
+	String subtitle_path;
 	int audio_track = 0;
 
 public:
 	void set_file(const String &p_file);
 	String get_file();
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
 
 	virtual void set_audio_track(int p_track);
 	virtual Ref<VideoStreamPlayback> instantiate_playback();

@@ -125,6 +125,7 @@ void AudioStreamPlayerInternal::process() {
 		active.clear();
 		_stop_fading_out(); // The old stream of a crossfade ends with the new one.
 		_set_process(false);
+		update_playing_state();
 	}
 	if (!playbacks_to_remove.is_empty()) {
 		node->emit_signal(SceneStringName(finished));
@@ -191,7 +192,9 @@ Ref<AudioStreamPlayback> AudioStreamPlayerInternal::play_basic() {
 	}
 	ERR_FAIL_COND_V_MSG(!node->is_inside_tree(), stream_playback, "Playback can only happen when a node is inside the scene tree");
 	if (stream->is_monophonic() && is_playing()) {
+		restarting = true;
 		stop_callable.call();
+		restarting = false;
 	}
 	stream_playback = stream->instantiate_playback();
 	ERR_FAIL_COND_V_MSG(stream_playback.is_null(), stream_playback, "Failed to instantiate playback.");
@@ -240,6 +243,7 @@ void AudioStreamPlayerInternal::set_stream_paused(bool p_pause) {
 			AudioServer::get_singleton()->set_sample_playback_pause(playback->get_sample_playback(), p_pause);
 		}
 	}
+	update_playing_state();
 }
 
 bool AudioStreamPlayerInternal::get_stream_paused() const {
@@ -315,8 +319,10 @@ void AudioStreamPlayerInternal::seek(float p_seconds) {
 	if (is_playing()) {
 		// A seek keeps a running fade.
 		keep_fade_on_play = true;
+		restarting = true;
 		stop_callable.call();
 		play_callable.call(p_seconds);
+		restarting = false;
 		keep_fade_on_play = false;
 	}
 }
@@ -333,6 +339,7 @@ void AudioStreamPlayerInternal::stop_basic() {
 
 	active.clear();
 	_set_process(false);
+	update_playing_state();
 }
 
 void AudioStreamPlayerInternal::_stop_fading_out() {
@@ -364,6 +371,17 @@ void AudioStreamPlayerInternal::set_playing(bool p_enable) {
 		play_callable.call(0.0);
 	} else {
 		stop_callable.call();
+	}
+}
+
+void AudioStreamPlayerInternal::update_playing_state() {
+	if (restarting) {
+		return;
+	}
+	const bool now = !stream_playbacks.is_empty() && !get_stream_paused();
+	if (now != playing_state) {
+		playing_state = now;
+		node->emit_signal(SNAME("playing_changed"), now);
 	}
 }
 

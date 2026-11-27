@@ -272,6 +272,8 @@ public:
 	Ref<Texture2D> get_cover() const;
 	void set_cover_data(const Vector<uint8_t> &p_cover_data);
 	Vector<uint8_t> get_cover_data() const;
+	void set_subtitle_path(const String &p_subtitle_path);
+	String get_subtitle_path() const;
 	void clear_track_info();
 
 	static Ref<AudioStream> load_info(const String &p_path);

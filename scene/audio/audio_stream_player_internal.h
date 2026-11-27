@@ -79,6 +79,8 @@ private:
 	ObjectID track_playback;
 	uint32_t track_serial = 0;
 	double position_signal_elapsed = 0.0;
+	bool playing_state = false; // Last value of `playing_changed`.
+	bool restarting = false; // Stop and start of seek() and monophonic restarts: no `playing_changed`.
 
 	void _assign_stream(const Ref<AudioStream> &p_stream);
 	void _stop_fading_out();
@@ -97,6 +99,7 @@ public:
 	float fade_gain = 1.0f; // Multiplies the volume of the current playbacks.
 	bool volumes_dirty = false; // A fade gain changed; cleared by apply_bus_volumes().
 	float position_signal_interval = 0.0f;
+	String subtitle_path; // Override of `AudioStream.subtitle_path` for `SubtitlePlayer`.
 
 	void process();
 	void ensure_playback_limit();
@@ -119,6 +122,8 @@ public:
 	float get_playback_position();
 
 	void set_playing(bool p_enable);
+	// Emits `playing_changed` when "has a running, unpaused playback" changed.
+	void update_playing_state();
 	bool is_active() const;
 
 	void set_stream_paused(bool p_pause);

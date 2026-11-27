@@ -39,6 +39,7 @@
 #include "scene/gui/flow_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/tree.h"
+#include "scene/main/subtitle_player.h"
 #include "scene/scene_string_names.h"
 #include "servers/subtitle/subtitle_format_srt.h"
 #include "servers/subtitle/subtitle_server.h"
@@ -359,10 +360,56 @@ void EditorInspectorPluginSubtitle::parse_category(Object *p_object, const Strin
 	add_custom_control(memnew(SubtitleEditor(subtitle)));
 }
 
+// EditorInspectorPluginSubtitleSync
+
+static const char *const _subtitle_sync_classes[] = { "AudioStreamPlayer", "AudioStreamPlayer2D", "AudioStreamPlayer3D", "VideoStreamPlayer" };
+
+bool EditorInspectorPluginSubtitleSync::can_handle(Object *p_object) {
+	for (const char *class_name : _subtitle_sync_classes) {
+		if (p_object->is_class(class_name)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void EditorInspectorPluginSubtitleSync::parse_category(Object *p_object, const String &p_category) {
+	for (const char *class_name : _subtitle_sync_classes) {
+		if (p_category == class_name) {
+			Button *button = memnew(Button);
+			button->set_text(TTR("Add SubtitlePlayer"));
+			button->set_tooltip_text(TTR("Adds a child SubtitlePlayer that follows this player and plays the subtitle_path of this player or of its stream."));
+			button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginSubtitleSync::_add_subtitle_player).bind(p_object->get_instance_id()));
+			add_custom_control(button);
+			return;
+		}
+	}
+}
+
+void EditorInspectorPluginSubtitleSync::_add_subtitle_player(ObjectID p_player) {
+	Node *player = ObjectDB::get_instance<Node>(p_player);
+	Node *scene_root = EditorInterface::get_singleton()->get_edited_scene_root();
+	ERR_FAIL_COND(player == nullptr || scene_root == nullptr);
+	SubtitlePlayer *subtitle_player = memnew(SubtitlePlayer);
+	subtitle_player->set_name("SubtitlePlayer");
+	subtitle_player->set_sync_node(NodePath(".."));
+
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Add SubtitlePlayer"), UndoRedo::MERGE_DISABLE, player);
+	undo_redo->add_do_method(player, "add_child", subtitle_player, true);
+	undo_redo->add_do_method(subtitle_player, "set_owner", scene_root);
+	undo_redo->add_do_reference(subtitle_player);
+	undo_redo->add_undo_method(player, "remove_child", subtitle_player);
+	undo_redo->commit_action();
+}
+
 // SubtitleEditorPlugin
 
 SubtitleEditorPlugin::SubtitleEditorPlugin() {
 	Ref<EditorInspectorPluginSubtitle> plugin;
 	plugin.instantiate();
 	add_inspector_plugin(plugin);
+	Ref<EditorInspectorPluginSubtitleSync> sync_plugin;
+	sync_plugin.instantiate();
+	add_inspector_plugin(sync_plugin);
 }
