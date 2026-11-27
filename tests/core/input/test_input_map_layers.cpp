@@ -375,7 +375,8 @@ TEST_CASE("[InputActions] Empty slots of the Inspector are kept (#398)") {
 	events.push_back(Variant());
 	action->set_events(events);
 	CHECK(action->get_events().size() == 2);
-	CHECK(action->get_events()[1].get_type() == Variant::NIL);
+	// A typed array keeps the empty slot as a null object.
+	CHECK(Ref<InputEvent>(action->get_events()[1]).is_null());
 	CHECK(action->get_event_count() == 1);
 	CHECK(action->get_device_events(InputAction::INPUT_DEVICE_GAMEPAD).size() == 1);
 	CHECK_FALSE(action->has_event(Ref<InputEventKey>(memnew(InputEventKey))));

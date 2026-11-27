@@ -194,7 +194,10 @@ TEST_CASE("[LocalizationCatalog] Binary format loads one locale at a time") {
 	// Translator notes are not stored in the binary format.
 	CHECK(loaded->get_note_columns().is_empty());
 	catalog->set_note("HELLO", String());
-	CHECK(loaded->get("data") == catalog->get("data"));
+	// Without notes, the kept (empty) note column is the only difference.
+	Dictionary expected = Dictionary(catalog->get("data")).duplicate(true);
+	Dictionary(expected["?catalog"]).erase("notes");
+	CHECK(loaded->get("data") == expected);
 
 	// A changed catalog no longer reads from the file.
 	loaded->set_text("NEW", "en", "new");
