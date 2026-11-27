@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/string/localization_catalog.h"
 #include "editor/export/editor_export_plugin.h"
 #include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/inspector/editor_inspector.h"
@@ -39,7 +40,6 @@
 #include "scene/resources/localized_text.h"
 
 class ConfirmationDialog;
-class LocalizationCatalog;
 class Timer;
 class Tree;
 
