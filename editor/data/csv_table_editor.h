@@ -64,6 +64,7 @@ class CSVTableEditor : public EditorDock {
 	bool translation_mode = false;
 	Ref<LocalizationCatalog> catalog;
 	PackedStringArray catalog_fields; // Tree column - 1 -> entry field (`_key`, `_context`, `_plural`, locale, `_<note>`).
+	uint64_t catalog_modified_time = 0; // Of the catalog file when loaded or saved by the table.
 	HashMap<int64_t, String> cell_issues; // (row << 32) | tree column -> messages.
 	int page = 0;
 	bool updating = false;
@@ -92,6 +93,7 @@ class CSVTableEditor : public EditorDock {
 	void _commit_catalog_cells(const String &p_action, int p_row, int p_field, const Array &p_cells, int p_form);
 	void _render_catalog();
 	void _add_catalog_column();
+	void _filesystem_changed();
 
 	void _csv_changed();
 	void _update();

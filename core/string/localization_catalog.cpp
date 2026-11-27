@@ -31,6 +31,7 @@
 #include "localization_catalog.h"
 
 #include "core/config/engine.h"
+#include "core/io/config_file.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -651,6 +652,9 @@ Dictionary LocalizationCatalog::_get_data() const {
 		meta["plural_rules"] = rules;
 	}
 	meta["channel"] = channel;
+	if (!note_columns.is_empty()) {
+		meta["notes"] = get_note_columns(); // Also the columns without notes yet (#403).
+	}
 	data[CATALOG_ENTRY] = meta;
 
 	for (uint32_t row = 0; row < ids.size(); row++) {
@@ -872,6 +876,10 @@ void LocalizationCatalog::_set_data(const Dictionary &p_data) {
 			column->plural_rule = kv.value;
 		}
 	}
+	const PackedStringArray note_names = meta.get("notes", PackedStringArray());
+	for (const String &note_name : note_names) {
+		_get_note_column("_" + note_name);
+	}
 
 	for (const KeyValue<Variant, Variant> &kv : p_data) {
 		const String entry_name = kv.key;
@@ -946,6 +954,10 @@ static Dictionary _xml_to_data(const Dictionary &p_root, const String &p_extra_n
 	Dictionary meta;
 	meta["locales"] = locales.is_empty() ? Variant(Array()) : Variant(locales.split(","));
 	meta["plural_rules"] = rules;
+	const String notes = root_attributes.get("notes", String());
+	if (!notes.is_empty()) {
+		meta["notes"] = notes.split(",");
+	}
 	data[CATALOG_ENTRY] = meta;
 	return data;
 }
@@ -1016,6 +1028,10 @@ static Dictionary _data_to_xml(const Dictionary &p_data, const String &p_extra_n
 	Dictionary root_attributes;
 	const PackedStringArray locales = meta.get("locales", Array());
 	root_attributes["locales"] = String(",").join(locales);
+	const PackedStringArray notes = meta.get("notes", PackedStringArray());
+	if (!notes.is_empty()) {
+		root_attributes["notes"] = String(",").join(notes);
+	}
 	Dictionary root = _make_xml_element("catalog", root_attributes);
 	root[XML::KEY_CHILDREN] = children;
 	return root;
@@ -1863,12 +1879,26 @@ String ResourceFormatLoaderLocalizationCatalog::get_resource_type(const String &
 Error ResourceFormatSaverLocalizationCatalog::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
 	Ref<LocalizationCatalog> catalog = p_resource;
 	ERR_FAIL_COND_V(catalog.is_null(), ERR_INVALID_PARAMETER);
-	return catalog->save_to_file(p_path);
+	const Error err = catalog->save_to_file(p_path);
+	if (err == OK && Engine::get_singleton()->is_editor_hint() && p_path.get_extension().to_lower() == "csv") {
+		// The editor would import a new CSV as Translation (#403): a catalog CSV is kept as it is, like "Keep File".
+		Ref<ConfigFile> import_config;
+		import_config.instantiate();
+		if (import_config->load(p_path + ".import") != OK || String(import_config->get_value("remap", "importer", String())) != "keep") {
+			import_config->clear();
+			import_config->set_value("remap", "importer", "keep");
+			import_config->save(p_path + ".import");
+		}
+	}
+	return err;
 }
 
 void ResourceFormatSaverLocalizationCatalog::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
 	if (recognize(p_resource)) {
-		p_extensions->push_back(LocalizationCatalog::BINARY_EXTENSION);
+		// `lcat` first: the default of save dialogs.
+		for (const String &extension : LocalizationCatalog::get_file_extensions()) {
+			p_extensions->push_back(extension);
+		}
 	}
 }
 

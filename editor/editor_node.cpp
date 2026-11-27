@@ -55,6 +55,7 @@
 #include "editor/audio/audio_stream_editor_plugin.h"
 #include "editor/audio/audio_stream_preview.h"
 #include "editor/audio/editor_audio_buses.h"
+#include "editor/data/localization_catalog_editor_plugin.h" // Truely (#403).
 #include "editor/debugger/debugger_editor_plugin.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/debugger/script_editor_debugger.h"
@@ -1763,7 +1764,11 @@ Error EditorNode::load_resource(const String &p_resource, bool p_ignore_broken_d
 	Error err;
 
 	Ref<Resource> res;
-	if (force_textfile_extensions.has(p_resource.get_extension())) {
+	// Truely (#403): a data file listed in a localization catalog manifest opens as its catalog.
+	const StringName catalog_class = LocalizationCatalogEditorPlugin::get_manifest_catalog_class(p_resource);
+	if (catalog_class != StringName()) {
+		res = LocalizationCatalogEditorPlugin::load_catalog(p_resource, catalog_class);
+	} else if (force_textfile_extensions.has(p_resource.get_extension())) {
 		const String resource_type = ResourceLoader::get_resource_type(p_resource);
 		if (resource_type != "Translation" && ResourceLoader::exists(p_resource, "")) {
 			res = ResourceLoader::load(p_resource, "", ResourceFormatLoader::CACHE_MODE_REUSE, &err);

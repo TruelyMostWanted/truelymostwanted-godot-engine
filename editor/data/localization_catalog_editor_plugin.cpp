@@ -40,7 +40,10 @@
 #include "core/object/class_db.h"
 #include "core/string/localization_catalog.h"
 #include "core/string/localization_server.h"
+#include "core/string/resource_localization_server.h"
+#include "core/string/text_localization_server.h"
 #include "core/string/translation.h"
+#include "core/variant/variant_parser.h"
 #include "editor/editor_node.h"
 #include "editor/file_system/editor_file_system.h"
 #include "editor/file_system/editor_paths.h"
@@ -60,6 +63,41 @@ static const char *SETTING_TRANSLATION_REMAPS = "internationalization/locale/tra
 static bool _is_text_catalog_path(const String &p_path) {
 	const String extension = p_path.get_extension().to_lower();
 	return extension != LocalizationCatalog::BINARY_EXTENSION && LocalizationCatalog::get_file_extensions().has(extension);
+}
+
+// The catalog class of a manifest: its type hint, TextLocalizationCatalog without one.
+static StringName _get_manifest_class(const Ref<FilesManifest> &p_manifest) {
+	return p_manifest->get_type_hint() == StringName() ? StringName("TextLocalizationCatalog") : p_manifest->get_type_hint();
+}
+
+// A file imported by an importer (a CSV imported as Translation), not kept as it is.
+static bool _is_imported(const String &p_path) {
+	Ref<ConfigFile> import_config;
+	import_config.instantiate();
+	if (import_config->load(p_path + ".import") != OK) {
+		return false;
+	}
+	const String importer = import_config->get_value("remap", "importer", String());
+	return importer != "keep" && importer != "skip";
+}
+
+// Switches a CSV to "Keep File" like the Import dock: a reimport with "keep" returns before writing `.import`
+// (EditorFileSystem::_reimport_file()), so it is written here. Removes the files the CSV importer had written
+// (`<name>.<locale>.translation`) and returns them.
+static PackedStringArray _keep_csv_file(const String &p_path) {
+	Ref<ConfigFile> import_config;
+	import_config.instantiate();
+	if (import_config->load(p_path + ".import") == OK && String(import_config->get_value("remap", "importer", String())) == "keep") {
+		return PackedStringArray();
+	}
+	const PackedStringArray dest_files = import_config->get_value("deps", "dest_files", PackedStringArray());
+	for (const String &dest_file : dest_files) {
+		DirAccess::remove_absolute(dest_file);
+	}
+	import_config->clear();
+	import_config->set_value("remap", "importer", "keep");
+	import_config->save(p_path + ".import");
+	return dest_files;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -133,21 +171,21 @@ void EditorInspectorPluginLocalizationCatalog::parse_begin(Object *p_object) {
 
 void LocalizationCatalogExportPlugin::_export_begin(const HashSet<String> &p_features, bool p_debug, const String &p_path, int p_flags) {
 	catalog_classes.clear();
-	if (!bool(GLOBAL_GET(LocalizationServer::SETTING_EXPORT_CONVERT_TEXT_TO_BINARY))) {
-		return;
-	}
+	const bool convert = GLOBAL_GET(LocalizationServer::SETTING_EXPORT_CONVERT_TEXT_TO_BINARY);
 	const Array manifests = GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS);
 	for (const Variant &value : manifests) {
 		const Ref<FilesManifest> manifest = value;
 		if (manifest.is_null()) {
 			continue;
 		}
-		const StringName catalog_class = manifest->get_type_hint() == StringName() ? StringName("TextLocalizationCatalog") : manifest->get_type_hint();
+		const StringName catalog_class = _get_manifest_class(manifest);
 		if (!ClassDB::is_parent_class(catalog_class, "LocalizationCatalog")) {
 			continue;
 		}
 		for (const String &path : LocalizationServer::get_catalog_files(manifest)->get_paths()) {
-			if (_is_text_catalog_path(path)) {
+			// Without conversion too for a CSV still imported as Translation: only its `.translation` files would be
+			// exported, and the catalog would be missing at runtime (#403).
+			if (_is_text_catalog_path(path) && (convert || _is_imported(path))) {
 				catalog_classes[path] = catalog_class;
 			}
 		}
@@ -176,11 +214,10 @@ void EditorContextMenuPluginLocalizationCatalog::_use_as_catalog(const Dictionar
 	if (selected.size() != 1) {
 		return;
 	}
-	// Not from the cache: the path may be cached as another type (JSON, CSV).
-	const Ref<Resource> catalog = ResourceLoader::load(selected[0], p_class, ResourceFormatLoader::CACHE_MODE_IGNORE);
-	ERR_FAIL_COND_MSG(catalog.is_null(), vformat("\"%s\" is no %s.", selected[0], p_class));
-	catalog->set_path(selected[0], true);
-	EditorNode::get_singleton()->edit_resource(catalog);
+	const Ref<Resource> catalog = LocalizationCatalogEditorPlugin::load_catalog(selected[0], p_class);
+	if (catalog.is_valid()) {
+		EditorNode::get_singleton()->edit_resource(catalog);
+	}
 }
 
 void EditorContextMenuPluginLocalizationCatalog::get_options(const OptionsData &p_data) {
@@ -202,15 +239,53 @@ void EditorContextMenuPluginLocalizationCatalog::get_options(const OptionsData &
 /////////////////////////////////////////////////////////////////////////////
 // Plugin.
 
+StringName LocalizationCatalogEditorPlugin::get_manifest_catalog_class(const String &p_path) {
+	if (!_is_text_catalog_path(p_path)) {
+		return StringName(); // `.lcat` names its class itself.
+	}
+	const Array manifests = GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS);
+	for (const Variant &value : manifests) {
+		const Ref<FilesManifest> manifest = value;
+		if (manifest.is_valid() && ClassDB::is_parent_class(_get_manifest_class(manifest), "LocalizationCatalog") && LocalizationServer::get_catalog_files(manifest)->get_paths().has(p_path)) {
+			return _get_manifest_class(manifest);
+		}
+	}
+	return StringName();
+}
+
+Ref<Resource> LocalizationCatalogEditorPlugin::load_catalog(const String &p_path, const StringName &p_class) {
+	const Ref<Resource> cached = ResourceCache::get_ref(p_path);
+	if (cached.is_valid() && cached->is_class(p_class)) {
+		return cached;
+	}
+	// Not from the cache: the path may be cached as another type (JSON, CSV, TextFile).
+	const Ref<Resource> catalog = ResourceLoader::load(p_path, p_class, ResourceFormatLoader::CACHE_MODE_IGNORE);
+	ERR_FAIL_COND_V_MSG(catalog.is_null(), Ref<Resource>(), vformat("\"%s\" is no %s.", p_path, p_class));
+	catalog->set_path(p_path, true);
+	return catalog;
+}
+
 void LocalizationCatalogEditorPlugin::add_catalog_files(const PackedStringArray &p_paths, const StringName &p_class) {
 	Array manifests = GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS);
 	manifests = manifests.duplicate();
 	Ref<FilesManifest> target;
+	PackedStringArray in_other_manifests; // Paths also listed by a manifest of the other class.
 	for (const Variant &value : manifests) {
 		const Ref<FilesManifest> manifest = value;
-		if (manifest.is_valid() && (manifest->get_type_hint() == StringName() ? StringName("TextLocalizationCatalog") : manifest->get_type_hint()) == p_class) {
-			target = manifest;
-			break;
+		if (manifest.is_null()) {
+			continue;
+		}
+		if (_get_manifest_class(manifest) == p_class) {
+			if (target.is_null()) {
+				target = manifest;
+			}
+			continue;
+		}
+		const PackedStringArray listed = LocalizationServer::get_catalog_files(manifest)->get_paths();
+		for (const String &path : p_paths) {
+			if (listed.has(path) && !in_other_manifests.has(path)) {
+				in_other_manifests.push_back(path);
+			}
 		}
 	}
 	if (target.is_null()) {
@@ -220,21 +295,54 @@ void LocalizationCatalogEditorPlugin::add_catalog_files(const PackedStringArray 
 	}
 	const PackedStringArray listed = LocalizationServer::get_catalog_files(target)->get_paths();
 	PackedStringArray files = target->get_file_paths();
+	PackedStringArray csv_files;
+	PackedStringArray removed_translations;
 	for (const String &path : p_paths) {
 		if (!listed.has(path) && !files.has(path)) {
 			files.push_back(path);
 		}
 		// A CSV imported as Translation is no catalog for the loaders: "Keep File" keeps the text, which is loaded
 		// as a catalog and converted to `.lcat` on export.
-		Ref<ConfigFile> import_config;
-		import_config.instantiate();
-		if (path.get_extension().to_lower() == "csv" && import_config->load(path + ".import") == OK && String(import_config->get_value("remap", "importer", String())) != "keep") {
-			EditorFileSystem::get_singleton()->reimport_file_with_custom_parameters(path, "keep", HashMap<StringName, Variant>());
+		if (path.get_extension().to_lower() == "csv") {
+			csv_files.push_back(path);
+			removed_translations.append_array(_keep_csv_file(path));
 		}
 	}
 	target->set_file_paths(files);
 	ProjectSettings::get_singleton()->set_setting(LocalizationServer::SETTING_CATALOG_MANIFESTS, manifests);
+	if (!removed_translations.is_empty()) {
+		// The removed `.translation` files must not stay in the project's translations.
+		PackedStringArray translations = GLOBAL_GET(SETTING_TRANSLATIONS);
+		for (const String &removed : removed_translations) {
+			translations.erase(removed);
+		}
+		ProjectSettings::get_singleton()->set_setting(SETTING_TRANSLATIONS, translations);
+	}
 	ProjectSettings::get_singleton()->save();
+	if (!csv_files.is_empty()) {
+		EditorFileSystem::get_singleton()->reimport_files(csv_files);
+		EditorFileSystem::get_singleton()->scan_changes();
+	}
+	if (!in_other_manifests.is_empty()) {
+		EditorToaster::get_singleton()->popup_str(vformat(TTR("Also listed in a catalog manifest of the other class, so loaded as both kinds of catalog: %s"), String(", ").join(in_other_manifests)), EditorToaster::SEVERITY_WARNING);
+	}
+}
+
+void LocalizationCatalogEditorPlugin::_project_settings_changed() {
+	// The servers load the manifests at startup: a changed list (marked or converted catalogs, the Project Settings)
+	// is loaded again, so it works without a restart (#403).
+	String manifests;
+	VariantWriter::write_to_string(GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS), manifests);
+	if (manifests == loaded_manifests) {
+		return;
+	}
+	loaded_manifests = manifests;
+	if (TextLocalizationServer::get_singleton()) {
+		TextLocalizationServer::get_singleton()->load_project_catalogs();
+	}
+	if (ResourceLocalizationServer::get_singleton()) {
+		ResourceLocalizationServer::get_singleton()->load_project_catalogs();
+	}
 }
 
 void LocalizationCatalogEditorPlugin::_convert_project_translations() {
@@ -298,9 +406,12 @@ void LocalizationCatalogEditorPlugin::_convert_project_translations() {
 void LocalizationCatalogEditorPlugin::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
+			VariantWriter::write_to_string(GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS), loaded_manifests);
+			ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
 			add_tool_menu_item(TTR("Convert Project Translations to Catalogs..."), callable_mp((Window *)convert_dialog, &Window::popup_centered).bind(Size2i()));
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
+			ProjectSettings::get_singleton()->disconnect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
 			remove_tool_menu_item(TTR("Convert Project Translations to Catalogs..."));
 		} break;
 	}

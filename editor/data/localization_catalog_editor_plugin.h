@@ -82,8 +82,10 @@ class LocalizationCatalogEditorPlugin : public EditorPlugin {
 	GDCLASS(LocalizationCatalogEditorPlugin, EditorPlugin);
 
 	ConfirmationDialog *convert_dialog = nullptr;
+	String loaded_manifests; // The catalog manifests setting the servers loaded last, as text.
 
 	void _convert_project_translations();
+	void _project_settings_changed();
 
 protected:
 	void _notification(int p_what);
@@ -92,6 +94,10 @@ public:
 	// Adds the files to the first catalog manifest of the class (one is created if missing), switches CSV files
 	// to "Keep File" and saves the project settings.
 	static void add_catalog_files(const PackedStringArray &p_paths, const StringName &p_class);
+	// The class of the catalog manifest that lists the text file `p_path`, or empty.
+	static StringName get_manifest_catalog_class(const String &p_path);
+	// The catalog of `p_path` as `p_class`, taking over the path from a resource cached as another type.
+	static Ref<Resource> load_catalog(const String &p_path, const StringName &p_class);
 
 	virtual String get_plugin_name() const override { return "LocalizationCatalog"; }
 
