@@ -43,6 +43,10 @@ void EditorInspectorPluginInputAction::_read_from_input_map(ObjectID p_action) {
 	if (action == nullptr) {
 		return;
 	}
+	if (action->get_action().is_empty()) {
+		EditorToaster::get_singleton()->popup_str(TTR("Set the action name first."), EditorToaster::SEVERITY_WARNING);
+		return;
+	}
 	const String setting = "input/" + String(action->get_action());
 	const Dictionary project_action = ProjectSettings::get_singleton()->has_setting(setting) ? Dictionary(GLOBAL_GET(setting)) : Dictionary();
 	if (project_action.is_empty()) {
