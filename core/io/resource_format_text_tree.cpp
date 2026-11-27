@@ -37,6 +37,7 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/string/char_utils.h"
+#include "core/templates/local_vector.h"
 
 // ResourceFormatLoader::load() gets no type hint, but ResourceLoader calls recognize_path() with the hint
 // right before load() on the same thread. The hint is kept here for that one call (needed by CSV, which has no
@@ -235,10 +236,24 @@ Error ResourceFormatSaverTextTree::save(const Ref<Resource> &p_resource, const S
 	return OK;
 }
 
-void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (recognize(p_resource) && _can_save(p_resource)) {
-		p_extensions->push_back(_get_extension());
+static LocalVector<String> text_tree_save_dialog_exclusions;
+
+void ResourceFormatSaverTextTree::exclude_from_save_dialogs(const String &p_class) {
+	if (!text_tree_save_dialog_exclusions.has(p_class)) {
+		text_tree_save_dialog_exclusions.push_back(p_class);
 	}
+}
+
+void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
+	if (!recognize(p_resource) || !_can_save(p_resource)) {
+		return;
+	}
+	for (const String &excluded : text_tree_save_dialog_exclusions) {
+		if (p_resource->is_class(excluded)) {
+			return;
+		}
+	}
+	p_extensions->push_back(_get_extension());
 }
 
 bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) const {
