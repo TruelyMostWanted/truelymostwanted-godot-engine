@@ -278,7 +278,7 @@ void SettingsServer::register_domain_settings(const StringName &p_domain, bool p
 	const String formats = p_csv ? "JSON:0,INI:1,CSV:2,XML:3,TOML:4,YAML:5" : "JSON:0,INI:1,XML:3,TOML:4,YAML:5";
 	GLOBAL_DEF(PropertyInfo(Variant::INT, get_domain_setting_name(p_domain, SETTING_KEY_FORMAT), PROPERTY_HINT_ENUM, formats), ResourceTextSerializer::FORMAT_INI);
 	// The optional project defaults of the domain (read by _initialize()), with a file picker (#404).
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_DEFAULTS_PREFIX + String(p_domain), PROPERTY_HINT_FILE), String());
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, SETTING_DEFAULTS_PREFIX + String(p_domain), PROPERTY_HINT_FILE, "*.tres,*.res"), String());
 }
 
 // A format value of the project settings: a Format value, or a format name written by hand into project.godot ("json", "ini", ...).

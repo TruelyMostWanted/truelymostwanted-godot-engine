@@ -427,14 +427,16 @@ void DataFileInspectorView::_update() {
 	String counts;
 	if (csv) {
 		const Ref<CSV> csv_file = resource;
-		counts = vformat(TTR("%d rows, %d columns"), csv_file->get_row_count(), csv_file->get_column_count());
+		const int rows = csv_file->get_row_count();
+		const int columns = csv_file->get_column_count();
+		counts = vformat(TTRN("%d row", "%d rows", rows), rows) + ", " + vformat(TTRN("%d column", "%d columns", columns), columns);
 	} else if (Object::cast_to<INI>(*resource)) {
 		const Dictionary sections = file_data;
 		int key_count = 0;
 		for (const KeyValue<Variant, Variant> &kv : sections) {
 			key_count += Dictionary(kv.value).size();
 		}
-		counts = vformat(TTR("%d sections, %d keys"), sections.size(), key_count);
+		counts = vformat(TTRN("%d section", "%d sections", sections.size()), sections.size()) + ", " + vformat(TTRN("%d key", "%d keys", key_count), key_count);
 	} else if (xml) {
 		// The tree shows the root element itself as the only top-level node.
 		const Dictionary root = file_data;
@@ -443,7 +445,8 @@ void DataFileInspectorView::_update() {
 			nodes.push_back(root);
 		}
 		root_value = nodes;
-		counts = root.is_empty() ? TTR("No root element") : vformat(TTR("Root element <%s>, %d child nodes"), root.get(XML::KEY_NAME, String()), Array(root.get(XML::KEY_CHILDREN, Array())).size());
+		const int children = Array(root.get(XML::KEY_CHILDREN, Array())).size();
+		counts = root.is_empty() ? TTR("No root element") : vformat(TTRN("Root element <%s>, %d child node", "Root element <%s>, %d child nodes", children), root.get(XML::KEY_NAME, String()), children);
 	} else {
 		const DataFileTreeAdapter::Entry entry = DataFileTreeAdapter::make_entry(String(), file_data, false);
 		counts = entry.data.is_array() || entry.data.get_type() == Variant::DICTIONARY ? entry.type + ", " + entry.value : entry.type;

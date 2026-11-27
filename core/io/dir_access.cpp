@@ -234,6 +234,11 @@ static String _dir_access_resolve_prefixed_path(const String &p_path) {
 	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->resolve_engine_path(p_path) : p_path;
 }
 
+// Changes through a read-only prefix (`streaming://` in exports) are refused.
+static Error _dir_access_check_writable(const String &p_path) {
+	return PathPrefixServer::get_singleton() ? PathPrefixServer::get_singleton()->check_writable(p_path) : OK;
+}
+
 Ref<DirAccess> DirAccess::create_for_path(const String &p_path) {
 	Ref<DirAccess> da;
 	if (p_path.begins_with("res://")) {
@@ -288,12 +293,20 @@ String DirAccess::_get_drive_label(int p_idx) {
 }
 
 Error DirAccess::make_dir_absolute(const String &p_dir) {
+	const Error write_err = _dir_access_check_writable(p_dir);
+	if (write_err != OK) {
+		return write_err;
+	}
 	const String dir = _dir_access_resolve_prefixed_path(p_dir);
 	Ref<DirAccess> d = DirAccess::create_for_path(dir);
 	return d->make_dir(dir);
 }
 
 Error DirAccess::make_dir_recursive_absolute(const String &p_dir) {
+	const Error write_err = _dir_access_check_writable(p_dir);
+	if (write_err != OK) {
+		return write_err;
+	}
 	const String dir = _dir_access_resolve_prefixed_path(p_dir);
 	Ref<DirAccess> d = DirAccess::create_for_path(dir);
 	return d->make_dir_recursive(dir);
@@ -306,6 +319,10 @@ bool DirAccess::dir_exists_absolute(const String &p_dir) {
 }
 
 Error DirAccess::copy_absolute(const String &p_from, const String &p_to, int p_chmod_flags) {
+	const Error write_err = _dir_access_check_writable(p_to);
+	if (write_err != OK) {
+		return write_err;
+	}
 	Ref<DirAccess> d = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
 	// Support copying from res:// to user:// etc.
 	String from = ProjectSettings::get_singleton()->globalize_path(p_from);
@@ -314,6 +331,13 @@ Error DirAccess::copy_absolute(const String &p_from, const String &p_to, int p_c
 }
 
 Error DirAccess::rename_absolute(const String &p_from, const String &p_to) {
+	Error write_err = _dir_access_check_writable(p_from);
+	if (write_err == OK) {
+		write_err = _dir_access_check_writable(p_to);
+	}
+	if (write_err != OK) {
+		return write_err;
+	}
 	Ref<DirAccess> d = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
 	String from = ProjectSettings::get_singleton()->globalize_path(p_from);
 	String to = ProjectSettings::get_singleton()->globalize_path(p_to);
@@ -321,6 +345,10 @@ Error DirAccess::rename_absolute(const String &p_from, const String &p_to) {
 }
 
 Error DirAccess::remove_absolute(const String &p_path) {
+	const Error write_err = _dir_access_check_writable(p_path);
+	if (write_err != OK) {
+		return write_err;
+	}
 	const String path = _dir_access_resolve_prefixed_path(p_path);
 	Ref<DirAccess> d = DirAccess::create_for_path(path);
 	return d->remove(path);
