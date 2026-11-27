@@ -107,7 +107,7 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
   - Issue #3 → `03-feature-path-prefix-server`
   - Issue #123 → `123-feature-…`
   - `<art>` folgt dem Typ des Issues: `feature`, `refactoring`, `bug`, `concept`.
-- Derselbe Name gilt für den Feature-Ordner im Testprojekt (`res://03-feature-path-prefix-server/`) und für die Guide-Seite im Wiki.
+- Testprojekt-Ordner und Wiki-Guide tragen den Namen des Themas, nicht den des Branches: Guide `Path-Prefixes`, Ordner `res://path-prefixes/` (Beispiel + Test, siehe `FEATURE-WORKFLOW.md` 4.5).
 - Feature-Branches zweigen von `truely-godot-engine` ab und werden **nie gelöscht**. PR-Branches für Beiträge an Godot zweigen von `master` ab (siehe `README.md`).
 
 ---
@@ -135,8 +135,8 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 - [ ] C#/GDScript bindings created and registered
 - [ ] Documentation written (class reference in `doc/classes/` and wiki page: GDScript, C#, GDExtension)
 - [ ] Test build on the current platform done (no errors or warnings)
-- [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
+- [ ] Tested in the test project (`res://<guide>/`: Example and Test) with a Mono build, in GDScript and in C#
 ```
 
-- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (`<feature-branch>`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
+- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (nach Thema, z. B. `Path-Prefixes`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
 - **Tracker:** Größere Vorhaben bekommen ein `[Task] Tracker: …` mit `flag: tracker`, das die Issues in Reihenfolge und mit Abhängigkeiten auflistet.
