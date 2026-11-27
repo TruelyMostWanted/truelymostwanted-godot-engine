@@ -34,6 +34,7 @@
 #include "core/templates/hash_map.h"
 #include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
+#include "scene/audio/audio_fade.h"
 #include "scene/resources/audio/audio_mixer_channel.h"
 #include "scene/resources/audio/audio_mixer_layout.h"
 #include "scene/resources/audio/audio_stream.h"
@@ -51,24 +52,18 @@ class AudioMixerServer : public Object {
 	GDCLASS(AudioMixerServer, Object);
 
 public:
+	// Also the curve of the AudioStreamPlayer fades; the math is in AudioFade.
 	enum FadeCurve {
-		FADE_CURVE_LINEAR,
-		FADE_CURVE_EASE_IN,
-		FADE_CURVE_EASE_OUT,
-		FADE_CURVE_EQUAL_POWER,
+		FADE_CURVE_LINEAR = AudioFade::CURVE_LINEAR,
+		FADE_CURVE_EASE_IN = AudioFade::CURVE_EASE_IN,
+		FADE_CURVE_EASE_OUT = AudioFade::CURVE_EASE_OUT,
+		FADE_CURVE_EQUAL_POWER = AudioFade::CURVE_EQUAL_POWER,
 	};
 
 private:
 	static AudioMixerServer *singleton;
 
-	struct Fade {
-		bool active = false;
-		float from = 0.0f;
-		float to = 0.0f;
-		double time = 0.0;
-		double elapsed = 0.0;
-		FadeCurve curve = FADE_CURVE_LINEAR;
-	};
+	using Fade = AudioFade;
 
 	struct Voice {
 		Ref<AudioStreamPlayback> playback;

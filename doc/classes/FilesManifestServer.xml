@@ -59,14 +59,14 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Creates the folders of the manifest [param name] that do not exist. Read-only paths (such as [code]res://[/code] in exported builds) are skipped with an error, and [constant ERR_FILE_NO_PERMISSION] is returned.
+				Creates the folders of the manifest [param name] that do not exist. For a wildcard folder ([member FilesManifest.folder_paths]), the part before the first wildcard is created. Read-only paths (such as [code]res://[/code] in exported builds) are skipped with an error, and [constant ERR_FILE_NO_PERMISSION] is returned.
 			</description>
 		</method>
 		<method name="get_file_paths">
 			<return type="PackedStringArray" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Returns the file list of the manifest [param name]. The list is cached and rebuilt after every change of the manifest; call [method refresh] to read the folders again.
+				Returns the file list of the manifest [param name], in the load order described in [FilesManifest]. The list is cached and rebuilt after every change of the manifest; call [method refresh] to read the folders again.
 			</description>
 		</method>
 		<method name="get_manifest">
@@ -176,7 +176,7 @@
 			<return type="FilesManifestValidation" />
 			<param index="0" name="name" type="String" />
 			<description>
-				Checks the manifest [param name] and returns a [FilesManifestValidation] with the folders and files that do not exist and the extensions no resource loader recognizes. If no manifest is registered under [param name], an error is printed and the result has [constant ERR_DOES_NOT_EXIST] as [member FilesManifestValidation.error].
+				Checks the manifest [param name] and returns a [FilesManifestValidation] with the folders and files that do not exist and the extensions no resource loader recognizes. A wildcard folder counts as missing only if the part before its first wildcard does not exist. If no manifest is registered under [param name], an error is printed and the result has [constant ERR_DOES_NOT_EXIST] as [member FilesManifestValidation.error].
 				[codeblocks]
 				[gdscript]
 				var validation := FilesManifestServer.validate("mods")

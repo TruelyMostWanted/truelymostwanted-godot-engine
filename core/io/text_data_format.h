@@ -30,10 +30,13 @@
 
 #pragma once
 
+#include "core/io/data_validation.h"
 #include "core/io/resource.h"
 #include "core/io/serializer_options.h"
 #include "core/templates/list.h"
 #include "core/variant/variant.h"
+
+class DataSchema;
 
 // Base of the data file classes INI, CSV, XML, TOML and YAML (and of formats added by modules or extensions).
 // One instance holds the parsed `data` of one text file. Like JSON, the classes are Resources: load() of a
@@ -62,10 +65,17 @@ protected:
 	// Type `data` must have (Variant::NIL = any).
 	virtual Variant::Type _get_data_type() const { return Variant::NIL; }
 	virtual void _get_extensions(List<String> *r_extensions) const {}
+	// Options for files with the extension of `p_path` when `options` is not set (CSV: a tab for `.tsv`), or null.
+	virtual Ref<SerializerOptions> _get_path_options(const String &p_path) const { return Ref<SerializerOptions>(); }
 	// Called after `data` was replaced (parse(), set_data(), clear()), for caches of subclasses.
 	virtual void _data_replaced() {}
 	// Called by clear(), for state of subclasses beside `data`.
 	virtual void _cleared() {}
+
+	// Validates `data` against a schema (default: DataSchema.validate(data)).
+	virtual Ref<DataValidation> _validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const;
+	// Sets the lines of the issues from the kept text (default: DataValidation.resolve_lines()).
+	virtual void _resolve_issue_lines(const Ref<DataValidation> &p_validation, const String &p_text) const;
 
 	// For subclasses that change `data` in place: drops the kept text and emits `changed`.
 	void _mark_data_changed();
@@ -78,6 +88,9 @@ public:
 
 	void set_options(const Ref<SerializerOptions> &p_options);
 	Ref<SerializerOptions> get_options() const { return serializer_options; }
+	// Without `options`, sets the options that the extension of `p_path` needs (a tab for `.tsv`). Called by
+	// load(), save() and the resource loader and saver before reading or writing a file.
+	void apply_path_options(const String &p_path);
 
 	// Parses `p_text` into `data`. With `p_keep_text`, the text is kept for get_parsed_text() (also on error).
 	Error parse(const String &p_text, bool p_keep_text = false);
@@ -86,6 +99,10 @@ public:
 	// Text for saving: the kept text if `data` was not changed since parse(), otherwise the encoded `data`.
 	Error get_save_text(String &r_text, String &r_error) const;
 	void clear();
+
+	// Validates `data` against `p_schema`. After a failed parse(), the result is the parse error. With
+	// DataValidationOptions.keep_positions and the text kept by parse(), issues get their line.
+	Ref<DataValidation> validate(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options = Ref<DataValidationOptions>()) const;
 
 	// Reads and parses a file (like ConfigFile.load(); no resource cache, resource_path unchanged).
 	Error load(const String &p_path);

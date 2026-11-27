@@ -145,6 +145,27 @@ TEST_CASE("[FlowGraph] Node ids are owned by the graph and never reused") {
 	CHECK(graph->get_node_ids() == PackedInt32Array({ 1, 2 }));
 }
 
+TEST_CASE("[FlowGraph] One start node") {
+	Ref<FlowGraph> graph;
+	graph.instantiate();
+	const int first = graph->add_node(memnew(FlowStartNode));
+	const int second = graph->add_node(memnew(FlowStartNode));
+	const int end = graph->add_node(memnew(FlowEndNode));
+	CHECK(graph->get_start_node_id() == first);
+	CHECK(has_issue(graph->validate(), FlowGraphValidation::ISSUE_KIND_MULTIPLE_START, second));
+	CHECK_FALSE(has_issue(graph->validate(), FlowGraphValidation::ISSUE_KIND_MULTIPLE_START, first));
+
+	graph->set_start_node_id(end);
+	CHECK(has_issue(graph->validate(), FlowGraphValidation::ISSUE_KIND_INVALID_START, end));
+
+	graph->set_start_node_id(first);
+	graph->remove_node(first);
+	CHECK(graph->get_start_node_id() == second); // The remaining start node takes over.
+	CHECK_FALSE(has_issue(graph->validate(), FlowGraphValidation::ISSUE_KIND_MULTIPLE_START, second));
+	graph->remove_node(second);
+	CHECK(graph->get_start_node_id() == FlowGraph::NODE_ID_NONE);
+}
+
 TEST_CASE("[FlowGraph] A node can't be added to two graphs") {
 	Ref<FlowGraph> first;
 	first.instantiate();

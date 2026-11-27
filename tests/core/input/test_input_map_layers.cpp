@@ -352,14 +352,49 @@ TEST_CASE("[InputActions] Lookup by name, replace, rename and remove") {
 	CHECK_FALSE(actions->has_action("jump"));
 	CHECK(actions->get_action("shoot") == fire);
 
-	// set_actions(): the later action of a name wins.
+	// set_actions(): all entries are kept (with a warning), the later action of a name wins.
 	TypedArray<InputAction> list;
 	list.push_back(Ref<InputAction>(memnew(InputAction("a", 0.1f))));
 	list.push_back(Ref<InputAction>(memnew(InputAction("b"))));
 	list.push_back(Ref<InputAction>(memnew(InputAction("a", 0.9f))));
+	ERR_PRINT_OFF;
 	actions->set_actions(list);
-	CHECK(actions->get_action_count() == 2);
+	ERR_PRINT_ON;
+	CHECK(actions->get_action_count() == 3);
+	CHECK(actions->get_actions().size() == 3);
 	CHECK(actions->get_action("a")->get_deadzone() == doctest::Approx(0.9f));
+	CHECK(actions->remove_action("a"));
+	CHECK(actions->get_action("a")->get_deadzone() == doctest::Approx(0.1f));
+}
+
+TEST_CASE("[InputActions] Empty slots of the Inspector are kept (#398)") {
+	// "Add Element" in the Inspector sets the array with a null slot; it must stay until it gets a value.
+	Ref<InputAction> action = Ref<InputAction>(memnew(InputAction("jump")));
+	TypedArray<InputEvent> events;
+	events.push_back(InputEventJoypadButton::create_reference(JoyButton::A));
+	events.push_back(Variant());
+	action->set_events(events);
+	CHECK(action->get_events().size() == 2);
+	// A typed array keeps the empty slot as a null object.
+	CHECK(Ref<InputEvent>(action->get_events()[1]).is_null());
+	CHECK(action->get_event_count() == 1);
+	CHECK(action->get_device_events(InputAction::INPUT_DEVICE_GAMEPAD).size() == 1);
+	CHECK_FALSE(action->has_event(Ref<InputEventKey>(memnew(InputEventKey))));
+	// A method that changes the events drops the empty slots.
+	action->clear_events();
+	CHECK(action->get_events().is_empty());
+
+	Ref<InputActions> actions;
+	actions.instantiate();
+	TypedArray<InputAction> list;
+	list.push_back(Variant());
+	list.push_back(action);
+	actions->set_actions(list);
+	CHECK(actions->get_actions().size() == 2);
+	CHECK(actions->get_action_count() == 1);
+	CHECK(actions->get_action("jump") == action);
+	actions->clear();
+	CHECK(actions->get_actions().is_empty());
 }
 
 TEST_CASE("[SceneTree][InputMap] Built-in actions come from the generated data") {

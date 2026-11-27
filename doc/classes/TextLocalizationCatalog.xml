@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TextLocalizationCatalog" inherits="LocalizationCatalog" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A catalog of localized texts with context, plural forms and plural rules.
+	</brief_description>
+	<description>
+		A [TextLocalizationCatalog] stores the texts of many keys in many locales (see [LocalizationCatalog] for the layout, the file formats and loading per locale). A key can have a context ([code]"menu"[/code] for the same key in another place), and each locale can have plural forms with its own plural rule.
+		It replaces a set of [Translation] resources (one per locale and file) with one resource per table. [method to_translations] and [method add_translation] convert between both.
+		[codeblocks]
+		[gdscript]
+		var catalog = TextLocalizationCatalog.new()
+		catalog.set_text("HELLO", "en", "Hello")
+		catalog.set_text("HELLO", "de", "Hallo")
+		catalog.set_text("HELLO", "de", "Hallo!", "menu")
+		catalog.set_plural_texts("APPLE", "de", ["%d Apfel", "%d Äpfel"])
+		print(catalog.get_plural_text("APPLE", "de", 3) % 3) # 3 Äpfel
+		print(catalog.to_text(ResourceTextSerializer.FORMAT_JSON))
+		[/gdscript]
+		[csharp]
+		var catalog = new TextLocalizationCatalog();
+		catalog.SetText("HELLO", "en", "Hello");
+		catalog.SetText("HELLO", "de", "Hallo");
+		catalog.SetText("HELLO", "de", "Hallo!", "menu");
+		catalog.SetPluralTexts("APPLE", "de", ["%d Apfel", "%d Äpfel"]);
+		GD.Print(catalog.GetPluralText("APPLE", "de", 3)); // %d Äpfel
+		GD.Print(catalog.ToText(ResourceTextSerializer.Format.Json));
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+		<link title="Localization catalogs (wiki)">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Localization-Catalogs</link>
+	</tutorials>
+	<methods>
+		<method name="add_translation">
+			<return type="void" />
+			<param index="0" name="translation" type="Translation" />
+			<description>
+				Adds all messages of [param translation] to the column of its locale, with their context and plural forms, and takes over its [member Translation.plural_rules_override]. Existing texts of the same keys are replaced.
+				[b]Note:[/b] [OptimizedTranslation] does not store its keys, so it can't be converted; convert the source [Translation] or CSV instead.
+			</description>
+		</method>
+		<method name="get_plural_form" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="locale" type="String" />
+			<param index="1" name="n" type="int" />
+			<description>
+				Returns the index of the plural form to use for the number [param n] in [param locale]. The rule is the one set with [method set_plural_rule], otherwise the default rule of the locale ([method TranslationServer.get_plural_rules]), otherwise the English rule, like in [Translation].
+			</description>
+		</method>
+		<method name="get_plural_key" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the plural key of [param key] (the [code]?plural[/code] column of a CSV file, the untranslated plural text), or an empty [String].
+			</description>
+		</method>
+		<method name="get_plural_rule" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="locale" type="String" />
+			<description>
+				Returns the plural rule set for [param locale], or an empty [String] if the locale uses its default rule.
+			</description>
+		</method>
+		<method name="get_plural_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="n" type="int" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the plural form of [param key] in [param locale] for the number [param n] (see [method get_plural_form]). Without plural forms, returns the text of the key.
+			</description>
+		</method>
+		<method name="get_plural_texts" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns all plural forms of [param key] in [param locale]. Without plural forms, returns the text as the only element (or an empty array if there is no text).
+			</description>
+		</method>
+		<method name="get_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Returns the text of [param key] with [param context] in [param locale] (the first plural form for plural keys), or an empty [String]. The locale is not resolved: [code]"de_DE"[/code] does not fall back to [code]"de"[/code] here (that is the job of the localization server).
+			</description>
+		</method>
+		<method name="set_plural_key">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="plural_key" type="String" />
+			<param index="2" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Sets the plural key of [param key] (see [method get_plural_key]). Adds the key if needed.
+			</description>
+		</method>
+		<method name="set_plural_rule">
+			<return type="void" />
+			<param index="0" name="locale" type="String" />
+			<param index="1" name="rule" type="String" />
+			<description>
+				Sets the plural rule of [param locale] in gettext form, for example [code]"nplurals=2; plural=(n != 1);"[/code]. An empty [param rule] uses the default rule of the locale.
+			</description>
+		</method>
+		<method name="set_plural_texts">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="texts" type="PackedStringArray" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Sets the plural forms of [param key] in [param locale]. The first form is also the text returned by [method get_text]. Adds the key and the locale if needed.
+			</description>
+		</method>
+		<method name="set_text">
+			<return type="void" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="locale" type="String" />
+			<param index="2" name="text" type="String" />
+			<param index="3" name="context" type="StringName" default="&amp;&quot;&quot;" />
+			<description>
+				Sets the text of [param key] with [param context] in [param locale]. Adds the key and the locale if needed. An empty [param text] marks the key as missing in that locale.
+			</description>
+		</method>
+		<method name="to_po" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="locale" type="String" default="&quot;&quot;" />
+			<description>
+				Returns the catalog in the gettext format: a template (POT) with empty translations if [param locale] is empty, otherwise a PO file of [param locale] with its texts, its plural rule as [code]Plural-Forms[/code] header and [code]Language[/code] header. Contexts become [code]msgctxt[/code], plural keys [code]msgid_plural[/code] with [code]msgstr[N][/code] per form, translator notes [code]#.[/code] comments ([code]#. max_length: 12[/code] for other note columns than [code]notes[/code]). Godot's PO loader reads the PO files as [Translation]. The inspector of a text catalog has a "Save POT..." button.
+				[codeblocks]
+				[gdscript]
+				var file = FileAccess.open("res://localization/ui.pot", FileAccess.WRITE)
+				file.store_string(catalog.to_po())
+				[/gdscript]
+				[csharp]
+				using var file = FileAccess.Open("res://localization/ui.pot", FileAccess.ModeFlags.Write);
+				file.StoreString(catalog.ToPo());
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="to_translations">
+			<return type="Translation[]" />
+			<description>
+				Returns one [Translation] per locale with all texts, contexts, plural forms and plural rules, for example to add them to the [TranslationServer]. Loads all locales.
+			</description>
+		</method>
+	</methods>
+</class>

@@ -141,6 +141,7 @@
 /modules/interactive_music/**/SCsub           @godotengine/audio @godotengine/buildsystem
 /modules/interactive_music/doc_classes/       @godotengine/audio @godotengine/documentation
 /modules/interactive_music/editor/            @godotengine/audio @godotengine/editor
+/modules/interactive_music/tests/             @godotengine/audio @godotengine/tests
 /modules/mp3/                                 @godotengine/audio
 /modules/mp3/**/*.py                          @godotengine/audio @godotengine/buildsystem
 /modules/mp3/**/SCsub                         @godotengine/audio @godotengine/buildsystem
@@ -547,11 +548,13 @@
 /modules/toml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/toml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/toml/editor/                         @TruelyMostWanted @godotengine/editor
 /modules/toml/tests/                          @TruelyMostWanted @godotengine/tests
 /modules/yaml/                                @TruelyMostWanted
 /modules/yaml/**/*.py                         @TruelyMostWanted @godotengine/buildsystem
 /modules/yaml/**/SCsub                        @TruelyMostWanted @godotengine/buildsystem
 /modules/yaml/doc_classes/                    @TruelyMostWanted @godotengine/documentation
+/modules/yaml/editor/                         @TruelyMostWanted @godotengine/editor
 /modules/yaml/tests/                          @TruelyMostWanted @godotengine/tests
 /modules/sqlite/                              @TruelyMostWanted
 /modules/sqlite/**/*.py                       @TruelyMostWanted @godotengine/buildsystem

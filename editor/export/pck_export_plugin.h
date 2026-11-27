@@ -36,6 +36,7 @@
 
 class CheckBox;
 class EditorFileDialog;
+class Label;
 class LineEdit;
 class OptionButton;
 
@@ -76,6 +77,7 @@ class PCKPackageExportDialog : public ConfirmationDialog {
 	Button *target_browse = nullptr;
 	CheckBox *debug_check = nullptr;
 	CheckBox *dependencies_check = nullptr;
+	Label *hint_label = nullptr; // Why "Build" is disabled.
 	EditorFileDialog *description_dialog = nullptr;
 	EditorFileDialog *target_dialog = nullptr;
 

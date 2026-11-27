@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="DialogueOption" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		One option of a [DialogueChoiceNode].
+	</brief_description>
+	<description>
+		A dialogue option is one answer the player can choose in a [DialogueChoiceNode]: its [member text], the flow output it continues through ([member port]), an optional [member condition] and whether it can be taken only [member once].
+		[codeblocks]
+		[gdscript]
+		var buy := DialogueOption.new()
+		buy.port = &amp;"buy"
+		buy.text = "Buy a sword (10 gold)"
+		buy.condition = "gold &gt;= 10"
+		choice.options = [buy]
+		[/gdscript]
+		[csharp]
+		var buy = new DialogueOption { Port = "buy", Text = "Buy a sword (10 gold)", Condition = "gold &gt;= 10" };
+		choice.Options = [buy];
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="condition" type="String" setter="set_condition" getter="get_condition" default="&quot;&quot;">
+			An [Expression] that decides whether the option is available. Every variable of the playback's [FlowBlackboard] can be used by its name, for example [code]gold &gt;= 10 and not met_king[/code]. An empty condition is always true; a condition that can't be parsed or fails is false and prints an error. The expression is parsed once and parsed again only when the condition or the set of variable names changes. It has no base instance; global functions can still be called, so treat dialogue files from untrusted sources (mods in [code]user://[/code]) like scripts.
+		</member>
+		<member name="once" type="bool" setter="set_once" getter="is_once" default="false">
+			If [code]true[/code], the option is disabled after it was taken once in the current run of the graph (see [DialogueChoiceNode]).
+		</member>
+		<member name="port" type="StringName" setter="set_port" getter="get_port" default="&amp;&quot;&quot;">
+			The name of the flow output of the option. If empty, the output is named [code]option_&lt;index&gt;[/code]; set a name to keep connections when options are reordered. Two options with the same port are a configuration warning.
+		</member>
+		<member name="text" type="String" setter="set_text" getter="get_text" default="&quot;&quot;">
+			The text of the option, or a translation key. It is translated with the [member DialogueChoiceNode.translation_context] and becomes the label of the [FlowExit].
+		</member>
+	</members>
+</class>

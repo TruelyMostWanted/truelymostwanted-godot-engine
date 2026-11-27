@@ -4,10 +4,11 @@
 		Reads and writes CSV text as arrays, and list resources as CSV.
 	</brief_description>
 	<description>
-		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
+		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Files with the extension [code].csv[/code] or [code].tsv[/code] load as [CSV]; for [code].tsv[/code] without [member TextDataFormat.options], the separator is a tab. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
 		Cells that contain the delimiter, a double quote, a line break or leading or trailing spaces are written in double quotes, and a double quote inside is doubled ([code]""[/code]). The delimiter comes from [member SerializerOptions.csv_delimiter] (one character, for example [code];[/code] or a tab).
 		The [member TextDataFormat.data] of an instance is an [Array] of rows, each row a [PackedStringArray]. With [member SerializerOptions.csv_headers] (the default), the first line names the columns: it is stored in [member header] and is not part of the data, and [method get_row_as_dictionary] keys a row by column name. Without it, [member header] is empty and every line is a data row. Columns are [int] indices; [method find_column] resolves a name. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
 		The static [method parse_string] returns an [Array] of [Dictionary] keyed by column name when headers are on, and an [Array] of [PackedStringArray] otherwise.
+		In the editor, a CSV file opens in the text editor and in the [b]CSV Table[/b] bottom dock at the same time: cells are typed and checked by a [DataSchema] (found by [member DataSchema.file_patterns]), translation tables are checked with [method validate_translation], and both editors always show the same data.
 		[codeblocks]
 		[gdscript]
 		var csv = CSV.new()
@@ -54,6 +55,14 @@
 				Adds [param values] as a new row at the end. Drops the kept parsed text.
 			</description>
 		</method>
+		<method name="append_typed_row">
+			<return type="int" enum="Error" />
+			<param index="0" name="values" type="Dictionary" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Adds a row from typed [param values], keyed by the column names of [member header] (by the field names of [param schema] in order if there is no header). Numbers, booleans and strings are written plainly, other types with [method @GlobalScope.var_to_str]. A missing key writes the field's [member DataField.default_value]. Returns [constant ERR_INVALID_DATA] and adds nothing if a value does not convert to the type of its field.
+			</description>
+		</method>
 		<method name="deserialize" qualifiers="static">
 			<return type="Resource" />
 			<param index="0" name="text" type="String" />
@@ -84,6 +93,16 @@
 			<param index="1" name="column" type="int" />
 			<description>
 				Returns the cell at [param row] and [param column], or an empty [String] if the row is shorter than [param column]. Prints an error if [param row] is out of range.
+			</description>
+		</method>
+		<method name="get_cells" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="column" type="int" />
+			<param index="2" name="row_count" type="int" />
+			<param index="3" name="column_count" type="int" />
+			<description>
+				Returns a block of [param row_count] rows and [param column_count] columns starting at [param row] and [param column], as an [Array] of [PackedStringArray]. Rows past the last row are left out; cells missing in a row are empty strings. With [method stringify] and a tab delimiter, the block becomes text that spreadsheets paste.
 			</description>
 		</method>
 		<method name="get_column" qualifiers="const">
@@ -117,6 +136,22 @@
 			<return type="int" />
 			<description>
 				Returns the number of data rows, not counting the header.
+			</description>
+		</method>
+		<method name="get_typed_column" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="column" type="int" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Returns the cells of [param column] converted to the type of its field in [param schema]: a [PackedInt64Array] for [int], [PackedFloat64Array] for [float], [PackedStringArray] for strings, [PackedVector2Array], [PackedVector3Array], [PackedVector4Array] or [PackedColorArray] for those types, an [Array] for other types. Empty and unconvertible cells give the field's [member DataField.default_value] (0 in packed number arrays).
+			</description>
+		</method>
+		<method name="get_typed_row" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="schema" type="DataSchema" />
+			<description>
+				Returns the row at index [param row] as a [Dictionary] of typed values, keyed by the column names of [member header] (by field name, or column index, if there is no header). Each cell is converted to the type of its field in [param schema] (by header name, or by position without a header); empty and unconvertible cells give the field's [member DataField.default_value], cells without a field stay strings.
 			</description>
 		</method>
 		<method name="insert_row">
@@ -159,6 +194,28 @@
 				Sets the cell at [param row] and [param column] to [param value]. A row that is shorter is padded with empty cells. Drops the kept parsed text.
 			</description>
 		</method>
+		<method name="set_cells">
+			<return type="void" />
+			<param index="0" name="row" type="int" />
+			<param index="1" name="column" type="int" />
+			<param index="2" name="cells" type="Array" />
+			<description>
+				Writes a block of cells (an [Array] of [PackedStringArray], one per row) with its first cell at [param row] and [param column]. Rows past the last row are appended, short rows are extended. [param row] may be [method get_row_count] to append the block. Emits [signal Resource.changed] once for the whole block.
+				Paste tab-separated text copied from a spreadsheet:
+				[codeblocks]
+				[gdscript]
+				var options = SerializerOptions.new()
+				options.csv_delimiter = "\t"
+				options.csv_headers = false
+				csv.set_cells(0, 1, CSV.parse_string(DisplayServer.clipboard_get(), options))
+				[/gdscript]
+				[csharp]
+				var options = new SerializerOptions { CsvDelimiter = "\t", CsvHeaders = false };
+				csv.SetCells(0, 1, Csv.ParseString(DisplayServer.ClipboardGet(), options));
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="set_row">
 			<return type="void" />
 			<param index="0" name="row" type="int" />
@@ -173,6 +230,37 @@
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
 				Writes the rows in [param data] as CSV text. Rows are either all [Dictionary]s or all arrays ([Array] or [PackedStringArray]). For dictionaries, the columns are the keys in order of first appearance (sorted with [member SerializerOptions.sort_keys]), a header row is written unless [member SerializerOptions.csv_headers] is off, and a missing key is an empty cell. Values are converted with [method @GlobalScope.str], [code]null[/code] is an empty cell. Returns an empty [String] and prints an error if a row has another type.
+			</description>
+		</method>
+		<method name="validate_translation" qualifiers="const">
+			<return type="DataValidation" />
+			<param index="0" name="options" type="DataValidationOptions" default="null" />
+			<description>
+				Validates the CSV as a translation table, with the rules of the CSV translation importer: column 0 holds the keys, columns named [code]?context[/code] and [code]?plural[/code] hold the message context and plural form, columns starting with [code]_[/code] are ignored, all other columns are locales. Rows whose key is [code]?pluralrule[/code] and rows without a key (further plural forms) are not checked. The importer uses the same header checks.
+				The result contains:
+				- [constant DataValidation.ISSUE_KIND_INVALID_LOCALE] for a header cell that is no locale (the importer ignores the column), for a locale whose language code is unknown (the importer imports it anyway), and once without a position when no column starts with a known language code (the file is no translation table; rows are not checked then).
+				- [constant DataValidation.ISSUE_KIND_DUPLICATE_KEY] for a second [code]?context[/code] or [code]?plural[/code] column, and for a key used twice in the same context (the later row replaces the earlier one on import).
+				- [constant DataValidation.ISSUE_KIND_EMPTY_REQUIRED] for each missing translation: an empty locale cell in a row with a key. The field of the issue is the name of the locale column.
+				- [constant DataValidation.ISSUE_KIND_MISSING_FIELD] if the CSV has no [member header].
+				Rows and columns are 0-based ([code]row[/code] counts data rows, without the header); header issues have no row. With [member DataValidationOptions.keep_positions] and text kept by [method TextDataFormat.parse], issues also get their line.
+				[codeblocks]
+				[gdscript]
+				var csv = CSV.new()
+				csv.parse(FileAccess.get_file_as_string("res://translations/ui.csv"))
+				var result = csv.validate_translation()
+				for i in result.get_issue_count():
+				    print(result.get_issue_message(i))
+				[/gdscript]
+				[csharp]
+				var csv = new Csv();
+				csv.Parse(FileAccess.GetFileAsString("res://translations/ui.csv"));
+				DataValidation result = csv.ValidateTranslation();
+				for (int i = 0; i &lt; result.GetIssueCount(); i++)
+				{
+				    GD.Print(result.GetIssueMessage(i));
+				}
+				[/csharp]
+				[/codeblocks]
 			</description>
 		</method>
 	</methods>

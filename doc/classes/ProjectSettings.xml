@@ -11,9 +11,9 @@
 	</description>
 	<tutorials>
 		<link title="Project Settings">$DOCS_URL/tutorials/editor/project_settings.html</link>
-		<link title="3D Physics Tests Demo">https://godotengine.org/asset-library/asset/2747</link>
-		<link title="3D Platformer Demo">https://godotengine.org/asset-library/asset/2748</link>
-		<link title="Operating System Testing Demo">https://godotengine.org/asset-library/asset/2789</link>
+		<link title="3D Physics Tests Demo">https://store.godotengine.org/asset/godot-foundation/physics-tests-3d-demo/</link>
+		<link title="3D Platformer Demo">https://store.godotengine.org/asset/godot-foundation/platformer-3d-demo/</link>
+		<link title="Operating System Testing Demo">https://store.godotengine.org/asset/godot-foundation/operating-system-testing-demo/</link>
 	</tutorials>
 	<methods>
 		<method name="add_property_info">
@@ -501,6 +501,9 @@
 		<member name="audio/general/text_to_speech" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], text-to-speech support is enabled on startup, otherwise it is enabled the first time any TTS method is used. See also [method DisplayServer.tts_get_voices] and [method DisplayServer.tts_speak].
 			[b]Note:[/b] Enabling TTS can cause additional idle CPU usage and interfere with the sleep mode, so consider disabling it if TTS is not used.
+		</member>
+		<member name="audio/info/read_file_tags" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], track information (title, artist, album, cover and so on, see [member AudioStream.title]) is read from the file when an [AudioStreamMP3], [AudioStreamWAV], [AudioStreamOggVorbis] or [AudioStreamOpus] is loaded from a buffer or file at runtime, and when such a file is imported. If [code]false[/code], the track information stays empty and the tags are not parsed. Can be overridden per file with the [code]info/read_file_tags[/code] import option.
 		</member>
 		<member name="audio/mixer/default_commands" type="String" setter="" getter="" default="&quot;&quot;">
 			Path to an [AudioCommandList] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
@@ -1251,6 +1254,10 @@
 		</member>
 		<member name="editor/version_control/plugin_name" type="String" setter="" getter="" default="&quot;&quot;">
 		</member>
+		<member name="filesystem/data/schema_files" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			The [DataSchema] files of the project. When a data file (JSON, INI, CSV, XML, TOML, YAML) is open in the script editor, the editor validates it while typing against the first schema in this list whose [member DataSchema.file_patterns] match the file's path, and marks the lines of all issues. Used by the editor only; at runtime, pass the schema to [method TextDataFormat.validate] or [method DataSchema.validate] directly.
+			See also [member EditorSettings.text_editor/data_files/schema_validation_max_size_mb].
+		</member>
 		<member name="filesystem/import/blender/enabled" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], Blender 3D scene files with the [code].blend[/code] extension will be imported by converting them to glTF 2.0.
 			This requires configuring a path to a Blender executable in the [member EditorSettings.filesystem/import/blender/blender_path] setting. Blender 3.0 or later is required.
@@ -1342,6 +1349,9 @@
 		</member>
 		<member name="filesystem/streaming_assets/target_folder" type="String" setter="" getter="" default="&quot;{exe_name}_Data/StreamingAssets&quot;">
 			The folder that holds the streaming assets in [code]Raw[/code] mode, relative to the folder of the executable (Windows, Linux) or to the bundle resources (macOS, iOS). Placeholders are expanded with [method StreamingAssetsServer.expand_template]: [code]{exe_name}[/code] is the base name of the exported executable, for example [code]MyGame[/code] for [code]MyGame.exe[/code]. Must be a relative folder without [code].[/code] or [code]..[/code].
+		</member>
+		<member name="flow_graph/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [FlowGraph] files in text formats ([code]mmd[/code] and the JSON, YAML and TOML formats of [ResourceTextSerializer]) are converted to binary [code]res[/code] files on export, so exported projects load them without parsing text. [code]tres[/code] files follow [member editor/export/convert_text_resources_to_binary].
 		</member>
 		<member name="gui/common/auto_focus_strategy" type="int" setter="" getter="" default="0">
 			Determines what strategy to use when inferring the top/left/right/bottom [Control] to focus if no neighbor is defined.
@@ -1893,6 +1903,13 @@
 			If non-empty, this locale will be used instead of the automatically detected system locale.
 			[b]Note:[/b] This setting also applies to the exported project. To only affect testing within the editor, override this setting with an [code]editor[/code] [url=$DOCS_URL/tutorials/export/feature_tags.html]feature tag[/url] for localization testing purposes.
 		</member>
+		<member name="internationalization/localization/catalog_manifests" type="Array" setter="" getter="" default="[]">
+			The localization catalogs of the game, DLCs and mods as a list of [FilesManifest]s, loaded at startup by [method LocalizationServer.load_project_catalogs]. The list order is the priority: the catalogs of a later manifest win over those of an earlier one. The [member FilesManifest.type_hint] of a manifest names the catalog kind: [code skip-lint]TextLocalizationCatalog[/code] (also when empty) for [TextLocalizationServer], [code skip-lint]ResourceLocalizationCatalog[/code] for [ResourceLocalizationServer]. Without [member FilesManifest.extensions], all catalog formats are listed. Folders may hold wildcards, for example [code]user://mods/*/translations[/code]; missing folders are skipped. On the Web, only paths in [code]user://[/code] or the PCK can be read.
+			[b]Note:[/b] Resource catalogs replace the remaps of the Localization tab ([code]internationalization/locale/translation_remaps[/code]), which are still imported as the first resource layer.
+		</member>
+		<member name="internationalization/localization/export/convert_text_to_binary" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], the text catalogs (CSV, JSON, YAML, TOML, INI, XML) listed by [member internationalization/localization/catalog_manifests] are exported as binary [code].lcat[/code] files: the text is parsed once in the editor, and the game loads only the keys and reads one locale at a time. The original path keeps working through a remap, so manifests and [method ResourceLoader.load] need no change. Catalogs in [code].lcat[/code], [code].tres[/code] or [code].res[/code] are exported unchanged.
+		</member>
 		<member name="internationalization/pseudolocalization/double_vowels" type="bool" setter="" getter="" default="false">
 			Double vowels in strings during pseudolocalization to simulate the lengthening of text due to localization.
 		</member>
@@ -1936,6 +1953,15 @@
 			"ICU / HarfBuzz / Graphite" ([TextServerAdvanced]) is the most advanced text driver, supporting right-to-left typesetting and complex scripts (for languages like Arabic, Hebrew, etc.). The "Fallback" text driver ([TextServerFallback]) does not support right-to-left typesetting and complex scripts.
 			[b]Note:[/b] The driver in use can be overridden at runtime via the [code]--text-driver[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
 			[b]Note:[/b] There is an additional [code]Dummy[/code] text driver available, which disables all text rendering and font-related functionality. This driver is not listed in the project settings, but it can be enabled when running the editor or project using the [code]--text-driver Dummy[/code] [url=$DOCS_URL/tutorials/editor/command_line_tutorial.html]command line argument[/url].
+		</member>
+		<member name="internationalization/text_insertion/default_values" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Paths of [TextInsertionValues] resources that [TextInsertionServer] adds on its first use, as with [method TextInsertionServer.add_values].
+		</member>
+		<member name="internationalization/text_insertion/escape_bbcode" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [method TextInsertionServer.insert] and [method TextInsertionServer.insert_template] escape the inserted values for [RichTextLabel] when called with [constant TextInsertionServer.ESCAPE_DEFAULT].
+		</member>
+		<member name="internationalization/text_insertion/warn_missing_values" type="bool" setter="" getter="" default="true">
+			If [code]true[/code], [TextInsertionServer] prints a warning once per name when a placeholder has no value or uses an unknown modifier. Only in debug builds.
 		</member>
 		<member name="layer_names/2d_navigation/layer_1" type="String" setter="" getter="" default="&quot;&quot;">
 			Optional name for the 2D navigation layer 1. If left empty, the layer will display as "Layer 1".
@@ -3794,6 +3820,57 @@
 		</member>
 		<member name="settings/camera_3d/override_format" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]) stores its file in [member settings/camera_3d/format] instead of [member settings/general/default_format].
+		</member>
+		<member name="settings/defaults/accessibility" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"accessibility"[/code] domain ([AccessibilitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/audio_bus" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_bus"[/code] domain ([AudioBusSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings]. Not used by this domain: its defaults are the project's bus layout.
+		</member>
+		<member name="settings/defaults/audio_device" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"audio_device"[/code] domain ([AudioDeviceSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/camera_3d" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"camera_3d"[/code] domain ([Camera3DSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/engine" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"engine"[/code] domain ([EngineSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/graphics_preset" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"graphics_preset"[/code] domain ([GraphicsPresetSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input"[/code] domain ([InputSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/input_map" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"input_map"[/code] domain ([InputMapSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/language" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"language"[/code] domain ([LanguageSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_effect" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_effect"[/code] domain ([RenderEffectSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/render_quality" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"render_quality"[/code] domain ([RenderQualitySettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/shadow" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"shadow"[/code] domain ([ShadowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture"[/code] domain ([TextureSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/texture_streaming" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"texture_streaming"[/code] domain ([TextureStreamingSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/tts_personas" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"tts_personas"[/code] domain ([TTSPersonaSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/window" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"window"[/code] domain ([WindowSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
+		</member>
+		<member name="settings/defaults/xr" type="String" setter="" getter="" default="&quot;&quot;">
+			An optional resource with the project defaults of the [code]"xr"[/code] domain ([XRSettingsServer]), for example a [code].tres[/code] file saved from its settings resource. Only the properties that exist in both resources are taken from it, after the engine state captured at startup. See [method SettingsServer.get_default_settings].
 		</member>
 		<member name="settings/engine/allow_simulation_values" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], players may change the simulation values of [EngineSettingsServer] ([code]time_scale[/code], [code]physics_ticks_per_second[/code], [code]max_physics_steps_per_frame[/code], [code]physics_jitter_fix[/code] and [code]audio_playback_speed_scale[/code]) through the API and their settings file. If [code]false[/code], these values stay at the project values: a hand-edited file or a call of [method SettingsServer.set_value] is ignored with a warning, and [method SettingsServer.is_value_supported] returns [code]false[/code] for them. Command-line options such as [code]--time-scale[/code] still apply. See [method EngineSettingsServer.is_simulation_locked].

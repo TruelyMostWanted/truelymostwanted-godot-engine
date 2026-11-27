@@ -2008,6 +2008,11 @@ Ref<Resource> YAML::deserialize(const String &p_text, const StringName &p_type_h
 	return serializer->deserialize(p_text, ResourceTextSerializer::FORMAT_YAML, p_type_hint, p_options);
 }
 
+YAML::YAML() {
+	// A new YAML document is an empty mapping ("{}"), not null.
+	_get_data_ref() = Dictionary();
+}
+
 void YAML::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_value", "path", "default"), &YAML::get_value, DEFVAL(Variant()));
 	ClassDB::bind_method(D_METHOD("set_value", "path", "value"), &YAML::set_value);

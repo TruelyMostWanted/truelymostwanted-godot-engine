@@ -8,6 +8,9 @@ def configure(env):
 
 def get_doc_classes():
     return [
+        "DialogueChoiceNode",
+        "DialogueLineNode",
+        "DialogueOption",
         "FlowBlackboard",
         "FlowBranchNode",
         "FlowConnection",
@@ -18,6 +21,8 @@ def get_doc_classes():
         "FlowFrame",
         "FlowGetVariableNode",
         "FlowGraph",
+        "FlowGraphMermaid",
+        "FlowGraphMermaidOptions",
         "FlowGraphPlayback",
         "FlowGraphPlayer",
         "FlowGraphState",

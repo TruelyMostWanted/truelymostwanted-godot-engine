@@ -4171,7 +4171,8 @@ String String::simplify_path() const {
 	if (p > 0) {
 		bool only_chars = true;
 		for (int i = 0; i < p; i++) {
-			if (!is_ascii_alphanumeric_char(s[i])) {
+			// Truely: allow '_' so path prefixes such as "pp_a://" keep their "://" (#388).
+			if (!is_ascii_alphanumeric_char(s[i]) && s[i] != '_') {
 				only_chars = false;
 				break;
 			}

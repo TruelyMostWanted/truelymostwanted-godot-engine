@@ -234,7 +234,7 @@ int FlowGraphPlayback::_step(int p_id) {
 		_notify_debugger();
 		return FlowGraph::NODE_ID_NONE;
 	}
-	if (!_exit_current()) {
+	if (!_exit_current(port)) {
 		return FlowGraph::NODE_ID_NONE;
 	}
 	if (result == ENTER_RESULT_END) {
@@ -244,13 +244,13 @@ int FlowGraphPlayback::_step(int p_id) {
 	return _follow(port);
 }
 
-bool FlowGraphPlayback::_exit_current() {
+bool FlowGraphPlayback::_exit_current(const StringName &p_port) {
 	const uint64_t serial = run_serial;
 	const Frame &frame = stack[stack.size() - 1];
 	const int id = frame.node_id;
 	const Ref<FlowNode> node = frame.graph->get_node(id);
 	evaluations.push_back({ frame.graph, id });
-	node->exit(this);
+	node->exit(this, p_port);
 	evaluations.remove_at(evaluations.size() - 1);
 	if (run_serial != serial) {
 		return false;
@@ -281,7 +281,7 @@ int FlowGraphPlayback::_end_frame(const StringName &p_end_name) {
 	const Frame &frame = stack[stack.size() - 1];
 	const FlowSubgraphNode *subgraph = Object::cast_to<FlowSubgraphNode>(frame.graph->get_node(frame.node_id).ptr());
 	const StringName port = (subgraph != nullptr && !p_end_name.is_empty() && subgraph->get_exit_names().has(String(p_end_name))) ? p_end_name : SNAME("out");
-	if (!_exit_current()) {
+	if (!_exit_current(port)) {
 		return FlowGraph::NODE_ID_NONE;
 	}
 	return _follow(port);
@@ -321,7 +321,7 @@ Error FlowGraphPlayback::advance() {
 	const uint64_t serial = _begin();
 	waiting = false;
 	const StringName port = _choose_current();
-	if (run_serial != serial || !_exit_current()) {
+	if (run_serial != serial || !_exit_current(port)) {
 		return OK;
 	}
 	return _run(serial, _follow(port));
@@ -333,7 +333,7 @@ Error FlowGraphPlayback::advance_to_exit(const StringName &p_port) {
 	ERR_FAIL_COND_V_MSG(output.is_null() || output->get_kind() != FlowPort::PORT_KIND_FLOW, ERR_INVALID_PARAMETER, vformat("FlowGraphPlayback: the current node has no flow output '%s'.", p_port));
 	const uint64_t serial = _begin();
 	waiting = false;
-	if (!_exit_current()) {
+	if (!_exit_current(p_port)) {
 		return OK;
 	}
 	return _run(serial, _follow(p_port));
@@ -642,7 +642,8 @@ void FlowGraphPlayback::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_state"), &FlowGraphPlayback::get_state);
 	ClassDB::bind_method(D_METHOD("set_state", "state"), &FlowGraphPlayback::set_state);
 
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "blackboard", PROPERTY_HINT_RESOURCE_TYPE, "FlowBlackboard"), "set_blackboard", "get_blackboard");
+	// Never null and not stored (like Node.multiplayer): no default-value comparison.
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "blackboard", PROPERTY_HINT_RESOURCE_TYPE, "FlowBlackboard", PROPERTY_USAGE_NONE), "set_blackboard", "get_blackboard");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_steps_per_advance", PROPERTY_HINT_RANGE, "1,65536,1,or_greater"), "set_max_steps_per_advance", "get_max_steps_per_advance");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_data_depth", PROPERTY_HINT_RANGE, "1,4096,1,or_greater"), "set_max_data_depth", "get_max_data_depth");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_subgraph_depth", PROPERTY_HINT_RANGE, "1,1024,1,or_greater"), "set_max_subgraph_depth", "get_max_subgraph_depth");

@@ -138,10 +138,17 @@ private:
 	String language;
 	bool auto_translate = false;
 
+	void _segment_changed();
+	void _connect_segment(const Ref<SubtitleSegment> &p_segment);
+	void _disconnect_segment(const Ref<SubtitleSegment> &p_segment);
+	void _disconnect_all_segments();
+
 protected:
 	static void _bind_methods();
 
 public:
+	~Subtitle();
+
 	void set_segments(const TypedArray<SubtitleSegment> &p_segments);
 	TypedArray<SubtitleSegment> get_segments() const;
 	void set_time_offset(double p_offset);
@@ -183,6 +190,9 @@ public:
 	// Segments as they are stored, for the formats and the server (no copy of the array).
 	const Vector<Ref<SubtitleSegment>> &get_segment_list() const { return segments; }
 };
+
+// Hint of the `subtitle_path` properties of streams and players (`PROPERTY_HINT_FILE`): subtitle files and saved `Subtitle` resources.
+#define SUBTITLE_PATH_HINT "*.srt,*.vtt,*.ttml,*.dfxp,*.ass,*.ssa,*.sbv,*.tres,*.res"
 
 VARIANT_ENUM_CAST(SubtitleSegment::Kind);
 VARIANT_ENUM_CAST(SubtitleSegment::Placement);

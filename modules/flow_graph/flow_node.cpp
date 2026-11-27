@@ -156,8 +156,11 @@ String FlowNode::get_category() const {
 }
 
 TypedArray<PackedStringArray> FlowNode::get_translatable_strings() const {
-	TypedArray<PackedStringArray> strings;
-	GDVIRTUAL_CALL(_get_translatable_strings, strings);
+	TypedArray<PackedStringArray> strings = _get_default_translatable_strings();
+	TypedArray<PackedStringArray> script_strings;
+	if (GDVIRTUAL_CALL(_get_translatable_strings, script_strings)) {
+		strings.append_array(script_strings);
+	}
 	return strings;
 }
 
@@ -207,7 +210,8 @@ FlowGraphPlayback::EnterResult FlowNode::enter(FlowGraphPlayback *p_playback) co
 	return _default_enter(p_playback);
 }
 
-void FlowNode::exit(FlowGraphPlayback *p_playback) const {
+void FlowNode::exit(FlowGraphPlayback *p_playback, const StringName &p_port) const {
+	_default_exit(p_playback, p_port); // Built-in bookkeeping runs even when a script overrides _exit().
 	GDVIRTUAL_CALL(_exit, Ref<FlowGraphPlayback>(p_playback));
 }
 
@@ -224,6 +228,11 @@ TypedArray<FlowExit> FlowNode::get_available_exits(FlowGraphPlayback *p_playback
 	if (GDVIRTUAL_CALL(_get_available_exits, Ref<FlowGraphPlayback>(p_playback), exits)) {
 		return exits;
 	}
+	return _default_get_available_exits(p_playback);
+}
+
+TypedArray<FlowExit> FlowNode::_default_get_available_exits(FlowGraphPlayback *p_playback) const {
+	TypedArray<FlowExit> exits;
 	_update_ports();
 	for (const Ref<FlowPort> &port : output_ports) {
 		if (port->get_kind() == FlowPort::PORT_KIND_FLOW) {

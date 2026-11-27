@@ -133,7 +133,7 @@
 		<method name="_get_translatable_strings" qualifiers="virtual const">
 			<return type="PackedStringArray[]" />
 			<description>
-				Override to return the texts of the node that should be translated, for example a dialogue line. Each entry is one string, described as a [PackedStringArray] in the order of the translation extractor: message id, context, plural id, comment (trailing items may be left out). [method FlowGraph.get_translatable_strings] collects the entries of all nodes of a graph. Return an empty array if the node has no texts.
+				Override to return the texts of the node that should be translated, for example a dialogue line. Each entry is one string, described as a [PackedStringArray] in the order of the translation extractor: message id, context, plural id, comment (trailing items may be left out). Built-in node types such as [DialogueLineNode] have their own entries; the entries of an override are added to them. [method FlowGraph.get_translatable_strings] collects the entries of all nodes of a graph, and the POT generation of the project settings collects them from graph files. Return an empty array if the node has no texts.
 			</description>
 		</method>
 		<method name="_process_waiting" qualifiers="virtual const">

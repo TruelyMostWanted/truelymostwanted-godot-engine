@@ -236,9 +236,9 @@ Error ResourceFormatSaverTextTree::save(const Ref<Resource> &p_resource, const S
 }
 
 void ResourceFormatSaverTextTree::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
-	if (recognize(p_resource) && _can_save(p_resource)) {
-		p_extensions->push_back(_get_extension());
-	}
+	// Nothing: the editor's save dialog offers a class only its native formats (its own savers, tres and res).
+	// The generic text formats stay available from code: ResourceSaver.save(resource, "x.json") goes through
+	// recognize_path(), which accepts the extension.
 }
 
 bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) const {
@@ -247,7 +247,6 @@ bool ResourceFormatSaverTextTree::recognize(const Ref<Resource> &p_resource) con
 }
 
 bool ResourceFormatSaverTextTree::recognize_path(const Ref<Resource> &p_resource, const String &p_path) const {
-	// Also when _can_save() is false, so that save() can report why the resource does not fit.
 	return p_path.get_extension().nocasecmp_to(_get_extension()) == 0;
 }
 
@@ -295,11 +294,6 @@ Error ResourceFormatLoaderResourceCSV::_parse_text(const String &p_text, const S
 
 Error ResourceFormatSaverResourceCSV::_write_text(const Ref<Resource> &p_resource, String &r_text, String &r_error) const {
 	return ResourceTextSerializer::write_csv(p_resource, ResourceTextSerializer::get_default_options(), r_text, r_error);
-}
-
-bool ResourceFormatSaverResourceCSV::_can_save(const Ref<Resource> &p_resource) const {
-	String error;
-	return ResourceTextSerializer::check_csv(p_resource, error) == OK;
 }
 
 /////////////////////////////////////////////////////////////////////////////

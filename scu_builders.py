@@ -436,6 +436,7 @@ def generate_scu_files(max_includes_per_scu):
             "/editor/export",
             "/editor/inspector",
             "/editor/scene",
+            "/editor/script",
             "/main",
             "/scene",
             "/servers",

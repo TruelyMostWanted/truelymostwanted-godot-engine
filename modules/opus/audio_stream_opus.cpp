@@ -32,6 +32,7 @@
 
 #include "core/io/file_access.h"
 #include "core/object/class_db.h"
+#include "scene/resources/audio/audio_stream_tags.h"
 
 static const int OPUS_SAMPLERATE = 48000;
 
@@ -199,6 +200,8 @@ void AudioStreamOpus::set_data(const Vector<uint8_t> &p_data) {
 
 	int64_t length_i = op_pcm_total(opus_file, -1);
 	length = (length_i > 0) ? (double(length_i) / OPUS_SAMPLERATE) : 0;
+	channels = op_channel_count(opus_file, -1);
+	bitrate = MAX(int(op_bitrate(opus_file, -1)), 0);
 
 	// Tags (parsed same as OGG Vorbis)
 	const OpusTags *opus_tags = op_tags(opus_file, -1);
@@ -251,7 +254,19 @@ double AudioStreamOpus::get_loop_offset() const {
 }
 
 double AudioStreamOpus::get_length() const {
-	return length;
+	return data.is_empty() ? AudioStream::get_length() : length;
+}
+
+int AudioStreamOpus::get_sample_rate() const {
+	return data.is_empty() ? AudioStream::get_sample_rate() : OPUS_SAMPLERATE;
+}
+
+int AudioStreamOpus::get_channel_count() const {
+	return data.is_empty() ? AudioStream::get_channel_count() : channels;
+}
+
+int AudioStreamOpus::get_bitrate() const {
+	return data.is_empty() ? AudioStream::get_bitrate() : bitrate;
 }
 
 Ref<AudioSample> AudioStreamOpus::generate_sample() const {
@@ -271,6 +286,7 @@ Ref<AudioStreamOpus> AudioStreamOpus::load_from_buffer(const Vector<uint8_t> &p_
 	opus_stream.instantiate();
 
 	opus_stream->set_data(p_stream_data);
+	AudioStreamTags::read_file_tags(opus_stream.ptr(), p_stream_data);
 
 	return opus_stream;
 }

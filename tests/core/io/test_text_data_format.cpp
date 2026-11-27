@@ -90,7 +90,7 @@ TEST_CASE("[TextDataFormat] Base API through INI") {
 	Ref<INI> ini;
 	ini.instantiate();
 	CHECK(ini->get_data().get_type() == Variant::DICTIONARY);
-	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini" }));
+	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini", "cfg" }));
 
 	const String text = "; comment\n[player]\nname=\"Ann\"\nlevel=3\n";
 	REQUIRE(ini->parse(text, true) == OK);
@@ -360,6 +360,42 @@ TEST_CASE("[TextDataFormat] Type check reads only the head of big files") {
 	const Ref<TextDataEntry> entry = ResourceLoader::load(marked_path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
 	REQUIRE(entry.is_valid());
 	CHECK(entry->get_title().length() == 20000);
+}
+
+TEST_CASE("[CSV] Blocks of cells for copy, paste and undo") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("name,hp,speed\nknight,100,4\narcher,60\n") == OK);
+
+	// Missing cells read as empty, rows past the end are left out.
+	const Array block = csv->get_cells(0, 1, 5, 2);
+	REQUIRE(block.size() == 2);
+	CHECK(PackedStringArray(block[0]) == PackedStringArray({ "100", "4" }));
+	CHECK(PackedStringArray(block[1]) == PackedStringArray({ "60", "" }));
+
+	// A pasted tab-separated block overwrites cells and appends rows.
+	Ref<SerializerOptions> tsv_options;
+	tsv_options.instantiate();
+	tsv_options->set_csv_delimiter("\t");
+	tsv_options->set_csv_headers(false);
+	const Array tsv = CSV::parse_string("70\t5\r\n50\t3\r\n", tsv_options);
+	csv->set_cells(1, 1, tsv);
+	CHECK(csv->get_row_count() == 3);
+	CHECK(csv->get_row(1) == PackedStringArray({ "archer", "70", "5" }));
+	CHECK(csv->get_row(2) == PackedStringArray({ "", "50", "3" }));
+
+	// Writing the old block back and removing the appended row restores the data (the table editor's undo).
+	Array old_block;
+	old_block.push_back(PackedStringArray({ "60", "" }));
+	csv->set_cells(1, 1, old_block);
+	csv->remove_row(2);
+	CHECK(csv->get_cell(1, 1) == "60");
+	CHECK(csv->get_row_count() == 2);
+
+	ERR_PRINT_OFF;
+	csv->set_cells(5, 0, tsv);
+	ERR_PRINT_ON;
+	CHECK(csv->get_row_count() == 2);
 }
 
 TEST_CASE("[TextDataFormat] Instance load() and save()") {

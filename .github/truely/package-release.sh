@@ -5,10 +5,14 @@
 #   artifacts-dir  bin/ files of all build jobs (godot.<platform>.<target>...) and
 #                  <platform>/GodotSharp/ for linuxbsd, windows and macos
 #   name           e.g. Truely-v0.1.0_Godot4.8-beta5_a1b2c3d
-#   config         version.txt of the standard templates, e.g. 4.8.beta5 (Mono gets ".mono")
+#   config         version.txt of the standard templates, e.g. 4.8.beta5 (.NET gets ".mono", Godot's template folder name)
+#
+# File names (#337): <name>_<platform>-<arch>[_dotnet].zip and <name>_export-templates[_dotnet].tpz,
+# platforms windows, linux, macos. The engine binaries keep Godot's ".mono" suffix.
 #
 # Editor zips hold one folder with the editor and ._sc_ (self-contained mode).
 # The .tpz files hold templates/ with version.txt, named like the official Godot templates.
+# PARTIAL=1: macOS builds that are missing are left out (published later by truely_release_update.yml).
 set -euo pipefail
 
 A="$(cd "$1" && pwd)"
@@ -16,7 +20,7 @@ mkdir -p "$2"
 OUT="$(cd "$2" && pwd)"
 NAME="$3"
 CONFIG="$4"
-DIST="$(cd "$(dirname "$0")/../../misc/dist" && pwd)"
+DIST="${DIST:-$(cd "$(dirname "$0")/../../misc/dist" && pwd)}"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
@@ -44,10 +48,10 @@ sharp() { # sharp <platform> <dest>: copies GodotSharp/ of a platform
 
 echo "Editors"
 for m in "" ".mono"; do
-	p="${m:+mono_}"
+	s="${m:+_dotnet}"
 
 	# Windows
-	f="${NAME}_${p}win64"
+	f="${NAME}_windows-x86_64$s"
 	d="$STAGE/$f/$f"
 	mkdir -p "$d"
 	cp "$(bin "godot.windows.editor.x86_64$m.exe")" "$d/$f.exe"
@@ -57,17 +61,21 @@ for m in "" ".mono"; do
 	zipdir "$STAGE/$f" "$OUT/$f.zip"
 
 	# Linux
-	if [ -z "$m" ]; then f="${NAME}_linux.x86_64"; else f="${NAME}_mono_linux_x86_64"; fi
+	f="${NAME}_linux-x86_64$s"
 	d="$STAGE/$f/$f"
 	mkdir -p "$d"
-	cp "$(bin "godot.linuxbsd.editor.x86_64$m")" "$d/${NAME}_${p}linux.x86_64"
-	chmod +x "$d/${NAME}_${p}linux.x86_64"
+	cp "$(bin "godot.linuxbsd.editor.x86_64$m")" "$d/$f.x86_64"
+	chmod +x "$d/$f.x86_64"
 	touch "$d/._sc_"
 	[ -z "$m" ] || sharp linuxbsd "$d"
 	zipdir "$STAGE/$f" "$OUT/$f.zip"
 
 	# macOS: Godot.app with ._sc_ next to it (the editor looks outside the bundle)
-	f="${NAME}_${p}macos.universal"
+	if [ -n "${PARTIAL:-}" ] && [ ! -e "$A/godot.macos.editor.universal$m" ]; then
+		echo "  (skipped: no macOS editor$m build, PARTIAL)"
+		continue
+	fi
+	f="${NAME}_macos-universal$s"
 	d="$STAGE/$f/$f"
 	mkdir -p "$d"
 	cp -R "$DIST/macos_tools.app" "$d/Godot.app"
@@ -81,7 +89,8 @@ done
 
 echo "Export templates"
 for m in "" ".mono"; do
-	p="${m:+mono_}"
+	s="${m:+_dotnet}"
+	p="${m:+dotnet_}"
 	t="$STAGE/${p}tpz/templates"
 	mkdir -p "$t"
 	printf '%s' "$CONFIG$m" >"$t/version.txt"
@@ -97,6 +106,11 @@ for m in "" ".mono"; do
 	done
 
 	# macOS: macos.zip with macos_template.app
+	if [ -n "${PARTIAL:-}" ] && [ ! -e "$A/godot.macos.template_release.universal$m" ]; then
+		echo "  (no macOS templates$m, PARTIAL)"
+		zipdir "$STAGE/${p}tpz" "$OUT/${NAME}_export-templates$s.tpz"
+		continue
+	fi
 	app="$STAGE/${p}macos/macos_template.app"
 	mkdir -p "$(dirname "$app")"
 	cp -R "$DIST/macos_template.app" "$app"
@@ -107,5 +121,5 @@ for m in "" ".mono"; do
 	done
 	zipdir "$STAGE/${p}macos" "$t/macos.zip" >/dev/null
 
-	zipdir "$STAGE/${p}tpz" "$OUT/${NAME}_${p}export_templates.tpz"
+	zipdir "$STAGE/${p}tpz" "$OUT/${NAME}_export-templates$s.tpz"
 done

@@ -163,6 +163,7 @@
 #endif // !defined(NAVIGATION_2D_DISABLED) || !defined(NAVIGATION_3D_DISABLED)
 #include "scene/resources/audio/audio_stream_generator.h"
 #include "scene/resources/dpi_texture.h"
+#include "scene/resources/localized_text.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/particle_process_material.h"
 #include "scene/resources/placeholder_textures.h"
@@ -181,6 +182,7 @@
 #include "scene/resources/style_box_texture.h"
 #include "scene/resources/surface_tool.h"
 #include "scene/resources/syntax_highlighter.h"
+#include "scene/resources/system_font_resource_format.h"
 #include "scene/resources/text_line.h"
 #include "scene/resources/text_paragraph.h"
 #include "scene/resources/texture.h"
@@ -424,6 +426,7 @@ static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
 
 static Ref<ResourceFormatSaverFontFile> resource_saver_font_file;
 static Ref<ResourceFormatLoaderFontFile> resource_loader_font_file;
+static Ref<ResourceFormatLoaderSystemFont> resource_loader_system_font;
 
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
@@ -492,6 +495,11 @@ void register_scene_types() {
 
 		resource_loader_font_file.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_font_file);
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		resource_loader_system_font.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_system_font);
 	}
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -1085,6 +1093,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(Theme);
 	GDREGISTER_CLASS(InputIconSet);
 	GDREGISTER_CLASS(ProgressBarStyle);
+	GDREGISTER_CLASS(LocalizedText);
 
 	GDREGISTER_CLASS(BitMap);
 	GDREGISTER_CLASS(Gradient);
@@ -1446,6 +1455,7 @@ void unregister_scene_types() {
 		memdelete(progress_bar_server);
 		progress_bar_server = nullptr;
 	}
+	LocalizedText::finish();
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		ResourceSaver::remove_resource_format_saver(resource_saver_audio_stream_wav);
@@ -1510,6 +1520,11 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_font_file);
 		resource_loader_font_file.unref();
+	}
+
+	if constexpr (GD_IS_CLASS_ENABLED(SystemFont)) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_system_font);
+		resource_loader_system_font.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either

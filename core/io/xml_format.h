@@ -100,6 +100,7 @@ protected:
 	virtual Variant::Type _get_data_type() const override { return Variant::DICTIONARY; }
 	virtual void _get_extensions(List<String> *r_extensions) const override;
 	virtual void _data_replaced() override { root_view.unref(); }
+	virtual Ref<DataValidation> _validate_data(const Ref<DataSchema> &p_schema, const Ref<DataValidationOptions> &p_options) const override;
 
 public:
 	static constexpr const char *KEY_NAME = "name";

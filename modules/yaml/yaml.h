@@ -94,4 +94,6 @@ public:
 	static String stringify(const Variant &p_data, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static String serialize(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 	static Ref<Resource> deserialize(const String &p_text, const StringName &p_type_hint = StringName(), const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+
+	YAML();
 };

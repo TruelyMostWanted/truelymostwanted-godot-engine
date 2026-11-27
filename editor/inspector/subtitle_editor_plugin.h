@@ -69,6 +69,7 @@ class SubtitleEditor : public VBoxContainer {
 	VBoxContainer *offset_box = nullptr;
 	Label *offset_label = nullptr;
 	Button *offset_button = nullptr;
+	Label *save_note_label = nullptr;
 	Button *add_button = nullptr;
 	Button *sort_button = nullptr;
 	Tree *tree = nullptr;
@@ -92,6 +93,17 @@ public:
 
 class EditorInspectorPluginSubtitle : public EditorInspectorPlugin {
 	GDCLASS(EditorInspectorPluginSubtitle, EditorInspectorPlugin);
+
+public:
+	virtual bool can_handle(Object *p_object) override;
+	virtual void parse_category(Object *p_object, const String &p_category) override;
+};
+
+// A button "Add SubtitlePlayer" under the class header of the audio and video players.
+class EditorInspectorPluginSubtitleSync : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginSubtitleSync, EditorInspectorPlugin);
+
+	void _add_subtitle_player(ObjectID p_player);
 
 public:
 	virtual bool can_handle(Object *p_object) override;

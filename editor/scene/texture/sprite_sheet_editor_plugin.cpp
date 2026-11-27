@@ -30,13 +30,16 @@
 
 #include "sprite_sheet_editor_plugin.h"
 
+#include "core/config/project_settings.h"
 #include "core/input/input_event.h"
+#include "core/io/file_access.h"
 #include "core/io/image.h"
 #include "core/io/resource_saver.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
 #include "editor/docks/editor_dock_manager.h"
+#include "editor/docks/inspector_dock.h"
 #include "editor/editor_data.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
@@ -104,26 +107,18 @@ void SpriteSheetEditing::rename(const Ref<SpriteSheet> &p_atlas, const StringNam
 		EditorNode::get_singleton()->show_warning(vformat(TTR("A region named \"%s\" exists already."), p_to));
 		return;
 	}
-	// Rebuild the dictionaries so the renamed region keeps its position.
-	const TypedDictionary<StringName, Rect2i> old_regions = p_atlas->get_regions();
-	const TypedDictionary<StringName, Rect2i> old_margins = p_atlas->get_margins();
-	TypedDictionary<StringName, Rect2i> regions;
-	TypedDictionary<StringName, Rect2i> margins;
-	for (const KeyValue<Variant, Variant> &E : old_regions) {
-		const StringName key = E.key;
-		regions[key == p_from ? p_to : key] = E.value;
-	}
-	for (const KeyValue<Variant, Variant> &E : old_margins) {
-		const StringName key = E.key;
-		margins[key == p_from ? p_to : key] = E.value;
-	}
-	commit(TTR("Rename Region"), p_atlas, old_regions, old_margins, regions, margins);
+	// rename_region() keeps the position and the AtlasTexture that nodes already use.
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Rename Region"), UndoRedo::MERGE_DISABLE, p_atlas.ptr());
+	undo_redo->add_do_method(p_atlas.ptr(), "rename_region", p_from, p_to);
+	undo_redo->add_undo_method(p_atlas.ptr(), "rename_region", p_to, p_from);
+	undo_redo->commit_action();
 }
 
-void SpriteSheetEditing::add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
-	ERR_FAIL_COND(p_atlas.is_null());
+PackedStringArray SpriteSheetEditing::add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix) {
+	ERR_FAIL_COND_V(p_atlas.is_null(), PackedStringArray());
 	if (p_rects.is_empty()) {
-		return;
+		return PackedStringArray();
 	}
 	// Names and validation from the runtime API, applied to a copy so the change goes through undo/redo.
 	Ref<SpriteSheet> copy;
@@ -131,10 +126,12 @@ void SpriteSheetEditing::add(const Ref<SpriteSheet> &p_atlas, const String &p_ac
 	copy->set_texture(p_atlas->get_sheet_texture());
 	copy->set_regions(p_atlas->get_regions());
 	copy->set_margins(p_atlas->get_margins());
-	if (copy->add_regions(p_rects, p_prefix).is_empty()) {
-		return; // The error was printed by add_regions().
+	const PackedStringArray names = copy->add_regions(p_rects, p_prefix);
+	if (names.is_empty()) {
+		return names; // The error was printed by add_regions().
 	}
 	commit_regions(p_action, p_atlas, copy->get_regions(), copy->get_margins());
+	return names;
 }
 
 bool SpriteSheetEditing::parse_rect(const String &p_text, Rect2i &r_rect) {
@@ -183,10 +180,7 @@ String SpriteSheetEditing::get_texture_warning(const Ref<SpriteSheet> &p_atlas) 
 	if (texture->get_width() <= 0 || texture->get_height() <= 0) {
 		return TTR("The texture has no size.");
 	}
-	const Ref<Image> image = texture->get_image();
-	if (image.is_null() || image->is_empty()) {
-		return TTR("The texture has no image data: Auto Slice is not available.");
-	}
+	// No get_image() here: it reads the texture back from the GPU, and this runs on every change of the sheet.
 	return String();
 }
 
@@ -437,12 +431,18 @@ Vector2i SpriteSheetCanvas::_snap(const Vector2 &p_texture) const {
 	return Vector2i(int(Math::round(p_texture.x)), int(Math::round(p_texture.y)));
 }
 
-Rect2i SpriteSheetCanvas::_clamp_to_texture(const Rect2i &p_rect) const {
+Rect2i SpriteSheetCanvas::_get_texture_area() const {
 	const Ref<SpriteSheet> atlas = editor->get_atlas();
-	if (atlas.is_null() || atlas->get_sheet_texture().is_null()) {
-		return p_rect;
+	const Size2i size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? Size2i(atlas->get_sheet_texture()->get_size()) : Size2i();
+	if (size.x > 0 && size.y > 0) {
+		return Rect2i(Point2i(), size);
 	}
-	const Size2i size = Size2i(atlas->get_sheet_texture()->get_size());
+	// Without a texture, regions still start at (0, 0) or later.
+	return Rect2i(0, 0, 1 << 20, 1 << 20);
+}
+
+Rect2i SpriteSheetCanvas::_clamp_to_texture(const Rect2i &p_rect) const {
+	const Size2i size = _get_texture_area().size;
 	Rect2i rect = p_rect;
 	rect.size = rect.size.min(size).maxi(1);
 	rect.position = rect.position.clamp(Vector2i(), size - rect.size);
@@ -505,15 +505,15 @@ void SpriteSheetCanvas::set_zoom(float p_zoom, const Vector2 &p_center) {
 
 void SpriteSheetCanvas::fit() {
 	const Ref<SpriteSheet> atlas = editor->get_atlas();
-	if (atlas.is_null() || atlas->get_sheet_texture().is_null() || get_size().x <= 0 || get_size().y <= 0) {
+	const Size2 texture_size = atlas.is_valid() && atlas->get_sheet_texture().is_valid() ? atlas->get_sheet_texture()->get_size() : Size2();
+	if (texture_size.x <= 0 || texture_size.y <= 0 || get_size().x <= 0 || get_size().y <= 0) {
 		zoom = 1.0f;
 		view_offset = Vector2(8, 8) * EDSCALE;
 		queue_redraw();
 		return;
 	}
-	const Size2 texture_size = atlas->get_sheet_texture()->get_size();
 	const Size2 available = get_size() - Size2(16, 16) * EDSCALE;
-	zoom = MAX(0.0625f, MIN(available.x / texture_size.x, available.y / texture_size.y));
+	zoom = CLAMP(MIN(available.x / texture_size.x, available.y / texture_size.y), 0.0625f, 64.0f);
 	// Whole steps for pixel art when the sheet is smaller than the view.
 	if (zoom > 1.0f) {
 		zoom = Math::floor(zoom);
@@ -633,8 +633,13 @@ void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
 			return;
 		}
 		if (mb->get_button_index() == MouseButton::MIDDLE || mb->get_button_index() == MouseButton::RIGHT) {
-			drag_mode = mb->is_pressed() ? DRAG_PAN : DRAG_NONE;
-			drag_from = position;
+			// No pan during a left drag: its release commits the undo step.
+			if (mb->is_pressed() && drag_mode == DRAG_NONE) {
+				drag_mode = DRAG_PAN;
+				drag_from = position;
+			} else if (!mb->is_pressed() && drag_mode == DRAG_PAN) {
+				drag_mode = DRAG_NONE;
+			}
 			accept_event();
 			return;
 		}
@@ -691,11 +696,7 @@ void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
 		drag_mode = DRAG_NONE;
 		drag_handle = -1;
 		if (finished == DRAG_CREATE) {
-			Rect2i rect = drag_new_rect;
-			const Ref<Texture2D> texture = atlas->get_sheet_texture();
-			if (texture.is_valid()) {
-				rect = rect.intersection(Rect2i(Point2i(), Size2i(texture->get_size())));
-			}
+			const Rect2i rect = drag_new_rect.intersection(_get_texture_area());
 			if (rect.size.x > 0 && rect.size.y > 0) {
 				const String name = editor->make_new_region_name();
 				if (!name.is_empty()) {
@@ -763,11 +764,7 @@ void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
 			if (drag_handle == 4 || drag_handle == 5 || drag_handle == 6) {
 				to.y = MAX(point.y, from.y + 1);
 			}
-			Rect2i rect(from, to - from);
-			const Ref<Texture2D> texture = atlas->get_sheet_texture();
-			if (texture.is_valid()) {
-				rect = rect.intersection(Rect2i(Point2i(), Size2i(texture->get_size())));
-			}
+			const Rect2i rect = Rect2i(from, to - from).intersection(_get_texture_area());
 			if (rect.size.x > 0 && rect.size.y > 0) {
 				atlas->set_region(drag_name, rect);
 			}
@@ -815,6 +812,10 @@ void SpriteSheetCanvas::gui_input(const Ref<InputEvent> &p_event) {
 			Rect2i rect = regions[StringName(name)];
 			rect.position += direction * step;
 			regions[StringName(name)] = _clamp_to_texture(rect);
+		}
+		accept_event();
+		if (Dictionary(regions) == Dictionary(atlas->get_regions())) {
+			return; // At the edge: no empty undo step.
 		}
 		SpriteSheetEditing::commit_regions(TTR("Nudge Regions"), atlas, regions, atlas->get_margins(), UndoRedo::MERGE_ENDS);
 		accept_event();
@@ -865,6 +866,21 @@ void SpriteSheetEditor::_atlas_changed() {
 	warning->set_text(text);
 	warning->set_visible(!text.is_empty());
 	canvas->queue_redraw();
+}
+
+void SpriteSheetEditor::_inspector_object_changed() {
+	// Another resource in the Inspector ends the editing of this sheet; a node keeps it for "Assign to Selected Nodes".
+	const Object *object = InspectorDock::get_inspector_singleton()->get_edited_object();
+	if (Object::cast_to<Resource>(object) != nullptr && Object::cast_to<SpriteSheet>(object) == nullptr) {
+		edit(Ref<SpriteSheet>());
+	}
+}
+
+void SpriteSheetEditor::_filesystem_changed() {
+	// The sheet file was deleted.
+	if (atlas.is_valid() && atlas->get_path().is_resource_file() && !FileAccess::exists(atlas->get_path())) {
+		edit(Ref<SpriteSheet>());
+	}
 }
 
 void SpriteSheetEditor::set_selection(const PackedStringArray &p_names) {
@@ -927,7 +943,12 @@ void SpriteSheetEditor::_auto_slice() {
 		EditorNode::get_singleton()->show_warning(warning_text);
 		return;
 	}
-	const TypedArray<Rect2i> found = SpriteSheet::detect_sprite_rects(atlas->get_sheet_texture()->get_image());
+	const Ref<Image> image = atlas->get_sheet_texture()->get_image();
+	if (image.is_null() || image->is_empty()) {
+		EditorNode::get_singleton()->show_warning(TTR("The texture has no image data: Auto Slice is not available."));
+		return;
+	}
+	const TypedArray<Rect2i> found = SpriteSheet::detect_sprite_rects(image);
 	// Like SpriteSheet.auto_slice(): sprites that are regions already are skipped.
 	TypedArray<Rect2i> new_rects;
 	const TypedDictionary<StringName, Rect2i> regions = atlas->get_regions();
@@ -1044,10 +1065,12 @@ void SpriteSheetEditor::_assign_to_nodes() {
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	bool any = false;
 	for (Node *node : nodes) {
-		// Sprite2D, Sprite3D, TextureRect, TextureButton (normal) and any node with a Texture2D "texture" property.
+		// Sprite2D, Sprite3D, TextureRect and any node with a Texture2D "texture" property, also without a texture
+		// (an empty Ref is an OBJECT Variant without an object).
 		bool valid = false;
 		const Variant old_texture = node->get("texture", &valid);
-		if (!valid || (old_texture.get_type() != Variant::NIL && !Object::cast_to<Texture2D>(old_texture.get_validated_object()))) {
+		const Object *old_object = old_texture.get_validated_object();
+		if (!valid || (old_texture.get_type() != Variant::NIL && old_texture.get_type() != Variant::OBJECT) || (old_object != nullptr && !Object::cast_to<Texture2D>(old_object))) {
 			continue;
 		}
 		if (!any) {
@@ -1076,11 +1099,13 @@ void SpriteSheetEditor::_import_confirmed(const String &p_path) {
 		return;
 	}
 	// Load into a copy (all-or-nothing, errors are printed by the atlas), then apply it with undo.
+	// The dialog returns OS paths: inside the project, the texture path of TexturePacker files becomes a res:// path.
+	const String path = ProjectSettings::get_singleton()->localize_path(p_path);
 	Ref<SpriteSheet> copy;
 	copy.instantiate();
 	copy->set_texture(atlas->get_sheet_texture());
 	copy->set_texture_path(atlas->get_texture_path());
-	if (copy->load_from_file(p_path) != OK) {
+	if (copy->load_from_file(path) != OK) {
 		EditorNode::get_singleton()->show_warning(vformat(TTR("Importing \"%s\" failed. See the Output panel for details."), p_path));
 		return;
 	}
@@ -1115,13 +1140,14 @@ void SpriteSheetEditor::_export_confirmed(const String &p_path) {
 	if (atlas.is_null()) {
 		return;
 	}
-	const Error err = atlas->save_to_file(p_path);
+	const String path = ProjectSettings::get_singleton()->localize_path(p_path);
+	const Error err = atlas->save_to_file(path);
 	if (err != OK) {
-		EditorNode::get_singleton()->show_warning(vformat(TTR("Exporting \"%s\" failed: %s."), p_path, error_names[err]));
+		EditorNode::get_singleton()->show_warning(vformat(TTR("Exporting \"%s\" failed: %s."), path, error_names[err]));
 		return;
 	}
-	if (p_path.begins_with("res://")) {
-		EditorFileSystem::get_singleton()->update_file(p_path);
+	if (path.begins_with("res://")) {
+		EditorFileSystem::get_singleton()->update_file(path);
 	}
 }
 
@@ -1137,6 +1163,10 @@ void SpriteSheetEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_THEME_CHANGED: {
 			warning->add_theme_color_override(SceneStringName(font_color), get_theme_color(SNAME("warning_color"), EditorStringName(Editor)));
+		} break;
+		case NOTIFICATION_READY: {
+			InspectorDock::get_inspector_singleton()->connect("edited_object_changed", callable_mp(this, &SpriteSheetEditor::_inspector_object_changed));
+			EditorFileSystem::get_singleton()->connect("filesystem_changed", callable_mp(this, &SpriteSheetEditor::_filesystem_changed));
 		} break;
 	}
 }
@@ -1391,11 +1421,15 @@ void SpriteSheetInspector::_add_region() {
 	if (texture.is_valid()) {
 		rect.size = rect.size.min(Size2i(texture->get_size())).maxi(1);
 	}
-	SpriteSheetEditing::add(atlas, TTR("Add Region"), TypedArray<Rect2i>({ rect }), "sprite_");
+	const PackedStringArray names = SpriteSheetEditing::add(atlas, TTR("Add Region"), TypedArray<Rect2i>({ rect }), "sprite_");
+	// After the list has been rebuilt for the change.
+	callable_mp(region_list, &SpriteSheetRegionList::set_selected_names).call_deferred(names);
+	callable_mp(this, &SpriteSheetInspector::_selection_changed).call_deferred();
 }
 
 void SpriteSheetInspector::_delete_regions() {
 	SpriteSheetEditing::remove(atlas, region_list->get_selected_names());
+	delete_button->set_disabled(true);
 }
 
 void SpriteSheetInspector::_selection_changed() {
