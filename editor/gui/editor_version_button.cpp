@@ -39,15 +39,16 @@
 String _get_version_string(EditorVersionButton::VersionFormat p_format) {
 	String main;
 	switch (p_format) {
-		// The Truely version comes first, the Godot base version follows in parentheses.
+		// The Truely version comes first, the Godot base version follows in parentheses,
+		// without the build name (always "truely" in this fork), e.g. "Truely v0.2 (Godot v4.8.beta5.mono) [61d68d72e]".
 		case EditorVersionButton::FORMAT_BASIC: {
 			return TRUELY_VERSION_FULL_NAME " (" GODOT_VERSION_FULL_CONFIG ")";
 		} break;
 		case EditorVersionButton::FORMAT_WITH_BUILD: {
-			main = TRUELY_VERSION_FULL_NAME " (Godot v" GODOT_VERSION_FULL_BUILD ")";
+			main = TRUELY_VERSION_FULL_NAME " (Godot v" GODOT_VERSION_FULL_CONFIG ")";
 		} break;
 		case EditorVersionButton::FORMAT_WITH_NAME_AND_BUILD: {
-			main = TRUELY_VERSION_FULL_NAME " (" GODOT_VERSION_FULL_NAME ")";
+			main = TRUELY_VERSION_FULL_NAME " (" GODOT_VERSION_NAME " v" GODOT_VERSION_FULL_CONFIG ")";
 		} break;
 		default: {
 			ERR_FAIL_V_MSG(GODOT_VERSION_FULL_NAME, "Unexpected format: " + itos(p_format));
