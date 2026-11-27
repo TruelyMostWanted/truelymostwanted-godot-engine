@@ -403,15 +403,18 @@ void CSVTableEditor::_update() {
 	// No kept text: the data was changed by the table, undo/redo or a script, not by parsing the text.
 	// Show the change in the text editor, so neither side overwrites the other.
 	if (csv->get_parsed_text().is_empty()) {
+		const String text = csv->encode_to_text();
 		if (text_file.is_valid()) {
-			synced_text = csv->encode_to_text();
+			synced_text = text;
 			text_file->set_text(synced_text);
 		}
-		if (TextEditorBase *text_editor = _get_text_editor()) {
+		TextEditorBase *text_editor = _get_text_editor();
+		const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
+		// An empty file has no kept text either. Reloading the same text would validate (parse) it again,
+		// which emits `changed` and queues the next update: an endless loop.
+		if (text_edit && text_edit->get_text() != text) {
 			text_editor->reload_text();
-			if (const TextEdit *text_edit = Object::cast_to<TextEdit>(text_editor->get_base_editor())) {
-				reloaded_version = text_edit->get_version();
-			}
+			reloaded_version = text_edit->get_version();
 		}
 	}
 	_render();
