@@ -1,6 +1,6 @@
 # Konventionen der Truely-Engine
 
-Regeln für Code und Issues in dieser Engine-Fork. Was zusätzlich die CI verlangt (GCC/Clang, SCU, Sanitizer, Minimal-Template, doctool, C#): [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md). Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
+Regeln für Code und Issues in dieser Engine-Fork. Wie Features aufgebaut werden (Klassenarten, Schichten, Server-API, Data-Oriented Design): [`ARCHITECTURE.md`](ARCHITECTURE.md). Was zusätzlich die CI verlangt (GCC/Clang, SCU, Sanitizer, Minimal-Template, doctool, C#): [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md). Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
 Branches und Remotes in [`README.md`](README.md).
 
 ---
@@ -11,7 +11,7 @@ Branches und Remotes in [`README.md`](README.md).
 
 | Regel | Bedeutung |
 |---|---|
-| **Keine Nodes** | Neue Systeme sind **keine Nodes** im Szenenbaum. Server sind C++-Singletons wie `AudioServer` oder `TextServer`. Datentypen sind `Resource`s. |
+| **Passende Klassenart** | Jeder Teil eines Features hat die passende Art: Daten als `Resource`, Laufzeitzustand als `RefCounted`-Playback, gemeinsamer Zustand als Server (C++-Singleton wie `AudioServer`), ein `Node` nur als dünne Verbindung zur Szene (Muster Resource + Playback + Node, wie `AudioStream` + `AudioStreamPlayback` + `AudioStreamPlayer`). Regeln mit Beispielen: [`ARCHITECTURE.md`](ARCHITECTURE.md). |
 | **Das C++-Objekt ist die API** | Methoden, Properties, Signale und Enums werden in `_bind_methods()` gebunden. GDScript sieht sie direkt. C# bekommt sie über den generierten Glue. |
 | **Doku gehört dazu** | Jede Klasse hat ihre Klassenreferenz in `doc/classes/<Klasse>.xml` oder `modules/<modul>/doc_classes/`. Die pre-commit-Hooks `doc-status` und `make-rst` müssen durchlaufen. Die Benutzung steht im [Wiki](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki). |
 | **Zwei Sprachen** | Jedes Feature wird in **GDScript und C#** getestet, mit einem **Mono-Build** (Testprojekt [godot-custom-build-project](https://github.com/TruelyMostWanted/godot-custom-build-project)). |

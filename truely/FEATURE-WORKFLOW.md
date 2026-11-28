@@ -10,7 +10,7 @@ Gilt für jedes Feature- und Refactoring-Issue. Branches und Remotes stehen in [
 ## 1. Grundregeln
 
 Die Regeln für Code und Issues stehen in [`CONVENTIONS.md`](CONVENTIONS.md). Kurz:
-- Neue Systeme sind **keine Nodes**, sondern C++-Singletons (Server) und `Resource`s (Daten), gebunden in `_bind_methods()`.
+- Jeder Teil eines Features hat die passende Klassenart (Resource, Playback, Node, Server, Registry, Editor), gebunden in `_bind_methods()`; siehe [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - C# bekommt die API über den generierten Glue: `TTSServer` (statisch) und `TTSServerInstance`.
 - Jedes Feature hat Klassenreferenz, Wiki-Seite und Checks in GDScript und C# (Mono-Build).
 - Issues auf Englisch, nach Vorlage, mit „Feasibility to check“ und den fünf Abnahmepunkten.
