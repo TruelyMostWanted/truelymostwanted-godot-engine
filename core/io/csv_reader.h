@@ -71,7 +71,7 @@ class CSVReader : public RefCounted {
 	LocalVector<int> index_lines;
 
 	int _peek();
-	int _get();
+	int _next_byte();
 	void _jump(int64_t p_position, int p_line);
 	bool _read_record(PackedStringArray *r_cells);
 	void _fail(Error p_error, const String &p_message, int p_line);

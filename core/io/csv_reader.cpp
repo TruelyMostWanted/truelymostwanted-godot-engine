@@ -51,7 +51,7 @@ int CSVReader::_peek() {
 	return buffer[buffer_position];
 }
 
-int CSVReader::_get() {
+int CSVReader::_next_byte() {
 	const int c = _peek();
 	if (c >= 0) {
 		buffer_position++;
@@ -89,14 +89,14 @@ bool CSVReader::_read_record(PackedStringArray *r_cells) {
 	bool has_content = false;
 	int quote_line = 0;
 	while (true) {
-		const int c = _get();
+		const int c = _next_byte();
 		if (c < 0) {
 			break;
 		}
 		if (in_quotes) {
 			if (c == '"') {
 				if (_peek() == '"') {
-					_get();
+					_next_byte();
 					cell.push_back('"');
 				} else {
 					in_quotes = false;
@@ -124,7 +124,7 @@ bool CSVReader::_read_record(PackedStringArray *r_cells) {
 			if (c == '\n') {
 				line++;
 			} else if (_peek() == '\n') {
-				_get();
+				_next_byte();
 				line++;
 			}
 			if (has_content || !cell.is_empty()) {
