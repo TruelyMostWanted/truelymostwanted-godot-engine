@@ -35,6 +35,7 @@
 #include "core/object/class_db.h"
 #include "core/string/localization_server.h"
 #include "core/string/translation_server.h"
+#include "core/templates/hash_map.h"
 #include "scene/gui/option_button.h"
 #include "servers/settings/language_settings_server.h"
 
