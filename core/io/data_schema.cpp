@@ -30,6 +30,7 @@
 
 #include "data_schema.h"
 
+#include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
@@ -322,6 +323,87 @@ Ref<DataSchema> DataSchema::create_from_dictionary(const Dictionary &p_dictionar
 	return schema;
 }
 
+// Nesting of resources is cut at this depth (a class that holds an instance of itself).
+static constexpr int RESOURCE_SCHEMA_MAX_DEPTH = 6;
+
+static Ref<DataSchema> _schema_from_resource(const Ref<Resource> &p_resource, bool p_enums_as_names, int p_depth);
+
+// A sample of the Resource class named by `p_class` (the first of a comma separated list), or null.
+static Ref<Resource> _schema_sample(const String &p_class) {
+	String error;
+	return ResourceTextSerializer::instantiate_type(p_class.get_slicec(',', 0), error);
+}
+
+static Ref<DataField> _schema_field_from_property(const Object *p_object, const PropertyInfo &p_info, bool p_enums_as_names, int p_depth) {
+	Variant::Type type = p_info.type;
+	if (type != Variant::OBJECT && !DataField::is_data_type(type)) {
+		return Ref<DataField>();
+	}
+	Ref<DataField> field;
+	field.instantiate();
+	field->set_field_name(p_info.name);
+	if (type == Variant::OBJECT) {
+		// Built-in resources are written as objects, resources in files as their path.
+		Ref<Resource> nested = p_object->get(p_info.name);
+		if (nested.is_null() && p_info.hint == PROPERTY_HINT_RESOURCE_TYPE) {
+			nested = _schema_sample(p_info.hint_string);
+		}
+		if (nested.is_valid() && nested->is_built_in() && p_depth < RESOURCE_SCHEMA_MAX_DEPTH) {
+			field->set_value_type(Variant::DICTIONARY);
+			field->set_schema(_schema_from_resource(nested, p_enums_as_names, p_depth + 1));
+		} else if (nested.is_valid() && nested->is_built_in()) {
+			field->set_value_type(Variant::DICTIONARY);
+		} else {
+			field->set_value_type(Variant::STRING);
+		}
+		return field;
+	}
+	if (type == Variant::INT && p_enums_as_names && p_info.hint == PROPERTY_HINT_ENUM) {
+		type = Variant::STRING; // Written as the names.
+	}
+	field->set_value_type(type);
+	if (p_info.hint == PROPERTY_HINT_ENUM || p_info.hint == PROPERTY_HINT_RANGE) {
+		field->set_hint(p_info.hint);
+		field->set_hint_string(p_info.hint_string);
+	}
+	if (type == Variant::ARRAY && p_info.hint == PROPERTY_HINT_ARRAY_TYPE) {
+		// "ClassName" for resources, "<type>:<hint>" or "<type>/<hint>:<class>" otherwise.
+		const String element = p_info.hint_string.get_slicec(':', 0).get_slicec('/', 0);
+		const Variant::Type element_type = element.is_valid_int() ? Variant::Type(element.to_int()) : Variant::OBJECT;
+		if (element_type != Variant::OBJECT) {
+			if (DataField::is_data_type(element_type)) {
+				field->set_element_type(element_type);
+			}
+		} else if (p_depth < RESOURCE_SCHEMA_MAX_DEPTH) {
+			const Ref<Resource> sample = _schema_sample(element.is_valid_int() ? p_info.hint_string.get_slicec(':', 1) : element);
+			if (sample.is_valid()) {
+				field->set_element_schema(_schema_from_resource(sample, p_enums_as_names, p_depth + 1));
+			}
+		}
+	}
+	return field;
+}
+
+static Ref<DataSchema> _schema_from_resource(const Ref<Resource> &p_resource, bool p_enums_as_names, int p_depth) {
+	Ref<DataSchema> schema;
+	schema.instantiate();
+	schema->set_extra_fields(DataSchema::EXTRA_FIELDS_ALLOW);
+	LocalVector<PropertyInfo> properties;
+	ResourceTextSerializer::get_serialized_properties(p_resource.ptr(), properties);
+	for (const PropertyInfo &info : properties) {
+		const Ref<DataField> field = _schema_field_from_property(p_resource.ptr(), info, p_enums_as_names, p_depth);
+		if (field.is_valid()) {
+			schema->add_field(field);
+		}
+	}
+	return schema;
+}
+
+Ref<DataSchema> DataSchema::create_from_resource(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options) {
+	ERR_FAIL_COND_V(p_resource.is_null(), Ref<DataSchema>());
+	return _schema_from_resource(p_resource, ResourceTextSerializer::get_options(p_options).enums_as_names, 0);
+}
+
 void DataSchema::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_fields", "fields"), &DataSchema::set_fields);
 	ClassDB::bind_method(D_METHOD("get_fields"), &DataSchema::get_fields);
@@ -338,6 +420,7 @@ void DataSchema::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("validate", "data", "options"), &DataSchema::validate, DEFVAL(Ref<DataValidationOptions>()));
 	ClassDB::bind_method(D_METHOD("convert_value", "field_name", "text"), &DataSchema::convert_value);
 	ClassDB::bind_static_method("DataSchema", D_METHOD("create_from_dictionary", "dictionary"), &DataSchema::create_from_dictionary);
+	ClassDB::bind_static_method("DataSchema", D_METHOD("create_from_resource", "resource", "options"), &DataSchema::create_from_resource, DEFVAL(Ref<SerializerOptions>()));
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "fields", PROPERTY_HINT_ARRAY_TYPE, "DataField"), "set_fields", "get_fields");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "extra_fields", PROPERTY_HINT_ENUM, "Reject,Allow,Match Template"), "set_extra_fields", "get_extra_fields");

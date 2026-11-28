@@ -320,6 +320,10 @@ static void _get_serialized_properties(const Object *p_object, LocalVector<Prope
 	}
 }
 
+void ResourceTextSerializer::get_serialized_properties(const Object *p_object, LocalVector<PropertyInfo> &r_properties) {
+	_get_serialized_properties(p_object, r_properties);
+}
+
 typedef Pair<String, int64_t> EnumValue;
 
 static bool _get_enum_values(const PropertyInfo &p_info, LocalVector<EnumValue> &r_values) {

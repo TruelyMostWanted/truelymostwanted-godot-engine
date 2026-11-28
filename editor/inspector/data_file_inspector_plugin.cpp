@@ -32,13 +32,17 @@
 
 #include "core/core_string_names.h"
 #include "core/io/csv_format.h"
+#include "core/io/data_schema.h"
 #include "core/io/ini_format.h"
 #include "core/io/json.h"
 #include "core/io/xml_format.h"
 #include "core/object/callable_mp.h"
 #include "editor/data/csv_table_editor.h"
 #include "editor/editor_interface.h"
+#include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
+#include "editor/editor_undo_redo_manager.h"
+#include "editor/gui/create_dialog.h"
 #include "editor/script/data_schema_lookup.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/themes/editor_scale.h"
@@ -707,10 +711,62 @@ bool EditorInspectorPluginDataFile::parse_property(Object *p_object, const Varia
 	return hidden && !show_raw_properties;
 }
 
+// EditorInspectorPluginDataSchema
+
+// The button and the class picker it opens.
+class DataSchemaGenerateButton : public Button {
+	GDCLASS(DataSchemaGenerateButton, Button);
+
+	Ref<DataSchema> schema;
+	CreateDialog *dialog = nullptr;
+
+	void _generate() {
+		Ref<Resource> sample = Object::cast_to<Resource>(dialog->instantiate_selected().get_validated_object());
+		if (sample.is_null()) {
+			return;
+		}
+		const Ref<DataSchema> generated = DataSchema::create_from_resource(sample);
+		if (generated.is_null() || generated->get_fields().is_empty()) {
+			EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), sample->get_class()));
+			return;
+		}
+		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+		undo_redo->create_action(TTR("Generate Data Schema from Resource"), UndoRedo::MERGE_DISABLE, schema.ptr());
+		undo_redo->add_do_property(schema.ptr(), "fields", generated->get_fields());
+		undo_redo->add_undo_property(schema.ptr(), "fields", schema->get_fields());
+		undo_redo->add_do_property(schema.ptr(), "extra_fields", generated->get_extra_fields());
+		undo_redo->add_undo_property(schema.ptr(), "extra_fields", schema->get_extra_fields());
+		undo_redo->commit_action();
+	}
+
+public:
+	DataSchemaGenerateButton(const Ref<DataSchema> &p_schema) :
+			Button(TTR("Generate from Resource...")) {
+		schema = p_schema;
+		set_tooltip_text(TTR("Replace the fields with one field per stored property of a Resource class, as the text formats write them."));
+		dialog = memnew(CreateDialog);
+		dialog->set_base_type("Resource");
+		dialog->connect("create", callable_mp(this, &DataSchemaGenerateButton::_generate));
+		add_child(dialog);
+		connect(SceneStringName(pressed), callable_mp(dialog, &CreateDialog::popup_create).bind(true, false, String(), String()));
+	}
+};
+
+bool EditorInspectorPluginDataSchema::can_handle(Object *p_object) {
+	return Object::cast_to<DataSchema>(p_object) != nullptr;
+}
+
+void EditorInspectorPluginDataSchema::parse_begin(Object *p_object) {
+	add_custom_control(memnew(DataSchemaGenerateButton(Ref<DataSchema>(Object::cast_to<DataSchema>(p_object)))));
+}
+
 // DataFileInspectorEditorPlugin
 
 DataFileInspectorEditorPlugin::DataFileInspectorEditorPlugin() {
 	Ref<EditorInspectorPluginDataFile> plugin;
 	plugin.instantiate();
 	add_inspector_plugin(plugin);
+	Ref<EditorInspectorPluginDataSchema> schema_plugin;
+	schema_plugin.instantiate();
+	add_inspector_plugin(schema_plugin);
 }

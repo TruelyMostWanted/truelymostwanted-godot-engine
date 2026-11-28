@@ -92,6 +92,9 @@ public:
 	// The options of `p_options`, or of the project settings if it is null.
 	static Options get_options(const Ref<SerializerOptions> &p_options);
 
+	// The properties of an object that are written to the text formats (storage usage, without script and path).
+	static void get_serialized_properties(const Object *p_object, LocalVector<PropertyInfo> &r_properties);
+
 	// Type names.
 	static bool is_resource_type(const String &p_type);
 	static String get_type_name(const Object *p_object);
