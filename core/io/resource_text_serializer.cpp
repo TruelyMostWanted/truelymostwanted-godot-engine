@@ -323,6 +323,10 @@ static void _get_serialized_properties(const Object *p_object, LocalVector<Prope
 	}
 }
 
+void ResourceTextSerializer::get_serialized_properties(const Object *p_object, LocalVector<PropertyInfo> &r_properties) {
+	_get_serialized_properties(p_object, r_properties);
+}
+
 typedef Pair<String, int64_t> EnumValue;
 
 static bool _get_enum_values(const PropertyInfo &p_info, LocalVector<EnumValue> &r_values) {
@@ -371,6 +375,11 @@ static bool _get_enum_values(const PropertyInfo &p_info, LocalVector<EnumValue> 
 		return !r_values.is_empty();
 	}
 	return false;
+}
+
+bool ResourceTextSerializer::is_enum_property(const PropertyInfo &p_info) {
+	LocalVector<EnumValue> values;
+	return _get_enum_values(p_info, values);
 }
 
 // Element type of an Array property: from the typed array value, and enum names from the hint ("2/2:A,B").

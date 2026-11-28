@@ -149,6 +149,16 @@ public:
 	virtual bool parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const BitField<PropertyUsageFlags> p_usage, const bool p_wide = false) override;
 };
 
+// Adds the button "Generate from Resource…" to the inspector of a DataSchema: fills the fields from the
+// stored properties of a Resource class (DataSchema.create_from_resource()).
+class EditorInspectorPluginDataSchema : public EditorInspectorPlugin {
+	GDCLASS(EditorInspectorPluginDataSchema, EditorInspectorPlugin);
+
+public:
+	virtual bool can_handle(Object *p_object) override;
+	virtual void parse_begin(Object *p_object) override;
+};
+
 class DataFileInspectorEditorPlugin : public EditorPlugin {
 	GDCLASS(DataFileInspectorEditorPlugin, EditorPlugin);
 
