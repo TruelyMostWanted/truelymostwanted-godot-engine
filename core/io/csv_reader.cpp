@@ -82,7 +82,7 @@ bool CSVReader::_read_record(PackedStringArray *r_cells) {
 		index_positions.push_back(buffer_start + buffer_position);
 		index_lines.push_back(line);
 	}
-	const int record_line = line;
+	int record_line = line; // Moved past blank lines below.
 	LocalVector<uint8_t> cell;
 	int cell_count = 0;
 	bool in_quotes = false;
@@ -130,6 +130,7 @@ bool CSVReader::_read_record(PackedStringArray *r_cells) {
 			if (has_content || !cell.is_empty()) {
 				break;
 			}
+			record_line = line;
 		} else {
 			cell.push_back((uint8_t)c);
 		}
@@ -148,7 +149,8 @@ bool CSVReader::_read_record(PackedStringArray *r_cells) {
 	}
 	cell_count++;
 	if (!header.is_empty() && cell_count > header.size()) {
-		// The row number is the line number unless a quoted cell contains a line break.
+		// The row number counts the header row as row 1 (the check only runs with a header) and is the line
+		// number unless a quoted cell contains a line break.
 		_fail(ERR_PARSE_ERROR, vformat("Row %d: %d cells, but the header has %d columns.", row_index + 2, cell_count, header.size()), record_line);
 		return false;
 	}
@@ -187,6 +189,7 @@ Ref<CSVReader> CSVReader::open(const String &p_path, const Ref<SerializerOptions
 		if (reader->_read_record(&columns)) {
 			reader->header = columns;
 		}
+		ERR_FAIL_COND_V_MSG(reader->error != OK, Ref<CSVReader>(), vformat("Cannot read the header of '%s': %s", p_path, reader->error_message));
 	}
 	reader->index_positions.push_back(reader->buffer_start + reader->buffer_position);
 	reader->index_lines.push_back(reader->line);
@@ -202,6 +205,7 @@ void CSVReader::close() {
 }
 
 PackedStringArray CSVReader::read_row() {
+	ERR_FAIL_COND_V_MSG(file.is_null(), PackedStringArray(), "The CSVReader is closed.");
 	PackedStringArray cells;
 	if (!_read_record(&cells)) {
 		return PackedStringArray();
@@ -212,6 +216,7 @@ PackedStringArray CSVReader::read_row() {
 
 Array CSVReader::read_rows(int p_count) {
 	ERR_FAIL_COND_V(p_count < 0, Array());
+	ERR_FAIL_COND_V_MSG(file.is_null(), Array(), "The CSVReader is closed.");
 	Array rows;
 	for (int i = 0; i < p_count; i++) {
 		PackedStringArray cells;
@@ -239,6 +244,7 @@ Dictionary CSVReader::read_record() {
 
 Error CSVReader::skip_rows(int p_count) {
 	ERR_FAIL_COND_V(p_count < 0, ERR_INVALID_PARAMETER);
+	ERR_FAIL_COND_V_MSG(file.is_null(), ERR_UNCONFIGURED, "The CSVReader is closed.");
 	return _skip(p_count);
 }
 
@@ -264,12 +270,17 @@ int CSVReader::count_rows() {
 		return row_total;
 	}
 	ERR_FAIL_COND_V_MSG(file.is_null(), -1, "The CSVReader is closed.");
+	// The position and the error of the reader are the same after the call, whatever it finds.
 	const int saved = row_index;
-	if (seek_row(INT32_MAX) == ERR_PARSE_ERROR) {
-		return -1;
-	}
-	const int total = row_total;
+	const Error saved_error = error;
+	const String saved_message = error_message;
+	const int saved_line = error_line;
+	const bool failed = seek_row(INT32_MAX) == ERR_PARSE_ERROR;
+	const int total = failed ? -1 : row_total;
 	seek_row(saved);
+	error = saved_error;
+	error_message = saved_message;
+	error_line = saved_line;
 	return total;
 }
 

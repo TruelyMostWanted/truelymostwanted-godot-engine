@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		[CSVReader] reads a CSV file ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url], UTF-8) from a file buffer, one row at a time. Memory use is one row and a 64 KiB buffer, not the size of the file, so it suits files that are too large for [CSV], which holds every cell in memory. The syntax is the same as in [CSV]: quoted cells may contain the delimiter, double quotes ([code]""[/code]) and line breaks, blank lines are skipped and a byte order mark is ignored. The delimiter and the header row come from [SerializerOptions] ([member SerializerOptions.csv_delimiter], [member SerializerOptions.csv_headers]); the delimiter must be an ASCII character. Rows are [PackedStringArray]s of text, there is no type guessing.
-		Rows are read in order with [method read_row] or [method read_rows]. [method seek_row] jumps to a row number, for example to show one page of a table: the reader remembers the file position of every 1024th row it has passed, so a jump reads at most 1024 rows after the nearest known position. [method count_rows] reads the whole file once to count the rows.
+		Rows are read in order with [method read_row] or [method read_rows]. [method seek_row] jumps to a row number, for example to show one page of a table: the reader remembers the file position of every 1024th row it has passed, so a jump reads at most 1024 rows after the nearest known position. [method count_rows] reads the whole file once to count the rows, on the calling thread (a full scan for a large file). Rows are counted in an [int]: files are limited to 2^31 rows. Equal column names in the header: [method read_record] keeps the last one.
 		The file is read through [FileAccess], so [code]res://[/code], [code]user://[/code] and packed files work on every platform, including the Web export. Nothing is read in a thread.
 		If a row is invalid (a quoted cell that is not closed, or more cells than the header has columns), the reader stops: [method get_error] returns the error, the read methods return empty results, and [method seek_row] clears the error. Rows before the error are read normally.
 		[codeblocks]
@@ -48,7 +48,7 @@
 		<method name="close">
 			<return type="void" />
 			<description>
-				Closes the file. The reader is at its end afterwards and [method seek_row] fails. The file is also closed when the last reference to the reader goes away.
+				Closes the file. The reader is at its end afterwards; reading and [method seek_row] fail with an error. The file is also closed when the last reference to the reader goes away.
 			</description>
 		</method>
 		<method name="count_rows">
@@ -116,7 +116,7 @@
 			<param index="0" name="path" type="String" />
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
-				Opens the file at [param path] and reads the header row (with [member SerializerOptions.csv_headers]). [param options] [code]null[/code] uses the project settings. Returns [code]null[/code] and prints an error if the file cannot be opened or the delimiter is not an ASCII character. An invalid header row does not return [code]null[/code]: it sets [method get_error].
+				Opens the file at [param path] and reads the header row (with [member SerializerOptions.csv_headers]). [param options] [code]null[/code] uses the project settings. Returns [code]null[/code] and prints an error if the file cannot be opened, the header row is invalid (a quoted cell that is not closed) or the delimiter is not an ASCII character.
 			</description>
 		</method>
 		<method name="read_record">
@@ -135,14 +135,14 @@
 			<return type="Array" />
 			<param index="0" name="count" type="int" />
 			<description>
-				Reads up to [param count] rows as an [Array] of [PackedStringArray]. Fewer are returned at the end of the file or on an error.
+				Reads up to [param count] rows as an [Array] of [PackedStringArray]. The rows are all in memory at once: read large files in pages with a bounded [param count]. Fewer are returned at the end of the file or on an error.
 			</description>
 		</method>
 		<method name="seek_row">
 			<return type="int" enum="Error" />
 			<param index="0" name="row" type="int" />
 			<description>
-				Moves to the data row [param row] (from [code]0[/code]; [method read_row] then returns it) and clears the error. Returns [constant ERR_FILE_EOF] if the file has fewer rows (the reader is at the end), [constant ERR_PARSE_ERROR] if a row before it is invalid, and [constant ERR_UNCONFIGURED] if the reader is closed. Moving back, or forward within 1024 rows, is cheap once the reader has passed the row; a first jump far ahead reads every row on the way (without building them).
+				Moves to the data row [param row] (from [code]0[/code]; [method read_row] then returns it; [param row] equal to the number of rows is the end of the file and returns [constant OK]) and clears the error. Returns [constant ERR_FILE_EOF] if the file has fewer rows than [param row] (the reader is at the end), [constant ERR_PARSE_ERROR] if a row before it is invalid, and [constant ERR_UNCONFIGURED] if the reader is closed. Moving back, or forward within 1024 rows, is cheap once the reader has passed the row; a first jump far ahead reads every row on the way (without building them).
 			</description>
 		</method>
 		<method name="skip_rows">
