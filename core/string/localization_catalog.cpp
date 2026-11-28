@@ -1063,7 +1063,12 @@ Error LocalizationCatalog::_load_rows(const Array &p_rows) {
 	Ref<DataValidation> issues;
 	issues.instantiate();
 	CSV::check_translation_header(header_row, header, issues.ptr());
-	ERR_FAIL_COND_V_MSG(!header.has_known_language, ERR_INVALID_DATA, "No column of the CSV header row starts with a known language code: this is not a localization table.");
+	// A header with only the key, `?` and `_` columns is an empty catalog, not a data table (#346).
+	bool has_locale_columns = false;
+	for (int i = 1; i < header_row.size() && !has_locale_columns; i++) {
+		has_locale_columns = !header_row[i].begins_with("?") && !header_row[i].begins_with("_");
+	}
+	ERR_FAIL_COND_V_MSG(has_locale_columns && !header.has_known_language, ERR_INVALID_DATA, "No column of the CSV header row starts with a known language code: this is not a localization table.");
 
 	// Text catalogs: the `?plural` column holds the plural key and starts plural rows. Resource catalogs: `?type`.
 	const bool plurals = _get_kind() == KIND_TEXT;
@@ -1174,6 +1179,10 @@ Array LocalizationCatalog::_get_rows() const {
 		has_extra = has_extra || (_get_kind() == KIND_TEXT && !column->plural_forms.is_empty());
 		has_rules = has_rules || !column->plural_rule.is_empty();
 	}
+	// A new, empty catalog: the template of a localization table, with the context column and the tool locale
+	// (the editor's language) as its first locale (#346).
+	const bool is_new = ids.size() == 0 && columns.is_empty() && note_columns.is_empty();
+	has_context = has_context || is_new;
 	PackedStringArray header;
 	header.push_back("keys");
 	const int context_column = has_context ? (int)header.size() : -1;
@@ -1187,6 +1196,10 @@ Array LocalizationCatalog::_get_rows() const {
 	const int first_locale = (int)header.size();
 	for (const LocaleColumn *column : columns) {
 		header.push_back(column->locale);
+	}
+	if (is_new) {
+		const String tool_locale = TranslationServer::get_singleton()->get_tool_locale();
+		header.push_back(tool_locale.is_empty() ? String("en") : tool_locale);
 	}
 	const int first_note = (int)header.size();
 	for (const NoteColumn &note_column : note_columns) {

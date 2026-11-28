@@ -30,7 +30,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: truely-release
+  group: truely-release-update
   cancel-in-progress: false
 
 env:

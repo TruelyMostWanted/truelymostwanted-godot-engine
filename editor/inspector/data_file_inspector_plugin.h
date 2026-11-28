@@ -117,7 +117,9 @@ class DataFileInspectorView : public VBoxContainer {
 	void _queue_update();
 	void _update();
 	void _validate(bool p_list);
+	void _expand(TreeItem *p_item);
 	void _item_collapsed(TreeItem *p_item);
+	void _expand_deferred(ObjectID p_item_id);
 	void _item_selected();
 	void _open_text(int p_line);
 	void _open_table();
