@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "core/io/preload_list.h"
+#include "core/io/preloads.h"
 #include "core/io/resource.h"
 #include "core/object/object.h"
 #include "core/os/mutex.h"
@@ -53,14 +53,14 @@ class ResourceDatabase : public Object {
 
 	struct Entry {
 		Ref<Resource> resource;
-		// Other keys that lead to this entry (list keys, requested paths that differ from the resource path).
+		// Other keys that lead to this entry (keys of the preloads, requested paths that differ from the resource path).
 		LocalVector<String> aliases;
 	};
 
-	// One preload of a list, synchronous or on a worker thread.
+	// One preload of a Preloads resource, synchronous or on a worker thread.
 	struct Job {
 		uint64_t id = 0;
-		Ref<PreloadList> list;
+		Ref<Preloads> preloads;
 		// Requested path and type hint, in load order.
 		LocalVector<Pair<String, String>> paths;
 		// Key -> path, applied after all paths are loaded.
@@ -99,10 +99,10 @@ class ResourceDatabase : public Object {
 	// Loads one path and stores it under its resource path; `p_requested` becomes an alias if it differs.
 	Error _load_and_store(const String &p_requested, const String &p_type_hint);
 	void _apply_keys(const LocalVector<Pair<String, String>> &p_keys);
-	Error _collect(const Ref<PreloadList> &p_list, Job *r_job);
+	Error _collect(const Ref<Preloads> &p_preloads, Job *r_job);
 	void _run_job(Job *p_job);
 	void _job_done(uint64_t p_job_id);
-	void _emit_preload_finished(const Ref<PreloadList> &p_list, int p_error);
+	void _emit_preload_finished(const Ref<Preloads> &p_preloads, int p_error);
 
 protected:
 	static void _bind_methods();
@@ -110,10 +110,10 @@ protected:
 public:
 	static ResourceDatabase *get_singleton();
 
-	// Loads everything a list names. With `p_use_threads` (and threads available), the paths load
+	// Loads everything the preloads name. With `p_use_threads` (and threads available), the paths load
 	// on a worker thread and the call returns at once; otherwise it returns when all paths are loaded.
 	// `preload_finished` follows on the main thread in both cases.
-	Error preload_from_list(const Ref<PreloadList> &p_list, bool p_use_threads = true);
+	Error preload_from(const Ref<Preloads> &p_preloads, bool p_use_threads = true);
 	// Loads one path now and stores it; `p_key` becomes an extra key for it.
 	Error preload_resource(const String &p_path, const String &p_key = String());
 
@@ -132,9 +132,9 @@ public:
 	int64_t get_memory_usage() const;
 	bool is_preloading() const;
 
-	// Preloads the lists of `filesystem/resources/preload_lists` synchronously. Called once at startup
+	// Preloads the resources named in `filesystem/resources/preloads` synchronously. Called once at startup
 	// of a game (not in the editor).
-	void preload_project_lists();
+	void preload_project_preloads();
 	// Waits for running preloads and drops every entry. Called before scenes, scripts and servers
 	// shut down, so that stored resources are freed while their servers still exist.
 	void finish();

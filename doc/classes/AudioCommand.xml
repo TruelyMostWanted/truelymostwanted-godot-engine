@@ -4,8 +4,8 @@
 		One action on an [AudioMixerServer] channel, stored as data.
 	</brief_description>
 	<description>
-		An [AudioCommand] describes one audio action, such as playing a stream, toggling a soundboard pad, fading in ambience or jumping to a queue entry, as a resource. Run it with [method AudioMixerServer.execute], or collect many in an [AudioCommandList] and register them with [method AudioMixerServer.register_commands], so they run by name ([method AudioMixerServer.execute_named]) or by group ([method AudioMixerServer.execute_group]). A sound designer or modder can then change what plays when by editing data instead of scripts.
-		All stored properties are flat values (the stream is a path in [member stream_path], not an [AudioStream]), so a command list saves as [code].tres[/code], JSON, INI or CSV with one row per command. In text formats, [member command], [member fade_curve] and [member loop_mode] are written as names (for example [code]Toggle[/code], [code]Fade In[/code]); numbers are accepted when loading.
+		An [AudioCommand] describes one audio action, such as playing a stream, toggling a soundboard pad, fading in ambience or jumping to a queue entry, as a resource. Run it with [method AudioMixerServer.execute], or collect many in an [AudioCommands] and register them with [method AudioMixerServer.register_commands], so they run by name ([method AudioMixerServer.execute_named]) or by group ([method AudioMixerServer.execute_group]). A sound designer or modder can then change what plays when by editing data instead of scripts.
+		All stored properties are flat values (the stream is a path in [member stream_path], not an [AudioStream]), so a set of commands saves as [code].tres[/code], JSON, INI or CSV with one row per command. In text formats, [member command], [member fade_curve] and [member loop_mode] are written as names (for example [code]Toggle[/code], [code]Fade In[/code]); numbers are accepted when loading.
 		Each command uses only the properties it needs; the others are ignored:
 		- [constant COMMAND_PLAY]: [member stream_path] (empty: the queue entry at the cursor), [member position], [member loop_mode].
 		- [constant COMMAND_STOP]: [member fade_time].
@@ -85,7 +85,7 @@
 			The queue entry for [constant COMMAND_SET_QUEUE_INDEX] and [constant COMMAND_DEQUEUE], or the insert position of [constant COMMAND_ENQUEUE]. [code]-1[/code] means the end of the queue (enqueue) or the last entry (dequeue).
 		</member>
 		<member name="stream_path" type="String" setter="set_stream_path" getter="get_stream_path" default="&quot;&quot;">
-			The path of the [AudioStream] to play, cross-fade to or enqueue. The stream is loaded on the first [method AudioMixerServer.execute] (see [method AudioCommandList.preload_streams] to load it earlier) and freed when nothing plays it any more.
+			The path of the [AudioStream] to play, cross-fade to or enqueue. The stream is loaded on the first [method AudioMixerServer.execute] (see [method AudioCommands.preload_streams] to load it earlier) and freed when nothing plays it any more.
 		</member>
 		<member name="volume_db" type="float" setter="set_volume_db" getter="get_volume_db" default="0.0">
 			The channel volume in dB for [constant COMMAND_SET_VOLUME], or the extra volume of a [constant COMMAND_PLAY_ONE_SHOT].
