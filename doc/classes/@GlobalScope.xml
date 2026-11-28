@@ -1764,6 +1764,9 @@
 		<member name="Time" type="Time" setter="" getter="">
 			The [Time] singleton.
 		</member>
+		<member name="TimerServer" type="TimerServer" setter="" getter="">
+			The [TimerServer] singleton.
+		</member>
 		<member name="TranslationServer" type="TranslationServer" setter="" getter="">
 			The [TranslationServer] singleton.
 		</member>

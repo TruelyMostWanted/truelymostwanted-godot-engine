@@ -60,12 +60,6 @@
 				Returns [member current_time] formatted with [method TimerServer.format_time]. A countdown is rounded up to the smallest unit in [param format].
 			</description>
 		</method>
-		<method name="is_paused" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Returns [code]true[/code] if the timer is paused.
-			</description>
-		</method>
 		<method name="is_running" qualifiers="const">
 			<return type="bool" />
 			<description>

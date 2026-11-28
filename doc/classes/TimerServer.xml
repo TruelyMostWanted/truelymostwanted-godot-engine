@@ -66,7 +66,7 @@
 			<param index="1" name="format" type="String" default="&quot;{mm}:{ss}&quot;" />
 			<param index="2" name="round_up" type="bool" default="false" />
 			<description>
-				Formats [param seconds] with the placeholders [code]{h}[/code], [code]{hh}[/code], [code]{m}[/code], [code]{mm}[/code], [code]{s}[/code], [code]{ss}[/code], [code]{ds}[/code], [code]{cs}[/code] and [code]{ms}[/code] ([code]hh[/code], [code]mm[/code], [code]ss[/code], [code]cs[/code] and [code]ms[/code] are zero-padded; [code]ds[/code], [code]cs[/code] and [code]ms[/code] are tenths, hundredths and thousandths of a second). The largest unit in [param format] carries the full amount, so [code]&quot;{mm}:{ss}&quot;[/code] shows [code]75:03[/code] for 4503 seconds. If [param round_up] is [code]true[/code], the value is rounded up to the smallest unit in the format, as a countdown display expects.
+				Formats [param seconds] with the placeholders [code]{h}[/code], [code]{hh}[/code], [code]{m}[/code], [code]{mm}[/code], [code]{s}[/code], [code]{ss}[/code], [code]{ds}[/code], [code]{cs}[/code] and [code]{ms}[/code] ([code]hh[/code], [code]mm[/code], [code]ss[/code], [code]cs[/code] and [code]ms[/code] are zero-padded; [code]ds[/code], [code]cs[/code] and [code]ms[/code] are tenths, hundredths and thousandths of a second). The largest unit in [param format] carries the full amount, so [code]"{mm}:{ss}"[/code] shows [code]75:03[/code] for 4503 seconds. If [param round_up] is [code]true[/code], the value is rounded up to the smallest unit in the format, as a countdown display expects.
 			</description>
 		</method>
 		<method name="free_rid">

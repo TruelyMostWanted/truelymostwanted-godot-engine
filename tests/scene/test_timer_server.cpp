@@ -504,10 +504,14 @@ TEST_CASE("[SceneTree][TimerServer] Timer node, setting off: upstream timeout po
 	timer->set_one_shot(true);
 	timer->start(1.0);
 	CHECK(timer->is_processing_internal());
+	SIGNAL_WATCH(timer, SNAME("timeout"));
 	tree->process(0.5);
 	tree->process(0.5);
-	CHECK_FALSE(timer->is_stopped()); // Fires once time_left < 0, not at 0.
+	SIGNAL_CHECK_FALSE(SNAME("timeout")); // Fires once time_left < 0, not at 0 (is_stopped() is already true at 0, as upstream).
 	tree->process(0.25);
+	Array signal_args = { {} };
+	SIGNAL_CHECK(SNAME("timeout"), signal_args);
+	SIGNAL_UNWATCH(timer, SNAME("timeout"));
 	CHECK(timer->is_stopped());
 	CHECK(probe->stopped_in_pass); // timeout fired during the node pass, before the next node.
 
