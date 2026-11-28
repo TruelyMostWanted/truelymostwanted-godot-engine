@@ -28,6 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
+#include "core/io/resource_loader.h"
 #include "tests/test_macros.h"
 
 TEST_FORCE_LINK(test_transition_screen)
