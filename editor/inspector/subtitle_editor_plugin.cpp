@@ -241,9 +241,9 @@ void SubtitleEditor::_update() {
 
 	const Ref<SubtitleValidation> validation = subtitle->validate();
 	const int count = subtitle->get_segment_count();
-	String summary = vformat(TTR("%d segments"), count);
+	String summary = vformat(TTRN("%d segment", "%d segments", count), count);
 	if (count > 0) {
-		summary += ", " + SubtitleFormatSRT::format_time(subtitle->get_start_time()) + " - " + SubtitleFormatSRT::format_time(subtitle->get_end_time());
+		summary += ", " + SubtitleEditorHelper::format_short_time(subtitle->get_start_time()) + " - " + SubtitleEditorHelper::format_short_time(subtitle->get_end_time());
 	}
 	if (!subtitle->get_language().is_empty()) {
 		summary += ", " + subtitle->get_language();
@@ -537,10 +537,9 @@ bool SubtitleEditorPlugin::handles(Object *p_object) const {
 }
 
 void SubtitleEditorPlugin::make_visible(bool p_visible) {
+	// Never closed here (like the Animation dock): it closes with its own close button.
 	if (p_visible) {
 		dock->make_visible();
-	} else {
-		dock->close();
 	}
 }
 

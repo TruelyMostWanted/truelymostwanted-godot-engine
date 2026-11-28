@@ -31,6 +31,7 @@
 #pragma once
 
 #include "core/templates/hash_map.h"
+#include "core/templates/hash_set.h"
 #include "editor/docks/editor_dock.h"
 #include "servers/subtitle/subtitle.h"
 
@@ -41,12 +42,24 @@ class EditorResourcePicker;
 class HScrollBar;
 class Label;
 class Tree;
+class TreeItem;
 
-// Edits the cues of a `Subtitle` in a bottom dock: a table of cues and a timeline with the waveform of the
-// audio stream, where cues are moved and trimmed with the mouse and spotted at the playhead with the keyboard.
-// Opened for a Subtitle resource or an AudioStream with a subtitle file; the Inspector table is the quick path.
+// Edits the segments of a `Subtitle` in a bottom dock: a table and a timeline with the waveform of the audio
+// stream, where segments are moved and trimmed with the mouse and spotted at the playhead with the keyboard.
+// Opened for a Subtitle resource, or from the Inspector of an AudioStream with a subtitle file; the Inspector
+// table is the quick path.
 class SubtitlesDock : public EditorDock {
 	GDCLASS(SubtitlesDock, EditorDock);
+
+	enum Column {
+		COLUMN_INDEX,
+		COLUMN_START,
+		COLUMN_END,
+		COLUMN_SPEAKER,
+		COLUMN_KIND,
+		COLUMN_TEXT,
+		COLUMN_MAX,
+	};
 
 	enum DragMode {
 		DRAG_NONE,
@@ -56,13 +69,16 @@ class SubtitlesDock : public EditorDock {
 		DRAG_END,
 	};
 
+	static constexpr double MIN_DURATION = 0.1;
+	static constexpr double NEW_DURATION = 2.0;
 	static inline SubtitlesDock *singleton = nullptr;
 
 	Ref<Subtitle> subtitle;
 	Ref<AudioStream> stream;
 	int selected = -1;
 	HashMap<int, PackedStringArray> problems; // Of the last update: segment index -> messages.
-	bool dirty = false;
+	Vector<Ref<SubtitleSegment>> shown_segments; // The segments the table rows were built for.
+	HashSet<int> changed_rows; // Rows whose segment changed since the last update.
 	bool update_queued = false;
 	bool updating_tree = false;
 
@@ -80,6 +96,7 @@ class SubtitlesDock : public EditorDock {
 
 	Label *file_label = nullptr;
 	EditorResourcePicker *stream_picker = nullptr;
+	Label *stream_label = nullptr;
 	Button *play_button = nullptr;
 	Label *time_label = nullptr;
 	Button *add_button = nullptr;
@@ -93,25 +110,31 @@ class SubtitlesDock : public EditorDock {
 	Tree *tree = nullptr;
 	AudioStreamPlayer *player = nullptr;
 
+	static real_t _get_ruler_height();
+	static real_t _get_lane_height();
 	double _get_offset() const;
 	double _get_length() const;
 	double _x_to_time(double p_x) const;
 	double _time_to_x(double p_time) const;
-	Rect2 _get_cue_rect(int p_index) const;
-	int _get_cue_at(const Point2 &p_pos, DragMode &r_mode) const;
+	Rect2 _get_segment_rect(int p_index) const;
+	int _get_segment_at(const Point2 &p_pos, DragMode &r_mode) const;
 
 	void _queue_update();
 	void _update();
+	void _update_file_label();
 	void _update_tree();
+	void _fill_row(TreeItem *p_item, int p_index, const String &p_kinds);
+	void _watch_segments(bool p_watch);
 	void _update_scroll();
 	void _update_time_label();
 	void _subtitle_changed();
+	void _segment_changed(int p_index);
 	void _select(int p_index, bool p_scroll_tree = true);
 
 	void _commit_segments(const String &p_action, const TypedArray<SubtitleSegment> &p_segments, int p_select);
 	void _commit_times(const String &p_action, int p_index, double p_start, double p_end, double p_old_start, double p_old_end);
-	void _add_cue();
-	void _remove_cue();
+	void _add_segment();
+	void _remove_segment();
 	void _spot(bool p_end);
 	void _save();
 
@@ -119,22 +142,25 @@ class SubtitlesDock : public EditorDock {
 	void _seek(double p_time);
 	void _player_finished();
 	void _stream_picked(const Ref<Resource> &p_stream);
+	void _set_stream(const Ref<AudioStream> &p_stream);
 	void _preview_updated(ObjectID p_id);
 
 	void _timeline_draw();
 	void _timeline_gui_input(const Ref<InputEvent> &p_event);
+	void _cancel_drag();
 	void _scroll_changed(double p_value);
 	void _tree_selected();
 	void _tree_edited();
 	void _tree_activated();
+	void _file_removed(const String &p_file);
 
 protected:
 	void _notification(int p_what);
-	virtual void shortcut_input(const Ref<InputEvent> &p_event) override;
+	virtual void input(const Ref<InputEvent> &p_event) override;
 
 public:
 	static SubtitlesDock *get_singleton() { return singleton; }
-	// A Subtitle, or an AudioStream with a `subtitle_path` or a sidecar subtitle file.
+	// A Subtitle resource (audio streams open through the Inspector button).
 	static bool can_edit(const Object *p_object);
 	// The subtitle file of `p_stream`: its `subtitle_path`, else an .srt or .vtt next to the stream file.
 	static String get_stream_subtitle_path(const AudioStream *p_stream);
@@ -142,6 +168,7 @@ public:
 	static String find_sidecar_stream(const String &p_subtitle_path);
 
 	// Edits a Subtitle (finding a sidecar audio stream) or an AudioStream (loading its subtitle file).
+	// The same subtitle again keeps selection, zoom, playhead and stream.
 	void edit(const Ref<Resource> &p_resource);
 	Ref<Subtitle> get_subtitle() const { return subtitle; }
 

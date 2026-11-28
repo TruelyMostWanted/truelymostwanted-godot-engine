@@ -35,6 +35,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "editor/audio/audio_stream_preview.h"
+#include "editor/docks/filesystem_dock.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
@@ -48,24 +49,14 @@
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
+#include "scene/gui/line_edit.h"
 #include "scene/gui/scroll_bar.h"
+#include "scene/gui/separator.h"
 #include "scene/gui/split_container.h"
+#include "scene/gui/text_edit.h"
 #include "scene/gui/tree.h"
 #include "scene/resources/audio/audio_stream.h"
 #include "scene/scene_string_names.h"
-
-enum {
-	COLUMN_INDEX,
-	COLUMN_START,
-	COLUMN_END,
-	COLUMN_SPEAKER,
-	COLUMN_KIND,
-	COLUMN_TEXT,
-	COLUMN_MAX,
-};
-
-static constexpr double MIN_CUE_DURATION = 0.1;
-static constexpr double NEW_CUE_DURATION = 2.0;
 
 // Static helpers
 
@@ -108,13 +99,19 @@ String SubtitlesDock::find_sidecar_stream(const String &p_subtitle_path) {
 }
 
 bool SubtitlesDock::can_edit(const Object *p_object) {
-	if (Object::cast_to<Subtitle>(p_object)) {
-		return true;
-	}
-	return !get_stream_subtitle_path(Object::cast_to<AudioStream>(p_object)).is_empty();
+	// Not for every audio file with a sidecar subtitle: browsing voice lines must not take over the bottom panel.
+	return Object::cast_to<Subtitle>(p_object) != nullptr;
 }
 
 // Timeline geometry
+
+real_t SubtitlesDock::_get_ruler_height() {
+	return 18 * EDSCALE;
+}
+
+real_t SubtitlesDock::_get_lane_height() {
+	return 44 * EDSCALE;
+}
 
 double SubtitlesDock::_get_offset() const {
 	return subtitle.is_valid() ? subtitle->get_time_offset() : 0.0;
@@ -124,7 +121,7 @@ double SubtitlesDock::_get_length() const {
 	if (stream.is_valid() && stream->get_length() > 0.0) {
 		return stream->get_length();
 	}
-	// Without a stream: the cues and some room to spot new ones.
+	// Without a stream: the segments and some room to spot new ones.
 	const double end = subtitle.is_valid() && subtitle->get_segment_count() > 0 ? subtitle->get_end_time() : 0.0;
 	return MAX(30.0, end + 5.0);
 }
@@ -137,38 +134,30 @@ double SubtitlesDock::_time_to_x(double p_time) const {
 	return (p_time - view_start) * pixels_per_second;
 }
 
-static real_t _ruler_height() {
-	return 18 * EDSCALE;
-}
-
-static real_t _lane_height() {
-	return 44 * EDSCALE;
-}
-
-Rect2 SubtitlesDock::_get_cue_rect(int p_index) const {
+Rect2 SubtitlesDock::_get_segment_rect(int p_index) const {
 	const Ref<SubtitleSegment> segment = subtitle->get_segment(p_index);
 	if (segment.is_null()) {
 		return Rect2();
 	}
 	const double from = _time_to_x(segment->get_start_time() + _get_offset());
 	const double to = _time_to_x(segment->get_end_time() + _get_offset());
-	const real_t lane_top = timeline->get_size().height - _lane_height();
-	return Rect2(from, lane_top + 2 * EDSCALE, MAX(to - from, 2.0), _lane_height() - 4 * EDSCALE);
+	const real_t lane_top = timeline->get_size().height - _get_lane_height();
+	return Rect2(from, lane_top + 2 * EDSCALE, MAX(to - from, 2.0), _get_lane_height() - 4 * EDSCALE);
 }
 
-int SubtitlesDock::_get_cue_at(const Point2 &p_pos, DragMode &r_mode) const {
+int SubtitlesDock::_get_segment_at(const Point2 &p_pos, DragMode &r_mode) const {
 	r_mode = DRAG_SEEK;
-	if (subtitle.is_null() || p_pos.y < timeline->get_size().height - _lane_height()) {
+	if (subtitle.is_null() || p_pos.y < timeline->get_size().height - _get_lane_height()) {
 		return -1;
 	}
 	const real_t edge = 5 * EDSCALE;
-	// The selected cue first, so its edges win over a neighbor's.
+	// The selected segment first, so its edges win over a neighbor's.
 	for (int pass = 0; pass < 2; pass++) {
 		for (int i = 0; i < subtitle->get_segment_count(); i++) {
 			if ((pass == 0) != (i == selected)) {
 				continue;
 			}
-			const Rect2 rect = _get_cue_rect(i);
+			const Rect2 rect = _get_segment_rect(i);
 			if (p_pos.x < rect.position.x - edge || p_pos.x > rect.get_end().x + edge) {
 				continue;
 			}
@@ -196,12 +185,43 @@ void SubtitlesDock::_queue_update() {
 }
 
 void SubtitlesDock::_subtitle_changed() {
-	dirty = true;
 	if (drag_mode == DRAG_NONE || drag_mode == DRAG_SEEK) {
 		_queue_update();
 	} else {
 		timeline->queue_redraw(); // While dragging, the table follows on release.
 	}
+}
+
+void SubtitlesDock::_segment_changed(int p_index) {
+	changed_rows.insert(p_index);
+}
+
+void SubtitlesDock::_watch_segments(bool p_watch) {
+	for (int i = 0; i < shown_segments.size(); i++) {
+		const Ref<SubtitleSegment> &segment = shown_segments[i];
+		const Callable callback = callable_mp(this, &SubtitlesDock::_segment_changed).bind(i);
+		if (segment.is_null()) {
+			continue;
+		}
+		if (p_watch) {
+			segment->connect_changed(callback);
+		} else if (segment->is_connected(CoreStringName(changed), callback)) {
+			segment->disconnect_changed(callback);
+		}
+	}
+}
+
+void SubtitlesDock::_update_file_label() {
+	String file = TTR("No subtitle");
+	if (subtitle.is_valid()) {
+		file = subtitle->get_path().is_resource_file() ? subtitle->get_path().get_file() : TTR("Built-in Subtitle");
+		// Set by undo/redo operations on the subtitle, cleared when it is saved (also by Godot's Save).
+		if (subtitle->is_edited()) {
+			file += " (*)";
+		}
+	}
+	file_label->set_text(file);
+	file_label->set_tooltip_text(subtitle.is_valid() ? subtitle->get_path() : String());
 }
 
 void SubtitlesDock::_update() {
@@ -210,86 +230,134 @@ void SubtitlesDock::_update() {
 	if (has_subtitle && selected >= subtitle->get_segment_count()) {
 		selected = subtitle->get_segment_count() - 1;
 	}
-	String file = has_subtitle ? subtitle->get_path().get_file() : TTR("No subtitle");
-	if (has_subtitle && file.is_empty()) {
-		file = TTR("Built-in Subtitle");
-	}
-	file_label->set_text(dirty ? file + " (*)" : file);
-	for (Button *button : { add_button, spot_start_button, play_button }) {
+	_update_tree(); // Also updates the problems.
+	_update_file_label();
+	for (Button *button : { add_button, spot_start_button, play_button, save_button }) {
 		button->set_disabled(!has_subtitle);
 	}
 	remove_button->set_disabled(!has_subtitle || selected < 0);
 	spot_end_button->set_disabled(!has_subtitle || selected < 0);
-	save_button->set_disabled(!has_subtitle);
 	stream_picker->set_editable(has_subtitle);
+	stream_label->set_text(stream.is_valid() ? (stream->get_path().is_resource_file() ? stream->get_path().get_file() : TTR("Built-in Stream")) : TTR("No audio"));
+	stream_label->set_tooltip_text(stream.is_valid() ? stream->get_path() : String());
 
 	String status;
-	problems.clear();
+	String save_tooltip = TTR("Save the subtitle file in its own format.");
 	if (has_subtitle) {
-		problems = SubtitleEditorHelper::get_problems(subtitle);
-		status = vformat(TTR("%d cues"), subtitle->get_segment_count());
+		const int count = subtitle->get_segment_count();
+		status = vformat(TTRN("%d segment", "%d segments", count), count);
 		if (!problems.is_empty()) {
-			status += ", " + vformat(TTR("%d with problems (highlighted, see the tooltips)"), problems.size());
+			status += ", " + vformat(TTRN("%d with a problem (highlighted, see the tooltip)", "%d with problems (highlighted, see the tooltips)", problems.size()), problems.size());
 		}
 		if (stream.is_null()) {
 			status += ". " + TTR("Pick an audio stream to see its waveform and hear it; without one, Play runs a clock.");
 		}
+		const String extension = subtitle->get_path().get_extension().to_lower();
+		if (subtitle->get_time_offset() != 0.0 && Subtitle::get_recognized_extensions().has(extension)) {
+			save_tooltip += "\n" + vformat(TTR("Saving as .%s adds the time offset to the written times, because the format has no offset field."), extension);
+		}
+	} else {
+		status = TTR("Open a Subtitle from the FileSystem dock, or an audio stream with subtitles from its Inspector.");
 	}
 	status_label->set_text(status);
-	_update_tree();
+	save_button->set_tooltip_text(save_tooltip);
 	_update_scroll();
 	_update_time_label();
 	timeline->queue_redraw();
 }
 
-void SubtitlesDock::_update_tree() {
-	updating_tree = true;
-	tree->clear();
-	if (subtitle.is_null()) {
-		updating_tree = false;
+void SubtitlesDock::_fill_row(TreeItem *p_item, int p_index, const String &p_kinds) {
+	const Ref<SubtitleSegment> segment = subtitle->get_segment(p_index);
+	p_item->set_metadata(0, p_index);
+	p_item->set_text(COLUMN_INDEX, itos(p_index + 1));
+	if (segment.is_null()) {
+		p_item->set_text(COLUMN_TEXT, TTR("<empty slot>"));
 		return;
 	}
-	TreeItem *root = tree->create_item();
+	const double offset = _get_offset();
+	p_item->set_text(COLUMN_START, SubtitleEditorHelper::format_short_time(segment->get_start_time() + offset));
+	p_item->set_text(COLUMN_END, SubtitleEditorHelper::format_short_time(segment->get_end_time() + offset));
+	p_item->set_text(COLUMN_SPEAKER, segment->get_speaker());
+	if (p_item->get_cell_mode(COLUMN_KIND) != TreeItem::CELL_MODE_RANGE) {
+		p_item->set_cell_mode(COLUMN_KIND, TreeItem::CELL_MODE_RANGE);
+		p_item->set_text(COLUMN_KIND, p_kinds);
+		p_item->set_edit_multiline(COLUMN_TEXT, true);
+		for (int column = COLUMN_START; column < COLUMN_MAX; column++) {
+			p_item->set_editable(column, true);
+		}
+	}
+	p_item->set_range(COLUMN_KIND, segment->get_kind());
+	p_item->set_text(COLUMN_TEXT, segment->get_text());
+	const bool has_problem = problems.has(p_index);
+	const String tooltip = has_problem ? String("\n").join(problems.get(p_index)) : String();
 	const Color warning_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor));
+	for (int column = 0; column < COLUMN_MAX; column++) {
+		if (has_problem) {
+			p_item->set_custom_color(column, warning_color);
+		} else if (p_item->get_custom_color(column) != Color()) {
+			p_item->clear_custom_color(column);
+		}
+		p_item->set_tooltip_text(column, tooltip);
+	}
+}
+
+void SubtitlesDock::_update_tree() {
+	updating_tree = true;
+	const HashMap<int, PackedStringArray> old_problems(problems);
+	problems = subtitle.is_valid() ? SubtitleEditorHelper::get_problems(subtitle) : HashMap<int, PackedStringArray>();
 	String kinds;
 	for (int kind = 0; kind < SubtitleSegment::KIND_MAX; kind++) {
 		kinds += (kind > 0 ? "," : "") + SubtitleEditorHelper::get_kind_name(SubtitleSegment::Kind(kind));
 	}
-	const double offset = _get_offset();
-	TreeItem *selected_item = nullptr;
-	for (int i = 0; i < subtitle->get_segment_count(); i++) {
-		const Ref<SubtitleSegment> segment = subtitle->get_segment(i);
-		TreeItem *item = tree->create_item(root);
-		item->set_metadata(0, i);
-		item->set_text(COLUMN_INDEX, itos(i + 1));
-		if (segment.is_null()) {
-			item->set_text(COLUMN_TEXT, TTR("<empty slot>"));
-			continue;
-		}
-		item->set_text(COLUMN_START, SubtitleEditorHelper::format_short_time(segment->get_start_time() + offset));
-		item->set_text(COLUMN_END, SubtitleEditorHelper::format_short_time(segment->get_end_time() + offset));
-		item->set_text(COLUMN_SPEAKER, segment->get_speaker());
-		item->set_cell_mode(COLUMN_KIND, TreeItem::CELL_MODE_RANGE);
-		item->set_text(COLUMN_KIND, kinds);
-		item->set_range(COLUMN_KIND, segment->get_kind());
-		item->set_text(COLUMN_TEXT, segment->get_text());
-		item->set_edit_multiline(COLUMN_TEXT, true);
-		for (int column = COLUMN_START; column < COLUMN_MAX; column++) {
-			item->set_editable(column, true);
-		}
-		if (problems.has(i)) {
-			const String tooltip = String("\n").join(problems.get(i));
-			for (int column = 0; column < COLUMN_MAX; column++) {
-				item->set_custom_color(column, warning_color);
-				item->set_tooltip_text(column, tooltip);
+	TreeItem *root = tree->get_root();
+	const bool same_segments = subtitle.is_valid() && root != nullptr && shown_segments == subtitle->get_segment_list();
+	if (same_segments) {
+		// Only segments that changed, and rows whose problems changed: spotting stays fast with thousands of rows.
+		for (const KeyValue<int, PackedStringArray> &problem : old_problems) {
+			if (!problems.has(problem.key) || problems.get(problem.key) != problem.value) {
+				changed_rows.insert(problem.key);
 			}
 		}
-		if (i == selected) {
-			selected_item = item;
+		for (const KeyValue<int, PackedStringArray> &problem : problems) {
+			if (!old_problems.has(problem.key)) {
+				changed_rows.insert(problem.key);
+			}
+		}
+		for (int index : changed_rows) {
+			if (index >= 0 && index < root->get_child_count()) {
+				_fill_row(root->get_child(index), index, kinds);
+			}
+		}
+	} else {
+		_watch_segments(false);
+		shown_segments.clear();
+		if (subtitle.is_null()) {
+			tree->clear();
+		} else {
+			// Rows are reused: cells whose text stays the same are not touched (Tree skips equal texts).
+			shown_segments = subtitle->get_segment_list();
+			_watch_segments(true);
+			if (root == nullptr) {
+				root = tree->create_item();
+			}
+			while (root->get_child_count() > shown_segments.size()) {
+				TreeItem *last = root->get_child(root->get_child_count() - 1);
+				root->remove_child(last);
+				memdelete(last);
+			}
+			while (root->get_child_count() < shown_segments.size()) {
+				tree->create_item(root);
+			}
+			for (int i = 0; i < shown_segments.size(); i++) {
+				_fill_row(root->get_child(i), i, kinds);
+			}
 		}
 	}
-	if (selected_item) {
-		selected_item->select(0);
+	changed_rows.clear();
+	root = tree->get_root();
+	TreeItem *item = root && selected >= 0 && selected < root->get_child_count() ? root->get_child(selected) : nullptr;
+	if (item && !item->is_selected(0)) {
+		item->select(0);
 	}
 	updating_tree = false;
 }
@@ -345,29 +413,32 @@ void SubtitlesDock::_commit_times(const String &p_action, int p_index, double p_
 	const Ref<SubtitleSegment> segment = subtitle->get_segment(p_index);
 	ERR_FAIL_COND(segment.is_null());
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	// Segments without a path count as built into the edited scene: keep the action in the history of the subtitle.
 	undo_redo->create_action(p_action, UndoRedo::MERGE_DISABLE, subtitle.ptr());
+	// Segments without a path count as built into the edited scene: keep the action in the history of the subtitle.
 	undo_redo->force_fixed_history();
 	undo_redo->add_do_method(segment.ptr(), "set_start_time", p_start);
 	undo_redo->add_do_method(segment.ptr(), "set_end_time", p_end);
 	undo_redo->add_undo_method(segment.ptr(), "set_start_time", p_old_start);
 	undo_redo->add_undo_method(segment.ptr(), "set_end_time", p_old_end);
+	// Marks the subtitle as edited, so Godot's Save writes it too.
+	undo_redo->add_do_method(subtitle.ptr(), "emit_changed");
+	undo_redo->add_undo_method(subtitle.ptr(), "emit_changed");
 	undo_redo->commit_action();
 }
 
-void SubtitlesDock::_add_cue() {
+void SubtitlesDock::_add_segment() {
 	ERR_FAIL_COND(subtitle.is_null());
 	const double start = MAX(0.0, playhead - _get_offset());
-	_commit_segments(TTR("Add Subtitle Cue"), SubtitleEditorHelper::get_segments_with_segment_at(subtitle, start, start + NEW_CUE_DURATION), SubtitleEditorHelper::get_insert_index(subtitle, start));
+	_commit_segments(TTR("Add Subtitle Segment"), SubtitleEditorHelper::get_segments_with_segment_at(subtitle, start, start + NEW_DURATION), SubtitleEditorHelper::get_insert_index(subtitle, start));
 }
 
-void SubtitlesDock::_remove_cue() {
+void SubtitlesDock::_remove_segment() {
 	if (subtitle.is_null() || selected < 0 || selected >= subtitle->get_segment_count()) {
 		return;
 	}
 	TypedArray<SubtitleSegment> segments = subtitle->get_segments();
 	segments.remove_at(selected);
-	_commit_segments(TTR("Remove Subtitle Cue"), segments, MIN(selected, segments.size() - 1));
+	_commit_segments(TTR("Remove Subtitle Segment"), segments, MIN(selected, segments.size() - 1));
 }
 
 void SubtitlesDock::_spot(bool p_end) {
@@ -377,7 +448,7 @@ void SubtitlesDock::_spot(bool p_end) {
 	const double time = MAX(0.0, playhead - _get_offset());
 	if (selected < 0 || selected >= subtitle->get_segment_count()) {
 		if (!p_end) {
-			_add_cue(); // Spotting from scratch: a new cue starts at the playhead.
+			_add_segment(); // Spotting from scratch: a new segment starts at the playhead.
 		}
 		return;
 	}
@@ -386,15 +457,15 @@ void SubtitlesDock::_spot(bool p_end) {
 	const double start = segment->get_start_time();
 	const double end = segment->get_end_time();
 	if (!p_end) {
-		_commit_times(TTR("Spot Subtitle Cue Start"), selected, time, end > time ? end : time + NEW_CUE_DURATION, start, end);
+		_commit_times(TTR("Set Subtitle Segment Start"), selected, time, end > time ? end : time + NEW_DURATION, start, end);
 		return;
 	}
 	if (time <= start) {
-		status_label->set_text(TTR("The playhead is before the start of the selected cue."));
+		status_label->set_text(TTR("The playhead is before the start of the selected segment."));
 		return;
 	}
-	_commit_times(TTR("Spot Subtitle Cue End"), selected, start, time, start, end);
-	// The next cue is the one to spot next.
+	_commit_times(TTR("Set Subtitle Segment End"), selected, start, time, start, end);
+	// The next segment is the one to spot next.
 	if (selected + 1 < subtitle->get_segment_count()) {
 		_select(selected + 1);
 	}
@@ -409,8 +480,6 @@ void SubtitlesDock::_save() {
 		return;
 	}
 	EditorNode::get_singleton()->save_resource(subtitle);
-	dirty = false;
-	_update();
 }
 
 // Playback
@@ -452,14 +521,19 @@ void SubtitlesDock::_player_finished() {
 	}
 }
 
-void SubtitlesDock::_stream_picked(const Ref<Resource> &p_stream) {
+void SubtitlesDock::_set_stream(const Ref<AudioStream> &p_stream) {
 	if (playing) {
 		_play_pause();
 	}
 	stream = p_stream;
 	player->set_stream(stream);
+	stream_picker->set_edited_resource(stream);
 	playhead = MIN(playhead, _get_length());
 	_queue_update();
+}
+
+void SubtitlesDock::_stream_picked(const Ref<Resource> &p_stream) {
+	_set_stream(p_stream);
 }
 
 void SubtitlesDock::_preview_updated(ObjectID p_id) {
@@ -477,22 +551,21 @@ void SubtitlesDock::_timeline_draw() {
 	const Color font_color = get_theme_color(SceneStringName(font_color), SNAME("Label"));
 	const Color accent_color = get_theme_color(SNAME("accent_color"), EditorStringName(Editor));
 	const Color warning_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor));
-	const real_t ruler = _ruler_height();
-	const real_t lane_top = size.height - _lane_height();
+	const real_t ruler = _get_ruler_height();
+	const real_t lane_top = size.height - _get_lane_height();
 	const double length = _get_length();
 
 	timeline->draw_rect(Rect2(Point2(), size), get_theme_color(SNAME("dark_color_2"), EditorStringName(Editor)));
-	timeline->draw_rect(Rect2(0, lane_top, size.width, _lane_height()), get_theme_color(SNAME("dark_color_1"), EditorStringName(Editor)));
+	timeline->draw_rect(Rect2(0, lane_top, size.width, _get_lane_height()), get_theme_color(SNAME("dark_color_1"), EditorStringName(Editor)));
 	const real_t end_x = _time_to_x(length);
 	if (end_x < size.width) {
-		timeline->draw_rect(Rect2(end_x, 0, size.width - end_x, size.height), Color(0, 0, 0, 0.3));
+		timeline->draw_rect(Rect2(end_x, 0, size.width - end_x, size.height), get_theme_color(SNAME("dark_color_3"), EditorStringName(Editor)));
 	}
 
-	// Waveform between ruler and cue lane.
+	// Waveform between ruler and segment lane.
 	if (stream.is_valid() && stream->get_length() > 0.0) {
 		const Ref<AudioStreamPreview> preview = AudioStreamPreviewGenerator::get_singleton()->generate_preview(stream);
 		const float preview_length = preview.is_valid() ? preview->get_length() : 0.0f;
-		const real_t wave_top = ruler;
 		const real_t wave_height = lane_top - ruler;
 		Vector<Vector2> points;
 		for (int x = 0; x < int(MIN(size.width, end_x)); x++) {
@@ -503,8 +576,8 @@ void SubtitlesDock::_timeline_draw() {
 			}
 			const float max = preview->get_max(from, to) * 0.5f + 0.5f;
 			const float min = preview->get_min(from, to) * 0.5f + 0.5f;
-			points.push_back(Vector2(x + 0.5, wave_top + (1.0f - max) * wave_height));
-			points.push_back(Vector2(x + 0.5, wave_top + (1.0f - min) * wave_height + 1.0));
+			points.push_back(Vector2(x + 0.5, ruler + (1.0f - max) * wave_height));
+			points.push_back(Vector2(x + 0.5, ruler + (1.0f - min) * wave_height + 1.0));
 		}
 		if (!points.is_empty()) {
 			timeline->draw_multiline(points, get_theme_color(SNAME("contrast_color_2"), EditorStringName(Editor)));
@@ -527,12 +600,15 @@ void SubtitlesDock::_timeline_draw() {
 		timeline->draw_string(font, Point2(x + 3 * EDSCALE, ruler - 4 * EDSCALE), SubtitleEditorHelper::format_short_time(t), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, font_color * Color(1, 1, 1, 0.7));
 	}
 
-	// Cues.
+	// Segments: sorted by start, so stop after the first one past the right edge.
 	if (subtitle.is_valid()) {
 		const real_t padding = 4 * EDSCALE;
 		for (int i = 0; i < subtitle->get_segment_count(); i++) {
-			const Rect2 rect = _get_cue_rect(i);
-			if (rect.size.width <= 0 || rect.get_end().x < 0 || rect.position.x > size.width) {
+			const Rect2 rect = _get_segment_rect(i);
+			if (rect.position.x > size.width) {
+				break;
+			}
+			if (rect.size.width <= 0 || rect.get_end().x < 0) {
 				continue;
 			}
 			const bool is_selected = i == selected;
@@ -555,8 +631,24 @@ void SubtitlesDock::_timeline_draw() {
 	timeline->draw_texture(indicator, Point2(playhead_x - indicator->get_width() * 0.5, 0), accent_color);
 }
 
+void SubtitlesDock::_cancel_drag() {
+	const DragMode mode = drag_mode;
+	drag_mode = DRAG_NONE;
+	const Ref<SubtitleSegment> segment = subtitle.is_valid() && selected >= 0 ? subtitle->get_segment(selected) : Ref<SubtitleSegment>();
+	if (mode >= DRAG_MOVE && segment.is_valid()) {
+		segment->set_start_time(drag_old_start);
+		segment->set_end_time(drag_old_end);
+	}
+}
+
 void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 	if (subtitle.is_null()) {
+		return;
+	}
+	const Ref<InputEventKey> key = p_event;
+	if (key.is_valid() && key->is_pressed() && key->get_keycode() == Key::ESCAPE && drag_mode != DRAG_NONE) {
+		_cancel_drag();
+		timeline->accept_event();
 		return;
 	}
 	const Ref<InputEventMouseButton> mb = p_event;
@@ -579,7 +671,7 @@ void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 		if (mb->is_pressed()) {
 			timeline->grab_focus();
 			DragMode mode;
-			const int index = _get_cue_at(mb->get_position(), mode);
+			const int index = _get_segment_at(mb->get_position(), mode);
 			drag_mode = mode;
 			drag_from_time = _x_to_time(mb->get_position().x);
 			if (index >= 0) {
@@ -594,7 +686,7 @@ void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 			} else {
 				_seek(drag_from_time);
 			}
-		} else {
+		} else if (drag_mode != DRAG_NONE) {
 			const DragMode mode = drag_mode;
 			drag_mode = DRAG_NONE;
 			const Ref<SubtitleSegment> segment = selected >= 0 ? subtitle->get_segment(selected) : Ref<SubtitleSegment>();
@@ -602,7 +694,7 @@ void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 				const double start = segment->get_start_time();
 				const double end = segment->get_end_time();
 				if (start != drag_old_start || end != drag_old_end) {
-					static const char *const actions[] = { "", "", "Move Subtitle Cue", "Trim Subtitle Cue Start", "Trim Subtitle Cue End" };
+					static const char *const actions[] = { "", "", TTRC("Move Subtitle Segment"), TTRC("Trim Subtitle Segment Start"), TTRC("Trim Subtitle Segment End") };
 					_commit_times(TTR(actions[mode]), selected, start, end, drag_old_start, drag_old_end);
 				}
 			}
@@ -617,7 +709,7 @@ void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 	}
 	if (drag_mode == DRAG_NONE) {
 		DragMode mode;
-		_get_cue_at(mm->get_position(), mode);
+		_get_segment_at(mm->get_position(), mode);
 		timeline->set_default_cursor_shape(mode == DRAG_START || mode == DRAG_END ? CURSOR_HSIZE : (mode == DRAG_MOVE ? CURSOR_MOVE : CURSOR_ARROW));
 		return;
 	}
@@ -630,19 +722,20 @@ void SubtitlesDock::_timeline_gui_input(const Ref<InputEvent> &p_event) {
 	if (segment.is_null()) {
 		return;
 	}
-	// Times in segment time, snapped to milliseconds like the subtitle formats.
+	// Times in segment time, snapped to milliseconds like the subtitle formats, kept within the stream.
+	const double length = _get_length() - _get_offset();
 	double delta = Math::round((time - drag_from_time) * 1000.0) / 1000.0;
 	switch (drag_mode) {
 		case DRAG_MOVE: {
-			delta = MAX(delta, -drag_old_start);
+			delta = CLAMP(delta, -drag_old_start, MAX(0.0, length - drag_old_end));
 			segment->set_start_time(drag_old_start + delta);
 			segment->set_end_time(drag_old_end + delta);
 		} break;
 		case DRAG_START: {
-			segment->set_start_time(CLAMP(drag_old_start + delta, 0.0, drag_old_end - MIN_CUE_DURATION));
+			segment->set_start_time(MAX(0.0, MIN(drag_old_start + delta, drag_old_end - MIN_DURATION)));
 		} break;
 		case DRAG_END: {
-			segment->set_end_time(MAX(drag_old_end + delta, drag_old_start + MIN_CUE_DURATION));
+			segment->set_end_time(MIN(MAX(drag_old_end + delta, drag_old_start + MIN_DURATION), MAX(length, drag_old_end)));
 		} break;
 		default:
 			break;
@@ -665,7 +758,7 @@ void SubtitlesDock::_tree_selected() {
 		return;
 	}
 	_select(item->get_metadata(0), false);
-	// Show the cue on the timeline and move the playhead to it, ready to play from there.
+	// Show the segment on the timeline and move the playhead to it, ready to play from there.
 	const Ref<SubtitleSegment> segment = subtitle->get_segment(selected);
 	if (segment.is_valid()) {
 		const double start = segment->get_start_time() + _get_offset();
@@ -691,6 +784,7 @@ void SubtitlesDock::_tree_edited() {
 		double time = 0.0;
 		if (!SubtitleEditorHelper::parse_short_time(item->get_text(column), time)) {
 			status_label->set_text(TTR("Enter a time as seconds (5.5), minutes:seconds (0:05.500) or hours:minutes:seconds."));
+			changed_rows.insert(index);
 			_queue_update();
 			return;
 		}
@@ -698,9 +792,9 @@ void SubtitlesDock::_tree_edited() {
 		const double start = segment->get_start_time();
 		const double end = segment->get_end_time();
 		if (column == COLUMN_START) {
-			_commit_times(TTR("Set Subtitle Cue Start"), index, time, end, start, end);
+			_commit_times(TTR("Set Subtitle Segment Start"), index, time, end, start, end);
 		} else {
-			_commit_times(TTR("Set Subtitle Cue End"), index, start, time, start, end);
+			_commit_times(TTR("Set Subtitle Segment End"), index, start, time, start, end);
 		}
 		return;
 	}
@@ -723,10 +817,12 @@ void SubtitlesDock::_tree_edited() {
 			return;
 	}
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(TTR("Edit Subtitle Cue"), UndoRedo::MERGE_DISABLE, subtitle.ptr());
+	undo_redo->create_action(TTR("Edit Subtitle Segment"), UndoRedo::MERGE_DISABLE, subtitle.ptr());
 	undo_redo->force_fixed_history(); // The segment, without a path, would count as built into the edited scene.
 	undo_redo->add_do_property(segment.ptr(), property, value);
 	undo_redo->add_undo_property(segment.ptr(), property, segment->get(property));
+	undo_redo->add_do_method(subtitle.ptr(), "emit_changed");
+	undo_redo->add_undo_method(subtitle.ptr(), "emit_changed");
 	undo_redo->commit_action();
 }
 
@@ -735,7 +831,7 @@ void SubtitlesDock::_tree_activated() {
 	if (item == nullptr || subtitle.is_null()) {
 		return;
 	}
-	// Columns that are not edited in place: all properties of the cue in the Inspector.
+	// The # column is not edited in place: all properties of the segment in the Inspector.
 	if (tree->get_selected_column() == COLUMN_INDEX) {
 		const Ref<SubtitleSegment> segment = subtitle->get_segment(item->get_metadata(0));
 		if (segment.is_valid()) {
@@ -744,16 +840,24 @@ void SubtitlesDock::_tree_activated() {
 	}
 }
 
+void SubtitlesDock::_file_removed(const String &p_file) {
+	if (subtitle.is_valid() && subtitle->get_path() == p_file) {
+		// Save would write the deleted file again.
+		edit(Ref<Resource>());
+		close();
+	}
+}
+
 // Shortcuts
 
-void SubtitlesDock::shortcut_input(const Ref<InputEvent> &p_event) {
+void SubtitlesDock::input(const Ref<InputEvent> &p_event) {
+	// Before the focused control: the table and the buttons would take Space and Delete themselves.
 	const Ref<InputEventKey> key = p_event;
-	if (key.is_null() || !key->is_pressed() || subtitle.is_null() || !is_visible_in_tree()) {
+	if (key.is_null() || !key->is_pressed() || subtitle.is_null() || !is_visible_in_tree() || drag_mode != DRAG_NONE) {
 		return;
 	}
-	// Only while the timeline or the table has the focus (not while a cell is edited).
 	const Control *focus = get_viewport()->gui_get_focus_owner();
-	if (focus == nullptr || !is_ancestor_of(focus)) {
+	if (focus == nullptr || !is_ancestor_of(focus) || Object::cast_to<LineEdit>(focus) || Object::cast_to<TextEdit>(focus) || tree->is_editing()) {
 		return;
 	}
 	if (ED_IS_SHORTCUT("subtitles_dock/play_pause", p_event)) {
@@ -766,10 +870,10 @@ void SubtitlesDock::shortcut_input(const Ref<InputEvent> &p_event) {
 		_seek(playhead - 1.0);
 	} else if (ED_IS_SHORTCUT("subtitles_dock/forward", p_event)) {
 		_seek(playhead + 1.0);
-	} else if (ED_IS_SHORTCUT("subtitles_dock/add_cue", p_event)) {
-		_add_cue();
-	} else if (ED_IS_SHORTCUT("subtitles_dock/remove_cue", p_event)) {
-		_remove_cue();
+	} else if (ED_IS_SHORTCUT("subtitles_dock/add_segment", p_event)) {
+		_add_segment();
+	} else if (ED_IS_SHORTCUT("subtitles_dock/remove_segment", p_event)) {
+		_remove_segment();
 	} else {
 		return;
 	}
@@ -780,12 +884,21 @@ void SubtitlesDock::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_READY: {
 			AudioStreamPreviewGenerator::get_singleton()->connect(SNAME("preview_updated"), callable_mp(this, &SubtitlesDock::_preview_updated));
+			EditorUndoRedoManager::get_singleton()->connect(SNAME("history_changed"), callable_mp(this, &SubtitlesDock::_update_file_label));
+			EditorNode::get_singleton()->connect(SNAME("resource_saved"), callable_mp(this, &SubtitlesDock::_update_file_label).unbind(1));
+			if (FileSystemDock::get_singleton()) {
+				FileSystemDock::get_singleton()->connect(SNAME("file_removed"), callable_mp(this, &SubtitlesDock::_file_removed));
+				// A moved subtitle keeps its resource with the new path: only the label changes.
+				FileSystemDock::get_singleton()->connect(SNAME("files_moved"), callable_mp(this, &SubtitlesDock::_queue_update).unbind(2));
+			}
 		} break;
 		case NOTIFICATION_THEME_CHANGED: {
 			play_button->set_button_icon(get_editor_theme_icon(playing ? SNAME("Pause") : SNAME("MainPlay")));
 			add_button->set_button_icon(get_editor_theme_icon(SNAME("Add")));
 			remove_button->set_button_icon(get_editor_theme_icon(SNAME("Remove")));
+			save_button->set_button_icon(get_editor_theme_icon(SNAME("Save")));
 			time_label->add_theme_font_override(SceneStringName(font), get_theme_font(SNAME("status_source"), EditorStringName(EditorFonts)));
+			shown_segments.clear(); // Rebuild the rows with the new colors.
 			_queue_update();
 		} break;
 		case NOTIFICATION_PROCESS: {
@@ -795,7 +908,7 @@ void SubtitlesDock::_notification(int p_what) {
 			if (stream.is_valid() && player->is_playing()) {
 				playhead = player->get_playback_position();
 			} else if (stream.is_null()) {
-				playhead += get_process_delta_time(); // No stream: a clock, to spot cues against video or speech elsewhere.
+				playhead += get_process_delta_time(); // No stream: a clock, to spot segments against video or speech elsewhere.
 				if (playhead >= _get_length()) {
 					_player_finished();
 				}
@@ -810,14 +923,30 @@ void SubtitlesDock::_notification(int p_what) {
 			timeline->queue_redraw();
 		} break;
 		case NOTIFICATION_VISIBILITY_CHANGED: {
-			if (!is_visible_in_tree() && playing) {
-				_play_pause();
+			if (!is_visible_in_tree()) {
+				if (playing) {
+					_play_pause();
+				}
+				_cancel_drag();
 			}
 		} break;
 	}
 }
 
 void SubtitlesDock::edit(const Ref<Resource> &p_resource) {
+	Ref<Subtitle> new_subtitle = Ref<Subtitle>(Object::cast_to<Subtitle>(p_resource.ptr()));
+	Ref<AudioStream> new_stream = Ref<AudioStream>(Object::cast_to<AudioStream>(p_resource.ptr()));
+	if (new_stream.is_valid()) {
+		const String path = get_stream_subtitle_path(new_stream.ptr());
+		new_subtitle = path.is_empty() ? Ref<Subtitle>() : Ref<Subtitle>(ResourceLoader::load(path, "Subtitle"));
+	}
+	if (new_subtitle.is_valid() && new_subtitle == subtitle) {
+		// The same subtitle again (back from inspecting a segment, or the Inspector button): keep the view.
+		if (new_stream.is_valid() && new_stream != stream) {
+			_set_stream(new_stream);
+		}
+		return;
+	}
 	if (playing) {
 		_play_pause();
 	}
@@ -825,32 +954,36 @@ void SubtitlesDock::edit(const Ref<Resource> &p_resource) {
 	if (subtitle.is_valid() && subtitle->is_connected(CoreStringName(changed), callback)) {
 		subtitle->disconnect_changed(callback);
 	}
-	Ref<Subtitle> new_subtitle = Ref<Subtitle>(Object::cast_to<Subtitle>(p_resource.ptr()));
-	Ref<AudioStream> new_stream = Ref<AudioStream>(Object::cast_to<AudioStream>(p_resource.ptr()));
-	if (new_stream.is_valid()) {
-		const String path = get_stream_subtitle_path(new_stream.ptr());
-		new_subtitle = path.is_empty() ? Ref<Subtitle>() : Ref<Subtitle>(ResourceLoader::load(path, "Subtitle"));
-	} else if (new_subtitle.is_valid()) {
+	if (new_stream.is_null() && new_subtitle.is_valid()) {
 		const String sidecar = find_sidecar_stream(new_subtitle->get_path());
 		if (!sidecar.is_empty()) {
 			new_stream = ResourceLoader::load(sidecar, "AudioStream");
-		} else if (new_subtitle == subtitle) {
-			new_stream = stream; // Reopened: keep the stream picked for it.
 		}
 	}
 	subtitle = new_subtitle;
-	stream = new_stream;
 	if (subtitle.is_valid()) {
 		subtitle->connect_changed(callback);
 	}
-	player->set_stream(stream);
-	stream_picker->set_edited_resource(stream);
 	selected = -1;
-	dirty = false;
 	playhead = 0.0;
 	view_start = 0.0;
 	fit_pending = true;
-	_queue_update();
+	_set_stream(new_stream);
+}
+
+// Toolbar buttons: flat like Godot's other bottom panels, no keyboard focus (Space and Delete stay with the dock),
+// the live shortcut in the tooltip.
+static Button *_subtitles_dock_make_button(Control *p_context, const String &p_text, const String &p_tooltip, const String &p_shortcut) {
+	Button *button = memnew(Button(p_text));
+	button->set_theme_type_variation(SceneStringName(FlatButton));
+	button->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
+	button->set_tooltip_text(p_tooltip);
+	if (!p_shortcut.is_empty()) {
+		button->set_shortcut(ED_GET_SHORTCUT(p_shortcut));
+		button->set_shortcut_context(p_context);
+		button->set_shortcut_in_tooltip(true);
+	}
+	return button;
 }
 
 SubtitlesDock::SubtitlesDock() {
@@ -863,16 +996,17 @@ SubtitlesDock::SubtitlesDock() {
 	set_global(false);
 	set_transient(true);
 	set_custom_minimum_size(Size2(0, 300) * EDSCALE);
-	set_process_shortcut_input(true);
+	set_process_input(true);
 	pixels_per_second = 100.0 * EDSCALE;
 
 	ED_SHORTCUT_ARRAY("subtitles_dock/play_pause", TTRC("Play/Pause"), { int32_t(Key::SPACE), int32_t(Key::K) });
-	ED_SHORTCUT("subtitles_dock/spot_start", TTRC("Set Cue Start at Playhead"), Key::I);
-	ED_SHORTCUT("subtitles_dock/spot_end", TTRC("Set Cue End at Playhead"), Key::O);
+	ED_SHORTCUT("subtitles_dock/spot_start", TTRC("Set Segment Start at Playhead"), Key::I);
+	ED_SHORTCUT("subtitles_dock/spot_end", TTRC("Set Segment End at Playhead"), Key::O);
 	ED_SHORTCUT("subtitles_dock/back", TTRC("Back 1 Second"), Key::J);
 	ED_SHORTCUT("subtitles_dock/forward", TTRC("Forward 1 Second"), Key::L);
-	ED_SHORTCUT("subtitles_dock/add_cue", TTRC("Add Cue at Playhead"), Key::N);
-	ED_SHORTCUT("subtitles_dock/remove_cue", TTRC("Remove Cue"), Key::KEY_DELETE);
+	ED_SHORTCUT("subtitles_dock/add_segment", TTRC("Add Segment at Playhead"), Key::N);
+	ED_SHORTCUT("subtitles_dock/remove_segment", TTRC("Remove Segment"), Key::KEY_DELETE);
+	ED_SHORTCUT_OVERRIDE("subtitles_dock/remove_segment", "macos", KeyModifierMask::META | Key::BACKSPACE);
 
 	player = memnew(AudioStreamPlayer);
 	player->connect(SceneStringName(finished), callable_mp(this, &SubtitlesDock::_player_finished));
@@ -884,45 +1018,48 @@ SubtitlesDock::SubtitlesDock() {
 	HBoxContainer *toolbar = memnew(HBoxContainer);
 	main_vbox->add_child(toolbar);
 	file_label = memnew(Label);
+	file_label->set_mouse_filter(MOUSE_FILTER_PASS);
 	toolbar->add_child(file_label);
+	toolbar->add_child(memnew(VSeparator));
+
 	stream_picker = memnew(EditorResourcePicker);
 	stream_picker->set_base_type("AudioStream");
-	stream_picker->set_custom_minimum_size(Size2(160, 0) * EDSCALE);
+	stream_picker->set_custom_minimum_size(Size2(100, 0) * EDSCALE);
 	stream_picker->set_tooltip_text(TTR("The audio for the waveform and playback. Found as an audio file with the subtitle's name, or the stream the dock was opened for; a stream picked here is not saved."));
 	stream_picker->connect("resource_changed", callable_mp(this, &SubtitlesDock::_stream_picked));
 	toolbar->add_child(stream_picker);
-
-	play_button = memnew(Button);
-	play_button->set_flat(true);
-	play_button->set_tooltip_text(TTR("Play or pause from the playhead (Space or K). J and L move the playhead by one second."));
+	stream_label = memnew(Label);
+	stream_label->set_mouse_filter(MOUSE_FILTER_PASS);
+	toolbar->add_child(stream_label);
+	play_button = _subtitles_dock_make_button(this, String(), TTR("Play or pause from the playhead. The Back 1 Second and Forward 1 Second shortcuts move the playhead."), "subtitles_dock/play_pause");
+	play_button->set_accessibility_name(TTRC("Play/Pause"));
 	play_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_play_pause));
 	toolbar->add_child(play_button);
 	time_label = memnew(Label);
 	toolbar->add_child(time_label);
+	toolbar->add_child(memnew(VSeparator));
 
-	add_button = memnew(Button(TTR("Add Cue")));
-	add_button->set_tooltip_text(TTR("Add a two-second cue at the playhead (N)."));
-	add_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_add_cue));
+	add_button = _subtitles_dock_make_button(this, TTR("Add Segment"), TTR("Add a two-second segment at the playhead."), "subtitles_dock/add_segment");
+	add_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_add_segment));
 	toolbar->add_child(add_button);
-	remove_button = memnew(Button(TTR("Remove Cue")));
-	remove_button->set_tooltip_text(TTR("Remove the selected cue (Delete)."));
-	remove_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_remove_cue));
+	remove_button = _subtitles_dock_make_button(this, TTR("Remove Segment"), TTR("Remove the selected segment."), "subtitles_dock/remove_segment");
+	remove_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_remove_segment));
 	toolbar->add_child(remove_button);
-	spot_start_button = memnew(Button(TTR("Set Start")));
-	spot_start_button->set_tooltip_text(TTR("Set the start of the selected cue at the playhead (I). Without a selected cue, add one there."));
+	spot_start_button = _subtitles_dock_make_button(this, TTR("Set Start"), TTR("Set the start of the selected segment at the playhead. Without a selected segment, add one there."), "subtitles_dock/spot_start");
 	spot_start_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_spot).bind(false));
 	toolbar->add_child(spot_start_button);
-	spot_end_button = memnew(Button(TTR("Set End")));
-	spot_end_button->set_tooltip_text(TTR("Set the end of the selected cue at the playhead and select the next cue (O)."));
+	spot_end_button = _subtitles_dock_make_button(this, TTR("Set End"), TTR("Set the end of the selected segment at the playhead and select the next segment."), "subtitles_dock/spot_end");
 	spot_end_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_spot).bind(true));
 	toolbar->add_child(spot_end_button);
-	save_button = memnew(Button(TTR("Save")));
+	toolbar->add_child(memnew(VSeparator));
+	save_button = _subtitles_dock_make_button(this, TTR("Save"), String(), String());
 	save_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitlesDock::_save));
 	toolbar->add_child(save_button);
 
 	status_label = memnew(Label);
 	status_label->set_h_size_flags(SIZE_EXPAND_FILL);
 	status_label->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+	status_label->set_mouse_filter(MOUSE_FILTER_PASS);
 	toolbar->add_child(status_label);
 
 	VSplitContainer *split = memnew(VSplitContainer);
@@ -937,7 +1074,8 @@ SubtitlesDock::SubtitlesDock() {
 	timeline->set_v_size_flags(SIZE_EXPAND_FILL);
 	timeline->set_focus_mode(FOCUS_ALL);
 	timeline->set_clip_contents(true);
-	timeline->set_tooltip_text(TTR("Click to move the playhead. Drag a cue to move it, its edges to trim it; double-click a cue to inspect it. Ctrl+Wheel zooms."));
+	timeline->set_accessibility_name(TTRC("Subtitle Timeline"));
+	timeline->set_tooltip_text(TTR("Click to move the playhead. Drag a segment to move it, its edges to trim it (Escape cancels); double-click a segment to inspect it. Ctrl+Wheel zooms."));
 	timeline->connect(SceneStringName(draw), callable_mp(this, &SubtitlesDock::_timeline_draw));
 	timeline->connect(SceneStringName(gui_input), callable_mp(this, &SubtitlesDock::_timeline_gui_input));
 	timeline->connect(SceneStringName(resized), callable_mp(this, &SubtitlesDock::_update_scroll));
@@ -954,7 +1092,7 @@ SubtitlesDock::SubtitlesDock() {
 	tree->set_select_mode(Tree::SELECT_ROW);
 	tree->set_column_titles_visible(true);
 	static const char *const titles[] = { "#", TTRC("Start"), TTRC("End"), TTRC("Speaker"), TTRC("Kind"), TTRC("Text") };
-	static const int widths[] = { 40, 100, 100, 120, 120, 0 };
+	static const int widths[] = { 50, 100, 100, 120, 120, 0 };
 	for (int column = 0; column < COLUMN_MAX; column++) {
 		tree->set_column_title(column, column == COLUMN_INDEX ? String(titles[column]) : TTR(titles[column]));
 		if (widths[column] > 0) {
@@ -962,7 +1100,7 @@ SubtitlesDock::SubtitlesDock() {
 			tree->set_column_custom_minimum_width(column, widths[column] * EDSCALE);
 		}
 	}
-	tree->set_tooltip_text(TTR("Click a cell of a selected row to edit it. Double-click # to inspect all properties of the cue."));
+	tree->set_tooltip_text(TTR("Click a cell of a selected row to edit it. Double-click # to inspect all properties of the segment."));
 	tree->connect(SceneStringName(item_selected), callable_mp(this, &SubtitlesDock::_tree_selected));
 	tree->connect("item_edited", callable_mp(this, &SubtitlesDock::_tree_edited));
 	// Deferred: inspecting the segment rebuilds editors while the tree emits.
@@ -971,6 +1109,7 @@ SubtitlesDock::SubtitlesDock() {
 }
 
 SubtitlesDock::~SubtitlesDock() {
+	_watch_segments(false);
 	if (singleton == this) {
 		singleton = nullptr;
 	}
