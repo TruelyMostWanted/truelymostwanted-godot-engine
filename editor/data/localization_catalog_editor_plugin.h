@@ -139,6 +139,7 @@ class LocalizationCatalogEditorPlugin : public EditorPlugin {
 
 	void _convert_project_translations();
 	void _project_settings_changed();
+	void _resource_saved(Object *p_resource);
 	void _popup_convert_dialog();
 
 protected:
