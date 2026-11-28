@@ -75,7 +75,7 @@ void TransitionScreen::input(const Ref<InputEvent> &p_event) {
 		return;
 	}
 	// The covered scene gets no input while the screen hides it.
-	get_viewport()->set_input_as_handled();
+	Node::get_viewport()->set_input_as_handled();
 	if (!skippable || finish_requested || !p_event->is_pressed() || p_event->is_echo()) {
 		return;
 	}
