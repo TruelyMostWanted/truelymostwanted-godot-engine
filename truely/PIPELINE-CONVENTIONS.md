@@ -74,6 +74,7 @@ Hooks nie mit `--no-verify` umgehen. Schlägt ein Hook fehl, die Ursache beheben
 |---|---|
 | Vor `truely/release.ps1`: volle CI auf dem zu releasenden Commit von `truely-godot-engine` grün (`gh workflow run runner.yml --ref truely-godot-engine`). | Die Release-CI auf `truely-godot-engine-releases` fand am 2026-11-28 einen Clang-Fehler (P5), den lokal niemand sah. |
 | Versions-Commit (`truely/version.txt`) ohne `[skip ci]`; sonst startet die CI nach `release.ps1` nicht und muss mit `gh workflow run runner.yml --ref truely-godot-engine-releases` angestoßen werden. | 0.2.2 (2026-11-28): Push auf `truely-godot-engine-releases` ohne CI-Lauf. |
+| Sehr große Debug-Builds (ASan + UBSan, double, dev) können `.text` über 2 GB treiben (mold: „relocation … out of range“). Im Sanitizer-Job `cxxflags=-fno-sanitize=vptr`; neue große Module dort beachten. | 0.2.2 (2026-11-28): Release-CI, Job „Editor with doubles and GCC sanitizers“. |
 | `truely/version.txt` vor dem Release erhöhen (PATCH für Fixes, MINOR für Features); `truely/godot-status.txt` passt zur Godot-Basis. | Das Skript bricht bei einem vorhandenen Tag ab. |
 | Release-Builds ohne SCons-Cache. | Der Cache lieferte alte Objekte mit altem Versions-Header. |
 | Der `workflow_run` von „Truely Release“ meldet als `headSha` den Standard-Branch, nicht den Release-Commit. | Zuordnung von Läufen über die Zeit, nicht über den SHA (0.2.0). |
