@@ -4692,8 +4692,8 @@ int Main::start() {
 		ResourceSaver::add_custom_savers();
 
 		if (!project_manager && !editor) { // game
-			// `filesystem/resources/preload_lists`: before the autoloads, which may use the stored resources.
-			ResourceDatabase::get_singleton()->preload_project_lists();
+			// `filesystem/resources/preloads`: before the autoloads, which may use the stored resources.
+			ResourceDatabase::get_singleton()->preload_project_preloads();
 			if (!game_path.is_empty() || !script.is_empty()) {
 				//autoload
 				OS::get_singleton()->benchmark_begin_measure("Startup", "Load Autoloads");

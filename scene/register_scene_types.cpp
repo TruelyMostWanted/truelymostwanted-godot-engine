@@ -1124,7 +1124,11 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
 	GDREGISTER_CLASS(AudioCommand);
-	GDREGISTER_CLASS(AudioCommandList);
+	GDREGISTER_CLASS(AudioCommands);
+#ifndef DISABLE_DEPRECATED
+	// Renamed in 0.2.2 (naming rule: no container type in a name); saved resources keep loading.
+	ClassDB::add_compatibility_class("AudioCommandList", "AudioCommands");
+#endif // DISABLE_DEPRECATED
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.

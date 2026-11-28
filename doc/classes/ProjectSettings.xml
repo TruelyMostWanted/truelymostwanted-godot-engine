@@ -510,7 +510,7 @@
 			If [code]true[/code], track information (title, artist, album, cover and so on, see [member AudioStream.title]) is read from the file when an [AudioStreamMP3], [AudioStreamWAV], [AudioStreamOggVorbis] or [AudioStreamOpus] is loaded from a buffer or file at runtime, and when such a file is imported. If [code]false[/code], the track information stays empty and the tags are not parsed. Can be overridden per file with the [code]info/read_file_tags[/code] import option.
 		</member>
 		<member name="audio/mixer/default_commands" type="String" setter="" getter="" default="&quot;&quot;">
-			Path to an [AudioCommandList] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
+			Path to an [AudioCommands] ([code].tres[/code], [code].res[/code], JSON, INI or CSV) that the [AudioMixerServer] registers on the first use of its command methods (not in the editor), so its commands run with [method AudioMixerServer.execute_named] and [method AudioMixerServer.execute_group]. If empty, no commands are registered at startup.
 		</member>
 		<member name="audio/mixer/default_layout" type="String" setter="" getter="" default="&quot;&quot;">
 			Path to an [AudioMixerLayout] that the [AudioMixerServer] loads on its first use (not in the editor). If empty, the mixer starts without channels; add them with [method AudioMixerServer.add_channel] or [method AudioMixerServer.apply_layout].
@@ -1288,8 +1288,11 @@
 		<member name="filesystem/path_prefixes/defaults" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], [PathPrefixServer] registers [code]appdata://[/code], [code]config://[/code], [code]cache://[/code] and [code]temp://[/code] at startup (on the Web only [code]temp://[/code]). They can still be replaced or removed with [method PathPrefixServer.register_prefix] and [method PathPrefixServer.unregister_prefix].
 		</member>
-		<member name="filesystem/resources/preload_lists" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
-			Paths of [PreloadList] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
+		<member name="filesystem/resources/preload_lists" type="PackedStringArray" setter="" getter="" default="PackedStringArray()" deprecated="Use [member filesystem/resources/preloads] instead.">
+			Deprecated name of [member filesystem/resources/preloads]; both are read.
+		</member>
+		<member name="filesystem/resources/preloads" type="PackedStringArray" setter="" getter="" default="PackedStringArray()">
+			Paths of [Preloads] resources that [ResourceDatabase] preloads synchronously when the game starts, before the autoloads are created. Not used in the editor.
 		</member>
 		<member name="filesystem/resources/text_formats/csv_delimiter" type="String" setter="" getter="" default="&quot;,&quot;">
 			The delimiter of [code].csv[/code] resource files (one character), for example [code]";"[/code] for spreadsheets in many European languages or [code]"\t"[/code] for tab-separated files. Used when the options of [ResourceTextSerializer] are [code]null[/code]; see [member SerializerOptions.csv_delimiter].
