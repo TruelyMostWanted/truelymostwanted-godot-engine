@@ -133,6 +133,7 @@ Vorbild sind die [godot-proposals](https://github.com/godotengine/godot-proposal
 - **Kurz, einfach, direkt.** Stichpunkte, keine Füllwörter, ein roter Faden von oben nach unten. Jeder Satz sagt etwas.
 - **Konkret:** Klassen, Methoden und Einstellungen in `Code`, Dateien und Zeilen als Link (`https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/blob/<commit>/<pfad>#L10-L20`, Commit statt Branch, damit der Link stimmt).
 - **„How it will work“** zeigt die API so, wie Nutzer sie schreiben (GDScript, bei Bedarf C#), dazu Mock-ups oder Mermaid-Diagramme für Editor-Teile.
+- **Skizzen:** Jedes Issue mit Editor-Teilen (Inspector, Dock, Dialog, Menü, Node im Viewport) bekommt eine grobe Skizze wie in [godot-proposals#7082](https://github.com/godotengine/godot-proposals/issues/7082): ein SVG- oder PNG-Bild im Wiki-Repository unter `images/concepts/<nr>-<name>.svg`, im Issue eingebunden als `![Dock sketch](https://raw.githubusercontent.com/wiki/TruelyMostWanted/truelymostwanted-godot-engine/images/concepts/<nr>-<name>.svg)`. Grau-Töne wie der Godot-Editor, Beschriftungen auf Englisch, nur das Nötige.
 - **„Implementation plan“** listet **New** (Dateien, Klassen), **Changed** (Dateien und Methoden mit Link auf die Zeilen) und **Steps** in Reihenfolge; dazu, was geprüft wurde (Machbarkeit) und was je Plattform nicht geht (Web: ein Thread, Dateien nur in `user://` und im PCK).
 - **Entscheidungen und Änderungen** am Umfang kommen in den Body (der Body ist immer der aktuelle Stand); ein Kommentar sagt kurz, was sich geändert hat.
 
@@ -141,6 +142,39 @@ Vorbild sind die [godot-proposals](https://github.com/godotengine/godot-proposal
 - Alle Kommentare kommen vom Konto des Besitzers: **in der Ich-Form schreiben**, wie Review-Kommentare und Ergänzungen unter Godot-Issues und -PRs. **Keine Präfixe** wie „(Owner, 2026-11-28)“, „Decision (orchestrator, …)“ oder „Agent:“; das Datum zeigt GitHub.
 - Ein Kommentar hat einen Zweck: Ergebnis („Implemented in #123: …“), Entscheidung („I went with B, because …“), Fund („The table rebuilds every row on each change: 104 ms with 2000 segments.“), Frage.
 - Ergebnisse mit Messwerten und Prüfungen in Stichpunkten; lange Protokolle als `<details>`.
+
+### 3.3 Pull Requests
+
+Vorbild ist [godot#99404](https://github.com/godotengine/godot/pull/99404), etwas strenger aufgebaut. Ein PR zeigt das **Ergebnis**; das Issue bleibt der Ort für Problem und Plan.
+
+```markdown
+<One or two sentences: what this PR adds or changes.>
+
+Closes #<nr>
+
+<Main screenshot of the result>
+
+## Changes
+- <user-visible change>, with a screenshot below the point if it is a UI change
+  - <detail>
+
+## API
+<New and changed classes, methods, properties, signals, settings; GDScript snippet.>
+
+## Tests
+- Unit tests: <n>/<n>
+- Test project: `res://<guide>/` Example and Test in GDScript and C#
+- Editor playtest: `pt_<nr>` <n> checks, no ERROR lines
+
+## Measurements
+| Action | Before | After |
+
+## Not in this PR
+- <what is left out, and why> (empty for release mandates: everything goes in)
+```
+
+- **Screenshots** aus den Playtests und dem Wiki (`images/<Seite>/…` im Wiki-Repository) mit voller URL `https://raw.githubusercontent.com/wiki/TruelyMostWanted/truelymostwanted-godot-engine/images/<Seite>/<datei>.png` einbinden; jede UI-Änderung hat mindestens ein Bild.
+- Titel wie Commits: was der PR tut, Issue-Nummer am Ende (`Subtitles dock: timing tools (#443)`).
 
 - **Öffentlich und für sich verständlich:** Dieses Repository, das Wiki und das Testprojekt sind öffentlich. **Keine Verweise auf private Repositories**: keine Namen, Links, Pfade oder Klassennamen daraus. Ein Issue begründet sich allein über den Stand der Engine (Problem mit Code-Stellen) und den Vorschlag.
 - **Labels:** genau ein `type:`, mindestens ein `area:` (Engine-Bereiche: `core`, `scene`, `servers`, `editor`, `modules`, `dotnet`, `platform`, `thirdparty`, `build`, `tests`, `docs`), 0–3 `topic:`.
