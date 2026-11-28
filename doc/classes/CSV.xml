@@ -154,6 +154,29 @@
 				Returns the row at index [param row] as a [Dictionary] of typed values, keyed by the column names of [member header] (by field name, or column index, if there is no header). Each cell is converted to the type of its field in [param schema] (by header name, or by position without a header); empty and unconvertible cells give the field's [member DataField.default_value], cells without a field stay strings.
 			</description>
 		</method>
+		<method name="insert_column">
+			<return type="void" />
+			<param index="0" name="column" type="int" />
+			<param index="1" name="name" type="String" default="&quot;&quot;" />
+			<param index="2" name="value" type="String" default="&quot;&quot;" />
+			<description>
+				Inserts a column at index [param column] (from [code]0[/code] to [method get_column_count]); the following columns move right. [param name] goes into [member header] if the CSV has a header or [param name] is not empty, and every row gets [param value] in the new column. Emits [signal Resource.changed] once and drops the kept parsed text.
+				[codeblocks]
+				[gdscript]
+				var csv = CSV.new()
+				csv.parse("id,name\n1,Ann\n")
+				csv.insert_column(1, "team", "red")
+				print(csv.encode_to_text()) # Prints "id,team,name\n1,red,Ann\n"
+				[/gdscript]
+				[csharp]
+				var csv = new Csv();
+				csv.Parse("id,name\n1,Ann\n");
+				csv.InsertColumn(1, "team", "red");
+				GD.Print(csv.EncodeToText()); // Prints "id,team,name\n1,red,Ann\n"
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="insert_row">
 			<return type="void" />
 			<param index="0" name="row" type="int" />
@@ -168,6 +191,13 @@
 			<param index="1" name="options" type="SerializerOptions" default="null" />
 			<description>
 				Parses the CSV [param text] and returns its rows, like [method TextDataFormat.parse]. Returns an empty [Array] and prints the error if the text can't be read.
+			</description>
+		</method>
+		<method name="remove_column">
+			<return type="void" />
+			<param index="0" name="column" type="int" />
+			<description>
+				Removes the column at index [param column] (below [method get_column_count]) from [member header] and from every row; the following columns move left. Emits [signal Resource.changed] once and drops the kept parsed text.
 			</description>
 		</method>
 		<method name="remove_row">

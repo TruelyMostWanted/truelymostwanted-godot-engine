@@ -33,6 +33,7 @@
 TEST_FORCE_LINK(test_text_data_format)
 
 #include "core/config/project_settings.h"
+#include "core/core_string_names.h"
 #include "core/io/config_file.h"
 #include "core/io/csv_format.h"
 #include "core/io/file_access.h"
@@ -45,6 +46,7 @@ TEST_FORCE_LINK(test_text_data_format)
 #include "core/io/text_data_format.h"
 #include "core/io/xml_format.h"
 #include "core/object/class_db.h"
+#include "tests/signal_watcher.h"
 #include "tests/test_utils.h"
 
 namespace TestTextDataFormat {
@@ -238,6 +240,61 @@ TEST_CASE("[CSV] Rows, cells and columns by index") {
 	CHECK(csv->get_header().is_empty());
 	CHECK(csv->get_row_count() == 2);
 	CHECK(csv->encode_to_text() == "a;b\n1;2\n");
+}
+
+TEST_CASE("[CSV] Insert and remove columns") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("id,name\n1,Ann\n2\n", true) == OK);
+	Array once;
+	once.push_back(Array());
+	SIGNAL_WATCH(*csv, CoreStringName(changed));
+
+	csv->insert_column(1, "team", "red");
+	SIGNAL_CHECK("changed", once);
+	CHECK(csv->get_parsed_text().is_empty()); // The kept text is dropped.
+	CHECK(csv->get_header() == PackedStringArray({ "id", "team", "name" }));
+	CHECK(csv->get_row(0) == PackedStringArray({ "1", "red", "Ann" }));
+	CHECK(csv->get_row(1) == PackedStringArray({ "2", "red" })); // A short row gets the value at its column.
+	csv->insert_column(3, "note"); // Appended without a value: short rows stay short.
+	CHECK(csv->get_header() == PackedStringArray({ "id", "team", "name", "note" }));
+	CHECK(csv->get_row(1) == PackedStringArray({ "2", "red" }));
+	CHECK(csv->encode_to_text() == "id,team,name,note\n1,red,Ann\n2,red\n");
+
+	SIGNAL_DISCARD("changed");
+	csv->remove_column(3);
+	SIGNAL_CHECK("changed", once);
+	csv->remove_column(0);
+	CHECK(csv->get_header() == PackedStringArray({ "team", "name" }));
+	CHECK(csv->get_row(0) == PackedStringArray({ "red", "Ann" }));
+	CHECK(csv->get_row(1) == PackedStringArray({ "red" }));
+	SIGNAL_DISCARD("changed");
+
+	ERR_PRINT_OFF;
+	csv->insert_column(3);
+	csv->insert_column(-1);
+	csv->remove_column(2);
+	ERR_PRINT_ON;
+	SIGNAL_CHECK_FALSE("changed"); // Invalid indices change nothing.
+	SIGNAL_UNWATCH(*csv, CoreStringName(changed));
+	CHECK(csv->get_column_count() == 2);
+
+	// Without a header and without a name, only the rows change.
+	Ref<SerializerOptions> options;
+	options.instantiate();
+	options->set_csv_headers(false);
+	csv->set_options(options);
+	REQUIRE(csv->parse("a,b\n") == OK);
+	csv->insert_column(0, String(), "x");
+	CHECK(csv->get_header().is_empty());
+	CHECK(csv->get_row(0) == PackedStringArray({ "x", "a", "b" }));
+	// A new, empty CSV gets its header from the names.
+	Ref<CSV> created;
+	created.instantiate();
+	created->insert_column(0, "id");
+	created->insert_column(1, "name");
+	CHECK(created->get_header() == PackedStringArray({ "id", "name" }));
+	CHECK(created->encode_to_text() == "id,name\n");
 }
 
 TEST_CASE("[XML] XMLElement view over the stored tree") {
