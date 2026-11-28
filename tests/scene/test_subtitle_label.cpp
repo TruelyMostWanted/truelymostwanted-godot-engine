@@ -118,7 +118,7 @@ TEST_CASE("[SceneTree][SubtitleLabel] Follows the player, colors speakers, honor
 	label->get_property_list(&properties);
 	for (const PropertyInfo &property : properties) {
 		if (property.name == "text") {
-			CHECK_FALSE(property.usage & PROPERTY_USAGE_STORAGE);
+			CHECK_FALSE((property.usage & PROPERTY_USAGE_STORAGE) != 0);
 		}
 	}
 
