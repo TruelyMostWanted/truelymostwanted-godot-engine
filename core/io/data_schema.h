@@ -33,6 +33,7 @@
 #include "core/io/data_field.h"
 #include "core/io/data_validation.h"
 #include "core/io/resource.h"
+#include "core/io/serializer_options.h"
 #include "core/variant/typed_array.h"
 
 // Describes the fields of a data file independent of its format (CSV, INI, JSON, TOML, YAML, XML) and
@@ -89,6 +90,9 @@ public:
 	Variant convert_value(const StringName &p_field_name, const String &p_text) const;
 
 	static Ref<DataSchema> create_from_dictionary(const Dictionary &p_dictionary);
+	// One optional field per property that ResourceTextSerializer writes (nested built-in resources and typed
+	// arrays of resource classes get nested schemas); extra fields are allowed for the type marker.
+	static Ref<DataSchema> create_from_resource(const Ref<Resource> &p_resource, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
 };
 
 VARIANT_ENUM_CAST(DataSchema::ExtraFields);
