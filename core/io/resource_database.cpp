@@ -609,7 +609,8 @@ void ResourceDatabase::preload_project_preloads() {
 #ifndef DISABLE_DEPRECATED
 	// Deprecated name of the setting, still read.
 	if (settings_singleton->has_setting("filesystem/resources/preload_lists")) {
-		paths.append_array(GLOBAL_GET("filesystem/resources/preload_lists"));
+		const PackedStringArray legacy_paths = GLOBAL_GET("filesystem/resources/preload_lists");
+		paths.append_array(legacy_paths);
 	}
 #endif
 	for (const String &path : paths) {
