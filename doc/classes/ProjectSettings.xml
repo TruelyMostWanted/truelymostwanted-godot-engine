@@ -439,6 +439,9 @@
 		<member name="application/run/print_header" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], the engine header is printed in the console on startup. This header describes the current version of the engine, as well as the renderer being used. This behavior can also be disabled on the command line with the [code]--no-header[/code] option.
 		</member>
+		<member name="application/run/timer_nodes_use_timer_server" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], [Timer] nodes run on [TimerServer]: [signal Timer.timeout] is emitted after all [code]_process[/code] callbacks of the frame, [signal Timer.ticked], [signal Timer.alert_reached] and the ticks, alerts and time scale of [member Timer.timer_info] work, and [method TimerServer.pause_all], [method TimerServer.resume_all] and [method TimerServer.stop_all] reach the nodes. If [code]false[/code], [Timer] nodes run on Godot's own code path and behave exactly as in Godot. Read at startup; [TimerInstance] and [TimerServer] work in both cases. See [Timer] for the differences.
+		</member>
 		<member name="audio/buses/channel_disable_threshold_db" type="float" setter="" getter="" default="-60.0">
 			Audio buses will disable automatically when sound goes below a given dB threshold for a given time. This saves CPU as effects assigned to that bus will no longer do any processing.
 		</member>
