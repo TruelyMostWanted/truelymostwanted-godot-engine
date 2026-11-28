@@ -260,6 +260,10 @@ TEST_CASE("[CSV] Insert and remove columns") {
 	CHECK(csv->get_header() == PackedStringArray({ "id", "team", "name", "note" }));
 	CHECK(csv->get_row(1) == PackedStringArray({ "2", "red" }));
 	CHECK(csv->encode_to_text() == "id,team,name,note\n1,red,Ann\n2,red\n");
+	csv->insert_column(4); // Appended without a name: the header still counts it.
+	CHECK(csv->get_column_count() == 5);
+	CHECK(csv->get_header() == PackedStringArray({ "id", "team", "name", "note", "" }));
+	csv->remove_column(4);
 
 	SIGNAL_DISCARD("changed");
 	csv->remove_column(3);
