@@ -262,7 +262,8 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 4. **Alle Issues chronologisch** abarbeiten (Liste in #422).
 5. **Aufräumen:** nicht mehr benötigte Worktrees/Dateien regelmäßig löschen (Branches bleiben).
 6. **Vor jedem Merge playtesten:** Build, durch Inspector, Editor-Hilfe (Klassenreferenz), Resource-Properties, Docks klicken; Exceptions vor dem Merge finden, nicht erst in der CI (45 min). Harness `P:/wt/pt/<bereich>/` mit Szenario je Feature; Briefs `P:/wt/pt/brief.md`, `brief-final.md`, `fix-brief.md`.
-7. Release 0.3.0 am Ende: volle CI grün → `truely/version.txt` 0.3.0 → `release.ps1` **erst nach Freigabe des Besitzers im Chat**.
+7. **Review (Besitzer):** nach jedem fertigen Feature 1–3 unabhängige Reviewer-Agenten (Datenmodelle, Code-Review, UI/UX-Review); Funde ins Issue, vor dem Merge beheben oder begründen.
+8. Release 0.3.0 am Ende: volle CI grün → `truely/version.txt` 0.3.0 → `release.ps1` **erst nach Freigabe des Besitzers im Chat**.
 
 **Zuerst fertig machen (aus 0.2.x):**
 - Branch `389-fixes-022` (gepusht): #361 (Absturz Daten-Baum im Inspector, Fix `b649ae9211`, Worktree `P:/wt/fix/ini361`) + #346 (Katalog-CSV, Worktree `P:/wt/fix/loc3`). Build grün (2157/2157). Offen: **Absturz nach Klick auf TOML-Unterzeile** in `fix_361_all` (Log `P:/wt/pt/formats/logs/fix_361_all.*`; Harness oder Engine? Agent lief beim Neustart noch). `fix_361_ini`: Zähler „inputs=0“ im Harness falsch. `fix_346_owner`: 19 PASS, nur Kopfzeilen-Check erwartet `Keys,Context,en` → Kopfzeile bleibt Godot-kompatibel `keys,?context,en` (Besitzer hat nicht widersprochen), Check anpassen. Danach Merge (0.2.2-Inhalt geht in 0.3.0 auf, oder 0.2.2 vorab, wenn der Besitzer es will).
