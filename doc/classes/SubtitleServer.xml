@@ -50,7 +50,7 @@
 			<param index="1" name="segment" type="SubtitleSegment" />
 			<param index="2" name="bbcode" type="bool" default="false" />
 			<description>
-				Returns the text to show for [param segment]: translated if [member Subtitle.auto_translate] of [param subtitle] is enabled, then decorated by [member SubtitleSegment.kind] ([code][Applause][/code] for sounds and reactions, [code]♪ … ♪[/code] for music and lyrics, line by line). With [param bbcode], brackets in the text are escaped for [RichTextLabel], and off-screen and narration segments are put in [code][i][/code]. [param subtitle] may be [code]null[/code].
+				Returns the text to show for [param segment]: translated in the translation domain [code]"subtitles"[/code] (the locale of the subtitles channel, see [method TranslationServer.set_locale_for]) if [member Subtitle.auto_translate] of [param subtitle] is enabled, then decorated by [member SubtitleSegment.kind] ([code][Applause][/code] for sounds and reactions, [code]♪ … ♪[/code] for music and lyrics, line by line). With [param bbcode], brackets in the text are escaped for [RichTextLabel], and off-screen and narration segments are put in [code][i][/code]. [param subtitle] may be [code]null[/code].
 			</description>
 		</method>
 		<method name="get_track_ids" qualifiers="const">
@@ -142,13 +142,25 @@
 	</methods>
 	<members>
 		<member name="captions_enabled" type="bool" setter="set_captions_enabled" getter="is_captions_enabled">
-			If [code]false[/code], closed captions ([method SubtitleSegment.is_caption]: sounds, reactions, music, lyrics) are skipped; speech is still shown. Changing it updates all tracks at once.
+			If [code]false[/code], closed captions ([method SubtitleSegment.is_caption]: sounds, reactions, music, lyrics) are skipped; speech is still shown. Changing it updates all tracks at once and emits [signal captions_enabled_changed].
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled">
-			If [code]false[/code], no segment is shown: tracks keep running and finish, but emit no [signal segment_started]. Changing it updates all tracks at once. Connect it to [member AccessibilitySettings.subtitles_enabled] to follow the player's setting.
+			If [code]false[/code], no segment is shown: tracks keep running and finish, but emit no [signal segment_started]. Changing it updates all tracks at once and emits [signal enabled_changed]. Connect it to [member AccessibilitySettings.subtitles_enabled] to follow the player's setting.
 		</member>
 	</members>
 	<signals>
+		<signal name="captions_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted when [member captions_enabled] changed, after the tracks were updated. [param enabled] is the new value.
+			</description>
+		</signal>
+		<signal name="enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted when [member enabled] changed, after the tracks were updated. [param enabled] is the new value.
+			</description>
+		</signal>
 		<signal name="segment_ended">
 			<param index="0" name="track_id" type="int" />
 			<param index="1" name="segment" type="SubtitleSegment" />

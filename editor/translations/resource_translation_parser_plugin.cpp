@@ -37,6 +37,14 @@ void ResourceTranslationParserPlugin::get_recognized_extensions(List<String> *r_
 	r_extensions->push_back("tres");
 	r_extensions->push_back("res");
 	r_extensions->push_back("mmd"); // Mermaid flow graphs (modules/flow_graph).
+	// Subtitle files (.srt, .vtt, ...): Subtitle has get_translatable_strings() (#323).
+	List<String> subtitle_extensions;
+	ResourceLoader::get_recognized_extensions_for_type("Subtitle", &subtitle_extensions);
+	for (const String &extension : subtitle_extensions) {
+		if (r_extensions->find(extension) == nullptr) {
+			r_extensions->push_back(extension);
+		}
+	}
 }
 
 Error ResourceTranslationParserPlugin::parse_file(const String &p_path, Vector<Vector<String>> *r_translations) {

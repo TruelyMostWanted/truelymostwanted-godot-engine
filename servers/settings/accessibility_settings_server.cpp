@@ -487,6 +487,14 @@ bool AccessibilitySettingsServer::is_subtitles_enabled() const {
 	return get_value(SNAME("subtitles_enabled"));
 }
 
+void AccessibilitySettingsServer::set_captions_enabled(bool p_enabled) {
+	set_value(SNAME("captions_enabled"), p_enabled);
+}
+
+bool AccessibilitySettingsServer::is_captions_enabled() const {
+	return get_value(SNAME("captions_enabled"));
+}
+
 void AccessibilitySettingsServer::set_subtitle_scale(float p_scale) {
 	set_value(SNAME("subtitle_scale"), p_scale);
 }
@@ -581,6 +589,7 @@ void AccessibilitySettingsServer::_notify_value_applied(const StringName &p_name
 		"reduce_transparency",
 		"colorblind_mode",
 		"subtitles_enabled",
+		"captions_enabled",
 		"subtitle_scale",
 	};
 	for (const char *value_name : SIGNAL_VALUES) {
@@ -600,6 +609,7 @@ void AccessibilitySettingsServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("reduce_transparency_changed", PropertyInfo(Variant::BOOL, "enabled")));
 	ADD_SIGNAL(MethodInfo("colorblind_mode_changed", PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "AccessibilitySettingsServer.ColorblindMode")));
 	ADD_SIGNAL(MethodInfo("subtitles_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("captions_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
 	ADD_SIGNAL(MethodInfo("subtitle_scale_changed", PropertyInfo(Variant::FLOAT, "scale")));
 
 	ClassDB::bind_method(D_METHOD("set_ui_scale", "scale"), &AccessibilitySettingsServer::set_ui_scale);
@@ -625,6 +635,8 @@ void AccessibilitySettingsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_colorblind_mode"), &AccessibilitySettingsServer::get_colorblind_mode);
 	ClassDB::bind_method(D_METHOD("set_subtitles_enabled", "enabled"), &AccessibilitySettingsServer::set_subtitles_enabled);
 	ClassDB::bind_method(D_METHOD("is_subtitles_enabled"), &AccessibilitySettingsServer::is_subtitles_enabled);
+	ClassDB::bind_method(D_METHOD("set_captions_enabled", "enabled"), &AccessibilitySettingsServer::set_captions_enabled);
+	ClassDB::bind_method(D_METHOD("is_captions_enabled"), &AccessibilitySettingsServer::is_captions_enabled);
 	ClassDB::bind_method(D_METHOD("set_subtitle_scale", "scale"), &AccessibilitySettingsServer::set_subtitle_scale);
 	ClassDB::bind_method(D_METHOD("get_subtitle_scale"), &AccessibilitySettingsServer::get_subtitle_scale);
 
@@ -669,7 +681,7 @@ AccessibilitySettingsServer::AccessibilitySettingsServer() {
 
 	// Game-side values: stored, validated and signaled, never pushed to the engine.
 	static const char *game_values[] = {
-		"reduce_motion", "reduce_transparency", "colorblind_mode", "subtitles_enabled", "subtitle_scale", nullptr
+		"reduce_motion", "reduce_transparency", "colorblind_mode", "subtitles_enabled", "captions_enabled", "subtitle_scale", nullptr
 	};
 	for (int i = 0; game_values[i] != nullptr; i++) {
 		set_setting_flags(StringName(game_values[i]), SETTING_FLAG_NO_ENGINE_TARGET);

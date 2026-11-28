@@ -91,6 +91,7 @@
 #include "scene/gui/slider.h"
 #include "scene/gui/spin_box.h"
 #include "scene/gui/split_container.h"
+#include "scene/gui/subtitle_label.h"
 #include "scene/gui/subviewport_container.h"
 #include "scene/gui/tab_bar.h"
 #include "scene/gui/tab_container.h"
@@ -622,6 +623,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(ColorPicker);
 	GDREGISTER_CLASS(ColorPickerButton);
 	GDREGISTER_CLASS(RichTextLabel);
+	GDREGISTER_CLASS(SubtitleLabel); // Fork: subtitle display (#324).
 	GDREGISTER_CLASS(RichTextEffect);
 	GDREGISTER_CLASS(CharFXTransform);
 

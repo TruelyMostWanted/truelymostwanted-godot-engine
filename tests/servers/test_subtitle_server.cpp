@@ -34,6 +34,9 @@ TEST_FORCE_LINK(test_subtitle_server)
 
 #include "core/config/engine.h"
 #include "core/object/callable_mp.h"
+#include "core/string/translation.h"
+#include "core/string/translation_domain.h"
+#include "core/string/translation_server.h"
 #include "servers/subtitle/subtitle_server.h"
 
 namespace TestSubtitleServer {
@@ -254,6 +257,41 @@ TEST_CASE("[SubtitleServer] Display text") {
 	CHECK(server->get_display_text(subtitle, off_screen) == "a [b]");
 	CHECK(server->get_display_text(subtitle, off_screen, true) == "[i]a [lb]b][/i]");
 	CHECK(server->get_display_text(subtitle, make_segment(0, 1, "Once upon a time", SubtitleSegment::KIND_NARRATION), true) == "[i]Once upon a time[/i]");
+}
+
+TEST_CASE("[SubtitleServer] auto_translate follows the subtitles channel") {
+	SubtitleServer *server = SubtitleServer::get_singleton();
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	Ref<Translation> german;
+	german.instantiate();
+	german->set_locale("de");
+	german->add_message("LINE_1", "Wo sind wir?");
+	german->add_message("LINE_1", "Wo bin ich?", "alone");
+	const Ref<TranslationDomain> domain = translation_server->get_or_add_domain("subtitles");
+	domain->add_translation(german);
+	const String locale = translation_server->get_locale();
+	translation_server->set_locale("en");
+
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	Ref<SubtitleSegment> line = make_segment(0, 1, "LINE_1");
+	CHECK(server->get_display_text(subtitle, line) == "LINE_1"); // auto_translate is off.
+	subtitle->set_auto_translate(true);
+	CHECK(server->get_display_text(subtitle, line) == "LINE_1"); // No English text.
+
+	// Voices in English, subtitles in German: only the subtitles channel changes.
+	translation_server->set_locale_for("subtitles", "de");
+	CHECK(translation_server->get_locale_for("interface") == "en");
+	CHECK(server->get_display_text(subtitle, line) == "Wo sind wir?");
+	line->set_translation_context("alone");
+	CHECK(server->get_display_text(subtitle, line) == "Wo bin ich?");
+	CHECK(String(translation_server->translate("LINE_1")) == "LINE_1"); // Not in the main domain.
+
+	translation_server->clear_locale_for("subtitles");
+	CHECK(server->get_display_text(subtitle, line) == "LINE_1");
+
+	domain->remove_translation(german);
+	translation_server->set_locale(locale);
 }
 
 TEST_CASE("[SubtitleServer] An empty subtitle finishes at the next frame") {

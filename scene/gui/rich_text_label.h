@@ -759,8 +759,11 @@ private:
 	static String _get_tag_value(const String &p_tag);
 
 #ifndef DISABLE_DEPRECATED
-	// Kept for compatibility from 3.x to 4.0.
+protected:
+	// Kept for compatibility from 3.x to 4.0. Protected: GDCLASS of derived classes (SubtitleLabel) refers to it.
 	bool _set(const StringName &p_name, const Variant &p_value);
+
+private:
 #endif
 	bool use_bbcode = false;
 	String text;
