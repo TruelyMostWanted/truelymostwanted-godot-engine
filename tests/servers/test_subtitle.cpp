@@ -344,4 +344,33 @@ TEST_CASE("[Subtitle] Changes of a segment reach the subtitle") {
 	SIGNAL_UNWATCH(subtitle.ptr(), "changed");
 }
 
+TEST_CASE("[Subtitle] Translatable strings for POT generation") {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	subtitle->add_segment(make_segment(0, 1, "Hello"));
+	Ref<SubtitleSegment> spoken = make_segment(1, 2, "Run!");
+	spoken->set_speaker("Anna");
+	spoken->set_translation_context("chase");
+	subtitle->add_segment(spoken);
+	subtitle->add_segment(make_segment(2, 3, ""));
+
+	// Extraction does not depend on auto_translate; empty texts are skipped.
+	const TypedArray<PackedStringArray> strings = subtitle->get_translatable_strings();
+	REQUIRE(strings.size() == 2);
+	CHECK(PackedStringArray(strings[0]) == PackedStringArray({ "Hello", "", "", "" }));
+	CHECK(PackedStringArray(strings[1]) == PackedStringArray({ "Run!", "chase", "", "Speaker: Anna" }));
+
+	// A loaded .srt file gives its cue texts.
+	const String path = TestUtils::get_temp_path("subtitle_pot.srt");
+	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+	REQUIRE(file.is_valid());
+	file->store_string("1\n00:00:01,000 --> 00:00:02,000\nWhere are we?\n\n");
+	file->close();
+	const Ref<Subtitle> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	const TypedArray<PackedStringArray> loaded_strings = loaded->get_translatable_strings();
+	REQUIRE(loaded_strings.size() == 1);
+	CHECK(PackedStringArray(loaded_strings[0])[0] == "Where are we?");
+}
+
 } // namespace TestSubtitle

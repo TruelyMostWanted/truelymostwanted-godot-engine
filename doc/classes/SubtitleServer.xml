@@ -50,7 +50,7 @@
 			<param index="1" name="segment" type="SubtitleSegment" />
 			<param index="2" name="bbcode" type="bool" default="false" />
 			<description>
-				Returns the text to show for [param segment]: translated if [member Subtitle.auto_translate] of [param subtitle] is enabled, then decorated by [member SubtitleSegment.kind] ([code][Applause][/code] for sounds and reactions, [code]♪ … ♪[/code] for music and lyrics, line by line). With [param bbcode], brackets in the text are escaped for [RichTextLabel], and off-screen and narration segments are put in [code][i][/code]. [param subtitle] may be [code]null[/code].
+				Returns the text to show for [param segment]: translated in the translation domain [code]"subtitles"[/code] (the locale of the subtitles channel, see [method TranslationServer.set_locale_for]) if [member Subtitle.auto_translate] of [param subtitle] is enabled, then decorated by [member SubtitleSegment.kind] ([code][Applause][/code] for sounds and reactions, [code]♪ … ♪[/code] for music and lyrics, line by line). With [param bbcode], brackets in the text are escaped for [RichTextLabel], and off-screen and narration segments are put in [code][i][/code]. [param subtitle] may be [code]null[/code].
 			</description>
 		</method>
 		<method name="get_track_ids" qualifiers="const">
