@@ -7,3 +7,5 @@ deadlock:tests/core/templates/test_command_queue.cpp
 race:modules/navigation_2d/nav_map_2d.cpp
 race:modules/navigation_3d/nav_map_3d.cpp
 race:thirdparty/thorvg/src/loaders/external_jpg/tvgJpgLoader.cpp
+# Truely: load progress is a plain float written by the loader thread and read by load_threaded_get_status() (upstream design, benign).
+race:ResourceLoader::_dependency_get_progress

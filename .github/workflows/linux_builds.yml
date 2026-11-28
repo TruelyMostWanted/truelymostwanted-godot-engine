@@ -50,6 +50,8 @@ jobs:
             cache-name: linux-editor-double-sanitizers
             target: editor
             # Debug symbols disabled as they're huge on this build and we hit the 14 GB limit for runners.
+            # Truely: -Og instead of -O0, the .text section of this build is past 2 GB at -O0 (mold: relocation out of range).
+            # cxxflags=-fno-sanitize=vptr does not help: detect.py appends -fsanitize=...,vptr after the user flags.
             scons-flags: >-
               dev_build=yes
               scu_build=yes
@@ -57,6 +59,7 @@ jobs:
               precision=double
               use_asan=yes
               use_ubsan=yes
+              optimize=debug
               linker=mold
             bin: ./bin/godot.linuxbsd.editor.dev.double.x86_64.san
             install-mold: true
