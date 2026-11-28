@@ -305,16 +305,16 @@ void ResourceDatabase::_apply_keys(const LocalVector<Pair<String, String>> &p_ke
 	}
 }
 
-Error ResourceDatabase::_collect(const Ref<PreloadList> &p_list, Job *r_job) {
+Error ResourceDatabase::_collect(const Ref<Preloads> &p_preloads, Job *r_job) {
 	Error first_error = OK;
-	const PackedStringArray paths = p_list->get_paths();
+	const PackedStringArray paths = p_preloads->get_paths();
 	for (const String &path : paths) {
 		if (!path.is_empty()) {
 			r_job->paths.push_back(Pair<String, String>(path, String()));
 		}
 	}
 
-	const TypedArray<FilesManifest> manifests = p_list->get_manifests();
+	const TypedArray<FilesManifest> manifests = p_preloads->get_manifests();
 	for (int i = 0; i < manifests.size(); i++) {
 		const Ref<FilesManifest> manifest = manifests[i];
 		if (manifest.is_null()) {
@@ -333,7 +333,7 @@ Error ResourceDatabase::_collect(const Ref<PreloadList> &p_list, Job *r_job) {
 		}
 	}
 
-	const Dictionary keys = p_list->get_keys();
+	const Dictionary keys = p_preloads->get_keys();
 	for (const KeyValue<Variant, Variant> &kv : keys) {
 		r_job->keys.push_back(Pair<String, String>(kv.key, kv.value));
 	}
@@ -372,16 +372,16 @@ void ResourceDatabase::_job_done(uint64_t p_job_id) {
 		job->thread->wait_to_finish();
 		memdelete(job->thread);
 	}
-	_emit_preload_finished(job->list, job->error);
+	_emit_preload_finished(job->preloads, job->error);
 	memdelete(job);
 }
 
-void ResourceDatabase::_emit_preload_finished(const Ref<PreloadList> &p_list, int p_error) {
-	emit_signal(SNAME("preload_finished"), p_list, p_error);
+void ResourceDatabase::_emit_preload_finished(const Ref<Preloads> &p_preloads, int p_error) {
+	emit_signal(SNAME("preload_finished"), p_preloads, p_error);
 }
 
-Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p_use_threads) {
-	ERR_FAIL_COND_V_MSG(p_list.is_null(), ERR_INVALID_PARAMETER, "The preload list is null.");
+Error ResourceDatabase::preload_from(const Ref<Preloads> &p_preloads, bool p_use_threads) {
+	ERR_FAIL_COND_V_MSG(p_preloads.is_null(), ERR_INVALID_PARAMETER, "The preloads are null.");
 	bool is_finished = false;
 	{
 		MutexLock jobs_lock(jobs_mutex);
@@ -392,7 +392,7 @@ Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p
 	Error first_error = OK;
 
 	// Direct references: stored now, under their path or their name.
-	const TypedArray<Resource> resources = p_list->get_resources();
+	const TypedArray<Resource> resources = p_preloads->get_resources();
 	for (int i = 0; i < resources.size(); i++) {
 		const Ref<Resource> resource = resources[i];
 		if (resource.is_null()) {
@@ -400,7 +400,7 @@ Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p
 		}
 		const String key = resource->get_path().is_empty() ? resource->get_name() : resource->get_path();
 		if (key.is_empty()) {
-			ERR_PRINT(vformat("ResourceDatabase: resource %d of the preload list has neither a path nor a name and is skipped.", i));
+			ERR_PRINT(vformat("ResourceDatabase: resource %d of the preloads has neither a path nor a name and is skipped.", i));
 			if (first_error == OK) {
 				first_error = ERR_INVALID_DATA;
 			}
@@ -410,8 +410,8 @@ Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p
 	}
 
 	Job *job = memnew(Job);
-	job->list = p_list;
-	const Error collect_error = _collect(p_list, job);
+	job->preloads = p_preloads;
+	const Error collect_error = _collect(p_preloads, job);
 	if (first_error == OK) {
 		first_error = collect_error;
 	}
@@ -439,7 +439,7 @@ Error ResourceDatabase::preload_from_list(const Ref<PreloadList> &p_list, bool p
 		first_error = job->error;
 	}
 	memdelete(job);
-	callable_mp(this, &ResourceDatabase::_emit_preload_finished).call_deferred(p_list, int(first_error));
+	callable_mp(this, &ResourceDatabase::_emit_preload_finished).call_deferred(p_preloads, int(first_error));
 	return first_error;
 }
 
@@ -597,21 +597,31 @@ bool ResourceDatabase::is_preloading() const {
 	return !jobs.is_empty();
 }
 
-void ResourceDatabase::preload_project_lists() {
-	if (!ProjectSettings::get_singleton() || !ProjectSettings::get_singleton()->has_setting("filesystem/resources/preload_lists")) {
+void ResourceDatabase::preload_project_preloads() {
+	ProjectSettings *settings_singleton = ProjectSettings::get_singleton();
+	if (!settings_singleton) {
 		return;
 	}
-	const PackedStringArray lists = GLOBAL_GET("filesystem/resources/preload_lists");
-	for (const String &path : lists) {
+	PackedStringArray paths;
+	if (settings_singleton->has_setting("filesystem/resources/preloads")) {
+		paths = GLOBAL_GET("filesystem/resources/preloads");
+	}
+#ifndef DISABLE_DEPRECATED
+	// Deprecated name of the setting, still read.
+	if (settings_singleton->has_setting("filesystem/resources/preload_lists")) {
+		paths.append_array(GLOBAL_GET("filesystem/resources/preload_lists"));
+	}
+#endif
+	for (const String &path : paths) {
 		if (path.is_empty()) {
 			continue;
 		}
-		const Ref<PreloadList> list = ResourceLoader::load(path, "PreloadList");
-		if (list.is_null()) {
-			ERR_PRINT(vformat("ResourceDatabase: can't load the preload list \"%s\" named in \"filesystem/resources/preload_lists\".", path));
+		const Ref<Preloads> preloads = ResourceLoader::load(path, "Preloads");
+		if (preloads.is_null()) {
+			ERR_PRINT(vformat("ResourceDatabase: can't load the preloads \"%s\" named in \"filesystem/resources/preloads\".", path));
 			continue;
 		}
-		preload_from_list(list, false);
+		preload_from(preloads, false);
 	}
 }
 
@@ -636,7 +646,10 @@ void ResourceDatabase::finish() {
 }
 
 void ResourceDatabase::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("preload_from_list", "list", "use_threads"), &ResourceDatabase::preload_from_list, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("preload_from", "preloads", "use_threads"), &ResourceDatabase::preload_from, DEFVAL(true));
+#ifndef DISABLE_DEPRECATED
+	ClassDB::bind_method(D_METHOD("preload_from_list", "list", "use_threads"), &ResourceDatabase::preload_from, DEFVAL(true)); // Deprecated alias.
+#endif
 	ClassDB::bind_method(D_METHOD("preload_resource", "path", "key"), &ResourceDatabase::preload_resource, DEFVAL(String()));
 
 	ClassDB::bind_method(D_METHOD("add_resource", "key", "resource"), &ResourceDatabase::add_resource);
@@ -653,7 +666,7 @@ void ResourceDatabase::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_memory_usage"), &ResourceDatabase::get_memory_usage);
 	ClassDB::bind_method(D_METHOD("is_preloading"), &ResourceDatabase::is_preloading);
 
-	ADD_SIGNAL(MethodInfo("preload_finished", PropertyInfo(Variant::OBJECT, "list", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error")));
+	ADD_SIGNAL(MethodInfo("preload_finished", PropertyInfo(Variant::OBJECT, "preloads", PROPERTY_HINT_RESOURCE_TYPE, "Preloads"), PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error")));
 }
 
 ResourceDatabase::ResourceDatabase() {

@@ -16,7 +16,7 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **AudioBusSettings** / **AudioBusSettingsServer**: settings domain that stores and applies volume and mute of the audio buses. In code: `servers/settings/audio_bus_settings_server.*`, `servers/settings/audio_settings.*`. Wiki: [`Audio-Bus-Settings`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Audio-Bus-Settings).
 
-**AudioCommand** / **AudioCommandList**: data description of an audio action that can be stored, edited in the inspector and run later. In code: `scene/audio/audio_command.*`. Wiki: [`Audio-Commands`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Audio-Commands).
+**AudioCommand** / **AudioCommands**: data description of an audio action (and a collection of them) that can be stored, edited in the inspector and run later. `AudioCommands` was `AudioCommandList` before 0.2.2 (deprecated name, old `.tres` files still load). In code: `scene/audio/audio_command.*`. Wiki: [`Audio-Commands`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Audio-Commands).
 
 **AudioDeviceSettings** / **AudioDeviceSettingsServer**: settings domain for the output and input audio device. In code: `servers/settings/audio_device_settings_server.*`. Wiki: [`Audio-Device-Settings`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Audio-Device-Settings).
 
@@ -140,7 +140,7 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **PR branch**: branch from `master` for a contribution to Godot; it must start at `master` so the PR does not contain own features. See `truely/README.md`.
 
-**PreloadList**: resource that names what `ResourceDatabase` loads in one call. In code: `core/io/preload_list.*`. Wiki: [`Resource-Database`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Resource-Database).
+**Preloads**: resource that names what `ResourceDatabase` loads in one call (was `PreloadList` before 0.2.2, deprecated name, old `.tres` files still load). In code: `core/io/preloads.*`. Wiki: [`Resource-Database`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Resource-Database).
 
 **Process memory**: `OS` methods that return the memory of the whole process as the platform tools show it (works in release exports, unlike `get_static_memory_usage()`). In code: `core/os/os.*`. Wiki: [`Process-Memory`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/Process-Memory).
 
@@ -244,7 +244,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Language, input, accessibility, engine, TTS settings | `LanguageSettings*`, `InputSettings*`, `InputMapSettings*`, `InputActionRebinder`, `AccessibilitySettings*`, `EngineSettings*`, `TTSPersonaSettings*` | `servers/settings/`, `core/input/` | `tests/servers/test_*_settings_server.cpp`, `test_input_action_rebinder.cpp` |
 | Path prefixes | `PathPrefixServer`, `PathPrefix`, `PathInfo` | `core/io/path_prefix_server.*`, `core/io/path_info.*` | `tests/core/io/test_path_prefix_server.cpp` |
 | Resource loading, formats, results | `ResourceLoader`, `ResourceSaver`, `ResourceFormatLoader`, `ResourceLoadResult`, `ResourceSaveResult` | `core/io/resource_loader.*`, `core/io/resource_result.*`, `core/io/resource_format_callable.*` | `tests/core/io/test_resource_formats.cpp`, `test_resource_result.cpp`, `test_resource_format_callable.cpp` |
-| File manifests, resource database | `FilesManifest`, `FilesManifestServer`, `ResourceDatabase`, `PreloadList` | `core/io/files_manifest*.*`, `editor/inspector/files_manifest_editor_plugin.*`, `core/io/resource_database.*`, `core/io/preload_list.*` | `tests/core/io/test_files_manifest*.cpp`, `test_resource_database.cpp` |
+| File manifests, resource database | `FilesManifest`, `FilesManifestServer`, `ResourceDatabase`, X, `editor/inspector/files_manifest_editor_plugin.*`, `core/io/resource_database.*`, `core/io/preloads.*` | `tests/core/io/test_files_manifest*.cpp`, `test_resource_database.cpp` |
 | Localization catalogs | `LocalizationCatalog`, `TextLocalizationCatalog`, `ResourceLocalizationCatalog` | `core/string/localization_catalog.*` | `tests/core/string/test_localization_catalog.cpp` |
 | Localization editor | `CSVTableEditor` (catalog mode), `EditorInspectorPluginLocalizationCatalog`, `LocalizationCatalogExportPlugin`, `LocalizationCatalogEditorPlugin` | `editor/data/localization_catalog_editor_plugin.*`, `editor/data/csv_table_editor.*` | `tests/core/string/test_localization_catalog.cpp` (API) |
 | Text insertion | `TextInsertionServer`, `TextInsertionValues`, `TextInsertionTemplate` | `core/string/text_insertion_*.*` | `tests/core/string/test_text_insertion_server.cpp` |
@@ -258,7 +258,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Databases | `SQLiteDatabase`, `SQLiteStatement` | `modules/sqlite/` | `modules/sqlite/tests/` |
 | Databases | `SQLiteDatabase`, `SQLiteStatement`, `SQLiteColumn` | `modules/sqlite/` | `modules/sqlite/tests/` |
 | Flow graphs | `FlowGraph`, `FlowNode`, `FlowPort`, `FlowConnection`, `FlowFrame`, `FlowVariable`, `FlowBlackboard`, `FlowGraphValidation`, built-in `Flow*Node`s, `FlowGraphMermaid` (`.mmd`) | `modules/flow_graph/` | `modules/flow_graph/tests/` |
-| Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommandList` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
+| Audio mixer, commands | `AudioMixerServer`, `AudioMixerChannel`, `AudioMixerLayout`, `AudioCommand`, `AudioCommands` | `scene/audio/`, `scene/resources/audio/` | `tests/scene/test_audio_*.cpp` |
 | Audio player fades, playlist API | `AudioFade`, `AudioStreamPlayer*` fades and track info, `AudioStreamPlaylist` list and time API | `scene/audio/audio_fade.h`, `scene/audio/audio_stream_player_internal.*`, `modules/interactive_music/audio_stream_playlist.*` | `tests/scene/test_audio_stream_player_fades.cpp`, `modules/interactive_music/tests/test_audio_stream_playlist.h` |
 | Audio track information | `AudioStream` track fields, format getters, `load_info()`, `AudioStreamTags` (C++ only) | `scene/resources/audio/audio_stream.*`, `scene/resources/audio/audio_stream_tags.*` | `tests/scene/test_audio_stream_tags.cpp` |
 | Subtitles, TTS | `SubtitleServer`, `Subtitle`, `SubtitlePlayback`, `SubtitlePlayer`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `scene/main/subtitle_player.*`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `tests/scene/test_subtitle_player.cpp`, `test_tts_server.cpp` |

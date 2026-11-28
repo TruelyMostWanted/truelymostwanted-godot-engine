@@ -41,6 +41,7 @@ TEST_FORCE_LINK(test_resource_database)
 #include "core/os/thread.h"
 #include "core/templates/safe_refcount.h"
 #include "tests/signal_watcher.h"
+#include "tests/test_utils.h"
 
 namespace TestResourceDatabase {
 
@@ -78,7 +79,7 @@ static Ref<Resource> _named(const String &p_name) {
 }
 
 // Expected arguments of one `preload_finished` emission without error.
-static Array _finished_args(const Ref<PreloadList> &p_list) {
+static Array _finished_args(const Ref<Preloads> &p_list) {
 	Array args;
 	args.push_back(p_list);
 	args.push_back(int(OK));
@@ -122,7 +123,7 @@ TEST_CASE("[ResourceDatabase] Patterns, keys, types and removal") {
 	CHECK(db->find_resources("items/%gold").size() == 1);
 	CHECK(db->find_resources("%sword%", "FilesManifest").size() == 1);
 	CHECK(db->find_resources("%sword%", "Resource").size() == 2);
-	CHECK(db->find_resources("%sword%", "PreloadList").is_empty());
+	CHECK(db->find_resources("%sword%", "Preloads").is_empty());
 	CHECK(db->find_keys("%sword%", "FilesManifest") == PackedStringArray({ "items/sword_gold" }));
 
 	CHECK_FALSE(db->add_resource_if_missing("items/shield", _named("other")));
@@ -169,7 +170,7 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	manifest->set_folder_paths(PackedStringArray({ root }));
 	manifest->set_extensions(PackedStringArray({ ".dbcount" }));
 
-	Ref<PreloadList> list;
+	Ref<Preloads> list;
 	list.instantiate();
 	TypedArray<Resource> resources;
 	resources.push_back(_named("direct_a"));
@@ -186,7 +187,7 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	CHECK_FALSE(list->is_empty());
 
 	SIGNAL_WATCH(db, "preload_finished");
-	CHECK(db->preload_from_list(list, false) == OK);
+	CHECK(db->preload_from(list, false) == OK);
 	MessageQueue::get_singleton()->flush();
 	SIGNAL_CHECK("preload_finished", _finished_args(list));
 	SIGNAL_UNWATCH(db, "preload_finished");
@@ -215,11 +216,11 @@ TEST_CASE("[ResourceDatabase] Preload list: resources, paths, manifest, keys; lo
 	CHECK(loader->loads.get() == 4);
 
 	// Threaded preload: the signal follows on the main thread.
-	Ref<PreloadList> list2;
+	Ref<Preloads> list2;
 	list2.instantiate();
 	list2->set_paths(PackedStringArray({ "res://db_t1.dbcount", "res://db_t2.dbcount" }));
 	SIGNAL_WATCH(db, "preload_finished");
-	CHECK(db->preload_from_list(list2, true) == OK);
+	CHECK(db->preload_from(list2, true) == OK);
 	_wait_for_preloads(db);
 	MessageQueue::get_singleton()->flush();
 	SIGNAL_CHECK("preload_finished", _finished_args(list2));
@@ -277,5 +278,21 @@ TEST_CASE("[ResourceDatabase] Parallel add and find") {
 	CHECK(db->find_resources("thread2/%").size() == 100);
 	db->clear();
 }
+
+#ifndef DISABLE_DEPRECATED
+TEST_CASE("[ResourceDatabase] A .tres with the old type PreloadList loads as Preloads") {
+	const String path = TestUtils::get_temp_path("old_preload_list.tres");
+	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+	REQUIRE(file.is_valid());
+	file->store_string("[gd_resource type=\"PreloadList\" format=3]\n\n[resource]\npaths = PackedStringArray(\"res://a.tres\")\n");
+	file.unref();
+
+	const Ref<Preloads> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_class() == "Preloads");
+	CHECK(loaded->get_paths() == PackedStringArray({ "res://a.tres" }));
+	DirAccess::remove_absolute(path);
+}
+#endif // DISABLE_DEPRECATED
 
 } // namespace TestResourceDatabase

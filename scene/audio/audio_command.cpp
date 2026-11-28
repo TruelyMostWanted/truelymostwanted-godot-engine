@@ -260,24 +260,24 @@ void AudioCommand::_bind_methods() {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// AudioCommandList.
+// AudioCommands.
 
-void AudioCommandList::set_commands(const TypedArray<AudioCommand> &p_commands) {
+void AudioCommands::set_commands(const TypedArray<AudioCommand> &p_commands) {
 	commands = p_commands;
 	emit_changed();
 }
 
-TypedArray<AudioCommand> AudioCommandList::get_commands() const {
+TypedArray<AudioCommand> AudioCommands::get_commands() const {
 	return commands;
 }
 
-void AudioCommandList::add_command(const Ref<AudioCommand> &p_command) {
+void AudioCommands::add_command(const Ref<AudioCommand> &p_command) {
 	ERR_FAIL_COND_MSG(p_command.is_null(), "The audio command is null.");
 	commands.push_back(p_command);
 	emit_changed();
 }
 
-Ref<AudioCommand> AudioCommandList::find_command(const StringName &p_name) const {
+Ref<AudioCommand> AudioCommands::find_command(const StringName &p_name) const {
 	for (int i = 0; i < commands.size(); i++) {
 		const Ref<AudioCommand> entry = commands[i];
 		if (entry.is_valid() && entry->get_command_name() == p_name) {
@@ -287,7 +287,7 @@ Ref<AudioCommand> AudioCommandList::find_command(const StringName &p_name) const
 	return Ref<AudioCommand>();
 }
 
-Error AudioCommandList::preload_streams() {
+Error AudioCommands::preload_streams() {
 	preloaded_streams.clear();
 	Error first_error = OK;
 	String first_message;
@@ -311,27 +311,27 @@ Error AudioCommandList::preload_streams() {
 		}
 	}
 	if (first_error != OK) {
-		ERR_PRINT(vformat("Cannot preload all audio streams of the command list: %s", first_message));
+		ERR_PRINT(vformat("Cannot preload all audio streams of the audio commands: %s", first_message));
 	}
 	return first_error;
 }
 
-void AudioCommandList::clear_preloaded_streams() {
+void AudioCommands::clear_preloaded_streams() {
 	preloaded_streams.clear();
 }
 
-int AudioCommandList::get_preloaded_stream_count() const {
+int AudioCommands::get_preloaded_stream_count() const {
 	return (int)preloaded_streams.size();
 }
 
-void AudioCommandList::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_commands", "commands"), &AudioCommandList::set_commands);
-	ClassDB::bind_method(D_METHOD("get_commands"), &AudioCommandList::get_commands);
-	ClassDB::bind_method(D_METHOD("add_command", "command"), &AudioCommandList::add_command);
-	ClassDB::bind_method(D_METHOD("find_command", "name"), &AudioCommandList::find_command);
-	ClassDB::bind_method(D_METHOD("preload_streams"), &AudioCommandList::preload_streams);
-	ClassDB::bind_method(D_METHOD("clear_preloaded_streams"), &AudioCommandList::clear_preloaded_streams);
-	ClassDB::bind_method(D_METHOD("get_preloaded_stream_count"), &AudioCommandList::get_preloaded_stream_count);
+void AudioCommands::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_commands", "commands"), &AudioCommands::set_commands);
+	ClassDB::bind_method(D_METHOD("get_commands"), &AudioCommands::get_commands);
+	ClassDB::bind_method(D_METHOD("add_command", "command"), &AudioCommands::add_command);
+	ClassDB::bind_method(D_METHOD("find_command", "name"), &AudioCommands::find_command);
+	ClassDB::bind_method(D_METHOD("preload_streams"), &AudioCommands::preload_streams);
+	ClassDB::bind_method(D_METHOD("clear_preloaded_streams"), &AudioCommands::clear_preloaded_streams);
+	ClassDB::bind_method(D_METHOD("get_preloaded_stream_count"), &AudioCommands::get_preloaded_stream_count);
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "commands", PROPERTY_HINT_ARRAY_TYPE, MAKE_RESOURCE_TYPE_HINT("AudioCommand")), "set_commands", "get_commands");
 }
@@ -371,9 +371,9 @@ void AudioCommandRegistry::_ensure_default_commands() {
 		return;
 	}
 	// The type hint lets a CSV file load as well.
-	const Ref<AudioCommandList> list = ResourceLoader::load(path, "AudioCommandList");
-	ERR_FAIL_COND_MSG(list.is_null(), vformat("Cannot load the audio command list \"%s\" (project setting \"audio/mixer/default_commands\").", path));
-	register_commands(list);
+	const Ref<AudioCommands> commands = ResourceLoader::load(path, "AudioCommands");
+	ERR_FAIL_COND_MSG(commands.is_null(), vformat("Cannot load the audio commands \"%s\" (project setting \"audio/mixer/default_commands\").", path));
+	register_commands(commands);
 }
 
 Error AudioCommandRegistry::_dispatch(const AudioCommand &p_command, String &r_message) {
@@ -568,9 +568,9 @@ Error AudioCommandRegistry::execute(const Ref<AudioCommand> &p_command) {
 	return OK;
 }
 
-Error AudioCommandRegistry::execute_list(const Ref<AudioCommandList> &p_list) {
-	ERR_FAIL_COND_V_MSG(p_list.is_null(), ERR_INVALID_PARAMETER, "The audio command list is null.");
-	const TypedArray<AudioCommand> list_commands = p_list->get_commands();
+Error AudioCommandRegistry::execute_commands(const Ref<AudioCommands> &p_commands) {
+	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The audio commands is null.");
+	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	Error first_error = OK;
 	for (int i = 0; i < list_commands.size(); i++) {
 		const Error err = execute(list_commands[i]);
@@ -581,10 +581,10 @@ Error AudioCommandRegistry::execute_list(const Ref<AudioCommandList> &p_list) {
 	return first_error;
 }
 
-Error AudioCommandRegistry::register_commands(const Ref<AudioCommandList> &p_list) {
+Error AudioCommandRegistry::register_commands(const Ref<AudioCommands> &p_commands) {
 	_ensure_default_commands();
-	ERR_FAIL_COND_V_MSG(p_list.is_null(), ERR_INVALID_PARAMETER, "The audio command list is null.");
-	const TypedArray<AudioCommand> list_commands = p_list->get_commands();
+	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The audio commands is null.");
+	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	LocalVector<StringName> replaced;
 	for (int i = 0; i < list_commands.size(); i++) {
 		const Ref<AudioCommand> entry = list_commands[i];
@@ -598,7 +598,7 @@ Error AudioCommandRegistry::register_commands(const Ref<AudioCommandList> &p_lis
 		}
 		Ref<AudioCommand> *existing = named.getptr(entry_name);
 		if (existing != nullptr && *existing != entry) {
-			// The last registered command wins, so a later list (a mod) can override one on purpose.
+			// The last registered command wins, so later commands (a mod) can override one on purpose.
 			registered.erase(*existing);
 			replaced.push_back(entry_name);
 		}
@@ -610,10 +610,10 @@ Error AudioCommandRegistry::register_commands(const Ref<AudioCommandList> &p_lis
 	return OK;
 }
 
-void AudioCommandRegistry::unregister_commands(const Ref<AudioCommandList> &p_list) {
+void AudioCommandRegistry::unregister_commands(const Ref<AudioCommands> &p_commands) {
 	_ensure_default_commands();
-	ERR_FAIL_COND_MSG(p_list.is_null(), "The audio command list is null.");
-	const TypedArray<AudioCommand> list_commands = p_list->get_commands();
+	ERR_FAIL_COND_MSG(p_commands.is_null(), "The audio commands is null.");
+	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	for (int i = 0; i < list_commands.size(); i++) {
 		const Ref<AudioCommand> entry = list_commands[i];
 		if (entry.is_null()) {
