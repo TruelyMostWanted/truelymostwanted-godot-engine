@@ -32,13 +32,18 @@
 
 #include "core/core_string_names.h"
 #include "core/io/csv_format.h"
+#include "core/io/data_schema.h"
 #include "core/io/ini_format.h"
 #include "core/io/json.h"
 #include "core/io/xml_format.h"
 #include "core/object/callable_mp.h"
 #include "editor/data/csv_table_editor.h"
+#include "editor/data/ini_editor.h"
 #include "editor/editor_interface.h"
+#include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
+#include "editor/editor_undo_redo_manager.h"
+#include "editor/gui/create_dialog.h"
 #include "editor/script/data_schema_lookup.h"
 #include "editor/script/script_editor_plugin.h"
 #include "editor/themes/editor_scale.h"
@@ -457,7 +462,11 @@ void DataFileInspectorView::_update() {
 	// Only plain file_data files open in the script editor (see ScriptEditorPlugin::handles()).
 	const String path = resource->get_path();
 	text_button->set_disabled(format.is_valid() ? !format->is_recognized_path(path) : path.get_extension().to_lower() != "json");
-	table_button->set_visible(csv);
+	// INI files open in the INI dock (#424), CSV files in the CSV Table dock.
+	const bool ini = Object::cast_to<INI>(*resource) != nullptr;
+	table_button->set_visible(csv || ini);
+	table_button->set_text(ini ? TTR("Open in INI Dock") : TTR("Open in Table"));
+	table_button->set_tooltip_text(ini ? TTR("Edit the sections and keys in the INI dock.") : TTR("Edit the rows in the CSV Table dock."));
 	search->set_visible(!csv);
 
 	if (csv) {
@@ -581,6 +590,12 @@ void DataFileInspectorView::_open_text(int p_line) {
 }
 
 void DataFileInspectorView::_open_table() {
+	INIEditor *ini_editor = INIEditor::get_singleton();
+	if (ini_editor && Object::cast_to<INI>(*resource)) {
+		ini_editor->edit(resource);
+		ini_editor->make_visible();
+		return;
+	}
 	CSVTableEditor *table_editor = CSVTableEditor::get_singleton();
 	if (table_editor) {
 		table_editor->edit(resource);
@@ -722,10 +737,57 @@ bool EditorInspectorPluginDataFile::parse_property(Object *p_object, const Varia
 	return hidden && !show_raw_properties;
 }
 
+// EditorInspectorPluginDataSchema
+
+// A Button created in the inspector cannot be a GDCLASS of its own (unregistered classes have no signals), so the
+// class picker calls a static function bound to the schema.
+static void _generate_data_schema(const Ref<DataSchema> &p_schema, Object *p_dialog) {
+	CreateDialog *dialog = Object::cast_to<CreateDialog>(p_dialog);
+	ERR_FAIL_NULL(dialog);
+	Ref<Resource> sample = Object::cast_to<Resource>(dialog->instantiate_selected().get_validated_object());
+	if (sample.is_null()) {
+		return;
+	}
+	const Ref<DataSchema> generated = DataSchema::create_from_resource(sample);
+	if (generated.is_null() || generated->get_fields().is_empty()) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), dialog->get_selected_type()));
+		return;
+	}
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Generate Data Schema from Resource"), UndoRedo::MERGE_DISABLE, p_schema.ptr());
+	undo_redo->add_do_property(p_schema.ptr(), "fields", generated->get_fields());
+	undo_redo->add_undo_property(p_schema.ptr(), "fields", p_schema->get_fields().duplicate());
+	undo_redo->add_do_property(p_schema.ptr(), "extra_fields", generated->get_extra_fields());
+	undo_redo->add_undo_property(p_schema.ptr(), "extra_fields", p_schema->get_extra_fields());
+	undo_redo->commit_action();
+}
+
+static Button *_make_data_schema_generate_button(const Ref<DataSchema> &p_schema) {
+	Button *button = memnew(Button(TTR("Generate from Resource...")));
+	button->set_tooltip_text(TTR("Replace the fields with one field per stored property of a Resource class, as the text formats write them."));
+	CreateDialog *dialog = memnew(CreateDialog);
+	dialog->set_base_type("Resource");
+	dialog->connect("create", callable_mp_static(&_generate_data_schema).bind(p_schema, dialog));
+	button->add_child(dialog);
+	button->connect(SceneStringName(pressed), callable_mp(dialog, &CreateDialog::popup_create).bind(true, false, String(), String()));
+	return button;
+}
+
+bool EditorInspectorPluginDataSchema::can_handle(Object *p_object) {
+	return Object::cast_to<DataSchema>(p_object) != nullptr;
+}
+
+void EditorInspectorPluginDataSchema::parse_begin(Object *p_object) {
+	add_custom_control(_make_data_schema_generate_button(Ref<DataSchema>(Object::cast_to<DataSchema>(p_object))));
+}
+
 // DataFileInspectorEditorPlugin
 
 DataFileInspectorEditorPlugin::DataFileInspectorEditorPlugin() {
 	Ref<EditorInspectorPluginDataFile> plugin;
 	plugin.instantiate();
 	add_inspector_plugin(plugin);
+	Ref<EditorInspectorPluginDataSchema> schema_plugin;
+	schema_plugin.instantiate();
+	add_inspector_plugin(schema_plugin);
 }

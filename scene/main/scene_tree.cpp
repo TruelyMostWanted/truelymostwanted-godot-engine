@@ -48,6 +48,8 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, RenderingServer);
 #include "scene/gui/control.h"
 #include "scene/main/multiplayer_api.h"
 #include "scene/main/node.h"
+#include "scene/main/timer_server.h"
+#include "scene/main/transition_screen.h"
 #include "scene/main/viewport.h"
 #include "scene/main/window.h"
 #include "scene/resources/environment.h"
@@ -792,6 +794,11 @@ bool SceneTree::process(double p_time) {
 }
 
 void SceneTree::process_timers(double p_delta, bool p_physics_frame) {
+	// Truely (#379): Timer nodes and code timers live in TimerServer.
+	if (TimerServer::get_singleton()) {
+		TimerServer::get_singleton()->process(p_delta, Engine::get_singleton()->get_process_step(), p_physics_frame, paused || suspended);
+	}
+
 	_THREAD_SAFE_METHOD_
 	const List<Ref<SceneTreeTimer>>::Element *L = timers.back(); // Last element.
 	const double unscaled_delta = Engine::get_singleton()->get_process_step();
@@ -1258,6 +1265,11 @@ void SceneTree::_process_groups_thread(uint32_t p_index, bool p_physics) {
 }
 
 void SceneTree::_process(bool p_physics) {
+	// Truely (#379): timers started from here until process_timers() skip this frame's delta.
+	if (TimerServer::get_singleton()) {
+		TimerServer::get_singleton()->begin_node_pass(p_physics);
+	}
+
 	if (process_groups_dirty) {
 		{
 			// First, remove dirty groups.
@@ -1775,6 +1787,11 @@ void SceneTree::unload_current_scene() {
 	}
 }
 
+Error SceneTree::change_scene_with_transition(const String &p_path, const Ref<PackedScene> &p_transition_scene) {
+	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), ERR_INVALID_PARAMETER, "Changing scene can only be done from the main thread.");
+	return TransitionScreen::change_scene_with_transition(this, p_path, p_transition_scene);
+}
+
 void SceneTree::add_current_scene(Node *p_current) {
 	ERR_FAIL_COND_MSG(!Thread::is_main_thread(), "Adding a current scene can only be done from the main thread.");
 	current_scene = p_current;
@@ -1986,6 +2003,7 @@ void SceneTree::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("reload_current_scene"), &SceneTree::reload_current_scene);
 	ClassDB::bind_method(D_METHOD("unload_current_scene"), &SceneTree::unload_current_scene);
+	ClassDB::bind_method(D_METHOD("change_scene_with_transition", "path", "transition_scene"), &SceneTree::change_scene_with_transition, DEFVAL(Ref<PackedScene>()));
 
 	ClassDB::bind_method(D_METHOD("set_multiplayer", "multiplayer", "root_path"), &SceneTree::set_multiplayer, DEFVAL(NodePath()));
 	ClassDB::bind_method(D_METHOD("get_multiplayer", "for_path"), &SceneTree::get_multiplayer, DEFVAL(NodePath()));

@@ -82,6 +82,12 @@
 				Returns the earliest [member SubtitleSegment.start_time] plus [member time_offset], or [code]0.0[/code] without segments.
 			</description>
 		</method>
+		<method name="get_translatable_strings" qualifiers="const">
+			<return type="PackedStringArray[]" />
+			<description>
+				Returns one entry per segment with text, for POT generation: [code][text, context, "", comment][/code] with [member SubtitleSegment.translation_context] as the context and [code]"Speaker: name"[/code] as the translator comment when [member SubtitleSegment.speaker] is set. The editor uses it for subtitle files ([code].srt[/code], [code].vtt[/code], ...) and [Subtitle] resources added to the POT generation list ([b]Project Settings &gt; Localization &gt; POT Generation[/b]). The entries do not depend on [member auto_translate].
+			</description>
+		</method>
 		<method name="load_from_file">
 			<return type="int" enum="Error" />
 			<param index="0" name="path" type="String" />

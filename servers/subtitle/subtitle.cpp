@@ -271,6 +271,18 @@ bool Subtitle::is_auto_translate() const {
 	return auto_translate;
 }
 
+TypedArray<PackedStringArray> Subtitle::get_translatable_strings() const {
+	TypedArray<PackedStringArray> result;
+	for (const Ref<SubtitleSegment> &segment : segments) {
+		if (segment.is_null() || segment->get_text().is_empty()) {
+			continue;
+		}
+		const StringName speaker = segment->get_speaker();
+		result.push_back(PackedStringArray({ segment->get_text(), String(segment->get_translation_context()), String(), speaker == StringName() ? String() : vformat("Speaker: %s", speaker) }));
+	}
+	return result;
+}
+
 void Subtitle::add_segment(const Ref<SubtitleSegment> &p_segment) {
 	ERR_FAIL_COND(p_segment.is_null());
 	int index = segments.size();
@@ -539,6 +551,7 @@ void Subtitle::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_end_time"), &Subtitle::get_end_time);
 	ClassDB::bind_method(D_METHOD("shift_times", "seconds"), &Subtitle::shift_times);
 	ClassDB::bind_method(D_METHOD("validate", "max_characters_per_second"), &Subtitle::validate, DEFVAL(20.0));
+	ClassDB::bind_method(D_METHOD("get_translatable_strings"), &Subtitle::get_translatable_strings);
 	ClassDB::bind_method(D_METHOD("to_text", "format"), &Subtitle::to_text);
 	ClassDB::bind_method(D_METHOD("load_from_text", "text", "format"), &Subtitle::load_from_text);
 	ClassDB::bind_method(D_METHOD("load_from_file", "path"), &Subtitle::load_from_file);

@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TimerServer" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Owns every timer: [Timer] nodes and [TimerInstance]s.
+	</brief_description>
+	<description>
+		[TimerServer] owns the timers of the project: [TimerInstance]s, and [Timer] nodes while [member ProjectSettings.application/run/timer_nodes_use_timer_server] is on (off by default: then [Timer] nodes run on Godot's own code path and are not timers of this server). Each timer is identified by an [RID]. The server is ticked once per process and per physics frame by the [SceneTree] after all [code]_process[/code] callbacks, so a timer fires at the same point as a [SceneTreeTimer]. A timer started while the [SceneTree] processes nodes does not count that frame's delta, as a [Timer] node in Godot. Timers that end in the same frame fire in the order they were scheduled.
+		The server does not count down every timer each frame. It keeps eight clocks (idle or physics, pausable or always, scaled or unscaled), and a running timer stores only where it started on its clock. Each clock has one heap of event times (end, next tick, next alert). Per frame and clock the server compares the top of the heap with the clock, so a frame without events costs O(1) per clock regardless of how many timers run, and an event costs O(log N).
+		A timer is either a countdown or a stopwatch (see [enum TimerInfo.TimerTickMode]). The shown time is the time left for a countdown and the elapsed time for a stopwatch. Ticks and alerts are given in shown time.
+		Events reach the owner of a timer through one [Callable] (see [method timer_set_callback]), which receives the [enum TimerEvent] and the shown time. [Timer] and [TimerInstance] turn the events into signals. If the owner set with [method timer_set_object] is a [RefCounted], the server keeps it alive while the timer is running.
+		[b]Note:[/b] The server and its timers must only be changed from the main thread; changes from other threads fail with an error. [Timer] nodes defer such calls to the main thread themselves.
+		[codeblocks]
+		[gdscript]
+		func _on_pause_menu_opened():
+			TimerServer.pause_all()
+
+		func _on_pause_menu_closed():
+			TimerServer.resume_all()
+
+		func start_cooldown():
+			var info = TimerInfo.new()
+			info.total_time = 90.0
+			info.alerts = PackedFloat64Array([10.0])
+			var timer = TimerServer.create_timer(info)
+			timer.start()
+			await timer.timeout
+			print(TimerServer.format_time(90.0)) # Prints "01:30".
+		[/gdscript]
+		[csharp]
+		private void OnPauseMenuOpened()
+		{
+			TimerServer.PauseAll();
+		}
+
+		private void OnPauseMenuClosed()
+		{
+			TimerServer.ResumeAll();
+		}
+
+		private async void StartCooldown()
+		{
+			var info = new TimerInfo();
+			info.TotalTime = 90.0;
+			info.Alerts = new double[] { 10.0 };
+			TimerInstance timer = TimerServer.CreateTimer(info);
+			timer.Start();
+			await ToSignal(timer, TimerInstance.SignalName.Timeout);
+			GD.Print(TimerServer.FormatTime(90.0)); // Prints "01:30".
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="create_timer">
+			<return type="TimerInstance" />
+			<param index="0" name="info" type="TimerInfo" default="null" />
+			<description>
+				Creates a [TimerInstance] from [param info] and returns it. The instance is stopped; call [method TimerInstance.start] to run it. A running instance is kept alive by the server, so [code]await TimerServer.create_timer(info).timeout[/code] works after [method TimerInstance.start] was called on it. A running instance that never ends (a looping countdown, or a stopwatch without [member TimerInfo.total_time]) stays alive until it is stopped, also when no reference to it is left.
+			</description>
+		</method>
+		<method name="format_time" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="seconds" type="float" />
+			<param index="1" name="format" type="String" default="&quot;{mm}:{ss}&quot;" />
+			<param index="2" name="round_up" type="bool" default="false" />
+			<description>
+				Formats [param seconds] with the placeholders [code]{h}[/code], [code]{hh}[/code], [code]{m}[/code], [code]{mm}[/code], [code]{s}[/code], [code]{ss}[/code], [code]{ds}[/code], [code]{cs}[/code] and [code]{ms}[/code] ([code]hh[/code], [code]mm[/code], [code]ss[/code], [code]cs[/code] and [code]ms[/code] are zero-padded; [code]ds[/code], [code]cs[/code] and [code]ms[/code] are tenths, hundredths and thousandths of a second). The largest unit in [param format] carries the full amount, so [code]"{mm}:{ss}"[/code] shows [code]75:03[/code] for 4503 seconds. If [param round_up] is [code]true[/code], the value is rounded up to the smallest unit in the format, as a countdown display expects.
+			</description>
+		</method>
+		<method name="free_rid">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Frees [param timer]. Emits [signal timer_unregistered]. [Timer] nodes and [TimerInstance]s free their timers themselves.
+			</description>
+		</method>
+		<method name="get_timer" qualifiers="const">
+			<return type="RID" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the first timer with the name [param name], or an invalid [RID] if there is none. [Timer] nodes use their node name unless [member TimerInfo.timer_name] is set.
+			</description>
+		</method>
+		<method name="get_timer_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of timers.
+			</description>
+		</method>
+		<method name="get_timers" qualifiers="const">
+			<return type="RID[]" />
+			<description>
+				Returns the [RID]s of all timers, including those of [Timer] nodes (also internal and editor ones) and [TimerInstance]s.
+			</description>
+		</method>
+		<method name="pause_all">
+			<return type="void" />
+			<description>
+				Pauses every running timer. The timers emit their [code]pause_changed[/code] signal and report [method timer_is_paused] as [code]true[/code]. Timers that are not running are not paused. Engine-owned timers (internal [Timer] nodes such as those of GUI controls, and the editor's own [Timer] nodes) are skipped; the timeout timer of [HTTPRequest] is a regular child and is paused too. See also [method resume_all].
+			</description>
+		</method>
+		<method name="resume_all">
+			<return type="void" />
+			<description>
+				Resumes every paused timer, except engine-owned ones (see [method pause_all]).
+			</description>
+		</method>
+		<method name="stop_all">
+			<return type="void" />
+			<description>
+				Stops every timer, as if [method timer_stop] was called on each of them, except engine-owned ones (see [method pause_all]). The timers emit their [code]stopped[/code] signal.
+			</description>
+		</method>
+		<method name="timer_add_time">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="time_sec" type="float" />
+			<description>
+				Adds [param time_sec] to the shown time of [param timer] (time left for a countdown, elapsed time for a stopwatch). Use a negative value to remove time.
+			</description>
+		</method>
+		<method name="timer_create">
+			<return type="RID" />
+			<description>
+				Creates a stopped timer and returns its [RID]. Emits [signal timer_registered]. Free it with [method free_rid].
+			</description>
+		</method>
+		<method name="timer_get_current_time" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the shown time of [param timer]: the time left for a countdown (its full time before the first start, [code]0.0[/code] after a stop or the end), the elapsed time for a stopwatch.
+			</description>
+		</method>
+		<method name="timer_get_elapsed_time" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the time that has passed since [param timer] was started, in seconds, scaled by its time scale.
+			</description>
+		</method>
+		<method name="timer_get_name" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the name of [param timer].
+			</description>
+		</method>
+		<method name="timer_get_object" qualifiers="const">
+			<return type="Object" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the object set with [method timer_set_object], or [code]null[/code] if there is none or it was freed.
+			</description>
+		</method>
+		<method name="timer_get_tick_mode" qualifiers="const">
+			<return type="int" enum="TimerInfo.TimerTickMode" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the tick mode of [param timer].
+			</description>
+		</method>
+		<method name="timer_get_time_left" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the time until [param timer] ends, in seconds. A countdown that has not been started yet returns its full time. This is [code]0.0[/code] after a stop or the end, and for a stopwatch that is not running or has no total time.
+			</description>
+		</method>
+		<method name="timer_get_total_time" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns the total time of [param timer].
+			</description>
+		</method>
+		<method name="timer_is_loop" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns [code]true[/code] if [param timer] restarts after it ended.
+			</description>
+		</method>
+		<method name="timer_is_paused" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns [code]true[/code] if [param timer] is paused.
+			</description>
+		</method>
+		<method name="timer_is_running" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns [code]true[/code] if [param timer] was started and has not ended or been stopped. A paused timer is still running.
+			</description>
+		</method>
+		<method name="timer_is_valid" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Returns [code]true[/code] if [param timer] is a timer of this server.
+			</description>
+		</method>
+		<method name="timer_set_alerts">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="alerts" type="PackedFloat64Array" />
+			<description>
+				Sets the alerts of [param timer], in shown time: the time left for a countdown, the elapsed time for a stopwatch. Each alert emits an alert event once per run.
+			</description>
+		</method>
+		<method name="timer_set_callback">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="callback" type="Callable" />
+			<description>
+				Sets the callable that receives the events of [param timer]. It is called with the event ([enum TimerEvent]) and the shown time as arguments, only when something happens. Per frame and timer the order is alerts, tick, timeout.
+			</description>
+		</method>
+		<method name="timer_set_current_time">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="time_sec" type="float" />
+			<description>
+				Sets the shown time of [param timer]. A countdown may get more time left than its total time; a stopwatch does not go below zero.
+			</description>
+		</method>
+		<method name="timer_set_ignore_time_scale">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="ignore" type="bool" />
+			<description>
+				If [param ignore] is [code]true[/code], [param timer] ignores [member Engine.time_scale].
+			</description>
+		</method>
+		<method name="timer_set_info">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="info" type="TimerInfo" />
+			<param index="2" name="include_clock" type="bool" default="true" />
+			<description>
+				Applies all values of [param info] to [param timer]. If [param include_clock] is [code]false[/code], [member TimerInfo.process_mode] is not applied; [Timer] nodes use this because they follow [member Node.process_mode].
+			</description>
+		</method>
+		<method name="timer_set_loop">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="enable" type="bool" />
+			<description>
+				If [param enable] is [code]true[/code], [param timer] restarts when it ends, carrying over the remainder of the frame.
+			</description>
+		</method>
+		<method name="timer_set_name">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="name" type="StringName" />
+			<description>
+				Sets the name of [param timer], used by [method get_timer].
+			</description>
+		</method>
+		<method name="timer_set_object">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="object" type="Object" />
+			<description>
+				Sets the object that owns [param timer]. If it is a [RefCounted], the server keeps it alive while the timer is running.
+			</description>
+		</method>
+		<method name="timer_set_paused">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="paused" type="bool" />
+			<description>
+				Pauses or resumes [param timer] and emits the matching event.
+			</description>
+		</method>
+		<method name="timer_set_process_always">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="enable" type="bool" />
+			<description>
+				If [param enable] is [code]true[/code], [param timer] keeps running while the [SceneTree] is paused.
+			</description>
+		</method>
+		<method name="timer_set_process_in_physics">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="enable" type="bool" />
+			<description>
+				If [param enable] is [code]true[/code], [param timer] is updated every physics frame instead of every process frame.
+			</description>
+		</method>
+		<method name="timer_set_suspended">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="suspended" type="bool" />
+			<description>
+				Suspends or unsuspends [param timer] without changing its paused state. [Timer] nodes use this while they cannot process (outside the tree, [member Node.process_mode], tree pause).
+			</description>
+		</method>
+		<method name="timer_set_tick_interval">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="interval_sec" type="float" />
+			<description>
+				Sets the interval of the tick events of [param timer]. [code]0[/code] disables ticks.
+			</description>
+		</method>
+		<method name="timer_set_tick_mode">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="mode" type="int" enum="TimerInfo.TimerTickMode" />
+			<description>
+				Sets the tick mode of [param timer].
+			</description>
+		</method>
+		<method name="timer_set_time_scale">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="scale" type="float" />
+			<description>
+				Sets the speed of [param timer] relative to its clock. [code]2.0[/code] runs twice as fast.
+			</description>
+		</method>
+		<method name="timer_set_total_time">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<param index="1" name="time_sec" type="float" />
+			<description>
+				Sets the total time of [param timer], in seconds. For a stopwatch, [code]0[/code] means it has no end.
+			</description>
+		</method>
+		<method name="timer_start">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Starts [param timer] from the beginning and emits the started event.
+			</description>
+		</method>
+		<method name="timer_stop">
+			<return type="void" />
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Stops [param timer] and emits the stopped event. This does not emit a timeout.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="timer_registered">
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Emitted when a timer is created.
+			</description>
+		</signal>
+		<signal name="timer_unregistered">
+			<param index="0" name="timer" type="RID" />
+			<description>
+				Emitted when a timer is freed.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="TIMER_EVENT_STARTED" value="0" enum="TimerEvent">
+			The timer was started. The shown time is the one at the start.
+		</constant>
+		<constant name="TIMER_EVENT_STOPPED" value="1" enum="TimerEvent">
+			The timer was stopped.
+		</constant>
+		<constant name="TIMER_EVENT_PAUSED" value="2" enum="TimerEvent">
+			The timer was paused.
+		</constant>
+		<constant name="TIMER_EVENT_RESUMED" value="3" enum="TimerEvent">
+			The timer was resumed.
+		</constant>
+		<constant name="TIMER_EVENT_TICKED" value="4" enum="TimerEvent">
+			A tick interval has passed. The shown time is passed along.
+		</constant>
+		<constant name="TIMER_EVENT_ALERT_REACHED" value="5" enum="TimerEvent">
+			An alert time was reached. The alert time is passed along.
+		</constant>
+		<constant name="TIMER_EVENT_TIMEOUT" value="6" enum="TimerEvent">
+			The timer reached its end. At most one timeout is emitted per timer and frame.
+		</constant>
+	</constants>
+</class>

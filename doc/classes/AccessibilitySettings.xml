@@ -5,12 +5,15 @@
 	</brief_description>
 	<description>
 		The data of the settings domain [code]"accessibility"[/code]. [AccessibilitySettingsServer] keeps three copies of it (defaults, applied and pending values, see [method SettingsServer.get_settings]) and stores it in [code]user://settings/accessibility.ini[/code]. Change the values through [AccessibilitySettingsServer] or [method SettingsServer.set_value], not on the resource, so that they are validated and applied.
-		[member ui_scale], [member font_size_factor], [member color_scheme], [member custom_color_scheme_path], [member focus_outline_width], [member speak_focused_controls] and [member speech_persona] reach the engine (root window, its theme, [TTSServer]). [member reduce_motion], [member reduce_transparency], [member colorblind_mode], [member subtitles_enabled] and [member subtitle_scale] are game-side values: the engine stores them, and the game applies them.
+		[member ui_scale], [member font_size_factor], [member color_scheme], [member custom_color_scheme_path], [member focus_outline_width], [member speak_focused_controls] and [member speech_persona] reach the engine (root window, its theme, [TTSServer]). [member reduce_motion], [member reduce_transparency], [member colorblind_mode], [member subtitles_enabled], [member captions_enabled] and [member subtitle_scale] are game-side values: the engine stores them, and the game applies them.
 		It can also be used as the project defaults of the domain: save an [AccessibilitySettings] as a [code].tres[/code] file and name it in the project setting [code]settings/defaults/accessibility[/code].
 	</description>
 	<tutorials>
 	</tutorials>
 	<members>
+		<member name="captions_enabled" type="bool" setter="set_captions_enabled" getter="is_captions_enabled" default="true">
+			If [code]true[/code], subtitles include closed captions (sounds, reactions, music, lyrics, see [method SubtitleSegment.is_caption]); if [code]false[/code], they show speech only. Only applies while [member subtitles_enabled] is on. Game-side: [SubtitleLabel] follows it; [member SubtitleServer.captions_enabled] is the separate switch of the subtitle tracks.
+		</member>
 		<member name="color_scheme" type="int" setter="set_color_scheme" getter="get_color_scheme" default="0">
 			The color scheme of the GUI, an [enum AccessibilitySettingsServer.ColorScheme] value. Any other value than [constant AccessibilitySettingsServer.COLOR_SCHEME_DEFAULT] overlays text, selection and focus colors and the flat style boxes of the built-in controls. The default is [constant AccessibilitySettingsServer.COLOR_SCHEME_HIGH_CONTRAST_DARK] if the OS asks for more contrast ([method DisplayServer.accessibility_should_increase_contrast]).
 		</member>

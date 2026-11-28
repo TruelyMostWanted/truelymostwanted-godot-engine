@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TimerInstance" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A timer created in code, without a scene.
+	</brief_description>
+	<description>
+		A [TimerInstance] is a timer of [TimerServer] that is created in code with [method TimerServer.create_timer]. It has the same methods and signals as the [Timer] node, but needs no node in the scene tree. It is stopped until [method start] is called.
+		A running instance is kept alive by [TimerServer], so you do not have to store a reference to it. Its timer is freed when the instance is freed: in GDScript as soon as it has ended and no reference is left; in C#, the wrapper object holds a reference until the garbage collector collects it.
+		[codeblocks]
+		[gdscript]
+		var info = TimerInfo.new()
+		info.total_time = 2.5
+		var timer = TimerServer.create_timer(info)
+		timer.start()
+		await timer.timeout
+		print("Done")
+		[/gdscript]
+		[csharp]
+		var info = new TimerInfo();
+		info.TotalTime = 2.5;
+		TimerInstance timer = TimerServer.CreateTimer(info);
+		timer.Start();
+		await ToSignal(timer, TimerInstance.SignalName.Timeout);
+		GD.Print("Done");
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="add_time">
+			<return type="void" />
+			<param index="0" name="time_sec" type="float" />
+			<description>
+				Adds [param time_sec] to the shown time (time left for a countdown, elapsed time for a stopwatch). Use a negative value to remove time.
+			</description>
+		</method>
+		<method name="get_elapsed_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the time that has passed since the timer was started, in seconds.
+			</description>
+		</method>
+		<method name="get_rid" qualifiers="const">
+			<return type="RID" />
+			<description>
+				Returns the [RID] of the timer in [TimerServer].
+			</description>
+		</method>
+		<method name="get_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the time until the timer ends, in seconds. A countdown that has not been started yet returns its full time ([member TimerInfo.total_time]). This is [code]0.0[/code] after [method stop] or the end, and for a stopwatch that is not running or has no [member TimerInfo.total_time].
+			</description>
+		</method>
+		<method name="get_time_text" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="format" type="String" default="&quot;{mm}:{ss}&quot;" />
+			<description>
+				Returns [member current_time] formatted with [method TimerServer.format_time]. A countdown is rounded up to the smallest unit in [param format].
+			</description>
+		</method>
+		<method name="is_running" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the timer was started and has not ended or been stopped. A paused timer is still running.
+			</description>
+		</method>
+		<method name="is_stopped" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the timer is stopped or has not started.
+			</description>
+		</method>
+		<method name="pause">
+			<return type="void" />
+			<description>
+				Pauses the timer. Emits [signal pause_changed].
+			</description>
+		</method>
+		<method name="restart">
+			<return type="void" />
+			<description>
+				Resumes the timer if it is paused and starts it from the beginning.
+			</description>
+		</method>
+		<method name="resume">
+			<return type="void" />
+			<description>
+				Resumes the timer if it is paused. Emits [signal pause_changed].
+			</description>
+		</method>
+		<method name="start">
+			<return type="void" />
+			<description>
+				Starts the timer from the beginning, or resets it if it was started already. Emits [signal started]. This does not resume a paused timer; see [method resume]. While running, the instance is kept alive by [TimerServer]; one that never ends (looping, or a stopwatch without [member TimerInfo.total_time]) must be stopped to be freed.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops the timer. Emits [signal stopped], but not [signal timeout].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="current_time" type="float" setter="set_current_time" getter="get_current_time">
+			The shown time: the time left for a countdown (its full time before the first [method start], [code]0[/code] after [method stop] or the end), the elapsed time for a stopwatch.
+		</member>
+		<member name="paused" type="bool" setter="set_paused" getter="is_paused">
+			If [code]true[/code], the timer is paused. A paused timer does not advance until this is set back to [code]false[/code].
+		</member>
+		<member name="timer_info" type="TimerInfo" setter="set_timer_info" getter="get_timer_info">
+			The [TimerInfo] that describes this timer. Changes to the resource apply live.
+		</member>
+	</members>
+	<signals>
+		<signal name="alert_reached">
+			<param index="0" name="time" type="float" />
+			<description>
+				Emitted when a time from [member TimerInfo.alerts] is reached. [param time] is the alert in shown time.
+			</description>
+		</signal>
+		<signal name="pause_changed">
+			<param index="0" name="paused" type="bool" />
+			<description>
+				Emitted when the timer is paused or resumed.
+			</description>
+		</signal>
+		<signal name="started">
+			<description>
+				Emitted when the timer is started.
+			</description>
+		</signal>
+		<signal name="stopped">
+			<description>
+				Emitted when the timer is stopped.
+			</description>
+		</signal>
+		<signal name="ticked">
+			<param index="0" name="time" type="float" />
+			<description>
+				Emitted every [member TimerInfo.tick_interval]. [param time] is the shown time.
+			</description>
+		</signal>
+		<signal name="timeout">
+			<description>
+				Emitted when the timer reaches its end.
+			</description>
+		</signal>
+	</signals>
+</class>

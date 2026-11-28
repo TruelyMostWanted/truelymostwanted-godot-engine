@@ -113,8 +113,8 @@ bool LanguageSettingsServer::_is_developer_locale(const String &p_locale) {
 
 bool LanguageSettingsServer::_has_locale(const String &p_locale, const StringName &p_channel) {
 	const PackedStringArray available = get_available_locales_for(p_channel);
-	if (available.is_empty()) {
-		// No translations: the game may still use the locale for its own texts.
+	if (available.is_empty() || p_locale == TranslationServer::get_singleton()->get_fallback_locale()) {
+		// No translations, or the fallback locale: the game may still use it for its own texts.
 		return true;
 	}
 	// The same matching rule as the localization servers: the locale, its parents or the closest other locale.

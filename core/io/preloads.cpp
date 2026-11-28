@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  preload_list.cpp                                                      */
+/*  preloads.cpp                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,60 +28,60 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "preload_list.h"
+#include "preloads.h"
 
 #include "core/object/class_db.h"
 
-void PreloadList::set_resources(const TypedArray<Resource> &p_resources) {
+void Preloads::set_resources(const TypedArray<Resource> &p_resources) {
 	resources = p_resources;
 	emit_changed();
 }
 
-TypedArray<Resource> PreloadList::get_resources() const {
+TypedArray<Resource> Preloads::get_resources() const {
 	return resources;
 }
 
-void PreloadList::set_paths(const PackedStringArray &p_paths) {
+void Preloads::set_paths(const PackedStringArray &p_paths) {
 	paths = p_paths;
 	emit_changed();
 }
 
-PackedStringArray PreloadList::get_paths() const {
+PackedStringArray Preloads::get_paths() const {
 	return paths;
 }
 
-void PreloadList::set_manifests(const TypedArray<FilesManifest> &p_manifests) {
+void Preloads::set_manifests(const TypedArray<FilesManifest> &p_manifests) {
 	manifests = p_manifests;
 	emit_changed();
 }
 
-TypedArray<FilesManifest> PreloadList::get_manifests() const {
+TypedArray<FilesManifest> Preloads::get_manifests() const {
 	return manifests;
 }
 
-void PreloadList::set_keys(const TypedDictionary<String, String> &p_keys) {
+void Preloads::set_keys(const TypedDictionary<String, String> &p_keys) {
 	keys = p_keys;
 	emit_changed();
 }
 
-TypedDictionary<String, String> PreloadList::get_keys() const {
+TypedDictionary<String, String> Preloads::get_keys() const {
 	return keys;
 }
 
-bool PreloadList::is_empty() const {
+bool Preloads::is_empty() const {
 	return resources.is_empty() && paths.is_empty() && manifests.is_empty();
 }
 
-void PreloadList::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_resources", "resources"), &PreloadList::set_resources);
-	ClassDB::bind_method(D_METHOD("get_resources"), &PreloadList::get_resources);
-	ClassDB::bind_method(D_METHOD("set_paths", "paths"), &PreloadList::set_paths);
-	ClassDB::bind_method(D_METHOD("get_paths"), &PreloadList::get_paths);
-	ClassDB::bind_method(D_METHOD("set_manifests", "manifests"), &PreloadList::set_manifests);
-	ClassDB::bind_method(D_METHOD("get_manifests"), &PreloadList::get_manifests);
-	ClassDB::bind_method(D_METHOD("set_keys", "keys"), &PreloadList::set_keys);
-	ClassDB::bind_method(D_METHOD("get_keys"), &PreloadList::get_keys);
-	ClassDB::bind_method(D_METHOD("is_empty"), &PreloadList::is_empty);
+void Preloads::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_resources", "resources"), &Preloads::set_resources);
+	ClassDB::bind_method(D_METHOD("get_resources"), &Preloads::get_resources);
+	ClassDB::bind_method(D_METHOD("set_paths", "paths"), &Preloads::set_paths);
+	ClassDB::bind_method(D_METHOD("get_paths"), &Preloads::get_paths);
+	ClassDB::bind_method(D_METHOD("set_manifests", "manifests"), &Preloads::set_manifests);
+	ClassDB::bind_method(D_METHOD("get_manifests"), &Preloads::get_manifests);
+	ClassDB::bind_method(D_METHOD("set_keys", "keys"), &Preloads::set_keys);
+	ClassDB::bind_method(D_METHOD("get_keys"), &Preloads::get_keys);
+	ClassDB::bind_method(D_METHOD("is_empty"), &Preloads::is_empty);
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "resources", PROPERTY_HINT_ARRAY_TYPE, "Resource"), "set_resources", "get_resources");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_STRING_ARRAY, "paths", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:", Variant::STRING, PROPERTY_HINT_FILE)), "set_paths", "get_paths");

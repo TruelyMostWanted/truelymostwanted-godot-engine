@@ -72,6 +72,7 @@
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/link_button.h"
+#include "scene/gui/locale_option_button.h"
 #include "scene/gui/margin_container.h"
 #include "scene/gui/menu_bar.h"
 #include "scene/gui/menu_button.h"
@@ -90,6 +91,7 @@
 #include "scene/gui/slider.h"
 #include "scene/gui/spin_box.h"
 #include "scene/gui/split_container.h"
+#include "scene/gui/subtitle_label.h"
 #include "scene/gui/subviewport_container.h"
 #include "scene/gui/tab_bar.h"
 #include "scene/gui/tab_container.h"
@@ -116,6 +118,8 @@
 #include "scene/main/status_indicator.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
+#include "scene/main/timer_server.h"
+#include "scene/main/transition_screen.h"
 #include "scene/main/viewport.h"
 #include "scene/main/viewport_server.h"
 #include "scene/main/window.h"
@@ -404,6 +408,7 @@ static ScreenshotServer *screenshot_server = nullptr;
 static ViewportServer *viewport_server = nullptr;
 static InputIconServer *input_icon_server = nullptr;
 static ProgressBarServer *progress_bar_server = nullptr;
+static TimerServer *timer_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
 static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
@@ -531,8 +536,15 @@ void register_scene_types() {
 	GDREGISTER_CLASS(HTTPRequestTarget);
 	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
+	GDREGISTER_CLASS(TimerInfo);
+	GDREGISTER_CLASS(TimerInstance);
 	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
+	// Scene transitions (#399).
+	GDREGISTER_CLASS(TransitionScreen);
+	GDREGISTER_CLASS(LoadingScreen);
+	GDREGISTER_CLASS(SplashScreen);
+	GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "application/boot_splash/scene", PROPERTY_HINT_FILE, "*.tscn,*.scn,*.res"), String());
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
 
@@ -616,10 +628,12 @@ void register_scene_types() {
 	GDREGISTER_CLASS(MenuBar);
 	GDREGISTER_CLASS(MenuButton);
 	GDREGISTER_CLASS(OptionButton);
+	GDREGISTER_CLASS(LocaleOptionButton);
 	GDREGISTER_CLASS(SpinBox);
 	GDREGISTER_CLASS(ColorPicker);
 	GDREGISTER_CLASS(ColorPickerButton);
 	GDREGISTER_CLASS(RichTextLabel);
+	GDREGISTER_CLASS(SubtitleLabel); // Fork: subtitle display (#324).
 	GDREGISTER_CLASS(RichTextEffect);
 	GDREGISTER_CLASS(CharFXTransform);
 
@@ -1118,7 +1132,11 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
 	GDREGISTER_CLASS(AudioCommand);
-	GDREGISTER_CLASS(AudioCommandList);
+	GDREGISTER_CLASS(AudioCommands);
+#ifndef DISABLE_DEPRECATED
+	// Renamed in 0.2.2 (naming rule: no container type in a name); saved resources keep loading.
+	ClassDB::add_compatibility_class("AudioCommandList", "AudioCommands");
+#endif // DISABLE_DEPRECATED
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
@@ -1455,6 +1473,10 @@ void unregister_scene_types() {
 		memdelete(progress_bar_server);
 		progress_bar_server = nullptr;
 	}
+	if (timer_server) {
+		memdelete(timer_server);
+		timer_server = nullptr;
+	}
 	LocalizedText::finish();
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
@@ -1573,6 +1595,10 @@ void register_scene_singletons() {
 	GDREGISTER_ABSTRACT_CLASS(ProgressBarServer);
 	progress_bar_server = memnew(ProgressBarServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ProgressBarServer", ProgressBarServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(TimerServer);
+	timer_server = memnew(TimerServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TimerServer", TimerServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }
