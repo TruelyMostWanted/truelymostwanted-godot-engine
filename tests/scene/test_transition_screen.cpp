@@ -104,7 +104,7 @@ TEST_CASE("[SceneTree][TransitionScreen] Defaults, overrides and clamped duratio
 	CHECK_FALSE(screen->is_skippable());
 	CHECK(screen->is_auto_finish());
 	CHECK_FALSE(screen->is_free_current_scene_before_loading());
-	CHECK(screen->get_preload_list().is_null());
+	CHECK(screen->get_preload_assets().is_null());
 	CHECK(screen->get_state() == TransitionScreen::STATE_IDLE);
 	CHECK(screen->get_progress() == doctest::Approx(0.0));
 
@@ -350,7 +350,7 @@ TEST_CASE("[SceneTree][LoadingScreen] Progress bar, tips and the preload list") 
 	Ref<PreloadList> list;
 	list.instantiate();
 	list->set_paths(PackedStringArray({ asset_path }));
-	screen->set_preload_list(list);
+	screen->set_preload_assets(list);
 	tree->get_root()->add_child(screen);
 
 	CHECK(label->get_text() == "first");

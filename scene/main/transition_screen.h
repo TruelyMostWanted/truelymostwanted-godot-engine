@@ -62,7 +62,7 @@ private:
 	bool skippable = false;
 	bool auto_finish = true;
 	bool free_current_scene_before_loading = false;
-	Ref<PreloadList> preload_list;
+	Ref<PreloadList> preload_assets;
 
 	State state = STATE_IDLE;
 	String loading_path; // Resolved `next_scene`; empty when no scene change happens.
@@ -108,8 +108,8 @@ public:
 	bool is_auto_finish() const;
 	void set_free_current_scene_before_loading(bool p_free);
 	bool is_free_current_scene_before_loading() const;
-	void set_preload_list(const Ref<PreloadList> &p_list);
-	Ref<PreloadList> get_preload_list() const;
+	void set_preload_assets(const Ref<PreloadList> &p_assets);
+	Ref<PreloadList> get_preload_assets() const;
 
 	void finish();
 	State get_state() const;

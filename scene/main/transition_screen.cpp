@@ -166,12 +166,12 @@ void TransitionScreen::_set_progress(float p_progress) {
 }
 
 void TransitionScreen::_request_loading() {
-	if (preload_list.is_valid() && ResourceDatabase::get_singleton()) {
+	if (preload_assets.is_valid() && ResourceDatabase::get_singleton()) {
 		ResourceDatabase *database = ResourceDatabase::get_singleton();
 		const Callable on_finished = callable_mp(this, &TransitionScreen::_preload_finished);
 		database->connect(SNAME("preload_finished"), on_finished);
 		preload_pending = true;
-		const Error preload_error = database->preload_from_list(preload_list);
+		const Error preload_error = database->preload_from_list(preload_assets);
 		if (preload_error == ERR_INVALID_PARAMETER || preload_error == ERR_UNAVAILABLE) {
 			// Rejected before starting: `preload_finished` will not be emitted.
 			preload_pending = false;
@@ -214,7 +214,7 @@ void TransitionScreen::_poll_loading() {
 }
 
 void TransitionScreen::_preload_finished(const Ref<PreloadList> &p_list, int p_error) {
-	if (p_list != preload_list) {
+	if (p_list != preload_assets) {
 		return;
 	}
 	preload_pending = false;
@@ -321,12 +321,12 @@ bool TransitionScreen::is_free_current_scene_before_loading() const {
 	return free_current_scene_before_loading;
 }
 
-void TransitionScreen::set_preload_list(const Ref<PreloadList> &p_list) {
-	preload_list = p_list;
+void TransitionScreen::set_preload_assets(const Ref<PreloadList> &p_assets) {
+	preload_assets = p_assets;
 }
 
-Ref<PreloadList> TransitionScreen::get_preload_list() const {
-	return preload_list;
+Ref<PreloadList> TransitionScreen::get_preload_assets() const {
+	return preload_assets;
 }
 
 void TransitionScreen::finish() {
@@ -360,8 +360,8 @@ void TransitionScreen::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_auto_finish"), &TransitionScreen::is_auto_finish);
 	ClassDB::bind_method(D_METHOD("set_free_current_scene_before_loading", "enabled"), &TransitionScreen::set_free_current_scene_before_loading);
 	ClassDB::bind_method(D_METHOD("is_free_current_scene_before_loading"), &TransitionScreen::is_free_current_scene_before_loading);
-	ClassDB::bind_method(D_METHOD("set_preload_list", "list"), &TransitionScreen::set_preload_list);
-	ClassDB::bind_method(D_METHOD("get_preload_list"), &TransitionScreen::get_preload_list);
+	ClassDB::bind_method(D_METHOD("set_preload_assets", "assets"), &TransitionScreen::set_preload_assets);
+	ClassDB::bind_method(D_METHOD("get_preload_assets"), &TransitionScreen::get_preload_assets);
 
 	ClassDB::bind_method(D_METHOD("finish"), &TransitionScreen::finish);
 	ClassDB::bind_method(D_METHOD("get_state"), &TransitionScreen::get_state);
@@ -378,7 +378,7 @@ void TransitionScreen::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "skippable"), "set_skippable", "is_skippable");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_finish"), "set_auto_finish", "is_auto_finish");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "free_current_scene_before_loading"), "set_free_current_scene_before_loading", "is_free_current_scene_before_loading");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "preload_list", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), "set_preload_list", "get_preload_list");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "preload_assets", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), "set_preload_assets", "get_preload_assets");
 
 	ADD_SIGNAL(MethodInfo("started"));
 	ADD_SIGNAL(MethodInfo("load_progress", PropertyInfo(Variant::FLOAT, "progress")));
