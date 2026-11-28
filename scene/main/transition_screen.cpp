@@ -267,7 +267,7 @@ void TransitionScreen::_fail_loading(Error p_error) {
 	load_error = p_error;
 	loading_path = String();
 	state = STATE_FADING_OUT;
-	emit_signal(SNAME("load_failed"), p_error);
+	emit_signal(SNAME("load_failed"), int(p_error));
 }
 
 void TransitionScreen::_preload_finished(const Ref<Preloads> &p_preloads, int p_error) {
@@ -295,7 +295,7 @@ void TransitionScreen::_change_scene() {
 	loaded_scene.unref();
 	if (err != OK) {
 		load_error = err;
-		emit_signal(SNAME("load_failed"), err);
+		emit_signal(SNAME("load_failed"), int(err));
 	}
 }
 
