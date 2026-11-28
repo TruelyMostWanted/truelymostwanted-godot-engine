@@ -38,7 +38,7 @@
 #include "scene/resources/audio/audio_stream.h"
 
 // One action on an AudioMixerServer channel. All stored properties are flat values,
-// so a list of commands saves as .tres, JSON, INI or CSV (one row per command).
+// so a set of commands saves as .tres, JSON, INI or CSV (one row per command).
 class AudioCommand : public Resource {
 	GDCLASS(AudioCommand, Resource);
 
@@ -135,8 +135,8 @@ public:
 };
 
 // Many commands in one resource; as CSV one row per command.
-class AudioCommandList : public Resource {
-	GDCLASS(AudioCommandList, Resource);
+class AudioCommands : public Resource {
+	GDCLASS(AudioCommands, Resource);
 
 	TypedArray<AudioCommand> commands;
 	LocalVector<Ref<AudioStream>> preloaded_streams; // Not stored: kept alive by preload_streams().
@@ -172,9 +172,9 @@ public:
 	static Error load_stream(const String &p_path, Ref<AudioStream> &r_stream, String &r_message);
 
 	Error execute(const Ref<AudioCommand> &p_command);
-	Error execute_list(const Ref<AudioCommandList> &p_list);
-	Error register_commands(const Ref<AudioCommandList> &p_list);
-	void unregister_commands(const Ref<AudioCommandList> &p_list);
+	Error execute_commands(const Ref<AudioCommands> &p_commands);
+	Error register_commands(const Ref<AudioCommands> &p_commands);
+	void unregister_commands(const Ref<AudioCommands> &p_commands);
 	bool has_command(const StringName &p_name);
 	Error execute_named(const StringName &p_name);
 	Error execute_group(const StringName &p_group);

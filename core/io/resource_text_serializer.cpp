@@ -180,11 +180,13 @@ bool ResourceTextSerializer::is_resource_type(const String &p_type) {
 	if (p_type.is_empty()) {
 		return false;
 	}
-	if (ClassDB::class_exists(p_type)) {
-		return ClassDB::is_parent_class(p_type, Resource::get_class_static());
+	// Renamed classes of old files.
+	const String type_name = ClassDB::get_compatibility_remapped_class(p_type);
+	if (ClassDB::class_exists(type_name)) {
+		return ClassDB::is_parent_class(type_name, Resource::get_class_static());
 	}
-	if (ScriptServer::is_global_class(p_type)) {
-		return ClassDB::is_parent_class(ScriptServer::get_global_class_native_base(p_type), Resource::get_class_static());
+	if (ScriptServer::is_global_class(type_name)) {
+		return ClassDB::is_parent_class(ScriptServer::get_global_class_native_base(type_name), Resource::get_class_static());
 	}
 	return false;
 }
@@ -244,36 +246,37 @@ static Ref<Resource> _instantiate_script(const Ref<Script> &p_script, String &r_
 }
 
 Ref<Resource> ResourceTextSerializer::instantiate_type(const String &p_type, String &r_error) {
-	if (ClassDB::class_exists(p_type)) {
-		if (!ClassDB::is_parent_class(p_type, Resource::get_class_static())) {
-			r_error = vformat("'%s' is not a Resource class.", p_type);
+	const String type_name = ClassDB::get_compatibility_remapped_class(p_type); // Renamed classes of old files.
+	if (ClassDB::class_exists(type_name)) {
+		if (!ClassDB::is_parent_class(type_name, Resource::get_class_static())) {
+			r_error = vformat("'%s' is not a Resource class.", type_name);
 			return Ref<Resource>();
 		}
-		if (!ClassDB::can_instantiate(p_type)) {
-			r_error = vformat("'%s' can't be instantiated (abstract or not exposed).", p_type);
+		if (!ClassDB::can_instantiate(type_name)) {
+			r_error = vformat("'%s' can't be instantiated (abstract or not exposed).", type_name);
 			return Ref<Resource>();
 		}
-		Object *object = ClassDB::instantiate(p_type);
+		Object *object = ClassDB::instantiate(type_name);
 		Resource *resource = Object::cast_to<Resource>(object);
 		if (resource == nullptr) {
 			if (object != nullptr) {
 				memdelete(object);
 			}
-			r_error = vformat("Can't create an instance of '%s'.", p_type);
+			r_error = vformat("Can't create an instance of '%s'.", type_name);
 			return Ref<Resource>();
 		}
 		return Ref<Resource>(resource);
 	}
-	if (ScriptServer::is_global_class(p_type)) {
-		const String path = ScriptServer::get_global_class_path(p_type);
+	if (ScriptServer::is_global_class(type_name)) {
+		const String path = ScriptServer::get_global_class_path(type_name);
 		const Ref<Script> script = ResourceLoader::load(path, Script::get_class_static());
 		if (script.is_null()) {
-			r_error = vformat("Can't load the script '%s' of class '%s'.", path, p_type);
+			r_error = vformat("Can't load the script '%s' of class '%s'.", path, type_name);
 			return Ref<Resource>();
 		}
 		return _instantiate_script(script, r_error);
 	}
-	r_error = vformat("Unknown type '%s'.", p_type);
+	r_error = vformat("Unknown type '%s'.", type_name);
 	return Ref<Resource>();
 }
 
@@ -318,6 +321,10 @@ static void _get_serialized_properties(const Object *p_object, LocalVector<Prope
 			r_properties.push_back(info);
 		}
 	}
+}
+
+void ResourceTextSerializer::get_serialized_properties(const Object *p_object, LocalVector<PropertyInfo> &r_properties) {
+	_get_serialized_properties(p_object, r_properties);
 }
 
 typedef Pair<String, int64_t> EnumValue;
@@ -368,6 +375,11 @@ static bool _get_enum_values(const PropertyInfo &p_info, LocalVector<EnumValue> 
 		return !r_values.is_empty();
 	}
 	return false;
+}
+
+bool ResourceTextSerializer::is_enum_property(const PropertyInfo &p_info) {
+	LocalVector<EnumValue> values;
+	return _get_enum_values(p_info, values);
 }
 
 // Element type of an Array property: from the typed array value, and enum names from the hint ("2/2:A,B").

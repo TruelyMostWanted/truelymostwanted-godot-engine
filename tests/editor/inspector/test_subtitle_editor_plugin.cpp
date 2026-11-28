@@ -103,6 +103,62 @@ TEST_CASE("[SubtitleEditorPlugin] Short times and row texts") {
 	CHECK(SubtitleEditorHelper::get_row_text(subtitle, sound) == "[Applause]");
 }
 
+TEST_CASE("[SubtitleEditorPlugin] Typed times of the Subtitles dock") {
+	double seconds = -1.0;
+	CHECK(SubtitleEditorHelper::parse_short_time("5.5", seconds));
+	CHECK(seconds == doctest::Approx(5.5));
+	CHECK(SubtitleEditorHelper::parse_short_time(" 1:05.250 ", seconds));
+	CHECK(seconds == doctest::Approx(65.25));
+	CHECK(SubtitleEditorHelper::parse_short_time("1:00:05.500", seconds));
+	CHECK(seconds == doctest::Approx(3605.5));
+	CHECK(SubtitleEditorHelper::parse_short_time("00:00:05,500", seconds)); // SRT.
+	CHECK(seconds == doctest::Approx(5.5));
+	// A round trip with the displayed format.
+	CHECK(SubtitleEditorHelper::parse_short_time(SubtitleEditorHelper::format_short_time(3725.125), seconds));
+	CHECK(seconds == doctest::Approx(3725.125));
+
+	seconds = 7.0;
+	CHECK_FALSE(SubtitleEditorHelper::parse_short_time("", seconds));
+	CHECK_FALSE(SubtitleEditorHelper::parse_short_time("abc", seconds));
+	CHECK_FALSE(SubtitleEditorHelper::parse_short_time("1.5:00", seconds));
+	CHECK_FALSE(SubtitleEditorHelper::parse_short_time("1:2:3:4", seconds));
+	CHECK_FALSE(SubtitleEditorHelper::parse_short_time("-2", seconds));
+	CHECK(seconds == 7.0); // Unchanged on failure.
+}
+
+TEST_CASE("[SubtitleEditorPlugin] Cues added at the playhead keep the order") {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	CHECK(SubtitleEditorHelper::get_insert_index(subtitle, 3.0) == 0);
+	subtitle->add_segment(make_segment(1.0, 2.0));
+	subtitle->add_segment(make_segment(5.0, 6.0));
+	CHECK(SubtitleEditorHelper::get_insert_index(subtitle, 0.5) == 0);
+	CHECK(SubtitleEditorHelper::get_insert_index(subtitle, 3.0) == 1);
+	CHECK(SubtitleEditorHelper::get_insert_index(subtitle, 5.0) == 2); // After a cue with the same start.
+	CHECK(SubtitleEditorHelper::get_insert_index(subtitle, 9.0) == 2);
+
+	const TypedArray<SubtitleSegment> segments = SubtitleEditorHelper::get_segments_with_segment_at(subtitle, 3.0, 4.5);
+	REQUIRE(segments.size() == 3);
+	const Ref<SubtitleSegment> added = segments[1];
+	CHECK(added->get_start_time() == doctest::Approx(3.0));
+	CHECK(added->get_end_time() == doctest::Approx(4.5));
+	CHECK(subtitle->get_segment_count() == 2); // The subtitle itself is unchanged.
+}
+
+TEST_CASE("[SubtitleEditorPlugin] Problems per cue") {
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	CHECK(SubtitleEditorHelper::get_problems(subtitle).is_empty());
+	subtitle->add_segment(make_segment(1.0, 3.0));
+	Ref<SubtitleSegment> empty = make_segment(2.0, 4.0); // Overlapped by the first one, and empty.
+	empty->set_text("");
+	subtitle->add_segment(empty);
+	const HashMap<int, PackedStringArray> problems = SubtitleEditorHelper::get_problems(subtitle);
+	CHECK(problems.has(0)); // Overlaps the next segment.
+	REQUIRE(problems.has(1));
+	CHECK(problems.get(1).size() >= 1);
+}
+
 } // namespace TestSubtitleEditorPlugin
 
 #endif // TOOLS_ENABLED

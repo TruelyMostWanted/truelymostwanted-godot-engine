@@ -9,7 +9,7 @@
 		- [member AccessibilitySettings.ui_scale] multiplies [member Window.content_scale_factor] of the root window. The factor of the window domain ([method WindowSettingsServer.set_content_scale_factor]) stays separate: the root window gets both multiplied. In [constant Window.CONTENT_SCALE_MODE_VIEWPORT] a larger factor also lowers the render resolution; games in that mode should rather use the font size factor.
 		- [member AccessibilitySettings.font_size_factor], [member AccessibilitySettings.color_scheme] and [member AccessibilitySettings.focus_outline_width] go into an [i]overlay theme[/i] that is set as [member Window.theme] of the root window: a copy of the root window's previous theme plus the changed items (default font size and the font sizes of the built-in types, text and selection colors, flat style boxes, the [code]focus[/code] style box). The project theme is not changed and keeps providing all other items. Themes that the game sets on its own nodes win over the overlay. When all these values are back at their defaults, the root window gets its previous theme again. See [method get_overlay_theme].
 		- [member AccessibilitySettings.speak_focused_controls] speaks the control that gets the focus in the root window with [TTSServer], using the persona [member AccessibilitySettings.speech_persona]. The text comes from [method get_control_speech_text]. Nothing is spoken while a screen reader is active ([method is_screen_reader_active]), which would speak the same control.
-		[b]Game-side values[/b] have no engine target ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): [member AccessibilitySettings.reduce_motion], [member AccessibilitySettings.reduce_transparency], [member AccessibilitySettings.colorblind_mode], [member AccessibilitySettings.subtitles_enabled] and [member AccessibilitySettings.subtitle_scale]. The game reads them, or uses the helpers [method get_animation_duration], [method get_motion_scale], [method scale_font_size] and [method scale_subtitle_font_size]. Connect to [signal SettingsServer.value_changed] to react to a change, and to [signal color_scheme_changed] to recolor UI that the game draws itself.
+		[b]Game-side values[/b] have no engine target ([constant SettingsServer.SETTING_FLAG_NO_ENGINE_TARGET]): [member AccessibilitySettings.reduce_motion], [member AccessibilitySettings.reduce_transparency], [member AccessibilitySettings.colorblind_mode], [member AccessibilitySettings.subtitles_enabled], [member AccessibilitySettings.captions_enabled] and [member AccessibilitySettings.subtitle_scale]. The game reads them, or uses the helpers [method get_animation_duration], [method get_motion_scale], [method scale_font_size] and [method scale_subtitle_font_size]. Connect to [signal SettingsServer.value_changed] to react to a change, and to [signal color_scheme_changed] to recolor UI that the game draws itself.
 		[b]Defaults from the OS:[/b] when the domain starts, [method DisplayServer.accessibility_should_reduce_animation], [method DisplayServer.accessibility_should_reduce_transparency] and [method DisplayServer.accessibility_should_increase_contrast] set the defaults of reduced motion, reduced transparency and the color scheme ([constant COLOR_SCHEME_HIGH_CONTRAST_DARK]). Platforms that don't answer (builds without AccessKit, headless, Android, iOS, Web) keep the off defaults. A value the player has saved always wins.
 		[codeblocks]
 		[gdscript]
@@ -145,6 +145,12 @@
 				Returns the pending value of [member AccessibilitySettings.ui_scale].
 			</description>
 		</method>
+		<method name="is_captions_enabled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns the pending value of [member AccessibilitySettings.captions_enabled].
+			</description>
+		</method>
 		<method name="is_reducing_motion" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -187,6 +193,13 @@
 			<param index="0" name="size" type="int" />
 			<description>
 				Returns [param size] multiplied with [member AccessibilitySettings.font_size_factor] and [member AccessibilitySettings.subtitle_scale], rounded, at least [code]1[/code].
+			</description>
+		</method>
+		<method name="set_captions_enabled">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Sets [member AccessibilitySettings.captions_enabled]. A game-side value.
 			</description>
 		</method>
 		<method name="set_color_scheme">
@@ -282,6 +295,12 @@
 		</method>
 	</methods>
 	<signals>
+		<signal name="captions_enabled_changed">
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Emitted once when a changed [member AccessibilitySettings.captions_enabled] reached the engine: by [method SettingsServer.apply] (also at startup after the settings file is loaded, and after [method SettingsServer.reset_to_defaults] in [constant SettingsServer.APPLY_MODE_IMMEDIATE]), [method SettingsServer.apply_with_confirmation], [method SettingsServer.cancel_confirmation] (with the restored value) or a session override. Not emitted for pending changes in [constant SettingsServer.APPLY_MODE_MANUAL]; [signal SettingsServer.value_changed] reports those.
+			</description>
+		</signal>
 		<signal name="color_scheme_changed">
 			<param index="0" name="scheme" type="AccessibilityColorScheme" />
 			<description>

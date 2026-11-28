@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TransitionScreen" inherits="CanvasLayer" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Root of a scene that covers the screen while the next scene loads, then changes to it.
+	</brief_description>
+	<description>
+		A transition screen is the root node of a scene you design like any other (a [ColorRect] background, a logo, a [ProgressBar]). Added to the [SceneTree], it runs one transition and frees itself:
+		1. On its first frame it emits [signal started] and starts loading [member next_scene] in the background with [method ResourceLoader.load_threaded_request] (and [member preload_assets] with [method ResourceDatabase.preload_from]).
+		2. It fades in over the current scene for [member fade_in_duration] seconds.
+		3. While fully visible it emits [signal progress_changed] and, when everything is loaded, [signal loaded] (or [signal load_failed], then it fades out without changing the scene). It waits at least [member min_duration] seconds (or until [method finish] is called, or a key, mouse button, touch or joypad button is pressed if [member skippable] is [code]true[/code]).
+		4. It changes the scene with [method SceneTree.change_scene_to_packed] while it is fully visible, so the old scene is never seen again.
+		5. It fades out over the new scene for [member fade_out_duration] seconds, emits [signal finished] and frees itself.
+		The easiest way to start a transition is [method SceneTree.change_scene_with_transition]. A transition screen can also be the current scene (opened with [method SceneTree.change_scene_to_file], or the boot splash): it detaches itself from [member SceneTree.current_scene] before the change and stays for the fade-out. A screen added inside the current scene moves itself to the tree root before it starts, so it is not removed with the old scene. With an empty [member next_scene] it only fades in, waits and fades out, as an overlay.
+		Only one transition runs at a time: [method SceneTree.change_scene_with_transition] returns [constant ERR_BUSY] while one runs, and a second screen added to the tree prints an error and frees itself without doing anything. From the start of the fade-in until the scene has changed, the screen marks every input event as handled in [method Node._input], so the covered scene (and the screen's own [Control]s) receive no input; skip inputs still work.
+		The fade modulates the whole layer (all children together, their own [member CanvasItem.modulate] stays untouched). Override [method _update_fade] for custom intro and outro animations. In the editor the screen is shown fully visible and does nothing. It runs while the tree is paused ([member Node.process_mode] is [constant Node.PROCESS_MODE_ALWAYS]). Durations are in scaled time: with an [member Engine.time_scale] of [code]0.0[/code] the transition does not advance.
+		See [LoadingScreen] for a progress bar and tips, and [SplashScreen] for the boot splash.
+		[b]Note:[/b] Without threads (the default Web export) [method ResourceLoader.load_threaded_request] loads on the main thread. The screen therefore starts loading only on the frame after it became fully visible, and the whole load is one blocking step: the game shows the screen's last frame (animations, tips and the progress bar stop) until the scene is loaded, and [method get_progress] jumps from [code]0.0[/code] to [code]1.0[/code]. For a boot splash this means the splash is drawn first, then the main scene loads, then [member min_duration] runs.
+		[b]Note:[/b] A [CanvasModulate] inside the screen replaces the fade, as both set the modulate of the layer's canvas.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="_update_fade" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="fade" type="float" />
+			<description>
+				Called every frame while the screen fades in ([param fade] rises from [code]0.0[/code] to [code]1.0[/code] over [member fade_in_duration]) and fades out (back to [code]0.0[/code] over [member fade_out_duration]). Override it to animate the screen yourself (slide in, shader dissolve); the default fade of the layer is not applied then.
+				[codeblocks]
+				[gdscript]
+				func _update_fade(fade):
+				    $Curtain.position.y = lerpf(-get_viewport().get_visible_rect().size.y, 0.0, fade)
+				[/gdscript]
+				[csharp]
+				public override void _UpdateFade(float fade)
+				{
+				    var curtain = GetNode&lt;Control&gt;("Curtain");
+				    curtain.Position = new Vector2(curtain.Position.X, Mathf.Lerp(-GetViewport().GetVisibleRect().Size.Y, 0.0f, fade));
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
+		<method name="finish">
+			<return type="void" />
+			<description>
+				Changes the scene as soon as everything is loaded, without waiting for the rest of [member min_duration]. Needed when [member auto_finish] is [code]false[/code], for example for a "Press any key" prompt after [signal loaded].
+			</description>
+		</method>
+		<method name="get_fade" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current visibility of the screen, from [code]0.0[/code] (transparent) to [code]1.0[/code] (fully visible).
+			</description>
+		</method>
+		<method name="get_load_error" qualifiers="const">
+			<return type="int" enum="Error" />
+			<description>
+				Returns [constant OK], or the error of the last failed load or scene change (see [signal load_failed]).
+			</description>
+		</method>
+		<method name="get_progress" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the load progress of [member next_scene] from [code]0.0[/code] to [code]1.0[/code]. It is [code]1.0[/code] only when the scene and [member preload_assets] are loaded.
+			</description>
+		</method>
+		<method name="get_state" qualifiers="const">
+			<return type="int" enum="TransitionScreen.State" />
+			<description>
+				Returns the current step of the transition.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="auto_finish" type="bool" setter="set_auto_finish" getter="is_auto_finish" default="true">
+			If [code]true[/code], the scene changes as soon as everything is loaded and [member min_duration] has passed. If [code]false[/code], the screen waits for [method finish] (or a skip input if [member skippable] is [code]true[/code]).
+		</member>
+		<member name="fade_in_duration" type="float" setter="set_fade_in_duration" getter="get_fade_in_duration" default="0.3">
+			Seconds the screen takes to fade in over the current scene. [code]0.0[/code] shows it at once.
+		</member>
+		<member name="fade_out_duration" type="float" setter="set_fade_out_duration" getter="get_fade_out_duration" default="0.3">
+			Seconds the screen takes to fade out over the new scene. [code]0.0[/code] hides it at once.
+		</member>
+		<member name="free_current_scene_before_loading" type="bool" setter="set_free_current_scene_before_loading" getter="is_free_current_scene_before_loading" default="false">
+			If [code]true[/code], the current scene is freed as soon as the screen is fully visible, and [member next_scene] starts loading on the next frame. The old and the new scene are never in memory together, which helps on mobile and Web; loading starts a little later. If loading then fails, no scene is left in the tree.
+		</member>
+		<member name="layer" type="int" setter="set_layer" getter="get_layer" overrides="CanvasLayer" default="100" />
+		<member name="min_duration" type="float" setter="set_min_duration" getter="get_min_duration" default="0.0">
+			Minimum seconds the screen stays fully visible before the scene changes, even if loading is done earlier.
+		</member>
+		<member name="next_scene" type="String" setter="set_next_scene" getter="get_next_scene" default="&quot;&quot;">
+			Path or UID of the scene ([code].tscn[/code], [code].scn[/code] or [code].res[/code]) to change to. If empty, no scene change happens: the screen fades in, waits [member min_duration] and fades out. [SplashScreen] uses [member ProjectSettings.application/run/main_scene] instead. A screen never loads its own scene file.
+		</member>
+		<member name="preload_assets" type="Preloads" setter="set_preload_assets" getter="get_preload_assets">
+			Optional assets that are loaded into the [ResourceDatabase] with [method ResourceDatabase.preload_from] while the screen loads [member next_scene]. The scene changes only after [signal ResourceDatabase.preload_finished] for these [Preloads].
+		</member>
+		<member name="process_mode" type="int" setter="set_process_mode" getter="get_process_mode" overrides="Node" enum="Node.ProcessMode" default="3" />
+		<member name="skippable" type="bool" setter="set_skippable" getter="is_skippable" default="false">
+			If [code]true[/code], a pressed key, mouse button (not the wheel), touch or joypad button emits [signal skipped] and calls [method finish]. The scene still changes only when everything is loaded.
+		</member>
+	</members>
+	<signals>
+		<signal name="finished">
+			<description>
+				Emitted when the screen has faded out (over the new scene, or over the unchanged scene after [signal load_failed]), right before it frees itself.
+			</description>
+		</signal>
+		<signal name="load_failed">
+			<param index="0" name="error" type="int" enum="Error" />
+			<description>
+				Emitted instead of [signal loaded] when [member next_scene] cannot be loaded, or after [signal loaded] when the loaded scene cannot be instantiated. The scene does not change and the screen fades out over the current scene. With [member free_current_scene_before_loading] the old scene is already freed, so no scene is left: connect to this signal to change to a fallback scene. See [method get_load_error].
+			</description>
+		</signal>
+		<signal name="loaded">
+			<description>
+				Emitted once when [member next_scene] and [member preload_assets] are loaded. Not emitted when loading fails (see [signal load_failed]).
+			</description>
+		</signal>
+		<signal name="progress_changed">
+			<param index="0" name="progress" type="float" />
+			<description>
+				Emitted when the load progress changes, with a value from [code]0.0[/code] to [code]1.0[/code]. See [method get_progress].
+			</description>
+		</signal>
+		<signal name="skipped">
+			<description>
+				Emitted when a skip input was pressed while [member skippable] is [code]true[/code].
+			</description>
+		</signal>
+		<signal name="started">
+			<description>
+				Emitted on the first frame of the screen in the tree, when loading starts and the fade-in begins.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="STATE_IDLE" value="0" enum="State">
+			Not started yet (or in the editor).
+		</constant>
+		<constant name="STATE_FADING_IN" value="1" enum="State">
+			Fading in over the current scene.
+		</constant>
+		<constant name="STATE_LOADING" value="2" enum="State">
+			Fully visible, loading.
+		</constant>
+		<constant name="STATE_LOADED" value="3" enum="State">
+			Fully visible, everything loaded; waiting for [member min_duration] or [method finish].
+		</constant>
+		<constant name="STATE_FADING_OUT" value="4" enum="State">
+			The scene has changed (or loading failed); fading out.
+		</constant>
+		<constant name="STATE_COMPLETED" value="5" enum="State">
+			Done; the screen is freed at the end of the frame.
+		</constant>
+	</constants>
+</class>

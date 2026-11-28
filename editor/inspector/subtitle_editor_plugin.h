@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/templates/hash_map.h"
 #include "editor/inspector/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 #include "scene/gui/box_container.h"
@@ -55,6 +56,14 @@ public:
 	static String get_row_text(const Ref<Subtitle> &p_subtitle, const Ref<SubtitleSegment> &p_segment);
 	// "Dialog", "Sound", …
 	static String get_kind_name(SubtitleSegment::Kind p_kind);
+	// Reads "5.5", "0:05.500", "1:00:05.500" or an SRT time ("00:00:05,500") as seconds.
+	static bool parse_short_time(const String &p_text, double &r_seconds);
+	// The index at which a segment starting at `p_start_time` keeps the segments sorted by start time.
+	static int get_insert_index(const Ref<Subtitle> &p_subtitle, double p_start_time);
+	// The segments with a new segment from `p_start_time` to `p_end_time`, inserted at `get_insert_index()`.
+	static TypedArray<SubtitleSegment> get_segments_with_segment_at(const Ref<Subtitle> &p_subtitle, double p_start_time, double p_end_time);
+	// The validation problems of each segment index, as readable messages.
+	static HashMap<int, PackedStringArray> get_problems(const Ref<Subtitle> &p_subtitle);
 };
 
 // The segments of a `Subtitle` as a table under its class header in the Inspector.
@@ -82,6 +91,7 @@ class SubtitleEditor : public VBoxContainer {
 	void _add_segment();
 	void _sort_segments();
 	void _item_activated();
+	void _open_in_dock();
 
 protected:
 	void _notification(int p_what);
@@ -93,6 +103,8 @@ public:
 
 class EditorInspectorPluginSubtitle : public EditorInspectorPlugin {
 	GDCLASS(EditorInspectorPluginSubtitle, EditorInspectorPlugin);
+
+	void _open_stream_in_dock(ObjectID p_stream);
 
 public:
 	virtual bool can_handle(Object *p_object) override;
@@ -110,11 +122,20 @@ public:
 	virtual void parse_category(Object *p_object, const String &p_category) override;
 };
 
+class SubtitlesDock;
+
 class SubtitleEditorPlugin : public EditorPlugin {
 	GDCLASS(SubtitleEditorPlugin, EditorPlugin);
 
+	SubtitlesDock *dock = nullptr;
+
 public:
 	virtual String get_plugin_name() const override { return "Subtitle"; }
+	virtual void edit(Object *p_object) override;
+	virtual bool handles(Object *p_object) const override;
+	// The dock stays open while a segment or another object is inspected; it closes with its close button.
+	virtual bool can_auto_hide() const override { return false; }
+	virtual void make_visible(bool p_visible) override;
 
 	SubtitleEditorPlugin();
 };

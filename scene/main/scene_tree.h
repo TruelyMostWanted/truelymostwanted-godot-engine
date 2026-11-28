@@ -434,6 +434,8 @@ public:
 	Error change_scene_to_node(RequiredParam<Node> p_node);
 	Error reload_current_scene();
 	void unload_current_scene();
+	// Truely (#399): loads the next scene behind a TransitionScreen.
+	Error change_scene_with_transition(const String &p_path, const Ref<PackedScene> &p_transition_scene);
 
 	RequiredResult<SceneTreeTimer> create_timer(double p_delay_sec, bool p_process_always = true, bool p_process_in_physics = false, bool p_ignore_time_scale = false);
 	RequiredResult<Tween> create_tween();

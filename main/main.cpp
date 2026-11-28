@@ -4533,6 +4533,16 @@ int Main::start() {
 		}
 	}
 
+	// Truely (#399): a scene splash runs before the main scene (also when the editor runs it with `--scene`);
+	// its SplashScreen root changes to the main scene. Not for headless runs, dedicated servers and `--quit-after`.
+	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && !game_path.is_empty() && quit_after == 0 &&
+			DisplayServer::get_singleton()->get_name() != NULL_DISPLAY_DRIVER && !OS::get_singleton()->has_feature("dedicated_server")) {
+		const String splash_scene = GLOBAL_GET("application/boot_splash/scene");
+		if (!splash_scene.is_empty() && ResourceUID::ensure_path(game_path) == ResourceUID::ensure_path(String(GLOBAL_GET("application/run/main_scene")))) {
+			game_path = ResourceUID::ensure_path(splash_scene);
+		}
+	}
+
 #ifdef TOOLS_ENABLED
 	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && game_path.is_empty()) {
 		// If we end up here, it means we didn't manage to detect what we want to run.
@@ -4683,8 +4693,8 @@ int Main::start() {
 		ResourceSaver::add_custom_savers();
 
 		if (!project_manager && !editor) { // game
-			// `filesystem/resources/preload_lists`: before the autoloads, which may use the stored resources.
-			ResourceDatabase::get_singleton()->preload_project_lists();
+			// `filesystem/resources/preloads`: before the autoloads, which may use the stored resources.
+			ResourceDatabase::get_singleton()->preload_project_preloads();
 			if (!game_path.is_empty() || !script.is_empty()) {
 				//autoload
 				OS::get_singleton()->benchmark_begin_measure("Startup", "Load Autoloads");

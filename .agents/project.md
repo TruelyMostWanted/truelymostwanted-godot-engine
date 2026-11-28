@@ -271,3 +271,8 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 - Inspector-Buttons „Open as Text“/„Open in Table“: Vorschlag (Doppelklick öffnet Text + Tabelle, Buttons weg, Kontextmenü) → in #420 umsetzen.
 
 **Neue Dokumente dieser Session:** `truely/ARCHITECTURE.md` (Klassenarten, Schichten, Server-API, DOD, Code, Editor, Docks; Godot- und Truely-Beispiel je Regel), `truely/PIPELINE-CONVENTIONS.md` + `truely/pipeline_lint.py` (pre-commit-Hook). Fix-Agenten: `P:/wt/tools/find_broken_strings.py` vor jedem Commit (echte Zeilenumbrüche in C++-Strings).
+### Stand (2026-11-28, 04:30) — Nacht-Auftrag 0.2.2
+- **Besitzer:** Release heißt **0.2.2** (nicht 0.3.0), Tracker #422 umbenannt. Freigegeben: alle eigenen Feature-Issues umsetzen, prüfen, playtesten, lokal bauen, mergen, Release-Pipeline, Release-Post auf 0.2.2, Builds bereitstellen. Qualität vor Pipeline-Tempo. Konventions-Check je Issue (Abschnitt im Issue). Neue Namensregel: kein Container-Typ im Namen (`TtsPersona`/`TtsPersonas`), CONVENTIONS 1.2, Umbenennung #423.
+- **Welle 1 (Agenten, ohne Build, Worktrees `.claude/worktrees/`):** #323+#324 (Opus), #379 (Opus), #414 (Sonnet), #397 (Sonnet), #421+#420 Konzept (+0.2.2-Teil, Opus). Briefs `P:/wt/brief-common.md` + `P:/wt/brief-022.md`; Ergebnisse `P:/wt/issues/<N>/` (issue-comment.md, pt_scenario.gd, wiki/).
+- `389-fixes-022` + `f38d88d1ee` (#361 ObjectID-Fix) gebaut, Szenarien laufen. Danach: #325, #399, #423, #419 (Dry-Run 46098649468 queued; Web editor + Linux arm32 .NET editor rot, Logs nicht abrufbar).
+- **Freigabe (Besitzer, 2026-11-28 ~04:40, für 5–8 Std.):** Commit, Push, Merge, PRs, Builds, CI/CD, Release voll autonom nach den Konventionen.
