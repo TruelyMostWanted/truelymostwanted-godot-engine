@@ -116,6 +116,7 @@
 #include "scene/main/status_indicator.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
+#include "scene/main/timer_server.h"
 #include "scene/main/viewport.h"
 #include "scene/main/viewport_server.h"
 #include "scene/main/window.h"
@@ -404,6 +405,7 @@ static ScreenshotServer *screenshot_server = nullptr;
 static ViewportServer *viewport_server = nullptr;
 static InputIconServer *input_icon_server = nullptr;
 static ProgressBarServer *progress_bar_server = nullptr;
+static TimerServer *timer_server = nullptr;
 
 static Ref<ResourceFormatSaverAudioStreamWAV> resource_saver_audio_stream_wav;
 static Ref<ResourceFormatLoaderAudioStreamWAV> resource_loader_audio_stream_wav;
@@ -531,6 +533,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(HTTPRequestTarget);
 	GDREGISTER_CLASS(HTTPResponse);
 	GDREGISTER_CLASS(Timer);
+	GDREGISTER_CLASS(TimerInfo);
+	GDREGISTER_CLASS(TimerInstance);
 	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
 	GDREGISTER_CLASS(ResourcePreloader);
@@ -1455,6 +1459,10 @@ void unregister_scene_types() {
 		memdelete(progress_bar_server);
 		progress_bar_server = nullptr;
 	}
+	if (timer_server) {
+		memdelete(timer_server);
+		timer_server = nullptr;
+	}
 	LocalizedText::finish();
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
@@ -1573,6 +1581,10 @@ void register_scene_singletons() {
 	GDREGISTER_ABSTRACT_CLASS(ProgressBarServer);
 	progress_bar_server = memnew(ProgressBarServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ProgressBarServer", ProgressBarServer::get_singleton()));
+
+	GDREGISTER_ABSTRACT_CLASS(TimerServer);
+	timer_server = memnew(TimerServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("TimerServer", TimerServer::get_singleton()));
 
 	OS::get_singleton()->benchmark_end_measure("Scene", "Register Singletons");
 }

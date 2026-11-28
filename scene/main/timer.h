@@ -31,6 +31,7 @@
 #pragma once
 
 #include "scene/main/node.h"
+#include "scene/resources/timer_info.h"
 
 class Timer : public Node {
 	GDCLASS(Timer, Node);
@@ -38,14 +39,22 @@ class Timer : public Node {
 	double wait_time = 1.0;
 	bool one_shot = false;
 	bool autostart = false;
-	bool processing = false;
 	bool paused = false;
 	bool ignore_time_scale = false;
 
-	double time_left = -1.0;
+	// Truely (#379): the state lives in TimerServer; the node holds the RID (created on first entering the tree).
+	RID timer;
+	Ref<TimerInfo> timer_info;
+	TimerInfo::TimerTickMode tick_mode = TimerInfo::TICK_MODE_COUNTDOWN;
+
+	void _create_timer();
+	void _update_suspended();
+	void _apply_timer_info();
+	void _on_event(int p_event, double p_time);
 
 protected:
 	void _notification(int p_what);
+	void _validate_property(PropertyInfo &p_property) const;
 	static void _bind_methods();
 
 public:
@@ -81,9 +90,28 @@ public:
 	void set_timer_process_callback(TimerProcessCallback p_callback);
 	TimerProcessCallback get_timer_process_callback() const;
 
+	// Truely (#379).
+	RID get_timer_rid() const;
+
+	void set_timer_info(const Ref<TimerInfo> &p_info);
+	Ref<TimerInfo> get_timer_info() const;
+
+	void set_tick_mode(TimerInfo::TimerTickMode p_mode);
+	TimerInfo::TimerTickMode get_tick_mode() const;
+
+	void set_current_time(double p_time);
+	double get_current_time() const;
+
+	void pause();
+	void resume();
+	void restart();
+	void add_time(double p_time);
+	String get_time_text(const String &p_format = "{mm}:{ss}") const;
+
+	~Timer();
+
 private:
 	TimerProcessCallback timer_process_callback = TIMER_PROCESS_IDLE;
-	void _set_process(bool p_process, bool p_force = false);
 };
 
 VARIANT_ENUM_CAST(Timer::TimerProcessCallback);

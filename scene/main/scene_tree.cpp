@@ -48,6 +48,7 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, RenderingServer);
 #include "scene/gui/control.h"
 #include "scene/main/multiplayer_api.h"
 #include "scene/main/node.h"
+#include "scene/main/timer_server.h"
 #include "scene/main/viewport.h"
 #include "scene/main/window.h"
 #include "scene/resources/environment.h"
@@ -792,6 +793,11 @@ bool SceneTree::process(double p_time) {
 }
 
 void SceneTree::process_timers(double p_delta, bool p_physics_frame) {
+	// Truely (#379): Timer nodes and code timers live in TimerServer.
+	if (TimerServer::get_singleton()) {
+		TimerServer::get_singleton()->process(p_delta, Engine::get_singleton()->get_process_step(), p_physics_frame, paused || suspended);
+	}
+
 	_THREAD_SAFE_METHOD_
 	const List<Ref<SceneTreeTimer>>::Element *L = timers.back(); // Last element.
 	const double unscaled_delta = Engine::get_singleton()->get_process_step();
