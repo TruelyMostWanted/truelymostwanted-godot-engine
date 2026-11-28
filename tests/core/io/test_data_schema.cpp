@@ -395,7 +395,7 @@ TEST_CASE("[DataSchema] create_from_resource describes the stored properties") {
 	REQUIRE(fields.is_valid());
 	CHECK(fields->get_value_type() == Variant::ARRAY);
 	REQUIRE(fields->get_element_schema().is_valid());
-	CHECK(fields->get_element_schema()->get_field("field_name").is_valid());
+	CHECK(fields->get_element_schema()->get_field("name").is_valid());
 	const Ref<DataField> field_template = schema->get_field("extra_field_template");
 	REQUIRE(field_template.is_valid());
 	CHECK(field_template->get_value_type() == Variant::DICTIONARY);
