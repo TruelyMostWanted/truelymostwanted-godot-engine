@@ -4,11 +4,11 @@
 		Owns every timer: [Timer] nodes and [TimerInstance]s.
 	</brief_description>
 	<description>
-		[TimerServer] owns all timers of the project. [Timer] nodes and [TimerInstance]s are timers of this server, identified by an [RID]. The server is ticked once per process and per physics frame by the [SceneTree] after all [code]_process[/code] callbacks, so a timer fires at the same point as a [SceneTreeTimer].
+		[TimerServer] owns the timers of the project: [TimerInstance]s, and [Timer] nodes while [member ProjectSettings.application/run/timer_nodes_use_timer_server] is on (off by default: then [Timer] nodes run on Godot's own code path and are not timers of this server). Each timer is identified by an [RID]. The server is ticked once per process and per physics frame by the [SceneTree] after all [code]_process[/code] callbacks, so a timer fires at the same point as a [SceneTreeTimer]. A timer started while the [SceneTree] processes nodes does not count that frame's delta, as a [Timer] node in Godot. Timers that end in the same frame fire in the order they were scheduled.
 		The server does not count down every timer each frame. It keeps eight clocks (idle or physics, pausable or always, scaled or unscaled), and a running timer stores only where it started on its clock. Each clock has one heap of event times (end, next tick, next alert). Per frame and clock the server compares the top of the heap with the clock, so a frame without events costs O(1) per clock regardless of how many timers run, and an event costs O(log N).
 		A timer is either a countdown or a stopwatch (see [enum TimerInfo.TimerTickMode]). The shown time is the time left for a countdown and the elapsed time for a stopwatch. Ticks and alerts are given in shown time.
 		Events reach the owner of a timer through one [Callable] (see [method timer_set_callback]), which receives the [enum TimerEvent] and the shown time. [Timer] and [TimerInstance] turn the events into signals. If the owner set with [method timer_set_object] is a [RefCounted], the server keeps it alive while the timer is running.
-		[b]Note:[/b] The server and its timers must only be used from the main thread.
+		[b]Note:[/b] The server and its timers must only be changed from the main thread; changes from other threads fail with an error. [Timer] nodes defer such calls to the main thread themselves.
 		[codeblocks]
 		[gdscript]
 		func _on_pause_menu_opened():
@@ -57,7 +57,7 @@
 			<return type="TimerInstance" />
 			<param index="0" name="info" type="TimerInfo" default="null" />
 			<description>
-				Creates a [TimerInstance] from [param info] and returns it. The instance is stopped; call [method TimerInstance.start] to run it. A running instance is kept alive by the server, so [code]await TimerServer.create_timer(info).timeout[/code] works after [method TimerInstance.start] was called on it.
+				Creates a [TimerInstance] from [param info] and returns it. The instance is stopped; call [method TimerInstance.start] to run it. A running instance is kept alive by the server, so [code]await TimerServer.create_timer(info).timeout[/code] works after [method TimerInstance.start] was called on it. A running instance that never ends (a looping countdown, or a stopwatch without [member TimerInfo.total_time]) stays alive until it is stopped, also when no reference to it is left.
 			</description>
 		</method>
 		<method name="format_time" qualifiers="static">
@@ -92,25 +92,25 @@
 		<method name="get_timers" qualifiers="const">
 			<return type="RID[]" />
 			<description>
-				Returns the [RID]s of all timers, including those of [Timer] nodes and [TimerInstance]s.
+				Returns the [RID]s of all timers, including those of [Timer] nodes (also internal and editor ones) and [TimerInstance]s.
 			</description>
 		</method>
 		<method name="pause_all">
 			<return type="void" />
 			<description>
-				Pauses every running timer. The timers emit their [code]pause_changed[/code] signal and report [method timer_is_paused] as [code]true[/code]. Timers that are not running are not paused. See also [method resume_all].
+				Pauses every running timer. The timers emit their [code]pause_changed[/code] signal and report [method timer_is_paused] as [code]true[/code]. Timers that are not running are not paused. Engine-owned timers (internal [Timer] nodes such as those of [HTTPRequest] or GUI controls, and the editor's own [Timer] nodes) are skipped. See also [method resume_all].
 			</description>
 		</method>
 		<method name="resume_all">
 			<return type="void" />
 			<description>
-				Resumes every paused timer. See also [method pause_all].
+				Resumes every paused timer, except engine-owned ones (see [method pause_all]).
 			</description>
 		</method>
 		<method name="stop_all">
 			<return type="void" />
 			<description>
-				Stops every timer, as if [method timer_stop] was called on each of them. The timers emit their [code]stopped[/code] signal.
+				Stops every timer, as if [method timer_stop] was called on each of them, except engine-owned ones (see [method pause_all]). The timers emit their [code]stopped[/code] signal.
 			</description>
 		</method>
 		<method name="timer_add_time">

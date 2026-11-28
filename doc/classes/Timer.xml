@@ -13,7 +13,10 @@
 		[/codeblock]
 		[b]Note:[/b] To create a one-shot timer without instantiating a node, use [method SceneTree.create_timer].
 		[b]Note:[/b] Timers are affected by [member Engine.time_scale] unless [member ignore_time_scale] is [code]true[/code]. The higher the time scale, the sooner timers will end. How often a timer processes may depend on the framerate or [member Engine.physics_ticks_per_second].
-		In this engine, [Timer] nodes are ticked by [TimerServer] instead of being processed per node. A [signal timeout] is emitted after all [code]_process[/code] callbacks of the frame, at the same point where a [SceneTreeTimer] fires. Assign a [TimerInfo] to [member timer_info] for stopwatches, ticks and alerts, and use [method TimerServer.pause_all] to pause every timer at once.
+		In this engine, [Timer] nodes have two code paths, chosen at startup by [member ProjectSettings.application/run/timer_nodes_use_timer_server]:
+		- Off (default): the node runs on Godot's own code path (internal processing) and behaves exactly as in Godot. [signal timeout] is emitted during the node's [code]_process[/code] or [code]_physics_process[/code] step once [member time_left] drops below [code]0[/code]. The new members work as well: [signal started], [signal stopped], [signal pause_changed], [method pause], [method resume], [method restart], [member current_time], [method add_time], [method get_time_text], [member tick_mode] and the [member timer_info] values that the node has itself. [signal ticked], [signal alert_reached], [member TimerInfo.tick_interval], [member TimerInfo.alerts], [member TimerInfo.time_scale] and [member TimerInfo.timer_name] have no effect, [method get_timer_rid] returns an empty [RID], and [TimerServer] does not see the node.
+		- On: the node is ticked by [TimerServer] and is not processed itself ([method Node.is_processing_internal] is [code]false[/code]). [signal timeout] is emitted after all [code]_process[/code] callbacks of the frame, at the same point where a [SceneTreeTimer] fires, once the end is reached; timers that end in the same frame fire in the order they were started. [member Node.process_priority] and [member Node.process_thread_group] do not change when it fires. All new members work, and [method TimerServer.pause_all] pauses the node (internal and editor [Timer] nodes are skipped). Calls from another thread run deferred on the main thread.
+		On both paths, a timer started during the node pass does not count that frame's delta, and changing [member wait_time] keeps the time left of the running cycle; the new value applies from the next cycle.
 	</description>
 	<tutorials>
 		<link title="2D Dodge The Creeps Demo">https://store.godotengine.org/asset/godot-foundation/dodge-the-creeps-demo/</link>
@@ -36,7 +39,7 @@
 		<method name="get_timer_rid" qualifiers="const">
 			<return type="RID" />
 			<description>
-				Returns the [RID] of the timer in [TimerServer]. It is invalid until the node entered the scene tree for the first time.
+				Returns the [RID] of the timer in [TimerServer]. It is invalid until the node entered the scene tree for the first time, and always invalid while [member ProjectSettings.application/run/timer_nodes_use_timer_server] is off.
 			</description>
 		</method>
 		<method name="is_stopped" qualifiers="const">
@@ -119,7 +122,7 @@
 		<signal name="alert_reached">
 			<param index="0" name="time" type="float" />
 			<description>
-				Emitted when a time from [member TimerInfo.alerts] is reached. [param time] is the alert in shown time.
+				Emitted when a time from [member TimerInfo.alerts] is reached. [param time] is the alert in shown time. Only emitted while [member ProjectSettings.application/run/timer_nodes_use_timer_server] is on.
 			</description>
 		</signal>
 		<signal name="pause_changed">
@@ -135,13 +138,13 @@
 		</signal>
 		<signal name="stopped">
 			<description>
-				Emitted when the timer is stopped.
+				Emitted when the timer is stopped with [method stop]. Not emitted when a one-shot timer ends by itself.
 			</description>
 		</signal>
 		<signal name="ticked">
 			<param index="0" name="time" type="float" />
 			<description>
-				Emitted every [member TimerInfo.tick_interval]. [param time] is the shown time.
+				Emitted every [member TimerInfo.tick_interval]. [param time] is the shown time. Only emitted while [member ProjectSettings.application/run/timer_nodes_use_timer_server] is on.
 			</description>
 		</signal>
 		<signal name="timeout">

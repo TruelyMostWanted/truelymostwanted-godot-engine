@@ -99,7 +99,7 @@
 		<method name="start">
 			<return type="void" />
 			<description>
-				Starts the timer from the beginning, or resets it if it was started already. Emits [signal started]. This does not resume a paused timer; see [method resume].
+				Starts the timer from the beginning, or resets it if it was started already. Emits [signal started]. This does not resume a paused timer; see [method resume]. While running, the instance is kept alive by [TimerServer]; one that never ends (looping, or a stopwatch without [member TimerInfo.total_time]) must be stopped to be freed.
 			</description>
 		</method>
 		<method name="stop">
