@@ -175,7 +175,9 @@ public:
 	void shift_times(double p_seconds);
 
 	Ref<SubtitleValidation> validate(double p_max_characters_per_second = 20.0) const;
-	// POT entries [text, translation_context, "", comment] for ResourceTranslationParserPlugin.
+	// The translation context of speaker names: POT entries, `SubtitleServer::get_display_speaker()`.
+	static constexpr const char *SPEAKER_TRANSLATION_CONTEXT = "speaker";
+	// POT entries [text, translation_context, "", comment] for ResourceTranslationParserPlugin: the segment texts, then the speaker names.
 	TypedArray<PackedStringArray> get_translatable_strings() const;
 
 	String to_text(Format p_format) const;
