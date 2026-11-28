@@ -30,9 +30,14 @@
 
 #include "timer_server.h"
 
+#include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/os/thread.h"
 #include "core/templates/sort_array.h"
+
+// The heaps and the RID owner are not thread-safe.
+#define TIMER_SERVER_MAIN_THREAD_GUARD ERR_FAIL_COND_MSG(!Thread::is_main_thread(), "TimerServer can only be changed from the main thread.")
 
 TimerServer *TimerServer::singleton = nullptr;
 
@@ -82,6 +87,7 @@ void TimerServer::_schedule(const RID &p_timer, TimerData *p_data) {
 	entry.time = clock.now + MAX(next - p_data->base_elapsed, 0.0) / p_data->time_scale;
 	entry.rid = p_timer;
 	entry.version = p_data->version;
+	entry.seq = next_seq++;
 	clock.heap.push_back(entry);
 	SortArray<HeapEntry, HeapEntryCompare> sorter;
 	sorter.push_heap(0, clock.heap.size() - 1, 0, entry, clock.heap.ptr());
@@ -89,6 +95,20 @@ void TimerServer::_schedule(const RID &p_timer, TimerData *p_data) {
 
 	if (clock.stale > 64 && clock.stale * 2 > clock.heap.size()) {
 		_compact(clock);
+	}
+}
+
+void TimerServer::_schedule_started(const RID &p_timer, TimerData *p_data) {
+	if (!in_node_pass[(p_data->clock & CLOCK_PHYSICS) ? 1 : 0]) {
+		_schedule(p_timer, p_data);
+		return;
+	}
+	// Started, resumed or unsuspended while SceneTree processes nodes: re-based after this frame's clock advance in
+	// process(), so this frame's delta is not counted (as for a Timer node that starts processing during the node pass).
+	p_data->base_now = clocks[p_data->clock].now;
+	if (!p_data->pending) {
+		p_data->pending = true;
+		pending.push_back(p_timer);
 	}
 }
 
@@ -150,8 +170,10 @@ void TimerServer::_process_timer(const HeapEntry &p_entry) {
 	const double elapsed = _get_elapsed(data);
 	data->base_elapsed = elapsed;
 	data->base_now = clocks[data->clock].now;
+	// The entry was popped because its event is due; the recomputed elapsed time may be 1 ulp short of it.
+	const double reached = elapsed + 1e-9 * MAX(1.0, Math::abs(elapsed));
 
-	while (data->alert_index < data->alert_times.size() && data->alert_times[data->alert_index] <= elapsed) {
+	while (data->alert_index < data->alert_times.size() && data->alert_times[data->alert_index] <= reached) {
 		const double alert = data->to_shown(data->alert_times[data->alert_index]);
 		data->alert_index++;
 		_emit(rid, TIMER_EVENT_ALERT_REACHED, alert);
@@ -161,8 +183,8 @@ void TimerServer::_process_timer(const HeapEntry &p_entry) {
 		}
 	}
 
-	if (data->tick_interval > 0.0 && elapsed >= data->next_tick) {
-		data->next_tick = (Math::floor(elapsed / data->tick_interval) + 1.0) * data->tick_interval;
+	if (data->tick_interval > 0.0 && reached >= data->next_tick) {
+		data->next_tick = (Math::floor(reached / data->tick_interval) + 1.0) * data->tick_interval;
 		_emit(rid, TIMER_EVENT_TICKED, data->to_shown(elapsed));
 		data = timer_owner.get_or_null(rid);
 		if (!data || data->version != version) {
@@ -170,7 +192,7 @@ void TimerServer::_process_timer(const HeapEntry &p_entry) {
 		}
 	}
 
-	if (data->has_end() && elapsed >= data->total_time) {
+	if (data->has_end() && reached >= data->total_time) {
 		const double shown = data->tick_mode == TimerInfo::TICK_MODE_COUNTDOWN ? 0.0 : data->total_time;
 		if (data->loop) {
 			// The remainder carries over, as in Godot's Timer.
@@ -192,17 +214,40 @@ void TimerServer::_process_timer(const HeapEntry &p_entry) {
 	_schedule(rid, data);
 }
 
+void TimerServer::begin_node_pass(bool p_physics_frame) {
+	in_node_pass[p_physics_frame ? 1 : 0] = true;
+}
+
 void TimerServer::process(double p_delta, double p_unscaled_delta, bool p_physics_frame, bool p_tree_paused) {
-	SortArray<HeapEntry, HeapEntryCompare> sorter;
+	in_node_pass[p_physics_frame ? 1 : 0] = false;
+	bool advanced[CLOCK_MAX];
 	for (int idx = 0; idx < CLOCK_MAX; idx++) {
-		if (((idx & CLOCK_PHYSICS) != 0) != p_physics_frame) {
+		advanced[idx] = ((idx & CLOCK_PHYSICS) != 0) == p_physics_frame && (!p_tree_paused || (idx & CLOCK_ALWAYS) != 0);
+		if (advanced[idx]) {
+			clocks[idx].now += (idx & CLOCK_UNSCALED) ? p_unscaled_delta : p_delta;
+		}
+	}
+	for (const RID &rid : pending) {
+		TimerData *data = timer_owner.get_or_null(rid);
+		if (!data || !data->pending) {
 			continue;
 		}
-		if (p_tree_paused && (idx & CLOCK_ALWAYS) == 0) {
+		data->pending = false;
+		if (data->queued) {
+			clocks[data->clock].stale++; // Scheduled from the clock time before the advance.
+			data->queued = false;
+		}
+		data->version++;
+		_schedule(rid, data); // Starts counting from the advanced clock time.
+	}
+	pending.clear();
+
+	SortArray<HeapEntry, HeapEntryCompare> sorter;
+	for (int idx = 0; idx < CLOCK_MAX; idx++) {
+		if (!advanced[idx]) {
 			continue;
 		}
 		Clock &clock = clocks[idx];
-		clock.now += (idx & CLOCK_UNSCALED) ? p_unscaled_delta : p_delta;
 		while (!clock.heap.is_empty() && clock.heap[0].time <= clock.now) {
 			sorter.pop_heap(0, clock.heap.size(), clock.heap.ptr());
 			const HeapEntry entry = clock.heap[clock.heap.size() - 1];
@@ -231,12 +276,18 @@ void TimerServer::process(double p_delta, double p_unscaled_delta, bool p_physic
 }
 
 RID TimerServer::timer_create() {
+	ERR_FAIL_COND_V_MSG(!Thread::is_main_thread(), RID(), "TimerServer can only be changed from the main thread.");
 	const RID rid = timer_owner.make_rid();
 	emit_signal(SNAME("timer_registered"), rid);
 	return rid;
 }
 
 void TimerServer::free_rid(const RID &p_timer) {
+	if (!Thread::is_main_thread()) {
+		// For example a TimerInstance released on another thread: the RID stays valid until then.
+		callable_mp(this, &TimerServer::free_rid).call_deferred(p_timer);
+		return;
+	}
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->queued) {
@@ -254,6 +305,7 @@ bool TimerServer::timer_is_valid(const RID &p_timer) const {
 
 void TimerServer::timer_set_info(const RID &p_timer, const Ref<TimerInfo> &p_info, bool p_include_clock) {
 	ERR_FAIL_COND(p_info.is_null());
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (p_info->get_timer_name() != StringName()) {
@@ -277,6 +329,7 @@ void TimerServer::timer_set_info(const RID &p_timer, const Ref<TimerInfo> &p_inf
 }
 
 void TimerServer::timer_set_name(const RID &p_timer, const StringName &p_name) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	data->name = p_name;
@@ -289,6 +342,7 @@ StringName TimerServer::timer_get_name(const RID &p_timer) const {
 }
 
 void TimerServer::timer_set_object(const RID &p_timer, Object *p_object) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	data->object = p_object ? p_object->get_instance_id() : ObjectID();
@@ -301,12 +355,14 @@ Object *TimerServer::timer_get_object(const RID &p_timer) const {
 }
 
 void TimerServer::timer_set_callback(const RID &p_timer, const Callable &p_callback) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	data->callback = p_callback;
 }
 
 void TimerServer::timer_set_tick_mode(const RID &p_timer, TimerInfo::TimerTickMode p_mode) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->tick_mode == p_mode) {
@@ -327,6 +383,7 @@ TimerInfo::TimerTickMode TimerServer::timer_get_tick_mode(const RID &p_timer) co
 
 void TimerServer::timer_set_total_time(const RID &p_timer, double p_time) {
 	ERR_FAIL_COND_MSG(p_time < 0, "Total time can't be negative.");
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->total_time == p_time) {
@@ -346,6 +403,7 @@ double TimerServer::timer_get_total_time(const RID &p_timer) const {
 }
 
 void TimerServer::timer_set_loop(const RID &p_timer, bool p_loop) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	data->loop = p_loop; // Read when the end is reached; the schedule does not change.
@@ -359,6 +417,7 @@ bool TimerServer::timer_is_loop(const RID &p_timer) const {
 
 void TimerServer::timer_set_tick_interval(const RID &p_timer, double p_interval) {
 	ERR_FAIL_COND_MSG(p_interval < 0, "Tick interval can't be negative.");
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	_freeze(data);
@@ -368,6 +427,7 @@ void TimerServer::timer_set_tick_interval(const RID &p_timer, double p_interval)
 }
 
 void TimerServer::timer_set_alerts(const RID &p_timer, const PackedFloat64Array &p_alerts) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	_freeze(data);
@@ -379,6 +439,7 @@ void TimerServer::timer_set_alerts(const RID &p_timer, const PackedFloat64Array 
 
 void TimerServer::timer_set_time_scale(const RID &p_timer, double p_scale) {
 	ERR_FAIL_COND_MSG(p_scale < 0, "Time scale can't be negative.");
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->time_scale == p_scale) {
@@ -390,6 +451,7 @@ void TimerServer::timer_set_time_scale(const RID &p_timer, double p_scale) {
 }
 
 void TimerServer::_set_clock(const RID &p_timer, uint8_t p_bit, bool p_enable) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	const uint8_t clock = p_enable ? (data->clock | p_bit) : (data->clock & ~p_bit);
@@ -414,6 +476,7 @@ void TimerServer::timer_set_ignore_time_scale(const RID &p_timer, bool p_ignore)
 }
 
 void TimerServer::timer_set_suspended(const RID &p_timer, bool p_suspended) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->suspended == p_suspended) {
@@ -421,10 +484,11 @@ void TimerServer::timer_set_suspended(const RID &p_timer, bool p_suspended) {
 	}
 	_freeze(data);
 	data->suspended = p_suspended;
-	_schedule(p_timer, data);
+	_schedule_started(p_timer, data);
 }
 
 void TimerServer::timer_start(const RID &p_timer) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	_freeze(data);
@@ -434,11 +498,12 @@ void TimerServer::timer_start(const RID &p_timer) {
 		data->hold = Ref<RefCounted>(Object::cast_to<RefCounted>(ObjectDB::get_instance(data->object)));
 	}
 	_seek(data);
-	_schedule(p_timer, data);
+	_schedule_started(p_timer, data);
 	_emit(p_timer, TIMER_EVENT_STARTED, data->to_shown(0.0));
 }
 
 void TimerServer::timer_stop(const RID &p_timer) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (!data->running) {
@@ -452,6 +517,7 @@ void TimerServer::timer_stop(const RID &p_timer) {
 }
 
 void TimerServer::timer_set_paused(const RID &p_timer, bool p_paused) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	if (data->paused == p_paused) {
@@ -459,7 +525,7 @@ void TimerServer::timer_set_paused(const RID &p_timer, bool p_paused) {
 	}
 	_freeze(data);
 	data->paused = p_paused;
-	_schedule(p_timer, data);
+	_schedule_started(p_timer, data);
 	_emit(p_timer, p_paused ? TIMER_EVENT_PAUSED : TIMER_EVENT_RESUMED, data->to_shown(data->base_elapsed));
 }
 
@@ -476,6 +542,7 @@ bool TimerServer::timer_is_running(const RID &p_timer) const {
 }
 
 void TimerServer::timer_set_current_time(const RID &p_timer, double p_time) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
 	TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL(data);
 	_freeze(data);
@@ -548,7 +615,7 @@ int TimerServer::get_timer_count() const {
 void TimerServer::pause_all() {
 	for (const RID &rid : timer_owner.get_owned_list()) {
 		const TimerData *data = timer_owner.get_or_null(rid);
-		if (data && data->running) {
+		if (data && data->running && !data->engine_owned) {
 			timer_set_paused(rid, true);
 		}
 	}
@@ -556,7 +623,8 @@ void TimerServer::pause_all() {
 
 void TimerServer::resume_all() {
 	for (const RID &rid : timer_owner.get_owned_list()) {
-		if (timer_owner.owns(rid)) {
+		const TimerData *data = timer_owner.get_or_null(rid);
+		if (data && !data->engine_owned) {
 			timer_set_paused(rid, false);
 		}
 	}
@@ -564,7 +632,8 @@ void TimerServer::resume_all() {
 
 void TimerServer::stop_all() {
 	for (const RID &rid : timer_owner.get_owned_list()) {
-		if (timer_owner.owns(rid)) {
+		const TimerData *data = timer_owner.get_or_null(rid);
+		if (data && !data->engine_owned) {
 			timer_stop(rid);
 		}
 	}
@@ -670,8 +739,25 @@ void TimerServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(TIMER_EVENT_TIMEOUT);
 }
 
+void TimerServer::set_used_for_timer_nodes(bool p_enable) {
+	used_for_timer_nodes = p_enable;
+}
+
+bool TimerServer::is_used_for_timer_nodes() const {
+	return used_for_timer_nodes;
+}
+
+void TimerServer::timer_set_engine_owned(const RID &p_timer, bool p_engine_owned) {
+	TIMER_SERVER_MAIN_THREAD_GUARD;
+	TimerData *data = timer_owner.get_or_null(p_timer);
+	ERR_FAIL_NULL(data);
+	data->engine_owned = p_engine_owned;
+}
+
 TimerServer::TimerServer() {
 	singleton = this;
+	// Opt-in: off, Timer nodes keep Godot's own code path (internal processing).
+	used_for_timer_nodes = GLOBAL_DEF_RST("application/run/timer_nodes_use_timer_server", false);
 }
 
 TimerServer::~TimerServer() {

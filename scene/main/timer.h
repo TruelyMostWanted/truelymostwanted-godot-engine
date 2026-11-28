@@ -39,10 +39,15 @@ class Timer : public Node {
 	double wait_time = 1.0;
 	bool one_shot = false;
 	bool autostart = false;
+	bool processing = false;
 	bool paused = false;
 	bool ignore_time_scale = false;
 
-	// Truely (#379): the state lives in TimerServer; the node holds the RID (created on first entering the tree).
+	double time_left = -1.0;
+
+	// Truely (#379): with the project setting `application/run/timer_nodes_use_timer_server` on, the state lives in
+	// TimerServer and the node holds the RID (created on first entering the tree). Without a RID, the node runs on
+	// Godot's own code path (internal processing) above.
 	RID timer;
 	Ref<TimerInfo> timer_info;
 	TimerInfo::TimerTickMode tick_mode = TimerInfo::TICK_MODE_COUNTDOWN;
@@ -50,6 +55,7 @@ class Timer : public Node {
 	void _create_timer();
 	void _update_suspended();
 	void _apply_timer_info();
+	void _set_server_total_time(const Ref<TimerInfo> &p_info);
 	void _on_event(int p_event, double p_time);
 
 protected:
@@ -112,6 +118,7 @@ public:
 
 private:
 	TimerProcessCallback timer_process_callback = TIMER_PROCESS_IDLE;
+	void _set_process(bool p_process, bool p_force = false);
 };
 
 VARIANT_ENUM_CAST(Timer::TimerProcessCallback);

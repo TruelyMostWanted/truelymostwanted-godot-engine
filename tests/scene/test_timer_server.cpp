@@ -83,6 +83,42 @@ static void step(double p_delta) {
 	TimerServer::get_singleton()->process(p_delta, p_delta, false, false);
 }
 
+static LocalVector<int> timeout_order;
+
+static void on_ordered_event(int p_event, double p_time, int p_index) {
+	if (p_event == TimerServer::TIMER_EVENT_TIMEOUT) {
+		timeout_order.push_back(p_index);
+	}
+}
+
+// Processed before the Timer that follows it in the tree: records whether the timer had already fired in this frame's
+// node pass, and can start the timer during the pass.
+class TimerProbe : public Node {
+	GDCLASS(TimerProbe, Node);
+
+protected:
+	void _notification(int p_what) {
+		if (p_what == NOTIFICATION_PROCESS && timer) {
+			if (start_time > 0.0) {
+				timer->start(start_time);
+				start_time = 0.0;
+			}
+			stopped_in_pass = timer->is_stopped();
+		}
+	}
+
+public:
+	Timer *timer = nullptr;
+	double start_time = 0.0;
+	bool stopped_in_pass = false;
+};
+
+// Sets the project setting's effect for Timer nodes created in this scope, and restores the default (off).
+struct TimerNodePath {
+	explicit TimerNodePath(bool p_use_server) { TimerServer::get_singleton()->set_used_for_timer_nodes(p_use_server); }
+	~TimerNodePath() { TimerServer::get_singleton()->set_used_for_timer_nodes(false); }
+};
+
 TEST_CASE("[TimerServer] Countdown: time left, current time and timeout") {
 	TimerServer *server = TimerServer::get_singleton();
 	reset_events();
@@ -324,7 +360,195 @@ TEST_CASE("[TimerServer] format_time") {
 	CHECK(TimerServer::format_time(-3.0, "{s}") == "0");
 }
 
+TEST_CASE("[TimerServer] Equal end times fire in start order") {
+	TimerServer *server = TimerServer::get_singleton();
+	timeout_order.clear();
+	LocalVector<RID> rids;
+	for (int idx = 0; idx < 16; idx++) {
+		const RID rid = server->timer_create();
+		server->timer_set_callback(rid, callable_mp_static(&on_ordered_event).bind(idx));
+		server->timer_set_total_time(rid, 1.0);
+		server->timer_start(rid);
+		rids.push_back(rid);
+	}
+	step(1.0);
+	REQUIRE(timeout_order.size() == 16);
+	for (int idx = 0; idx < 16; idx++) {
+		CHECK(timeout_order[idx] == idx);
+	}
+	for (const RID &rid : rids) {
+		server->free_rid(rid);
+	}
+}
+
+TEST_CASE("[TimerServer] Engine-owned timers are skipped by pause_all, resume_all and stop_all") {
+	TimerServer *server = TimerServer::get_singleton();
+	const RID own = make_timer(1.0);
+	server->timer_set_engine_owned(own, true);
+	server->timer_start(own);
+	server->pause_all();
+	CHECK_FALSE(server->timer_is_paused(own));
+	server->stop_all();
+	CHECK(server->timer_is_running(own));
+	server->timer_set_paused(own, true);
+	server->resume_all();
+	CHECK(server->timer_is_paused(own));
+	server->free_rid(own);
+}
+
+// Timer node behavior shared by both paths: the project setting off (Godot's code path) and on (TimerServer).
+static void check_common_timer_node_behavior(bool p_use_server) {
+	GDREGISTER_CLASS(TimerProbe);
+	TimerNodePath path(p_use_server);
+	SceneTree *tree = SceneTree::get_singleton();
+	TimerProbe *probe = memnew(TimerProbe);
+	Timer *timer = memnew(Timer);
+	probe->timer = timer;
+	probe->set_process(true);
+	tree->get_root()->add_child(probe);
+	tree->get_root()->add_child(timer);
+	CHECK(timer->get_timer_rid().is_valid() == p_use_server);
+
+	SUBCASE("A timer started during the node pass skips this frame's delta") {
+		probe->start_time = 1.0;
+		tree->process(0.5);
+		CHECK_FALSE(timer->is_stopped());
+		CHECK(timer->get_time_left() == doctest::Approx(1.0));
+		tree->process(0.5);
+		CHECK(timer->get_time_left() == doctest::Approx(0.5));
+	}
+
+	SUBCASE("A timer started between frames counts the next frame") {
+		timer->start(1.0);
+		tree->process(0.25);
+		CHECK(timer->get_time_left() == doctest::Approx(0.75));
+	}
+
+	SUBCASE("Changing wait_time keeps the time left of the running cycle") {
+		timer->start(1.0);
+		tree->process(0.25);
+		timer->set_wait_time(0.5);
+		CHECK(timer->get_time_left() == doctest::Approx(0.75));
+		CHECK(timer->get_wait_time() == doctest::Approx(0.5));
+		tree->process(1.0);
+		CHECK(timer->get_time_left() == doctest::Approx(0.25)); // 0.25 s into the next cycle, which uses the new wait_time.
+	}
+
+	SUBCASE("New members: signals, pause, resume, restart, current time") {
+		SIGNAL_WATCH(timer, SNAME("started"));
+		SIGNAL_WATCH(timer, SNAME("stopped"));
+		SIGNAL_WATCH(timer, SNAME("pause_changed"));
+		timer->start(2.0);
+		SIGNAL_CHECK(SNAME("started"), emissions_without_args());
+		tree->process(0.5);
+		CHECK(timer->get_current_time() == doctest::Approx(1.5));
+		timer->add_time(1.0);
+		CHECK(timer->get_time_left() == doctest::Approx(2.5));
+		timer->set_current_time(1.0);
+		CHECK(timer->get_time_left() == doctest::Approx(1.0));
+		CHECK(timer->get_time_text("{s}.{ds}") == "1.0");
+		timer->pause();
+		SIGNAL_CHECK(SNAME("pause_changed"), emissions_with(true));
+		tree->process(5.0);
+		CHECK(timer->get_time_left() == doctest::Approx(1.0));
+		timer->resume();
+		SIGNAL_CHECK(SNAME("pause_changed"), emissions_with(false));
+		timer->restart();
+		CHECK(timer->get_time_left() == doctest::Approx(2.0));
+		timer->stop();
+		SIGNAL_CHECK(SNAME("stopped"), emissions_without_args());
+		CHECK(timer->is_stopped());
+		CHECK(timer->get_current_time() == 0.0);
+		SIGNAL_UNWATCH(timer, SNAME("started"));
+		SIGNAL_UNWATCH(timer, SNAME("stopped"));
+		SIGNAL_UNWATCH(timer, SNAME("pause_changed"));
+	}
+
+	SUBCASE("A one-shot end emits timeout without stopped") {
+		SIGNAL_WATCH(timer, SNAME("timeout"));
+		SIGNAL_WATCH(timer, SNAME("stopped"));
+		timer->set_one_shot(true);
+		timer->start(0.5);
+		tree->process(0.75);
+		SIGNAL_CHECK(SNAME("timeout"), emissions_without_args());
+		SIGNAL_CHECK_FALSE(SNAME("stopped"));
+		CHECK(timer->is_stopped());
+		SIGNAL_UNWATCH(timer, SNAME("timeout"));
+		SIGNAL_UNWATCH(timer, SNAME("stopped"));
+	}
+
+	memdelete(timer);
+	memdelete(probe);
+}
+
+TEST_CASE("[SceneTree][TimerServer] Timer node, setting off: common behavior on Godot's code path") {
+	check_common_timer_node_behavior(false);
+}
+
+TEST_CASE("[SceneTree][TimerServer] Timer node, setting on: common behavior on TimerServer") {
+	check_common_timer_node_behavior(true);
+}
+
+TEST_CASE("[SceneTree][TimerServer] Timer node, setting off: upstream timeout point and comparison") {
+	GDREGISTER_CLASS(TimerProbe);
+	SceneTree *tree = SceneTree::get_singleton();
+	Timer *timer = memnew(Timer);
+	TimerProbe *probe = memnew(TimerProbe); // After the timer: processed after it in the node pass.
+	probe->timer = timer;
+	probe->set_process(true);
+	tree->get_root()->add_child(timer);
+	tree->get_root()->add_child(probe);
+	CHECK_FALSE(timer->get_timer_rid().is_valid());
+
+	timer->set_one_shot(true);
+	timer->start(1.0);
+	CHECK(timer->is_processing_internal());
+	tree->process(0.5);
+	tree->process(0.5);
+	CHECK_FALSE(timer->is_stopped()); // Fires once time_left < 0, not at 0.
+	tree->process(0.25);
+	CHECK(timer->is_stopped());
+	CHECK(probe->stopped_in_pass); // timeout fired during the node pass, before the next node.
+
+	memdelete(probe);
+	memdelete(timer);
+}
+
+TEST_CASE("[SceneTree][TimerServer] Timer node, setting on: timeout after the node pass, at <=, internal timers") {
+	GDREGISTER_CLASS(TimerProbe);
+	TimerNodePath path(true);
+	TimerServer *server = TimerServer::get_singleton();
+	SceneTree *tree = SceneTree::get_singleton();
+	Timer *timer = memnew(Timer);
+	TimerProbe *probe = memnew(TimerProbe);
+	probe->timer = timer;
+	probe->set_process(true);
+	tree->get_root()->add_child(timer);
+	tree->get_root()->add_child(probe);
+
+	timer->set_one_shot(true);
+	timer->start(1.0);
+	CHECK_FALSE(timer->is_processing_internal());
+	tree->process(0.5);
+	tree->process(0.5);
+	CHECK(timer->is_stopped()); // Fires once the end is reached.
+	CHECK_FALSE(probe->stopped_in_pass); // timeout fired after all nodes were processed.
+
+	Timer *internal = memnew(Timer);
+	tree->get_root()->add_child(internal, false, Node::INTERNAL_MODE_FRONT);
+	internal->start(1.0);
+	server->pause_all();
+	CHECK_FALSE(internal->is_paused());
+	server->stop_all();
+	CHECK_FALSE(internal->is_stopped());
+
+	memdelete(internal);
+	memdelete(probe);
+	memdelete(timer);
+}
+
 TEST_CASE("[SceneTree][TimerServer] Timer node: tree pause, process mode, TimerInfo and new API") {
+	TimerNodePath path(true);
 	TimerServer *server = TimerServer::get_singleton();
 	SceneTree *tree = SceneTree::get_singleton();
 	Timer *timer = memnew(Timer);

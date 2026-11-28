@@ -91,6 +91,8 @@ private:
 		bool paused = false;
 		bool suspended = false;
 		bool queued = false; // Has a valid heap entry.
+		bool pending = false; // Started during this frame's node pass; re-based after the clock advance.
+		bool engine_owned = false; // Not affected by pause_all(), resume_all() and stop_all().
 
 		bool is_active() const { return running && !paused && !suspended; }
 		bool has_end() const { return tick_mode == TimerInfo::TICK_MODE_COUNTDOWN || total_time > 0.0; }
@@ -102,11 +104,12 @@ private:
 		double time = 0.0;
 		RID rid;
 		uint32_t version = 0;
+		uint64_t seq = 0; // Equal times fire in schedule order.
 	};
 
 	struct HeapEntryCompare {
 		// Min-heap on time for SortArray's heap functions.
-		_FORCE_INLINE_ bool operator()(const HeapEntry &p_a, const HeapEntry &p_b) const { return p_a.time > p_b.time; }
+		_FORCE_INLINE_ bool operator()(const HeapEntry &p_a, const HeapEntry &p_b) const { return p_a.time > p_b.time || (p_a.time == p_b.time && p_a.seq > p_b.seq); }
 	};
 
 	struct Clock {
@@ -118,10 +121,15 @@ private:
 	Clock clocks[CLOCK_MAX];
 	mutable RID_Owner<TimerData> timer_owner;
 	LocalVector<HeapEntry> due; // Reused every frame.
+	LocalVector<RID> pending; // Timers started during this frame's node pass.
+	uint64_t next_seq = 0;
+	bool in_node_pass[2] = {}; // Idle, physics: SceneTree is processing nodes and has not advanced the clocks yet.
+	bool used_for_timer_nodes = false; // Project setting `application/run/timer_nodes_use_timer_server`, read at startup.
 
 	double _get_elapsed(const TimerData *p_data) const;
 	void _freeze(TimerData *p_data);
 	void _schedule(const RID &p_timer, TimerData *p_data);
+	void _schedule_started(const RID &p_timer, TimerData *p_data);
 	void _seek(TimerData *p_data);
 	void _update_alert_times(TimerData *p_data);
 	void _compact(Clock &r_clock);
@@ -137,6 +145,15 @@ public:
 
 	// Advances the clocks of this frame type and fires due events. Called by SceneTree::process_timers().
 	void process(double p_delta, double p_unscaled_delta, bool p_physics_frame, bool p_tree_paused);
+	// Called by SceneTree right before it processes nodes: timers started from then on until process() skip this
+	// frame's delta, as a Timer node that starts processing during the node pass does in Godot.
+	void begin_node_pass(bool p_physics_frame);
+
+	// Whether Timer nodes run on this server (project setting, default off). Tests may change it.
+	void set_used_for_timer_nodes(bool p_enable);
+	bool is_used_for_timer_nodes() const;
+	// Engine-owned timers (internal and editor Timer nodes) are skipped by pause_all(), resume_all() and stop_all().
+	void timer_set_engine_owned(const RID &p_timer, bool p_engine_owned);
 
 	RID timer_create();
 	void free_rid(const RID &p_timer);

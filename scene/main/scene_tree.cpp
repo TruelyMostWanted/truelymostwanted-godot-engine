@@ -1264,6 +1264,11 @@ void SceneTree::_process_groups_thread(uint32_t p_index, bool p_physics) {
 }
 
 void SceneTree::_process(bool p_physics) {
+	// Truely (#379): timers started from here until process_timers() skip this frame's delta.
+	if (TimerServer::get_singleton()) {
+		TimerServer::get_singleton()->begin_node_pass(p_physics);
+	}
+
 	if (process_groups_dirty) {
 		{
 			// First, remove dirty groups.

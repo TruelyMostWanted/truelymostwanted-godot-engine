@@ -33,7 +33,15 @@
 #include "core/config/engine.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/os/thread.h"
 #include "scene/main/timer_server.h"
+
+// TimerServer is main-thread only: on its path, calls from sub-thread process groups or other threads run deferred.
+#define TIMER_DEFER_OFF_MAIN_THREAD(m_deferred_call) \
+	if (timer.is_valid() && !Thread::is_main_thread()) { \
+		m_deferred_call; \
+		return; \
+	}
 
 void Timer::_notification(int p_what) {
 	switch (p_what) {
@@ -74,6 +82,50 @@ void Timer::_notification(int p_what) {
 				autostart = false;
 			}
 		} break;
+
+		// Godot's own code path, used while the project setting is off.
+		case NOTIFICATION_INTERNAL_PROCESS: {
+			if (!processing || timer_process_callback == TIMER_PROCESS_PHYSICS || !is_processing_internal()) {
+				return;
+			}
+			if (ignore_time_scale) {
+				time_left -= Engine::get_singleton()->get_process_step();
+			} else {
+				time_left -= get_process_delta_time();
+			}
+
+			if (time_left < 0) {
+				if (!one_shot) {
+					time_left += wait_time;
+				} else {
+					processing = false; // The natural end emits no `stopped`, as on the TimerServer path.
+					stop();
+				}
+
+				emit_signal(SNAME("timeout"));
+			}
+		} break;
+
+		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+			if (!processing || timer_process_callback == TIMER_PROCESS_IDLE || !is_physics_processing_internal()) {
+				return;
+			}
+			if (ignore_time_scale) {
+				time_left -= Engine::get_singleton()->get_process_step();
+			} else {
+				time_left -= get_physics_process_delta_time();
+			}
+
+			if (time_left < 0) {
+				if (!one_shot) {
+					time_left += wait_time;
+				} else {
+					processing = false;
+					stop();
+				}
+				emit_signal(SNAME("timeout"));
+			}
+		} break;
 	}
 }
 
@@ -81,9 +133,16 @@ void Timer::_notification(int p_what) {
 // and a suspended tree act on it exactly as on Godot's internal processing, without the node being processed.
 void Timer::_create_timer() {
 	TimerServer *server = TimerServer::get_singleton();
-	ERR_FAIL_NULL(server);
+	if (!server || !server->is_used_for_timer_nodes()) {
+		return;
+	}
 	timer = server->timer_create();
 	server->timer_set_object(timer, this);
+	bool engine_owned = is_internal();
+#ifdef TOOLS_ENABLED
+	engine_owned = engine_owned || (Engine::get_singleton()->is_editor_hint() && !is_part_of_edited_scene());
+#endif
+	server->timer_set_engine_owned(timer, engine_owned);
 	server->timer_set_name(timer, get_name());
 	server->timer_set_process_always(timer, true);
 	server->timer_set_suspended(timer, true);
@@ -107,18 +166,34 @@ void Timer::_apply_timer_info() {
 	if (timer_info.is_null()) {
 		return;
 	}
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::_apply_timer_info).call_deferred());
 	if (timer_info->get_total_time() > 0.0) {
 		wait_time = timer_info->get_total_time();
 	}
 	one_shot = !timer_info->is_loop();
 	tick_mode = timer_info->get_tick_mode();
 	ignore_time_scale = timer_info->is_ignoring_time_scale();
-	timer_process_callback = timer_info->get_process_callback() == TimerInfo::PROCESS_CALLBACK_PHYSICS ? TIMER_PROCESS_PHYSICS : TIMER_PROCESS_IDLE;
 	if (timer.is_valid()) {
 		// The node follows its own Node.process_mode, so TimerInfo.process_mode is not applied.
-		TimerServer *server = TimerServer::get_singleton();
-		server->timer_set_info(timer, timer_info, false);
-		server->timer_set_process_in_physics(timer, timer_process_callback == TIMER_PROCESS_PHYSICS);
+		_set_server_total_time(timer_info);
+	}
+	set_timer_process_callback(timer_info->get_process_callback() == TimerInfo::PROCESS_CALLBACK_PHYSICS ? TIMER_PROCESS_PHYSICS : TIMER_PROCESS_IDLE);
+	update_configuration_warnings();
+}
+
+// As in Godot's Timer, a new wait_time keeps the time left of the running cycle and applies from the next cycle.
+void Timer::_set_server_total_time(const Ref<TimerInfo> &p_info) {
+	TimerServer *server = TimerServer::get_singleton();
+	const bool keep = server->timer_is_running(timer) && server->timer_get_tick_mode(timer) == TimerInfo::TICK_MODE_COUNTDOWN && tick_mode == TimerInfo::TICK_MODE_COUNTDOWN;
+	const double left = server->timer_get_time_left(timer);
+	if (p_info.is_valid()) {
+		server->timer_set_info(timer, p_info, false);
+	}
+	if (p_info.is_null() || tick_mode == TimerInfo::TICK_MODE_COUNTDOWN) {
+		server->timer_set_total_time(timer, wait_time); // A TimerInfo without total_time keeps the node's wait_time.
+	}
+	if (keep) {
+		server->timer_set_current_time(timer, left);
 	}
 }
 
@@ -152,9 +227,10 @@ void Timer::_on_event(int p_event, double p_time) {
 
 void Timer::set_wait_time(double p_time) {
 	ERR_FAIL_COND_MSG(p_time <= 0, "Time should be greater than zero.");
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_wait_time).call_deferred(p_time));
 	wait_time = p_time;
 	if (timer.is_valid()) {
-		TimerServer::get_singleton()->timer_set_total_time(timer, wait_time);
+		_set_server_total_time(Ref<TimerInfo>());
 	}
 	update_configuration_warnings();
 }
@@ -164,6 +240,7 @@ double Timer::get_wait_time() const {
 }
 
 void Timer::set_one_shot(bool p_one_shot) {
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_one_shot).call_deferred(p_one_shot));
 	one_shot = p_one_shot;
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_set_loop(timer, !one_shot);
@@ -185,28 +262,47 @@ bool Timer::has_autostart() const {
 void Timer::start(double p_time) {
 	ERR_FAIL_COND_MSG(!is_inside_tree(), "Unable to start the timer because it's not inside the scene tree. Either add it or set autostart to true.");
 
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::start).call_deferred(p_time));
 	if (p_time > 0) {
 		set_wait_time(p_time);
 	}
-	TimerServer::get_singleton()->timer_start(timer);
+	if (timer.is_valid()) {
+		TimerServer::get_singleton()->timer_start(timer);
+		return;
+	}
+	time_left = wait_time;
+	_set_process(true);
+	emit_signal(SNAME("started"));
 }
 
 void Timer::stop() {
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::stop).call_deferred());
+	autostart = false;
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_stop(timer);
+		return;
 	}
-	autostart = false;
+	const bool was_running = processing;
+	time_left = -1;
+	_set_process(false);
+	if (was_running) {
+		emit_signal(SNAME("stopped"));
+	}
 }
 
 void Timer::set_paused(bool p_paused) {
 	if (paused == p_paused) {
 		return;
 	}
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_paused).call_deferred(p_paused));
 
 	paused = p_paused;
 	if (timer.is_valid()) {
-		TimerServer::get_singleton()->timer_set_paused(timer, paused);
+		TimerServer::get_singleton()->timer_set_paused(timer, paused); // Emits `pause_changed` through _on_event().
+		return;
 	}
+	_set_process(processing);
+	emit_signal(SNAME("pause_changed"), paused);
 }
 
 bool Timer::is_paused() const {
@@ -214,6 +310,7 @@ bool Timer::is_paused() const {
 }
 
 void Timer::set_ignore_time_scale(bool p_ignore) {
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_ignore_time_scale).call_deferred(p_ignore));
 	ignore_time_scale = p_ignore;
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_set_ignore_time_scale(timer, ignore_time_scale);
@@ -225,25 +322,61 @@ bool Timer::is_ignoring_time_scale() {
 }
 
 bool Timer::is_stopped() const {
-	return !timer.is_valid() || !TimerServer::get_singleton()->timer_is_running(timer);
+	if (timer.is_valid()) {
+		return !TimerServer::get_singleton()->timer_is_running(timer);
+	}
+	return get_time_left() <= 0;
 }
 
 double Timer::get_time_left() const {
-	return timer.is_valid() ? TimerServer::get_singleton()->timer_get_time_left(timer) : 0.0;
+	if (timer.is_valid()) {
+		return TimerServer::get_singleton()->timer_get_time_left(timer);
+	}
+	return time_left > 0 ? time_left : 0;
 }
 
 void Timer::set_timer_process_callback(TimerProcessCallback p_callback) {
 	if (timer_process_callback == p_callback) {
 		return;
 	}
-	timer_process_callback = p_callback;
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_timer_process_callback).call_deferred(p_callback));
+
 	if (timer.is_valid()) {
+		timer_process_callback = p_callback;
 		TimerServer::get_singleton()->timer_set_process_in_physics(timer, timer_process_callback == TIMER_PROCESS_PHYSICS);
+		return;
 	}
+	switch (timer_process_callback) {
+		case TIMER_PROCESS_PHYSICS:
+			if (is_physics_processing_internal()) {
+				set_physics_process_internal(false);
+				set_process_internal(true);
+			}
+			break;
+		case TIMER_PROCESS_IDLE:
+			if (is_processing_internal()) {
+				set_process_internal(false);
+				set_physics_process_internal(true);
+			}
+			break;
+	}
+	timer_process_callback = p_callback;
 }
 
 Timer::TimerProcessCallback Timer::get_timer_process_callback() const {
 	return timer_process_callback;
+}
+
+void Timer::_set_process(bool p_process, bool p_force) {
+	switch (timer_process_callback) {
+		case TIMER_PROCESS_PHYSICS:
+			set_physics_process_internal(p_process && !paused);
+			break;
+		case TIMER_PROCESS_IDLE:
+			set_process_internal(p_process && !paused);
+			break;
+	}
+	processing = p_process;
 }
 
 RID Timer::get_timer_rid() const {
@@ -254,6 +387,7 @@ void Timer::set_timer_info(const Ref<TimerInfo> &p_info) {
 	if (timer_info == p_info) {
 		return;
 	}
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_timer_info).call_deferred(p_info));
 	const Callable changed = callable_mp(this, &Timer::_apply_timer_info);
 	if (timer_info.is_valid()) {
 		timer_info->disconnect_changed(changed);
@@ -277,6 +411,7 @@ Ref<TimerInfo> Timer::get_timer_info() const {
 }
 
 void Timer::set_tick_mode(TimerInfo::TimerTickMode p_mode) {
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_tick_mode).call_deferred(p_mode));
 	tick_mode = p_mode;
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_set_tick_mode(timer, tick_mode);
@@ -288,13 +423,22 @@ TimerInfo::TimerTickMode Timer::get_tick_mode() const {
 }
 
 void Timer::set_current_time(double p_time) {
+	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_current_time).call_deferred(p_time));
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_set_current_time(timer, p_time);
+	} else if (processing) {
+		time_left = tick_mode == TimerInfo::TICK_MODE_COUNTDOWN ? p_time : wait_time - p_time;
 	}
 }
 
 double Timer::get_current_time() const {
-	return timer.is_valid() ? TimerServer::get_singleton()->timer_get_current_time(timer) : 0.0;
+	if (timer.is_valid()) {
+		return TimerServer::get_singleton()->timer_get_current_time(timer);
+	}
+	if (tick_mode == TimerInfo::TICK_MODE_COUNTDOWN) {
+		return get_time_left();
+	}
+	return processing ? wait_time - get_time_left() : 0.0;
 }
 
 void Timer::pause() {
@@ -311,9 +455,7 @@ void Timer::restart() {
 }
 
 void Timer::add_time(double p_time) {
-	if (timer.is_valid()) {
-		TimerServer::get_singleton()->timer_add_time(timer, p_time);
-	}
+	set_current_time(get_current_time() + p_time);
 }
 
 String Timer::get_time_text(const String &p_format) const {
