@@ -51,7 +51,9 @@ class Timer : public Node {
 	RID timer;
 	Ref<TimerInfo> timer_info;
 	TimerInfo::TimerTickMode tick_mode = TimerInfo::TICK_MODE_COUNTDOWN;
+	bool was_started = false; // Until the first start, a countdown with timer_info shows its full time.
 
+	bool _is_endless() const { return tick_mode == TimerInfo::TICK_MODE_STOPWATCH && wait_time <= 0.0; }
 	void _create_timer();
 	void _update_suspended();
 	void _apply_timer_info();

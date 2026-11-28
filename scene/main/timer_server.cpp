@@ -493,6 +493,7 @@ void TimerServer::timer_start(const RID &p_timer) {
 	ERR_FAIL_NULL(data);
 	_freeze(data);
 	data->running = true;
+	data->was_started = true;
 	data->base_elapsed = 0.0;
 	if (data->hold.is_null()) {
 		data->hold = Ref<RefCounted>(Object::cast_to<RefCounted>(ObjectDB::get_instance(data->object)));
@@ -555,7 +556,8 @@ void TimerServer::timer_set_current_time(const RID &p_timer, double p_time) {
 double TimerServer::timer_get_current_time(const RID &p_timer) const {
 	const TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL_V(data, 0.0);
-	if (!data->running && data->tick_mode == TimerInfo::TICK_MODE_COUNTDOWN) {
+	// A countdown that has not started yet shows its full time; after stop() or its end, none is left (Godot's Timer).
+	if (!data->running && data->tick_mode == TimerInfo::TICK_MODE_COUNTDOWN && data->was_started) {
 		return 0.0;
 	}
 	return data->to_shown(_get_elapsed(data));
@@ -570,7 +572,10 @@ double TimerServer::timer_get_elapsed_time(const RID &p_timer) const {
 double TimerServer::timer_get_time_left(const RID &p_timer) const {
 	const TimerData *data = timer_owner.get_or_null(p_timer);
 	ERR_FAIL_NULL_V(data, 0.0);
-	if (!data->running || !data->has_end()) {
+	if (!data->running) {
+		return !data->was_started && data->tick_mode == TimerInfo::TICK_MODE_COUNTDOWN ? data->to_shown(data->base_elapsed) : 0.0;
+	}
+	if (!data->has_end()) {
 		return 0.0;
 	}
 	return MAX(data->total_time - _get_elapsed(data), 0.0);

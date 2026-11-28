@@ -86,6 +86,12 @@ static void step(double p_delta) {
 
 static LocalVector<int> timeout_order;
 
+static int signal_counts[2] = {};
+
+static void count_signal(int p_index) {
+	signal_counts[p_index]++;
+}
+
 static void on_ordered_event(int p_event, double p_time, int p_index) {
 	if (p_event == TimerServer::TIMER_EVENT_TIMEOUT) {
 		timeout_order.push_back(p_index);
@@ -126,6 +132,9 @@ TEST_CASE("[TimerServer] Countdown: time left, current time and timeout") {
 	const RID rid = make_timer(1.0);
 	CHECK(server->timer_is_valid(rid));
 	CHECK_FALSE(server->timer_is_running(rid));
+	// Not started yet: the full time.
+	CHECK(server->timer_get_time_left(rid) == doctest::Approx(1.0));
+	CHECK(server->timer_get_current_time(rid) == doctest::Approx(1.0));
 
 	server->timer_start(rid);
 	CHECK(event_count[TimerServer::TIMER_EVENT_STARTED] == 1);
@@ -140,6 +149,7 @@ TEST_CASE("[TimerServer] Countdown: time left, current time and timeout") {
 	CHECK(event_count[TimerServer::TIMER_EVENT_TIMEOUT] == 1);
 	CHECK_FALSE(server->timer_is_running(rid));
 	CHECK(server->timer_get_time_left(rid) == 0.0);
+	CHECK(server->timer_get_current_time(rid) == 0.0);
 
 	step(5.0);
 	CHECK(event_count[TimerServer::TIMER_EVENT_TIMEOUT] == 1);
@@ -350,6 +360,63 @@ TEST_CASE("[TimerServer] A running TimerInstance stays alive until it ends") {
 	CHECK_FALSE(server->timer_is_valid(rid));
 }
 
+TEST_CASE("[TimerServer] A dropped TimerInstance with connected signals is freed after it ends") {
+	TimerServer *server = TimerServer::get_singleton();
+	Ref<TimerInfo> info;
+	info.instantiate();
+	info->set_total_time(0.5);
+	signal_counts[0] = 0;
+	signal_counts[1] = 0;
+	RID rid;
+	{
+		Ref<TimerInstance> instance = server->create_timer(info);
+		rid = instance->get_rid();
+		instance->connect(SNAME("started"), callable_mp_static(&count_signal).bind(0));
+		instance->connect(SNAME("timeout"), callable_mp_static(&count_signal).bind(1));
+		server->begin_node_pass(false); // Started during the node pass, as from a script's _process().
+		instance->start();
+	}
+	CHECK(signal_counts[0] == 1);
+	step(0.25);
+	CHECK(server->timer_is_valid(rid));
+	step(0.5);
+	CHECK(signal_counts[1] == 1);
+	CHECK_FALSE(server->timer_is_valid(rid));
+}
+
+TEST_CASE("[TimerServer] TimerInstance before the first start, after stop and after the end") {
+	TimerServer *server = TimerServer::get_singleton();
+	Ref<TimerInfo> info;
+	info.instantiate();
+	info->set_total_time(2.0);
+	Ref<TimerInstance> instance = server->create_timer(info);
+	CHECK(instance->is_stopped());
+	CHECK(instance->get_time_left() == doctest::Approx(2.0));
+	CHECK(instance->get_current_time() == doctest::Approx(2.0));
+	CHECK(instance->get_time_text() == "00:02");
+	info->set_total_time(3.0);
+	CHECK(instance->get_time_text() == "00:03");
+	instance->start();
+	step(1.0);
+	CHECK(instance->get_time_left() == doctest::Approx(2.0));
+	instance->stop();
+	CHECK(instance->get_time_left() == 0.0);
+	CHECK(instance->get_current_time() == 0.0);
+	CHECK(instance->get_time_text() == "00:00");
+	instance->start();
+	step(5.0);
+	CHECK(instance->is_stopped());
+	CHECK(instance->get_time_left() == 0.0);
+
+	Ref<TimerInfo> stopwatch_info;
+	stopwatch_info.instantiate();
+	stopwatch_info->set_total_time(2.0);
+	stopwatch_info->set_tick_mode(TimerInfo::TICK_MODE_STOPWATCH);
+	Ref<TimerInstance> stopwatch = server->create_timer(stopwatch_info);
+	CHECK(stopwatch->get_current_time() == 0.0); // A stopwatch starts at zero.
+	CHECK(stopwatch->get_time_left() == 0.0);
+}
+
 TEST_CASE("[TimerServer] format_time") {
 	CHECK(TimerServer::format_time(75.4) == "01:15");
 	CHECK(TimerServer::format_time(4503.25) == "75:03");
@@ -465,6 +532,52 @@ static void check_common_timer_node_behavior(bool p_use_server) {
 		SIGNAL_UNWATCH(timer, SNAME("pause_changed"));
 	}
 
+	SUBCASE("A stopwatch with wait_time 0 counts up without an end") {
+		SIGNAL_WATCH(timer, SNAME("timeout"));
+		ERR_PRINT_OFF;
+		timer->set_wait_time(0.0); // A countdown keeps Godot's check.
+		ERR_PRINT_ON;
+		CHECK(timer->get_wait_time() == doctest::Approx(1.0));
+		timer->set_tick_mode(TimerInfo::TICK_MODE_STOPWATCH);
+		timer->set_wait_time(0.0);
+		CHECK(timer->get_wait_time() == 0.0);
+		CHECK(timer->get_configuration_warnings().is_empty());
+		timer->start();
+		CHECK_FALSE(timer->is_stopped());
+		tree->process(0.5);
+		tree->process(2.0);
+		CHECK(timer->get_current_time() == doctest::Approx(2.5));
+		CHECK(timer->get_time_left() == 0.0);
+		CHECK_FALSE(timer->is_stopped());
+		SIGNAL_CHECK_FALSE(SNAME("timeout"));
+		timer->set_current_time(10.0);
+		CHECK(timer->get_current_time() == doctest::Approx(10.0));
+		timer->stop();
+		CHECK(timer->is_stopped());
+		SIGNAL_UNWATCH(timer, SNAME("timeout"));
+	}
+
+	SUBCASE("Before the first start, a countdown with timer_info shows its full time") {
+		CHECK(timer->get_time_left() == 0.0); // Without timer_info, as in Godot.
+		CHECK(timer->get_current_time() == 0.0);
+		Ref<TimerInfo> info;
+		info.instantiate();
+		info->set_total_time(2.0);
+		timer->set_timer_info(info);
+		CHECK(timer->is_stopped());
+		CHECK(timer->get_time_left() == doctest::Approx(2.0));
+		CHECK(timer->get_current_time() == doctest::Approx(2.0));
+		CHECK(timer->get_time_text() == "00:02");
+		timer->start();
+		tree->process(0.5);
+		CHECK(timer->get_time_left() == doctest::Approx(1.5));
+		timer->stop();
+		CHECK(timer->is_stopped());
+		CHECK(timer->get_time_left() == 0.0);
+		CHECK(timer->get_current_time() == 0.0);
+		timer->set_timer_info(Ref<TimerInfo>());
+	}
+
 	SUBCASE("A one-shot end emits timeout without stopped") {
 		SIGNAL_WATCH(timer, SNAME("timeout"));
 		SIGNAL_WATCH(timer, SNAME("stopped"));
@@ -488,6 +601,25 @@ TEST_CASE("[SceneTree][TimerServer] Timer node, setting off: common behavior on 
 
 TEST_CASE("[SceneTree][TimerServer] Timer node, setting on: common behavior on TimerServer") {
 	check_common_timer_node_behavior(true);
+}
+
+TEST_CASE("[TimerServer] Timer binds tick_mode before wait_time") {
+	// A saved scene sets properties in this order: a stopwatch's wait_time 0 loads after its tick mode.
+	List<PropertyInfo> properties;
+	ClassDB::get_property_list("Timer", &properties, true);
+	int tick_mode_index = -1;
+	int wait_time_index = -1;
+	int index = 0;
+	for (const PropertyInfo &property : properties) {
+		if (property.name == "tick_mode") {
+			tick_mode_index = index;
+		} else if (property.name == "wait_time") {
+			wait_time_index = index;
+		}
+		index++;
+	}
+	CHECK(tick_mode_index >= 0);
+	CHECK(tick_mode_index < wait_time_index);
 }
 
 TEST_CASE("[SceneTree][TimerServer] Timer node, setting off: upstream timeout point and comparison") {

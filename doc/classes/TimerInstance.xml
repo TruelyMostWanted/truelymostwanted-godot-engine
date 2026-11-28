@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		A [TimerInstance] is a timer of [TimerServer] that is created in code with [method TimerServer.create_timer]. It has the same methods and signals as the [Timer] node, but needs no node in the scene tree. It is stopped until [method start] is called.
-		A running instance is kept alive by [TimerServer], so you do not have to store a reference to it. Its timer is freed when the instance is freed.
+		A running instance is kept alive by [TimerServer], so you do not have to store a reference to it. Its timer is freed when the instance is freed: in GDScript as soon as it has ended and no reference is left; in C#, the wrapper object holds a reference until the garbage collector collects it.
 		[codeblocks]
 		[gdscript]
 		var info = TimerInfo.new()
@@ -50,7 +50,7 @@
 		<method name="get_time_left" qualifiers="const">
 			<return type="float" />
 			<description>
-				Returns the time until the timer ends, in seconds. This is [code]0.0[/code] if the timer is stopped or a stopwatch without [member TimerInfo.total_time].
+				Returns the time until the timer ends, in seconds. A countdown that has not been started yet returns its full time ([member TimerInfo.total_time]). This is [code]0.0[/code] after [method stop] or the end, and for a stopwatch that is not running or has no [member TimerInfo.total_time].
 			</description>
 		</method>
 		<method name="get_time_text" qualifiers="const">
@@ -105,7 +105,7 @@
 	</methods>
 	<members>
 		<member name="current_time" type="float" setter="set_current_time" getter="get_current_time">
-			The shown time: the time left for a countdown (always [code]0[/code] while stopped), the elapsed time for a stopwatch.
+			The shown time: the time left for a countdown (its full time before the first [method start], [code]0[/code] after [method stop] or the end), the elapsed time for a stopwatch.
 		</member>
 		<member name="paused" type="bool" setter="set_paused" getter="is_paused">
 			If [code]true[/code], the timer is paused. A paused timer does not advance until this is set back to [code]false[/code].

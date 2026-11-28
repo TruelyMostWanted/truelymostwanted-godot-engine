@@ -131,7 +131,7 @@
 			<return type="float" />
 			<param index="0" name="timer" type="RID" />
 			<description>
-				Returns the shown time of [param timer]: the time left for a countdown (always [code]0.0[/code] while stopped), the elapsed time for a stopwatch.
+				Returns the shown time of [param timer]: the time left for a countdown (its full time before the first start, [code]0.0[/code] after a stop or the end), the elapsed time for a stopwatch.
 			</description>
 		</method>
 		<method name="timer_get_elapsed_time" qualifiers="const">
@@ -166,7 +166,7 @@
 			<return type="float" />
 			<param index="0" name="timer" type="RID" />
 			<description>
-				Returns the time until [param timer] ends, in seconds. This is [code]0.0[/code] if the timer is stopped or a stopwatch without a total time.
+				Returns the time until [param timer] ends, in seconds. A countdown that has not been started yet returns its full time. This is [code]0.0[/code] after a stop or the end, and for a stopwatch that is not running or has no total time.
 			</description>
 		</method>
 		<method name="timer_get_total_time" qualifiers="const">

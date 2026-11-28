@@ -88,6 +88,7 @@ private:
 		TimerInfo::TimerTickMode tick_mode = TimerInfo::TICK_MODE_COUNTDOWN;
 		bool loop = false;
 		bool running = false;
+		bool was_started = false; // Until the first start, a countdown shows its full time.
 		bool paused = false;
 		bool suspended = false;
 		bool queued = false; // Has a valid heap entry.

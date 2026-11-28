@@ -94,7 +94,7 @@ void Timer::_notification(int p_what) {
 				time_left -= get_process_delta_time();
 			}
 
-			if (time_left < 0) {
+			if (time_left < 0 && !_is_endless()) {
 				if (!one_shot) {
 					time_left += wait_time;
 				} else {
@@ -116,7 +116,7 @@ void Timer::_notification(int p_what) {
 				time_left -= get_physics_process_delta_time();
 			}
 
-			if (time_left < 0) {
+			if (time_left < 0 && !_is_endless()) {
 				if (!one_shot) {
 					time_left += wait_time;
 				} else {
@@ -167,8 +167,8 @@ void Timer::_apply_timer_info() {
 		return;
 	}
 	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::_apply_timer_info).call_deferred());
-	if (timer_info->get_total_time() > 0.0) {
-		wait_time = timer_info->get_total_time();
+	if (timer_info->get_total_time() > 0.0 || timer_info->get_tick_mode() == TimerInfo::TICK_MODE_STOPWATCH) {
+		wait_time = timer_info->get_total_time(); // A stopwatch with total_time 0 counts up without an end.
 	}
 	one_shot = !timer_info->is_loop();
 	tick_mode = timer_info->get_tick_mode();
@@ -226,7 +226,8 @@ void Timer::_on_event(int p_event, double p_time) {
 }
 
 void Timer::set_wait_time(double p_time) {
-	ERR_FAIL_COND_MSG(p_time <= 0, "Time should be greater than zero.");
+	// A stopwatch may have no end (0); set tick_mode first. The property is bound after tick_mode for scene loading.
+	ERR_FAIL_COND_MSG(p_time < 0 || (p_time == 0 && tick_mode == TimerInfo::TICK_MODE_COUNTDOWN), "Time should be greater than zero.");
 	TIMER_DEFER_OFF_MAIN_THREAD(callable_mp(this, &Timer::set_wait_time).call_deferred(p_time));
 	wait_time = p_time;
 	if (timer.is_valid()) {
@@ -266,6 +267,7 @@ void Timer::start(double p_time) {
 	if (p_time > 0) {
 		set_wait_time(p_time);
 	}
+	was_started = true;
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_start(timer);
 		return;
@@ -325,12 +327,18 @@ bool Timer::is_stopped() const {
 	if (timer.is_valid()) {
 		return !TimerServer::get_singleton()->timer_is_running(timer);
 	}
-	return get_time_left() <= 0;
+	if (_is_endless()) {
+		return !processing;
+	}
+	return time_left <= 0; // Godot's `get_time_left() <= 0`, without the full time shown before the first start.
 }
 
 double Timer::get_time_left() const {
+	if (!was_started && timer_info.is_valid() && tick_mode == TimerInfo::TICK_MODE_COUNTDOWN) {
+		return wait_time; // Not started yet: the full time, like a round timer before the round. Without timer_info 0, as in Godot.
+	}
 	if (timer.is_valid()) {
-		return TimerServer::get_singleton()->timer_get_time_left(timer);
+		return is_stopped() ? 0.0 : TimerServer::get_singleton()->timer_get_time_left(timer);
 	}
 	return time_left > 0 ? time_left : 0;
 }
@@ -416,6 +424,8 @@ void Timer::set_tick_mode(TimerInfo::TimerTickMode p_mode) {
 	if (timer.is_valid()) {
 		TimerServer::get_singleton()->timer_set_tick_mode(timer, tick_mode);
 	}
+	notify_property_list_changed(); // wait_time allows 0 for a stopwatch.
+	update_configuration_warnings();
 }
 
 TimerInfo::TimerTickMode Timer::get_tick_mode() const {
@@ -432,13 +442,13 @@ void Timer::set_current_time(double p_time) {
 }
 
 double Timer::get_current_time() const {
-	if (timer.is_valid()) {
-		return TimerServer::get_singleton()->timer_get_current_time(timer);
-	}
 	if (tick_mode == TimerInfo::TICK_MODE_COUNTDOWN) {
 		return get_time_left();
 	}
-	return processing ? wait_time - get_time_left() : 0.0;
+	if (timer.is_valid()) {
+		return TimerServer::get_singleton()->timer_get_current_time(timer);
+	}
+	return processing ? wait_time - time_left : 0.0; // time_left goes below 0 on a stopwatch without an end.
 }
 
 void Timer::pause() {
@@ -465,7 +475,7 @@ String Timer::get_time_text(const String &p_format) const {
 PackedStringArray Timer::get_configuration_warnings() const {
 	PackedStringArray warnings = Node::get_configuration_warnings();
 
-	if (wait_time < 0.05 - CMP_EPSILON) {
+	if (wait_time < 0.05 - CMP_EPSILON && !_is_endless()) {
 		warnings.push_back(RTR("Very low timer wait times (< 0.05 seconds) may behave in significantly different ways depending on the rendered or physics frame rate.\nConsider using a script's process loop instead of relying on a Timer for very low wait times."));
 	}
 
@@ -473,6 +483,9 @@ PackedStringArray Timer::get_configuration_warnings() const {
 }
 
 void Timer::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "wait_time" && tick_mode == TimerInfo::TICK_MODE_STOPWATCH) {
+		p_property.hint_string = "0,4096,0.001,or_greater,exp,suffix:s"; // 0: a stopwatch without an end.
+	}
 	if (timer_info.is_null()) {
 		return;
 	}
@@ -530,13 +543,14 @@ void Timer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("alert_reached", PropertyInfo(Variant::FLOAT, "time")));
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "process_callback", PROPERTY_HINT_ENUM, "Physics,Idle"), "set_timer_process_callback", "get_timer_process_callback");
+	// Truely (#379): before wait_time, so a scene loads the tick mode first (a stopwatch allows wait_time 0).
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "tick_mode", PROPERTY_HINT_ENUM, "Countdown,Stopwatch"), "set_tick_mode", "get_tick_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wait_time", PROPERTY_HINT_RANGE, "0.001,4096,0.001,or_greater,exp,suffix:s"), "set_wait_time", "get_wait_time");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "one_shot"), "set_one_shot", "is_one_shot");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "autostart"), "set_autostart", "has_autostart");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "paused", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_paused", "is_paused");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ignore_time_scale"), "set_ignore_time_scale", "is_ignoring_time_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_left", PROPERTY_HINT_NONE, "suffix:s", PROPERTY_USAGE_NONE), "", "get_time_left");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "tick_mode", PROPERTY_HINT_ENUM, "Countdown,Stopwatch"), "set_tick_mode", "get_tick_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "current_time", PROPERTY_HINT_NONE, "suffix:s", PROPERTY_USAGE_NONE), "set_current_time", "get_current_time");
 	// Last, so its values apply over the node's own when a scene loads.
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "timer_info", PROPERTY_HINT_RESOURCE_TYPE, "TimerInfo"), "set_timer_info", "get_timer_info");
