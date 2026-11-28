@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="PreloadList" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="Preloads" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		A resource that names resources to load once and keep in memory.
 	</brief_description>
 	<description>
-		A [PreloadList] names resources for [ResourceDatabase]: direct references ([member resources]), paths ([member paths]) and file manifests ([member manifests]), plus optional keys ([member keys]). Hand it to [method ResourceDatabase.preload_from_list], or save it as a resource and add its path to [member ProjectSettings.filesystem/resources/preload_lists] to preload it at startup.
+		A [Preloads] names resources for [ResourceDatabase]: direct references ([member resources]), paths ([member paths]) and file manifests ([member manifests]), plus optional keys ([member keys]). Hand it to [method ResourceDatabase.preload_from], or save it as a resource and add its path to [member ProjectSettings.filesystem/resources/preloads] to preload it at startup.
+		[b]Note:[/b] This class was called [code]PreloadList[/code] before 0.2.2. The old name is deprecated: saved resources with the old type still load as [Preloads], but scripts must use the new name.
 		[codeblocks]
 		[gdscript]
-		var list := PreloadList.new()
-		list.paths = PackedStringArray(["res://items/sword.tres"])
-		list.keys = { "hero_sword": "res://items/sword.tres" }
-		ResourceSaver.save(list, "res://preload/items.tres")
+		var preloads := Preloads.new()
+		preloads.paths = PackedStringArray(["res://items/sword.tres"])
+		preloads.keys = { "hero_sword": "res://items/sword.tres" }
+		ResourceSaver.save(preloads, "res://preload/items.tres")
 		[/gdscript]
 		[csharp]
-		var list = new PreloadList();
-		list.Paths = ["res://items/sword.tres"];
-		list.Keys = new Godot.Collections.Dictionary&lt;string, string&gt; { { "hero_sword", "res://items/sword.tres" } };
-		ResourceSaver.Save(list, "res://preload/items.tres");
+		var preloads = new Preloads();
+		preloads.Paths = ["res://items/sword.tres"];
+		preloads.Keys = new Godot.Collections.Dictionary&lt;string, string&gt; { { "hero_sword", "res://items/sword.tres" } };
+		ResourceSaver.Save(preloads, "res://preload/items.tres");
 		[/csharp]
 		[/codeblocks]
 	</description>
@@ -26,7 +27,7 @@
 		<method name="is_empty" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Returns [code]true[/code] if the list names no resource, path or manifest.
+				Returns [code]true[/code] if it names no resource, path or manifest.
 			</description>
 		</method>
 	</methods>
