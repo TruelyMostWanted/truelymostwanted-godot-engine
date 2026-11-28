@@ -194,6 +194,12 @@ jobs:
           ref: ${{ env.SHA }}
           submodules: recursive
 
+      # Before the cross toolchain is on PATH: pip may build wheels (zstandard) from source with the host gcc.
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+        with:
+          python-arch: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
+
       - name: Setup dependencies
         run: |
           sudo apt-get update
@@ -214,11 +220,6 @@ jobs:
               echo "$RUNNER_TEMP/cross" >> "$GITHUB_PATH"
               ;;
           esac
-
-      - name: Setup Python and SCons
-        uses: ./.github/actions/godot-deps
-        with:
-          python-arch: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
 
       - name: Setup .NET SDK
         if: matrix.mono && matrix.target == 'editor' && matrix.arch == 'x86_64'
@@ -619,6 +620,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      # lib/build.gradle looks up scons while configuring, even though the template tasks exclude the scons builds.
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
 
       - name: Download native libraries
         uses: actions/download-artifact@v8

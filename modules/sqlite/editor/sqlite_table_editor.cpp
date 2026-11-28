@@ -47,7 +47,7 @@
 #include "scene/scene_string_names.h"
 #include "servers/display/display_server.h"
 
-static constexpr int PAGE_SIZE = 200;
+static constexpr int SQLITE_TABLE_PAGE_ROWS = 200;
 
 SQLiteTableEditor *SQLiteTableEditor::singleton = nullptr;
 
@@ -179,7 +179,7 @@ void SQLiteTableEditor::_load_page() {
 		}
 		const TypedArray<Dictionary> count = database->query("SELECT COUNT(*) AS n FROM " + _quote(table) + where + ";", params);
 		const int64_t total = count.is_empty() ? 0 : int64_t(Dictionary(count[0])["n"]);
-		page_count = MAX(1, int((total + PAGE_SIZE - 1) / PAGE_SIZE));
+		page_count = MAX(1, int((total + SQLITE_TABLE_PAGE_ROWS - 1) / SQLITE_TABLE_PAGE_ROWS));
 		page = CLAMP(page, 0, page_count - 1);
 		page_label->set_text(vformat(TTR("Page %d of %d, %d rows"), page + 1, page_count, total));
 
@@ -192,8 +192,8 @@ void SQLiteTableEditor::_load_page() {
 			order = " ORDER BY " + _quote(columns[sort_column]->get_name()) + (sort_descending ? " DESC" : " ASC");
 		}
 		const int limit_index = params.size() + 1;
-		params.push_back(PAGE_SIZE);
-		params.push_back(int64_t(page) * PAGE_SIZE);
+		params.push_back(SQLITE_TABLE_PAGE_ROWS);
+		params.push_back(int64_t(page) * SQLITE_TABLE_PAGE_ROWS);
 		Ref<SQLiteStatement> statement = database->prepare(vformat("SELECT %s* FROM %s%s%s LIMIT ?%d OFFSET ?%d;", select, _quote(table), where, order, limit_index, limit_index + 1));
 		if (statement.is_valid() && statement->bind_values(params) == OK) {
 			while (statement->step() == SQLiteStatement::STEP_RESULT_ROW) {
