@@ -1139,19 +1139,19 @@ Error AudioMixerServer::execute(const Ref<AudioCommand> &p_command) {
 	return command_registry->execute(p_command);
 }
 
-Error AudioMixerServer::execute_list(const Ref<AudioCommandList> &p_list) {
+Error AudioMixerServer::execute_commands(const Ref<AudioCommands> &p_commands) {
 	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
-	return command_registry->execute_list(p_list);
+	return command_registry->execute_commands(p_commands);
 }
 
-Error AudioMixerServer::register_commands(const Ref<AudioCommandList> &p_list) {
+Error AudioMixerServer::register_commands(const Ref<AudioCommands> &p_commands) {
 	MIXER_THREAD_GUARD_V(ERR_UNAVAILABLE);
-	return command_registry->register_commands(p_list);
+	return command_registry->register_commands(p_commands);
 }
 
-void AudioMixerServer::unregister_commands(const Ref<AudioCommandList> &p_list) {
+void AudioMixerServer::unregister_commands(const Ref<AudioCommands> &p_commands) {
 	MIXER_THREAD_GUARD();
-	command_registry->unregister_commands(p_list);
+	command_registry->unregister_commands(p_commands);
 }
 
 bool AudioMixerServer::has_command(const StringName &p_name) const {
@@ -1256,9 +1256,12 @@ void AudioMixerServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_utterance_count"), &AudioMixerServer::get_active_utterance_count);
 
 	ClassDB::bind_method(D_METHOD("execute", "command"), &AudioMixerServer::execute);
-	ClassDB::bind_method(D_METHOD("execute_list", "list"), &AudioMixerServer::execute_list);
-	ClassDB::bind_method(D_METHOD("register_commands", "list"), &AudioMixerServer::register_commands);
-	ClassDB::bind_method(D_METHOD("unregister_commands", "list"), &AudioMixerServer::unregister_commands);
+	ClassDB::bind_method(D_METHOD("execute_commands", "commands"), &AudioMixerServer::execute_commands);
+#ifndef DISABLE_DEPRECATED
+	ClassDB::bind_method(D_METHOD("execute_list", "commands"), &AudioMixerServer::execute_commands); // Deprecated alias.
+#endif
+	ClassDB::bind_method(D_METHOD("register_commands", "commands"), &AudioMixerServer::register_commands);
+	ClassDB::bind_method(D_METHOD("unregister_commands", "commands"), &AudioMixerServer::unregister_commands);
 	ClassDB::bind_method(D_METHOD("has_command", "command_name"), &AudioMixerServer::has_command);
 	ClassDB::bind_method(D_METHOD("execute_named", "command_name"), &AudioMixerServer::execute_named);
 	ClassDB::bind_method(D_METHOD("execute_group", "group"), &AudioMixerServer::execute_group);

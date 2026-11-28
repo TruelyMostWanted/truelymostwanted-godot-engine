@@ -72,6 +72,7 @@
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/link_button.h"
+#include "scene/gui/locale_option_button.h"
 #include "scene/gui/margin_container.h"
 #include "scene/gui/menu_bar.h"
 #include "scene/gui/menu_button.h"
@@ -617,6 +618,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(MenuBar);
 	GDREGISTER_CLASS(MenuButton);
 	GDREGISTER_CLASS(OptionButton);
+	GDREGISTER_CLASS(LocaleOptionButton);
 	GDREGISTER_CLASS(SpinBox);
 	GDREGISTER_CLASS(ColorPicker);
 	GDREGISTER_CLASS(ColorPickerButton);
@@ -1120,7 +1122,11 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioMixerChannel);
 	GDREGISTER_CLASS(AudioMixerLayout);
 	GDREGISTER_CLASS(AudioCommand);
-	GDREGISTER_CLASS(AudioCommandList);
+	GDREGISTER_CLASS(AudioCommands);
+#ifndef DISABLE_DEPRECATED
+	// Renamed in 0.2.2 (naming rule: no container type in a name); saved resources keep loading.
+	ClassDB::add_compatibility_class("AudioCommandList", "AudioCommands");
+#endif // DISABLE_DEPRECATED
 
 	if constexpr (GD_IS_CLASS_ENABLED(AudioStreamWAV)) {
 		// Not at the front: ResourceFormatImporter keeps precedence for imported WAV files.
