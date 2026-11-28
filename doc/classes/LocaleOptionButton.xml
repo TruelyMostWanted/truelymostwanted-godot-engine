@@ -61,6 +61,7 @@
 		</method>
 	</methods>
 	<members>
+		<member name="auto_translate_mode" type="int" setter="set_auto_translate_mode" getter="get_auto_translate_mode" overrides="Node" enum="Node.AutoTranslateMode" default="2" />
 		<member name="include_fallback" type="bool" setter="set_include_fallback" getter="is_including_fallback" default="false">
 			If [code]true[/code], the fallback locale ([method TranslationServer.get_fallback_locale]) is listed even if no catalog or translation has it.
 		</member>
@@ -78,7 +79,7 @@
 		<signal name="locale_selected">
 			<param index="0" name="locale" type="String" />
 			<description>
-				Emitted when the player selects an entry, after the locale of the [member target] was set.
+				Emitted when the player selects an entry, after the locale of the [member target] was set. Not emitted if the settings refused the locale.
 			</description>
 		</signal>
 	</signals>

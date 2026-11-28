@@ -187,6 +187,12 @@ String LocaleOptionButton::get_native_name(const String &p_locale, bool p_region
 
 void LocaleOptionButton::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_POSTINITIALIZE: {
+			// Native names must not go through the translation of the interface. Not in the constructor: it
+			// reaches the theme before the cache of the base class exists.
+			set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
+		} break;
+
 		case NOTIFICATION_ENTER_TREE: {
 			TranslationServer *translation_server = TranslationServer::get_singleton();
 			if (translation_server != nullptr && !connected && !Engine::get_singleton()->is_editor_hint()) {
@@ -226,7 +232,9 @@ void LocaleOptionButton::_on_item_selected(int p_idx) {
 	}
 	// A locale that the settings refused leaves the selection on the locale that is active.
 	_select_current();
-	emit_signal(SNAME("locale_selected"), locale);
+	if (get_selected_locale() == locale) {
+		emit_signal(SNAME("locale_selected"), locale);
+	}
 }
 
 void LocaleOptionButton::_select_current() {
@@ -368,7 +376,5 @@ void LocaleOptionButton::_bind_methods() {
 }
 
 LocaleOptionButton::LocaleOptionButton() {
-	// Native names must not go through the translation of the interface.
-	set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	connect(SNAME("item_selected"), callable_mp(this, &LocaleOptionButton::_on_item_selected));
 }
