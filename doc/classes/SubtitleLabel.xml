@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SubtitleLabel" inherits="RichTextLabel" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A ready-made subtitle line that shows the segments of a [SubtitlePlayer] and follows the accessibility settings.
+	</brief_description>
+	<description>
+		Point [member player] at a [SubtitlePlayer] and the label shows the segments that are visible now, one line each, in the order they started. The text of each line is [method SubtitleServer.get_display_text]: translated through the subtitles channel when [member Subtitle.auto_translate] is enabled, and decorated by [member SubtitleSegment.kind] ([code][Applause][/code], music notes, italics for off-screen and narration). Dialog lines get the speaker's name in front ([member show_speaker_names]) and the speaker's color ([member speaker_colors]).
+		With [member follow_accessibility_settings], the label shows nothing while [member AccessibilitySettings.subtitles_enabled] is off, and its text size is [member font_size] scaled by [member AccessibilitySettings.subtitle_scale] and [member AccessibilitySettings.font_size_factor] (see [method AccessibilitySettingsServer.scale_subtitle_font_size]). It updates at once when these settings change. [member SubtitleServer.captions_enabled] set to [code]false[/code] drops closed captions (sounds, reactions, music, lyrics), and [member SubtitleServer.enabled] set to [code]false[/code] hides all lines; these two are read at the next segment change, or call [method refresh].
+		The label writes [member RichTextLabel.text] itself: the text is not saved with the scene and is read-only in the Inspector. While the game runs, the label hides itself while no line is shown, so a background [StyleBox] (theme item [code]normal[/code]) disappears with the text; to hide subtitles yourself, hide a parent node. Style it like any [RichTextLabel] (fonts, outline, shadow, background). [member SubtitleSegment.placement] is not applied: place the label where you want subtitles.
+		[codeblocks]
+		[gdscript]
+		func _ready():
+		    var label := SubtitleLabel.new()
+		    label.player = label.get_path_to($SubtitlePlayer)
+		    label.speaker_colors = { &amp;"Anna": Color.GOLD, &amp;"Ben": Color.SKY_BLUE }
+		    label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+		    add_child(label)
+		[/gdscript]
+		[csharp]
+		public override void _Ready()
+		{
+		    var label = new SubtitleLabel();
+		    AddChild(label);
+		    label.Player = label.GetPathTo(GetNode("SubtitlePlayer"));
+		    label.SpeakerColors = new Godot.Collections.Dictionary&lt;StringName, Color&gt; { { "Anna", Colors.Gold }, { "Ben", Colors.SkyBlue } };
+		    label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterBottom);
+		}
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+		<link title="Subtitle display">https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/324-feature-subtitle-display</link>
+	</tutorials>
+	<methods>
+		<method name="get_display_font_size" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the text size in use: [member font_size], scaled by [method AccessibilitySettingsServer.scale_subtitle_font_size] if [member follow_accessibility_settings] is enabled.
+			</description>
+		</method>
+		<method name="get_subtitle_text" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the BBCode of the lines to show now, the same text [method refresh] writes to [member RichTextLabel.text]. Empty while no line is shown, the subtitles are disabled or [member player] is not found.
+			</description>
+		</method>
+		<method name="refresh">
+			<return type="void" />
+			<description>
+				Rebuilds the text from the active segments of [member player]. The label calls it on every segment change of the player and every change of the accessibility settings it follows; call it after changing [member SubtitleServer.enabled] or [member SubtitleServer.captions_enabled].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="bbcode_enabled" type="bool" setter="set_use_bbcode" getter="is_using_bbcode" overrides="RichTextLabel" default="true" />
+		<member name="fit_content" type="bool" setter="set_fit_content" getter="is_fit_content_enabled" overrides="RichTextLabel" default="true" />
+		<member name="follow_accessibility_settings" type="bool" setter="set_follow_accessibility_settings" getter="is_following_accessibility_settings" default="true">
+			If [code]true[/code], the label follows [AccessibilitySettingsServer]: it shows nothing while [member AccessibilitySettings.subtitles_enabled] is off and scales [member font_size] with [member AccessibilitySettings.subtitle_scale] and [member AccessibilitySettings.font_size_factor].
+		</member>
+		<member name="font_size" type="int" setter="set_font_size" getter="get_font_size" default="32">
+			The base text size in pixels, before the accessibility scale. It applies to every font of the label (normal, bold, italics, mono) and is not a theme override.
+		</member>
+		<member name="horizontal_alignment" type="int" setter="set_horizontal_alignment" getter="get_horizontal_alignment" overrides="RichTextLabel" enum="HorizontalAlignment" default="1" />
+		<member name="mouse_filter" type="int" setter="set_mouse_filter" getter="get_mouse_filter" overrides="Control" enum="Control.MouseFilter" default="2" />
+		<member name="player" type="NodePath" setter="set_player" getter="get_player" default="NodePath(&quot;&quot;)">
+			The [SubtitlePlayer] whose segments are shown. It is resolved when the label is ready, so the player can come later in the scene.
+		</member>
+		<member name="show_speaker_names" type="bool" setter="set_show_speaker_names" getter="is_showing_speaker_names" default="true">
+			If [code]true[/code], a dialog line with a [member SubtitleSegment.speaker] starts with the speaker's name and a colon, for example [code]Anna: Hello[/code]. Closed captions never show a speaker.
+		</member>
+		<member name="speaker_colors" type="Dictionary[StringName, Color]" setter="set_speaker_colors" getter="get_speaker_colors" default="{}">
+			The text color of each speaker's lines, by [member SubtitleSegment.speaker]. Lines of speakers without an entry, and closed captions, use the theme's text color ([code]default_color[/code]).
+		</member>
+	</members>
+</class>
