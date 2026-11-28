@@ -108,7 +108,7 @@ void TransitionScreen::_start() {
 	Node *current = get_tree()->get_current_scene();
 	if (current && current != this && current->is_ancestor_of(this)) {
 		// Inside the current scene it would be removed with it: run from the root (starts on the next frame).
-		call_deferred(SNAME("reparent"), get_tree()->get_root(), false);
+		call_deferred(SNAME("reparent"), Variant(get_tree()->get_root().ptr()), false);
 		return;
 	}
 	state = STATE_FADING_IN;
