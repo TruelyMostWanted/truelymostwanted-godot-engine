@@ -569,7 +569,7 @@ Error AudioCommandRegistry::execute(const Ref<AudioCommand> &p_command) {
 }
 
 Error AudioCommandRegistry::execute_commands(const Ref<AudioCommands> &p_commands) {
-	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The audio commands is null.");
+	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The AudioCommands resource is null.");
 	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	Error first_error = OK;
 	for (int i = 0; i < list_commands.size(); i++) {
@@ -583,7 +583,7 @@ Error AudioCommandRegistry::execute_commands(const Ref<AudioCommands> &p_command
 
 Error AudioCommandRegistry::register_commands(const Ref<AudioCommands> &p_commands) {
 	_ensure_default_commands();
-	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The audio commands is null.");
+	ERR_FAIL_COND_V_MSG(p_commands.is_null(), ERR_INVALID_PARAMETER, "The AudioCommands resource is null.");
 	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	LocalVector<StringName> replaced;
 	for (int i = 0; i < list_commands.size(); i++) {
@@ -612,7 +612,7 @@ Error AudioCommandRegistry::register_commands(const Ref<AudioCommands> &p_comman
 
 void AudioCommandRegistry::unregister_commands(const Ref<AudioCommands> &p_commands) {
 	_ensure_default_commands();
-	ERR_FAIL_COND_MSG(p_commands.is_null(), "The audio commands is null.");
+	ERR_FAIL_COND_MSG(p_commands.is_null(), "The AudioCommands resource is null.");
 	const TypedArray<AudioCommand> list_commands = p_commands->get_commands();
 	for (int i = 0; i < list_commands.size(); i++) {
 		const Ref<AudioCommand> entry = list_commands[i];

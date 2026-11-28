@@ -176,10 +176,12 @@ static char32_t _csv_delimiter(const ResourceTextSerializer::Options &p_options)
 /////////////////////////////////////////////////////////////////////////////
 // Types.
 
-bool ResourceTextSerializer::is_resource_type(const String &p_type) {
-	if (p_type.is_empty()) {
+bool ResourceTextSerializer::is_resource_type(const String &p_type_name) {
+	if (p_type_name.is_empty()) {
 		return false;
 	}
+	// Renamed classes of old files.
+	const String p_type = ClassDB::get_compatibility_remapped_class(p_type_name);
 	if (ClassDB::class_exists(p_type)) {
 		return ClassDB::is_parent_class(p_type, Resource::get_class_static());
 	}
@@ -243,7 +245,8 @@ static Ref<Resource> _instantiate_script(const Ref<Script> &p_script, String &r_
 	return ref;
 }
 
-Ref<Resource> ResourceTextSerializer::instantiate_type(const String &p_type, String &r_error) {
+Ref<Resource> ResourceTextSerializer::instantiate_type(const String &p_type_name, String &r_error) {
+	const String p_type = ClassDB::get_compatibility_remapped_class(p_type_name); // Renamed classes of old files.
 	if (ClassDB::class_exists(p_type)) {
 		if (!ClassDB::is_parent_class(p_type, Resource::get_class_static())) {
 			r_error = vformat("'%s' is not a Resource class.", p_type);

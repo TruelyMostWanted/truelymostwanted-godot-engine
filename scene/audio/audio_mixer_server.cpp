@@ -1258,7 +1258,7 @@ void AudioMixerServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("execute", "command"), &AudioMixerServer::execute);
 	ClassDB::bind_method(D_METHOD("execute_commands", "commands"), &AudioMixerServer::execute_commands);
 #ifndef DISABLE_DEPRECATED
-	ClassDB::bind_method(D_METHOD("execute_list", "list"), &AudioMixerServer::execute_commands); // Deprecated alias.
+	ClassDB::bind_method(D_METHOD("execute_list", "commands"), &AudioMixerServer::execute_commands); // Deprecated alias.
 #endif
 	ClassDB::bind_method(D_METHOD("register_commands", "commands"), &AudioMixerServer::register_commands);
 	ClassDB::bind_method(D_METHOD("unregister_commands", "commands"), &AudioMixerServer::unregister_commands);

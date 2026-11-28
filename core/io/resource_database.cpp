@@ -649,7 +649,7 @@ void ResourceDatabase::finish() {
 void ResourceDatabase::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("preload_from", "preloads", "use_threads"), &ResourceDatabase::preload_from, DEFVAL(true));
 #ifndef DISABLE_DEPRECATED
-	ClassDB::bind_method(D_METHOD("preload_from_list", "list", "use_threads"), &ResourceDatabase::preload_from, DEFVAL(true)); // Deprecated alias.
+	ClassDB::bind_method(D_METHOD("preload_from_list", "preloads", "use_threads"), &ResourceDatabase::preload_from, DEFVAL(true)); // Deprecated alias.
 #endif
 	ClassDB::bind_method(D_METHOD("preload_resource", "path", "key"), &ResourceDatabase::preload_resource, DEFVAL(String()));
 

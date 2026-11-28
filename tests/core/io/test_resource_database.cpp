@@ -36,6 +36,7 @@ TEST_FORCE_LINK(test_resource_database)
 #include "core/io/file_access.h"
 #include "core/io/resource_database.h"
 #include "core/io/resource_loader.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/object/message_queue.h"
 #include "core/os/os.h"
 #include "core/os/thread.h"
@@ -292,6 +293,14 @@ TEST_CASE("[ResourceDatabase] A .tres with the old type PreloadList loads as Pre
 	CHECK(loaded->get_class() == "Preloads");
 	CHECK(loaded->get_paths() == PackedStringArray({ "res://a.tres" }));
 	DirAccess::remove_absolute(path);
+}
+
+TEST_CASE("[ResourceDatabase] A JSON text with the old type PreloadList loads as Preloads") {
+	const String text = "{\"$type\": \"PreloadList\", \"paths\": [\"res://a.tres\"]}";
+	const Ref<Preloads> loaded = ResourceTextSerializer::get_singleton()->deserialize(text, ResourceTextSerializer::FORMAT_JSON);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_class() == "Preloads");
+	CHECK(loaded->get_paths() == PackedStringArray({ "res://a.tres" }));
 }
 #endif // DISABLE_DEPRECATED
 
