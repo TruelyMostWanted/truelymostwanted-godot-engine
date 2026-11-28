@@ -313,6 +313,10 @@
 		<member name="application/boot_splash/minimum_display_time" type="int" setter="" getter="" default="0">
 			Minimum boot splash display time (in milliseconds). It is not recommended to set too high values for this setting.
 		</member>
+		<member name="application/boot_splash/scene" type="String" setter="" getter="" default="&quot;&quot;">
+			Path of a scene that runs before the main scene, after the boot image. Its root should be a [SplashScreen], which changes to [member application/run/main_scene] when it has loaded it in the background and shown itself for at least [member TransitionScreen.min_duration]. The splash runs when the project starts its main scene, also when the editor runs the main scene; it does not run for other scenes (for example [b]Run Current Scene[/b] on another scene or [code]--scene[/code] with another path). Autoloads are created before the splash scene.
+			[b]Note:[/b] The scene and the main scene must be included in the exported PCK.
+		</member>
 		<member name="application/boot_splash/show_image" type="bool" setter="" getter="" default="true">
 			If [code]true[/code], displays the image specified in [member application/boot_splash/image] when the engine starts. If [code]false[/code], only displays the plain color specified in [member application/boot_splash/bg_color].
 		</member>

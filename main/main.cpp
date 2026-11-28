@@ -4533,6 +4533,15 @@ int Main::start() {
 		}
 	}
 
+	// Truely (#399): a scene splash runs before the main scene (also when the editor runs it with `--scene`);
+	// its SplashScreen root changes to the main scene.
+	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && !game_path.is_empty()) {
+		const String splash_scene = GLOBAL_GET("application/boot_splash/scene");
+		if (!splash_scene.is_empty() && ResourceUID::ensure_path(game_path) == ResourceUID::ensure_path(String(GLOBAL_GET("application/run/main_scene")))) {
+			game_path = ResourceUID::ensure_path(splash_scene);
+		}
+	}
+
 #ifdef TOOLS_ENABLED
 	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && game_path.is_empty()) {
 		// If we end up here, it means we didn't manage to detect what we want to run.

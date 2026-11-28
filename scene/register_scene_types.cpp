@@ -116,6 +116,7 @@
 #include "scene/main/status_indicator.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/timer.h"
+#include "scene/main/transition_screen.h"
 #include "scene/main/viewport.h"
 #include "scene/main/viewport_server.h"
 #include "scene/main/window.h"
@@ -533,6 +534,11 @@ void register_scene_types() {
 	GDREGISTER_CLASS(Timer);
 	GDREGISTER_CLASS(SubtitlePlayer);
 	GDREGISTER_CLASS(CanvasLayer);
+	// Scene transitions (#399).
+	GDREGISTER_CLASS(TransitionScreen);
+	GDREGISTER_CLASS(LoadingScreen);
+	GDREGISTER_CLASS(SplashScreen);
+	GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "application/boot_splash/scene", PROPERTY_HINT_FILE, "*.tscn,*.scn"), String());
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
 

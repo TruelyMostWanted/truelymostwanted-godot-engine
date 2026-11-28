@@ -71,6 +71,23 @@
 				[b]Note:[/b] See [method change_scene_to_node] for details on the order of operations.
 			</description>
 		</method>
+		<method name="change_scene_with_transition">
+			<return type="int" enum="Error" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="transition_scene" type="PackedScene" default="null" />
+			<description>
+				Changes the running scene to the scene at [param path] behind a [TransitionScreen]: the root of [param transition_scene] (a [TransitionScreen], [LoadingScreen] or [SplashScreen]) is instantiated, its [member TransitionScreen.next_scene] is set to [param path], and it is added to the root on the next frame. It fades in over the current scene, loads [param path] in the background, changes the scene while it is fully visible, fades out over the new scene and frees itself. If [param transition_scene] is [code]null[/code], a black fade is used.
+				Returns [constant OK] on success, [constant ERR_CANT_CREATE] if [param transition_scene] cannot be instantiated, or [constant ERR_INVALID_PARAMETER] if [param path] is empty or the root of [param transition_scene] is not a [TransitionScreen].
+				[codeblocks]
+				[gdscript]
+				get_tree().change_scene_with_transition("res://levels/level_2.tscn", preload("res://ui/loading_screen.tscn"))
+				[/gdscript]
+				[csharp]
+				GetTree().ChangeSceneWithTransition("res://levels/level_2.tscn", GD.Load&lt;PackedScene&gt;("res://ui/loading_screen.tscn"));
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 		<method name="create_timer">
 			<return type="SceneTreeTimer" />
 			<param index="0" name="time_sec" type="float" />
