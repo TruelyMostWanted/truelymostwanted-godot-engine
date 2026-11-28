@@ -32,6 +32,7 @@
 
 #include "core/io/resource_text_serializer.h"
 #include "core/object/class_db.h"
+#include "core/object/script_language.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/local_vector.h"
 
@@ -334,6 +335,57 @@ static Ref<Resource> _schema_sample(const String &p_class) {
 	return ResourceTextSerializer::instantiate_type(p_class.get_slicec(',', 0), error);
 }
 
+// The element type of an Array property: from the typed array value, else from the hint ("ClassName", "int",
+// "<type>:<class>" or "<type>/<hint>:<class>").
+static void _schema_set_element(const Ref<DataField> &p_field, const Array &p_live, const PropertyInfo &p_info, bool p_enums_as_names, int p_depth) {
+	Variant::Type element_type = Variant::NIL;
+	String element_class;
+	if (p_live.is_typed()) {
+		element_type = Variant::Type(p_live.get_typed_builtin());
+		element_class = p_live.get_typed_class_name();
+		const Ref<Script> script = p_live.get_typed_script();
+		if (script.is_valid() && script->get_global_name() != StringName()) {
+			element_class = script->get_global_name();
+		}
+	} else if ((p_info.hint == PROPERTY_HINT_ARRAY_TYPE || p_info.hint == PROPERTY_HINT_TYPE_STRING) && !p_info.hint_string.is_empty()) {
+		const int colon = p_info.hint_string.find_char(':');
+		const String type_part = (colon > 0 ? p_info.hint_string.substr(0, colon) : p_info.hint_string).get_slicec('/', 0);
+		if (type_part.is_valid_int()) {
+			element_type = Variant::Type(type_part.to_int());
+			element_class = colon > 0 ? p_info.hint_string.substr(colon + 1) : String();
+		} else if (Variant::get_type_by_name(type_part) != Variant::VARIANT_MAX) {
+			element_type = Variant::get_type_by_name(type_part);
+		} else {
+			element_type = Variant::OBJECT;
+			element_class = p_info.hint_string;
+		}
+	}
+	if (element_type != Variant::OBJECT) {
+		if (DataField::is_data_type(element_type)) {
+			p_field->set_element_type(element_type);
+		}
+		return;
+	}
+	if (p_depth >= RESOURCE_SCHEMA_MAX_DEPTH) {
+		return;
+	}
+	// Resources in files are paths, so only elements that are written as objects get a schema: the built-in
+	// elements of the array, or an empty array of a script class (data classes are usually embedded).
+	Ref<Resource> sample;
+	if (!p_live.is_empty()) {
+		const Ref<Resource> element = p_live[0];
+		if (element.is_valid() && element->is_built_in()) {
+			sample = element;
+		}
+	}
+	if (sample.is_null() && p_live.is_empty() && ScriptServer::is_global_class(element_class.get_slicec(',', 0))) {
+		sample = _schema_sample(element_class);
+	}
+	if (sample.is_valid()) {
+		p_field->set_element_schema(_schema_from_resource(sample, p_enums_as_names, p_depth + 1));
+	}
+}
+
 static Ref<DataField> _schema_field_from_property(const Object *p_object, const PropertyInfo &p_info, bool p_enums_as_names, int p_depth) {
 	Variant::Type type = p_info.type;
 	if (type != Variant::OBJECT && !DataField::is_data_type(type)) {
@@ -343,22 +395,20 @@ static Ref<DataField> _schema_field_from_property(const Object *p_object, const 
 	field.instantiate();
 	field->set_field_name(p_info.name);
 	if (type == Variant::OBJECT) {
-		// Built-in resources are written as objects, resources in files as their path.
-		Ref<Resource> nested = p_object->get(p_info.name);
-		if (nested.is_null() && p_info.hint == PROPERTY_HINT_RESOURCE_TYPE) {
-			nested = _schema_sample(p_info.hint_string);
-		}
-		if (nested.is_valid() && nested->is_built_in() && p_depth < RESOURCE_SCHEMA_MAX_DEPTH) {
+		// Built-in resources are written as objects, resources in files as their path. A resource that is not set
+		// can be either, so it stays untyped.
+		const Ref<Resource> nested = p_object->get(p_info.name);
+		if (nested.is_valid() && nested->is_built_in()) {
 			field->set_value_type(Variant::DICTIONARY);
-			field->set_schema(_schema_from_resource(nested, p_enums_as_names, p_depth + 1));
-		} else if (nested.is_valid() && nested->is_built_in()) {
-			field->set_value_type(Variant::DICTIONARY);
-		} else {
+			if (p_depth < RESOURCE_SCHEMA_MAX_DEPTH) {
+				field->set_schema(_schema_from_resource(nested, p_enums_as_names, p_depth + 1));
+			}
+		} else if (nested.is_valid()) {
 			field->set_value_type(Variant::STRING);
 		}
 		return field;
 	}
-	if (type == Variant::INT && p_enums_as_names && p_info.hint == PROPERTY_HINT_ENUM) {
+	if (type == Variant::INT && p_enums_as_names && ResourceTextSerializer::is_enum_property(p_info)) {
 		type = Variant::STRING; // Written as the names.
 	}
 	field->set_value_type(type);
@@ -366,20 +416,8 @@ static Ref<DataField> _schema_field_from_property(const Object *p_object, const 
 		field->set_hint(p_info.hint);
 		field->set_hint_string(p_info.hint_string);
 	}
-	if (type == Variant::ARRAY && p_info.hint == PROPERTY_HINT_ARRAY_TYPE) {
-		// "ClassName" for resources, "<type>:<hint>" or "<type>/<hint>:<class>" otherwise.
-		const String element = p_info.hint_string.get_slicec(':', 0).get_slicec('/', 0);
-		const Variant::Type element_type = element.is_valid_int() ? Variant::Type(element.to_int()) : Variant::OBJECT;
-		if (element_type != Variant::OBJECT) {
-			if (DataField::is_data_type(element_type)) {
-				field->set_element_type(element_type);
-			}
-		} else if (p_depth < RESOURCE_SCHEMA_MAX_DEPTH) {
-			const Ref<Resource> sample = _schema_sample(element.is_valid_int() ? p_info.hint_string.get_slicec(':', 1) : element);
-			if (sample.is_valid()) {
-				field->set_element_schema(_schema_from_resource(sample, p_enums_as_names, p_depth + 1));
-			}
-		}
+	if (type == Variant::ARRAY) {
+		_schema_set_element(field, p_object->get(p_info.name), p_info, p_enums_as_names, p_depth);
 	}
 	return field;
 }
@@ -391,6 +429,9 @@ static Ref<DataSchema> _schema_from_resource(const Ref<Resource> &p_resource, bo
 	LocalVector<PropertyInfo> properties;
 	ResourceTextSerializer::get_serialized_properties(p_resource.ptr(), properties);
 	for (const PropertyInfo &info : properties) {
+		if (ClassDB::has_property("Resource", info.name)) {
+			continue; // The name and the scene flag of every resource are noise in a data schema.
+		}
 		const Ref<DataField> field = _schema_field_from_property(p_resource.ptr(), info, p_enums_as_names, p_depth);
 		if (field.is_valid()) {
 			schema->add_field(field);

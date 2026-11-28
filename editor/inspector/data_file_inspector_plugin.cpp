@@ -727,13 +727,13 @@ class DataSchemaGenerateButton : public Button {
 		}
 		const Ref<DataSchema> generated = DataSchema::create_from_resource(sample);
 		if (generated.is_null() || generated->get_fields().is_empty()) {
-			EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), sample->get_class()));
+			EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), dialog->get_selected_type()));
 			return;
 		}
 		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 		undo_redo->create_action(TTR("Generate Data Schema from Resource"), UndoRedo::MERGE_DISABLE, schema.ptr());
 		undo_redo->add_do_property(schema.ptr(), "fields", generated->get_fields());
-		undo_redo->add_undo_property(schema.ptr(), "fields", schema->get_fields());
+		undo_redo->add_undo_property(schema.ptr(), "fields", schema->get_fields().duplicate());
 		undo_redo->add_do_property(schema.ptr(), "extra_fields", generated->get_extra_fields());
 		undo_redo->add_undo_property(schema.ptr(), "extra_fields", schema->get_extra_fields());
 		undo_redo->commit_action();

@@ -374,6 +374,11 @@ static bool _get_enum_values(const PropertyInfo &p_info, LocalVector<EnumValue> 
 	return false;
 }
 
+bool ResourceTextSerializer::is_enum_property(const PropertyInfo &p_info) {
+	LocalVector<EnumValue> values;
+	return _get_enum_values(p_info, values);
+}
+
 // Element type of an Array property: from the typed array value, and enum names from the hint ("2/2:A,B").
 static PropertyInfo _get_element_info(const PropertyInfo &p_array_info, const Variant &p_array, Variant &r_script) {
 	PropertyInfo element;

@@ -398,8 +398,9 @@ TEST_CASE("[DataSchema] create_from_resource describes the stored properties") {
 	CHECK(fields->get_element_schema()->get_field("name").is_valid());
 	const Ref<DataField> field_template = schema->get_field("extra_field_template");
 	REQUIRE(field_template.is_valid());
-	CHECK(field_template->get_value_type() == Variant::DICTIONARY);
-	CHECK(field_template->get_schema().is_valid());
+	CHECK(field_template->get_value_type() == Variant::NIL); // Not set: an object or a path.
+	CHECK(schema->get_field("resource_name").is_null());
+	CHECK(schema->get_field("resource_local_to_scene").is_null());
 	CHECK(schema->get_field("file_patterns")->get_value_type() == Variant::PACKED_STRING_ARRAY);
 	CHECK_FALSE(schema->get_field("fields")->is_required());
 
