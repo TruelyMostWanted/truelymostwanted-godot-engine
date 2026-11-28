@@ -43,6 +43,7 @@
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/string/fuzzy_search.h"
+#include "core/string/localization_catalog.h"
 #include "core/variant/dictionary.h"
 #include "core/version.h"
 #include "editor/debugger/editor_debugger_node.h"
@@ -1723,6 +1724,14 @@ void DocumentEditorContainer::_file_dialog_action(const String &p_file) {
 				if (err) {
 					EditorNode::get_singleton()->show_warning(TTR("Error writing TextFile:") + "\n" + p_file, TTR("Error!"));
 					break;
+				}
+				// Truely: a new data file starts as a valid empty document ("{}" for JSON, "<root/>" for XML).
+				const String type = ResourceLoader::get_resource_type(p_file);
+				if (type == "JSON") {
+					file->store_string("{}\n");
+				} else if (ClassDB::is_parent_class(type, "TextDataFormat") && ClassDB::can_instantiate(type)) {
+					const Ref<TextDataFormat> data_file = Object::cast_to<TextDataFormat>(ClassDB::instantiate(type));
+					file->store_string(data_file->encode_to_text());
 				}
 			}
 
@@ -3517,7 +3526,9 @@ void DocumentEditorContainer::set_window_layout(Ref<ConfigFile> p_layout) {
 
 		if (is_script) {
 			Ref<Resource> scr = ResourceLoader::load(path);
-			if (scr.is_null()) {
+			// Truely (#346): a data file listed in a catalog manifest loads as its catalog, which has no document
+			// editor (it opens in the inspector): the tab is not restored.
+			if (scr.is_null() || Object::cast_to<LocalizationCatalog>(scr.ptr())) {
 				continue;
 			}
 			if (!edit(scr, false)) {

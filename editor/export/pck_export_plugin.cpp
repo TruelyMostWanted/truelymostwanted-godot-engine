@@ -35,6 +35,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "editor/editor_node.h"
+#include "editor/editor_string_names.h"
 #include "editor/export/editor_export.h"
 #include "editor/export/pck_package_exporter.h"
 #include "editor/file_system/editor_file_system.h"
@@ -148,13 +149,24 @@ void PCKPackageExportDialog::_target_selected(const String &p_path) {
 }
 
 void PCKPackageExportDialog::_update_ok() {
-	get_ok_button()->set_disabled(description_edit->get_text().strip_edges().is_empty() || target_edit->get_text().strip_edges().is_empty() || preset_option->get_item_count() == 0);
+	String hint;
+	if (preset_option->get_item_count() == 0) {
+		hint = TTR("There is no export preset. Add one in Project > Export... to build packs.");
+	} else if (description_edit->get_text().strip_edges().is_empty()) {
+		hint = TTR("Choose a pack description.");
+	} else if (target_edit->get_text().strip_edges().is_empty()) {
+		hint = TTR("Choose the target pack.");
+	}
+	hint_label->set_text(hint);
+	hint_label->set_visible(!hint.is_empty());
+	get_ok_button()->set_disabled(!hint.is_empty());
 }
 
 void PCKPackageExportDialog::_notification(int p_what) {
 	if (p_what == NOTIFICATION_THEME_CHANGED) {
 		description_browse->set_button_icon(get_editor_theme_icon(SNAME("Folder")));
 		target_browse->set_button_icon(get_editor_theme_icon(SNAME("Folder")));
+		hint_label->add_theme_color_override(SceneStringName(font_color), get_theme_color(SNAME("warning_color"), EditorStringName(Editor)));
 	}
 }
 
@@ -247,6 +259,12 @@ PCKPackageExportDialog::PCKPackageExportDialog() {
 	dependencies_check->set_pressed(true);
 	dependencies_check->set_tooltip_text(TTR("Also pack the files the listed resources depend on. Turn it off if the main game already ships them."));
 	main_vb->add_child(dependencies_check);
+
+	hint_label = memnew(Label);
+	hint_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	hint_label->set_custom_minimum_size(Size2(400, 0) * EDSCALE);
+	hint_label->hide();
+	main_vb->add_child(hint_label);
 
 	description_dialog = memnew(EditorFileDialog);
 	description_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_FILE);

@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/io/data_validation.h"
 #include "core/io/resource.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -90,6 +91,7 @@ private:
 	HashMap<uint32_t, String> row_extras; // Sparse: plural key (text) or expected type (resource) per row.
 	LocalVector<NoteColumn> note_columns; // Never in `.lcat`.
 	bool skip_notes = false; // Set by the loader outside the editor: runtime lookups don't need notes.
+	PackedStringArray duplicates; // Entry names found more than once by the last load from text (validate()).
 	String source_path; // Binary file the unloaded columns are read from.
 	StringName channel;
 	mutable Mutex load_mutex;
@@ -104,6 +106,12 @@ private:
 
 	Dictionary _get_data() const;
 	void _set_data(const Dictionary &p_data);
+	// One key in the dictionary shape. The columns must be loaded.
+	Dictionary _get_entry(uint32_t p_row) const;
+	// `r_column_of_field` caches the column per field name. With `p_replace`, fields missing in the entry are cleared.
+	void _set_entry(uint32_t p_row, const Dictionary &p_entry, HashMap<String, LocaleColumn *> &r_column_of_field, bool p_replace);
+	// The line of every key row in CSV text (key cells in row order), for validate().
+	static LocalVector<int> _get_csv_key_lines(const String &p_text, const String &p_delimiter);
 	Error _load_rows(const Array &p_rows);
 	Array _get_rows() const;
 	Error _read_binary(const Ref<FileAccess> &p_file, const String &p_path);
@@ -167,6 +175,8 @@ public:
 	int get_key_count() const { return ids.size(); }
 	int add_key(const StringName &p_key, const StringName &p_context = StringName());
 	void remove_key(const StringName &p_key, const StringName &p_context = StringName());
+	// Keeps the row (position, texts, notes).
+	void rename_key(const StringName &p_key, const StringName &p_new_key, const StringName &p_context = StringName(), const StringName &p_new_context = StringName());
 	bool has_key(const StringName &p_key, const StringName &p_context = StringName()) const;
 	int find_key(const StringName &p_key, const StringName &p_context = StringName()) const;
 	StringName get_key(int p_row) const;
@@ -187,8 +197,19 @@ public:
 	String get_note(const StringName &p_key, const StringName &p_context = StringName(), const StringName &p_column = StringName("notes")) const;
 	PackedStringArray get_note_columns() const;
 
-	Error load_from_text(const String &p_text, ResourceTextSerializer::Format p_format);
-	String to_text(ResourceTextSerializer::Format p_format) const;
+	// One key as a Dictionary like an entry of the JSON format: `_key`, `_context` (with a context), `_plural` or
+	// `_type`, `_<note column>`, and per locale the text or an Array of plural forms. Empty if the key is missing.
+	Dictionary get_entry(const StringName &p_key, const StringName &p_context = StringName()) const;
+	// Replaces the extra field, notes and texts of the key (added if missing) with those of `p_entry`.
+	void set_entry(const StringName &p_key, const Dictionary &p_entry, const StringName &p_context = StringName());
+
+	// Missing translations (EMPTY_REQUIRED), keys defined twice in the loaded text (DUPLICATE_KEY) and locales that
+	// are not standard locale codes (INVALID_LOCALE). Catalogs loaded from a text file get line numbers.
+	Ref<DataValidation> validate(const Ref<DataValidationOptions> &p_options = Ref<DataValidationOptions>()) const;
+
+	// CSV text without options uses the delimiter (`,`, `;` or tab) found in its header row.
+	Error load_from_text(const String &p_text, ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>());
+	String to_text(ResourceTextSerializer::Format p_format, const Ref<SerializerOptions> &p_options = Ref<SerializerOptions>()) const;
 	Error load_from_file(const String &p_path);
 	Error save_to_file(const String &p_path);
 
@@ -218,6 +239,8 @@ public:
 
 	void add_translation(const Ref<Translation> &p_translation);
 	TypedArray<Translation> to_translations();
+	// gettext text: a POT template with an empty locale, else a PO file of `p_locale`. Notes become `#.` comments.
+	String to_po(const String &p_locale = String()) const;
 
 	TextLocalizationCatalog();
 };
@@ -264,4 +287,6 @@ public:
 	virtual Error save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags = 0) override;
 	virtual void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const override;
 	virtual bool recognize(const Ref<Resource> &p_resource) const override;
+	// Also the text formats, so catalogs edited in the editor save back to their file.
+	virtual bool recognize_path(const Ref<Resource> &p_resource, const String &p_path) const override;
 };

@@ -4,7 +4,7 @@
 		Reads and writes CSV text as arrays, and list resources as CSV.
 	</brief_description>
 	<description>
-		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
+		[CSV] converts comma-separated values ([url=https://www.rfc-editor.org/rfc/rfc4180]RFC 4180[/url]) to an [Array] of rows and back, with row, cell and column methods. Files with the extension [code].csv[/code] or [code].tsv[/code] load as [CSV]; for [code].tsv[/code] without [member TextDataFormat.options], the separator is a tab. Parsing, errors, [method TextDataFormat.load] and [method TextDataFormat.save] come from [TextDataFormat]; [method parse_string] and [method stringify] work on data without an instance, [method serialize] and [method deserialize] on resources.
 		Cells that contain the delimiter, a double quote, a line break or leading or trailing spaces are written in double quotes, and a double quote inside is doubled ([code]""[/code]). The delimiter comes from [member SerializerOptions.csv_delimiter] (one character, for example [code];[/code] or a tab).
 		The [member TextDataFormat.data] of an instance is an [Array] of rows, each row a [PackedStringArray]. With [member SerializerOptions.csv_headers] (the default), the first line names the columns: it is stored in [member header] and is not part of the data, and [method get_row_as_dictionary] keys a row by column name. Without it, [member header] is empty and every line is a data row. Columns are [int] indices; [method find_column] resolves a name. Cells are always [String]s, there is no type guessing ([code]007[/code] stays [code]"007"[/code]).
 		The static [method parse_string] returns an [Array] of [Dictionary] keyed by column name when headers are on, and an [Array] of [PackedStringArray] otherwise.
@@ -42,7 +42,7 @@
 		[/codeblocks]
 		[b]Resource and files:[/b] [CSV] is a [Resource] (see [TextDataFormat]). [code]load("res://x.csv")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
 		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_cell], [method append_row] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
-		[b]Import:[/b] CSV files that are imported as translations still load as [Translation]. Only files imported with [b]Keep File[/b] load as [CSV].
+		[b]Import:[/b] In the editor, a [code].csv[/code] file whose header has locale columns is imported as a translation (importer "CSV Translation") and loads as [Translation]. Other CSV files use the "CSV Dataset" importer and load as [CSV]; so do files imported with [b]Keep File[/b].
 		[b]Note:[/b] The static methods can be called from any thread. A [CSV] instance should be used by one thread at a time.
 	</description>
 	<tutorials>
@@ -267,7 +267,7 @@
 	<members>
 		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="[]" />
 		<member name="header" type="PackedStringArray" setter="set_header" getter="get_header" default="PackedStringArray()">
-			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line. Changing it drops the kept parsed text.
+			The names of the columns. Filled by [method TextDataFormat.parse] only if [member SerializerOptions.csv_headers] is on; empty otherwise. [method find_column] and [method get_row_as_dictionary] use it, and it is written as the first line, with unnamed columns added for rows that are wider, so the text parses again. Changing it drops the kept parsed text.
 		</member>
 	</members>
 </class>

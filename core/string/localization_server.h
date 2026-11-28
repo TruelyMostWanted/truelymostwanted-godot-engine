@@ -52,6 +52,8 @@ class LocalizationServer : public Object {
 
 public:
 	static constexpr const char *SETTING_CATALOG_MANIFESTS = "internationalization/localization/catalog_manifests";
+	// Export: the text catalogs of the manifests are written as binary `.lcat` (#346).
+	static constexpr const char *SETTING_EXPORT_CONVERT_TEXT_TO_BINARY = "internationalization/localization/export/convert_text_to_binary";
 
 	struct Key {
 		StringName key;
@@ -170,6 +172,8 @@ protected:
 
 public:
 	static void register_settings();
+	// A copy of a catalog manifest for listing its files: no type filter, the catalog formats without extensions.
+	static Ref<FilesManifest> get_catalog_files(const Ref<FilesManifest> &p_manifest);
 
 	// The one locale matching rule (texts, resources, LanguageSettingsServer): `p_locale` and its parents, the closest
 	// of `p_available` by TranslationServer::compare_locales() (`de_DE` -> `de_AT`), then the fallback and its parents.

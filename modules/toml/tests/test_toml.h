@@ -477,7 +477,7 @@ TEST_CASE("[TOML] Stringify keeps key order and reads back") {
 	CHECK(text.contains("\n[[players]]\nname = \"Ann\"\n\n[players.pos]\nx = 1\n"));
 	CHECK(text.contains("name = \"\"\"\nLine\nbreak\"\"\"\n"));
 	CHECK(text.contains("mixed = [1, { width = 1280, scale = 1.5, integral = 2.0 }]\n"));
-	CHECK(text.contains("nothing = \"\"\n"));
+	CHECK_FALSE(text.contains("nothing")); // TOML has no null: the key is left out.
 	CHECK(text.contains("special = inf\n"));
 	CHECK(text.contains("tags = [\"a\", \"b\"]\n"));
 	CHECK(text.find("[window]") < text.find("[[players]]"));
@@ -509,8 +509,8 @@ TEST_CASE("[TOML] Resource round trip as text") {
 	CHECK(text.begins_with("\"$type\" = \"TOMLTestSettings\"\n\"$format_version\" = 1\n"));
 	// Plain keys in property order, then sub-tables and arrays of tables in property order.
 	CHECK(text.find("volume = ") < text.find("title = "));
-	CHECK(text.find("title = ") < text.find("spare = \"\""));
-	CHECK(text.find("spare = ") < text.find("numbers = [4, -7]"));
+	CHECK_FALSE(text.contains("spare")); // null: left out.
+	CHECK(text.find("title = ") < text.find("numbers = [4, -7]"));
 	CHECK(text.find("numbers = ") < text.find("tint = \"#ff0000ff\""));
 	CHECK(text.find("tint = ") < text.find("\n[main]\n"));
 	CHECK(text.find("\n[main]\n") < text.find("\n[main.child]\n"));

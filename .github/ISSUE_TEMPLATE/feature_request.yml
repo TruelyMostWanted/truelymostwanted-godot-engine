@@ -87,7 +87,7 @@ body:
     id: technical
     attributes:
       label: Technical notes
-      description: Affected classes, source folders, bindings (GDScript/C#), file formats; dependencies on other issues.
+      description: Affected classes, source folders, bindings (GDScript/C#), file formats; dependencies on other issues. Answer the checklist of truely/ARCHITECTURE.md section 7 (class kinds, layers, server API, hot path, extension, undo/redo, CI).
       placeholder: |
         - New: `ResourceLoader::list_paths()` in core/io, bound to GDScript and C#
         - Depends on #12

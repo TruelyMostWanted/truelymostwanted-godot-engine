@@ -200,7 +200,16 @@ void PCKExtractDialog::_option_changed(int p_index) {
 }
 
 void PCKExtractDialog::_skip_engine_toggled(bool p_pressed) {
-	_update_tree();
+	// Only the engine files follow the toggle: the checks of the other files stay as the user set them.
+	TreeItem *root = tree->get_root();
+	for (TreeItem *item = root ? root->get_first_child() : nullptr; item; item = item->get_next()) {
+		const String key = String(item->get_metadata(COLUMN_PATH)).trim_prefix("res://");
+		const PCKPackage::Entry *entry = package.is_valid() ? package->get_entry_map().getptr(key) : nullptr;
+		if (_is_engine_file(key) || _is_not_editable(key) || (entry && entry->delta)) {
+			item->set_checked(COLUMN_PATH, !p_pressed);
+		}
+	}
+	_update_preview();
 }
 
 void PCKExtractDialog::_extract_progress(const String &p_path, int p_done, int p_total) {

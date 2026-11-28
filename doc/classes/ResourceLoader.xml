@@ -11,8 +11,8 @@
 		[b]Note:[/b] Non-resource files such as plain text files cannot be read using [ResourceLoader]. Use [FileAccess] for those files instead, and be aware that non-resource files are not exported by default (see notes in the [FileAccess] class description for instructions on exporting them).
 	</description>
 	<tutorials>
-		<link title="Threaded Loading Demo">https://godotengine.org/asset-library/asset/2778</link>
-		<link title="Operating System Testing Demo">https://godotengine.org/asset-library/asset/2789</link>
+		<link title="Threaded Loading Demo">https://store.godotengine.org/asset/godot-foundation/threaded-loading-demo/</link>
+		<link title="Operating System Testing Demo">https://store.godotengine.org/asset/godot-foundation/operating-system-testing-demo/</link>
 	</tutorials>
 	<methods>
 		<method name="add_resource_format_loader">
@@ -276,6 +276,7 @@
 				The registered [ResourceFormatLoader]s are queried sequentially to find the first one which can handle the file's extension, and then attempt loading. If loading fails, the remaining ResourceFormatLoaders are also attempted.
 				An optional [param type_hint] can be used to further specify the [Resource] type that should be handled by the [ResourceFormatLoader]. Anything that inherits from [Resource] can be used as a type hint, for example [Image].
 				The [param cache_mode] property defines whether and how the cache should be used or updated when loading the resource.
+				In every cache mode, the returned resource has [member Resource.resource_path] set to the loaded path (localized to [code]res://[/code] when it is inside the project). With [constant CACHE_MODE_REUSE] it is the instance held by the cache for that path, so loading the same path again returns the same instance. With [constant CACHE_MODE_REPLACE] an already cached instance is updated in place and returned. With [constant CACHE_MODE_IGNORE] it is a separate instance that reports the path but is not cached.
 				Returns an empty resource if no [ResourceFormatLoader] could handle the file, and prints an error if no file is found at the specified path. Use [method load_result] to get the [enum Error] code and the loader's message as well.
 				GDScript has a simplified [method @GDScript.load] built-in method which can be used in most situations, leaving the use of [ResourceLoader] for more advanced scenarios.
 				[b]Note:[/b] If [member ProjectSettings.editor/export/convert_text_resources_to_binary] is [code]true[/code], [method @GDScript.load] will not be able to read converted files in an exported project. If you rely on run-time loading of files present within the PCK, set [member ProjectSettings.editor/export/convert_text_resources_to_binary] to [code]false[/code].

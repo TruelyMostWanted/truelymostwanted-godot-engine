@@ -46,7 +46,7 @@
 			<param index="1" name="target_path" type="String" />
 			<param index="2" name="key" type="String" default="&quot;&quot;" />
 			<description>
-				Writes [param package] as a new pack to [param target_path], using [PCKPacker]. The pack uses the current format, [member PCKPackage.alignment] and [member PCKPackage.encrypted_directory]. Encrypted entries stay encrypted and are encrypted again with [param key]; an empty [param key] uses the key of the package (see [method PCKPackage.set_key]), or the key compiled into the engine. [code]ResourceSaver.save(package, "user://x.pck")[/code] calls this method with an empty [param key].
+				Writes [param package] as a new pack to [param target_path], using [PCKPacker]. The pack uses the current format, [member PCKPackage.alignment] and [member PCKPackage.encrypted_directory]. Encrypted entries stay encrypted and are encrypted again with [param key]; an empty [param key] uses the key of the package (see [method PCKPackage.set_key]), or the key compiled into the engine. [code]ResourceSaver.save(package, "user://x.pck")[/code] calls this method with an empty [param key]. [signal build_progress] is emitted after each entry.
 				Building onto the pack the package was read from, or onto its [member PCKPackage.base_pack], is allowed: the new pack is written to a temporary file first, then replaces the old one. A package that was read from that pack is read again from the new file.
 				Returns [constant ERR_BUSY] if [param target_path] is mounted (unmount it first), [constant ERR_FILE_NOT_FOUND] if source files added with [method PCKPackage.add_file] are missing (all of them are listed in the error, and nothing is written), and [constant ERR_UNAVAILABLE] if the package has delta patches, which can't be rebuilt.
 			</description>
@@ -160,6 +160,14 @@
 		</method>
 	</methods>
 	<signals>
+		<signal name="build_progress">
+			<param index="0" name="path" type="String" />
+			<param index="1" name="done" type="int" />
+			<param index="2" name="total" type="int" />
+			<description>
+				Emitted by [method build] after each file and removal written to the pack. [param path] is the path in the pack ([code]res://…[/code]), [param done] the number of entries written so far and [param total] the number of entries. Emitted on the main thread: when [method build] runs on another thread, the signal is deferred.
+			</description>
+		</signal>
 		<signal name="extract_progress">
 			<param index="0" name="path" type="String" />
 			<param index="1" name="done" type="int" />

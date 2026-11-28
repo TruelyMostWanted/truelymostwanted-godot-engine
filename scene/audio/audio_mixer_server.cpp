@@ -160,25 +160,7 @@ void AudioMixerServer::_preload_entry(Channel &p_channel, int p_index) {
 }
 
 float AudioMixerServer::_apply_curve(const Fade &p_fade) {
-	const float t = p_fade.time > 0.0 ? (float)CLAMP(p_fade.elapsed / p_fade.time, 0.0, 1.0) : 1.0f;
-	float shape = t;
-	switch (p_fade.curve) {
-		case FADE_CURVE_LINEAR: {
-			shape = t;
-		} break;
-		case FADE_CURVE_EASE_IN: {
-			shape = t * t;
-		} break;
-		case FADE_CURVE_EASE_OUT: {
-			shape = 1.0f - (1.0f - t) * (1.0f - t);
-		} break;
-		case FADE_CURVE_EQUAL_POWER: {
-			// Rising gains follow sin, falling gains follow cos, so the summed power of a cross-fade stays 1.
-			const float angle = t * (float)Math::PI * 0.5f;
-			shape = p_fade.to >= p_fade.from ? Math::sin(angle) : 1.0f - Math::cos(angle);
-		} break;
-	}
-	return p_fade.from + (p_fade.to - p_fade.from) * shape;
+	return p_fade.get_value();
 }
 
 ObjectID AudioMixerServer::_current_scene_id() {

@@ -192,6 +192,12 @@ Error CSV::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 		for (const String &column : header) {
 			cells.push_back(column);
 		}
+		// A row wider than the header (set_cell(), set_cells()) gets unnamed columns: the parser rejects
+		// rows wider than the header, and a failed re-parse of this text would drop the data.
+		for (int i = 0; i < rows.size(); i++) {
+			const PackedStringArray values = rows[i];
+			cells.resize(MAX(cells.size(), values.size()));
+		}
 		text += ResourceTextSerializer::write_csv_row(cells, delimiter);
 	}
 	for (int i = 0; i < rows.size(); i++) {
@@ -213,6 +219,18 @@ Error CSV::_encode_data(const Variant &p_data, const Ref<SerializerOptions> &p_o
 
 void CSV::_get_extensions(List<String> *r_extensions) const {
 	r_extensions->push_back("csv");
+	r_extensions->push_back("tsv");
+}
+
+Ref<SerializerOptions> CSV::_get_path_options(const String &p_path) const {
+	if (p_path.get_extension().nocasecmp_to("tsv") != 0) {
+		return Ref<SerializerOptions>();
+	}
+	// Tab-separated values: the other options keep their defaults.
+	Ref<SerializerOptions> options;
+	options.instantiate();
+	options->set_csv_delimiter("\t");
+	return options;
 }
 
 Array CSV::_get_rows() const {

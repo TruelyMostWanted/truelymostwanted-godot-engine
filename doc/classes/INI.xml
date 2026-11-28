@@ -41,7 +41,7 @@
 		[/codeblocks]
 		[b]Resource and files:[/b] [INI] is a [Resource] (see [TextDataFormat]). [code]load("res://x.ini")[/code] of a plain file returns an instance, while files with a [code]$type[/code] marker load as the serialized resource. Plain files load with the project default options. The instance methods [method TextDataFormat.load] and [method TextDataFormat.save] work like [method ConfigFile.load] and [method ConfigFile.save]: they do not use the resource cache and do not set [member Resource.resource_path]. In exported games [code]res://[/code] is read-only, so save to [code]user://[/code].
 		[b]Changes:[/b] changing the data ([member TextDataFormat.data] in the inspector, [member TextDataFormat.data], [method set_value], [method erase_section] ...) drops the kept parsed text, so comments and formatting of the file are lost on the next save. [member TextDataFormat.options] set to [code]null[/code] uses the project settings.
-		[b]ConfigFile and INI:[/b] the file extension [code].cfg[/code] is not claimed by [INI]; it stays with [ConfigFile]. [method set_value] with a [code]null[/code] value erases the key, and an emptied section is erased with it, like [ConfigFile]. Use [method to_config_file] and [method from_config_file] to convert between the two classes.
+		[b]ConfigFile and INI:[/b] files with the extension [code].ini[/code] or [code].cfg[/code] load as [INI]. Godot's own [code]export_presets.cfg[/code] and [code]override.cfg[/code] are not listed as [INI] resources in the editor, but [method @GDScript.load] still reads them; [ConfigFile] reads any [code].cfg[/code] file. [method set_value] with a [code]null[/code] value erases the key, and an emptied section is erased with it, like [ConfigFile]. Use [method to_config_file] and [method from_config_file] to convert between the two classes.
 		[codeblocks]
 		[gdscript]
 		var ini = INI.new()
@@ -210,4 +210,7 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="data" type="Variant" setter="set_data" getter="get_data" overrides="TextDataFormat" default="{}" />
+	</members>
 </class>

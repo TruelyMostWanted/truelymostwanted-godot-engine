@@ -9,9 +9,63 @@
 		The returned font might be part of a font collection or be a variable font with OpenType "weight", "width" and/or "italic" features set.
 		You can create [FontVariation] of the system font for precise control over its features.
 		[b]Note:[/b] This class is implemented on iOS, Linux, macOS and Windows, on other platforms it will fallback to default theme font.
+		To get a font only if it is installed, use [method find] or [method find_first]: they return [code]null[/code] instead of falling back to the default theme font.
+		A system font can also be loaded from a [code]sysfont://[/code] path, for example in a [Theme], a setting or a mod. The path holds one or more comma-separated family names (percent-encoded, [code]%20[/code] or [code]+[/code] for spaces) and the optional query options [code]weight[/code] (100-999), [code]italic[/code] ([code]true[/code]/[code]false[/code]) and [code]stretch[/code] (50-200). The result is the same as [method find_first]; [method ResourceLoader.exists] tells whether the font is installed. Loaded fonts are cached by their exact path.
+		[codeblocks]
+		[gdscript]
+		var title_font = load("sysfont://Segoe%20UI,Noto%20Sans?weight=700")
+		if ResourceLoader.exists("sysfont://Consolas"):
+			$Code.add_theme_font_override("font", load("sysfont://Consolas"))
+		[/gdscript]
+		[csharp]
+		var titleFont = GD.Load&lt;SystemFont&gt;("sysfont://Segoe%20UI,Noto%20Sans?weight=700");
+		if (ResourceLoader.Exists("sysfont://Consolas"))
+		{
+			GetNode&lt;Label&gt;("Code").AddThemeFontOverride("font", GD.Load&lt;Font&gt;("sysfont://Consolas"));
+		}
+		[/csharp]
+		[/codeblocks]
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="find" qualifiers="static">
+			<return type="SystemFont" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="weight" type="int" default="400" />
+			<param index="2" name="italic" type="bool" default="false" />
+			<param index="3" name="stretch" type="int" default="100" />
+			<description>
+				Returns a new [SystemFont] for the installed font family [param name] with [param name] as the only entry of [member font_names], or [code]null[/code] if the family is not installed. [param weight], [param italic] and [param stretch] select the face like [member font_weight], [member font_italic] and [member font_stretch]; the closest face of the family is used if there is no exact one.
+				Unlike a [SystemFont] created with [code]new()[/code], a missing font does not fall back to the default theme font. The name is compared case-insensitively with the family names of the resolved font (also its typographic and localized family names), because some platforms return a similar font for a missing name. The generic names [code]sans-serif[/code], [code]serif[/code], [code]monospace[/code], [code]cursive[/code] and [code]fantasy[/code] always resolve to the platform's default font for that style.
+				[codeblocks]
+				[gdscript]
+				var font = SystemFont.find("Segoe UI", 600)
+				if font:
+					$Label.add_theme_font_override("font", font)
+				[/gdscript]
+				[csharp]
+				SystemFont font = SystemFont.Find("Segoe UI", 600);
+				if (font != null)
+				{
+					GetNode&lt;Label&gt;("Label").AddThemeFontOverride("font", font);
+				}
+				[/csharp]
+				[/codeblocks]
+				[b]Note:[/b] Always returns [code]null[/code] on the Web platform, which has no access to system fonts, and on Linux without fontconfig.
+			</description>
+		</method>
+		<method name="find_first" qualifiers="static">
+			<return type="SystemFont" />
+			<param index="0" name="names" type="PackedStringArray" />
+			<param index="1" name="weight" type="int" default="400" />
+			<param index="2" name="italic" type="bool" default="false" />
+			<param index="3" name="stretch" type="int" default="100" />
+			<description>
+				Returns the [method find] result of the first family in [param names] that is installed, or [code]null[/code] if none is. Empty names are skipped. Use it for a list of preferred fonts across platforms, for example [code]["Segoe UI", "SF Pro Text", "Noto Sans"][/code].
+			</description>
+		</method>
+	</methods>
 	<members>
 		<member name="allow_system_fallback" type="bool" setter="set_allow_system_fallback" getter="is_allow_system_fallback" default="true">
 			If set to [code]true[/code], system fonts can be automatically used as fallbacks.

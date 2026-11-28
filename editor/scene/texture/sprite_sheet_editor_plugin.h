@@ -58,7 +58,7 @@ public:
 	static void commit_regions(const String &p_action, const Ref<SpriteSheet> &p_atlas, const TypedDictionary<StringName, Rect2i> &p_new_regions, const TypedDictionary<StringName, Rect2i> &p_new_margins, UndoRedo::MergeMode p_merge = UndoRedo::MERGE_DISABLE);
 	static void remove(const Ref<SpriteSheet> &p_atlas, const PackedStringArray &p_names);
 	static void rename(const Ref<SpriteSheet> &p_atlas, const StringName &p_from, const StringName &p_to);
-	static void add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
+	static PackedStringArray add(const Ref<SpriteSheet> &p_atlas, const String &p_action, const TypedArray<Rect2i> &p_rects, const String &p_prefix);
 	// Text "x, y, width, height" to a rectangle.
 	static bool parse_rect(const String &p_text, Rect2i &r_rect);
 	// The rectangle of the region editor dialog (float) in whole pixels inside the texture (no clamping if
@@ -118,6 +118,7 @@ class SpriteSheetCanvas : public Control {
 	SpriteSheetEditor *editor = nullptr;
 	float zoom = 1.0f;
 	Vector2 view_offset; // Screen position of the texture origin.
+	bool fit_pending = false; // Fit again on resize until the user zooms or pans (the dock opens hidden and grows).
 	DragMode drag_mode = DRAG_NONE;
 	int drag_handle = -1;
 	Vector2 drag_from; // In texture pixels (DRAG_PAN: in screen pixels).
@@ -130,6 +131,7 @@ class SpriteSheetCanvas : public Control {
 	Vector2 _to_texture(const Vector2 &p_screen) const;
 	Vector2 _to_screen(const Vector2 &p_texture) const;
 	Vector2i _snap(const Vector2 &p_texture) const;
+	Rect2i _get_texture_area() const;
 	Rect2i _clamp_to_texture(const Rect2i &p_rect) const;
 	StringName _region_at(const Vector2 &p_texture) const;
 	int _handle_at(const Vector2 &p_screen) const;
@@ -192,6 +194,8 @@ class SpriteSheetEditor : public EditorDock {
 	Ref<AtlasTexture> region_dialog_texture;
 
 	void _atlas_changed();
+	void _inspector_object_changed();
+	void _filesystem_changed();
 	void _region_dialog_confirmed();
 	void _region_dialog_visibility_changed();
 	void _region_dialog_release();

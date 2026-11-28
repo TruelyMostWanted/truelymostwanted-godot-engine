@@ -69,6 +69,47 @@ bool AudioStreamPlayerInternal::_is_sample() {
 }
 
 void AudioStreamPlayerInternal::process() {
+	const double delta = physical ? node->get_physics_process_delta_time() : node->get_process_delta_time();
+
+	// Fades. The signals are emitted after the state is updated, so handlers may start new fades.
+	for (uint32_t i = 0; i < fading_out.size();) {
+		FadingPlayback &fading = fading_out[i];
+		if (fading.fade.advance(delta, fading.gain) || !fading.fade.active) {
+			AudioServer::get_singleton()->stop_playback_stream(fading.playback);
+			fading_out.remove_at_unordered(i);
+			continue;
+		}
+		volumes_dirty = true;
+		i++;
+	}
+	if (fade.active) {
+		volumes_dirty = true;
+		if (fade.advance(delta, fade_gain)) {
+			if (fade_stop_at_end) {
+				stop_callable.call();
+			}
+			node->emit_signal(SNAME("fade_finished"));
+		}
+	}
+
+	// Track changes of playlists and the opt-in position signal.
+	if (!stream_playbacks.is_empty()) {
+		const Ref<AudioStreamPlayback> playback = stream_playbacks[stream_playbacks.size() - 1];
+		AudioStreamPlayback::TrackInfo info;
+		if (playback->get_track_info(info) && info.index >= 0 && (playback->get_instance_id() != track_playback || info.serial != track_serial)) {
+			track_playback = playback->get_instance_id();
+			track_serial = info.serial;
+			node->emit_signal(SNAME("track_changed"), info.index, info.stream);
+		}
+		if (position_signal_interval > 0.0f) {
+			position_signal_elapsed += delta;
+			if (position_signal_elapsed >= position_signal_interval) {
+				position_signal_elapsed = 0.0;
+				node->emit_signal(SNAME("position_changed"), get_track_position());
+			}
+		}
+	}
+
 	Vector<Ref<AudioStreamPlayback>> playbacks_to_remove;
 	for (Ref<AudioStreamPlayback> &playback : stream_playbacks) {
 		if (playback.is_valid() && !AudioServer::get_singleton()->is_playback_active(playback) && !AudioServer::get_singleton()->is_playback_paused(playback)) {
@@ -82,7 +123,9 @@ void AudioStreamPlayerInternal::process() {
 	if (!playbacks_to_remove.is_empty() && stream_playbacks.is_empty()) {
 		// This node is no longer actively playing audio.
 		active.clear();
+		_stop_fading_out(); // The old stream of a crossfade ends with the new one.
 		_set_process(false);
+		update_playing_state();
 	}
 	if (!playbacks_to_remove.is_empty()) {
 		node->emit_signal(SceneStringName(finished));
@@ -149,7 +192,9 @@ Ref<AudioStreamPlayback> AudioStreamPlayerInternal::play_basic() {
 	}
 	ERR_FAIL_COND_V_MSG(!node->is_inside_tree(), stream_playback, "Playback can only happen when a node is inside the scene tree");
 	if (stream->is_monophonic() && is_playing()) {
+		restarting = true;
 		stop_callable.call();
+		restarting = false;
 	}
 	stream_playback = stream->instantiate_playback();
 	ERR_FAIL_COND_V_MSG(stream_playback.is_null(), stream_playback, "Failed to instantiate playback.");
@@ -177,6 +222,13 @@ Ref<AudioStreamPlayback> AudioStreamPlayerInternal::play_basic() {
 		}
 	}
 
+	if (!keep_fade_on_play) {
+		// A plain play() is not faded.
+		fade.active = false;
+		fade_gain = 1.0f;
+	}
+	position_signal_elapsed = 0.0;
+
 	stream_playbacks.push_back(stream_playback);
 	active.set();
 	_set_process(true);
@@ -191,6 +243,7 @@ void AudioStreamPlayerInternal::set_stream_paused(bool p_pause) {
 			AudioServer::get_singleton()->set_sample_playback_pause(playback->get_sample_playback(), p_pause);
 		}
 	}
+	update_playing_state();
 }
 
 bool AudioStreamPlayerInternal::get_stream_paused() const {
@@ -242,22 +295,35 @@ void AudioStreamPlayerInternal::get_property_list(List<PropertyInfo> *p_list) co
 }
 
 void AudioStreamPlayerInternal::set_stream(Ref<AudioStream> p_stream) {
+	stop_callable.call();
+	_assign_stream(p_stream);
+}
+
+void AudioStreamPlayerInternal::_assign_stream(const Ref<AudioStream> &p_stream) {
 	if (stream.is_valid()) {
 		stream->disconnect(SNAME("parameter_list_changed"), callable_mp(this, &AudioStreamPlayerInternal::_update_stream_parameters));
 	}
-	stop_callable.call();
+	const bool changed = stream != p_stream;
 	stream = p_stream;
 	_update_stream_parameters();
 	if (stream.is_valid()) {
 		stream->connect(SNAME("parameter_list_changed"), callable_mp(this, &AudioStreamPlayerInternal::_update_stream_parameters));
 	}
 	node->notify_property_list_changed();
+	if (changed) {
+		node->emit_signal(SNAME("stream_changed"), stream);
+	}
 }
 
 void AudioStreamPlayerInternal::seek(float p_seconds) {
 	if (is_playing()) {
+		// A seek keeps a running fade.
+		keep_fade_on_play = true;
+		restarting = true;
 		stop_callable.call();
 		play_callable.call(p_seconds);
+		restarting = false;
+		keep_fade_on_play = false;
 	}
 }
 
@@ -266,9 +332,21 @@ void AudioStreamPlayerInternal::stop_basic() {
 		AudioServer::get_singleton()->stop_playback_stream(playback);
 	}
 	stream_playbacks.clear();
+	_stop_fading_out();
+	if (!keep_fade_on_play) {
+		fade.active = false;
+	}
 
 	active.clear();
 	_set_process(false);
+	update_playing_state();
+}
+
+void AudioStreamPlayerInternal::_stop_fading_out() {
+	for (const FadingPlayback &fading : fading_out) {
+		AudioServer::get_singleton()->stop_playback_stream(fading.playback);
+	}
+	fading_out.clear();
 }
 
 bool AudioStreamPlayerInternal::is_playing() const {
@@ -293,6 +371,17 @@ void AudioStreamPlayerInternal::set_playing(bool p_enable) {
 		play_callable.call(0.0);
 	} else {
 		stop_callable.call();
+	}
+}
+
+void AudioStreamPlayerInternal::update_playing_state() {
+	if (restarting) {
+		return;
+	}
+	const bool now = !stream_playbacks.is_empty() && !get_stream_paused();
+	if (now != playing_state) {
+		playing_state = now;
+		node->emit_signal(SNAME("playing_changed"), now);
 	}
 }
 
@@ -330,6 +419,119 @@ void AudioStreamPlayerInternal::set_playback_type(AuSE::PlaybackType p_playback_
 
 AuSE::PlaybackType AudioStreamPlayerInternal::get_playback_type() const {
 	return playback_type;
+}
+
+void AudioStreamPlayerInternal::fade_in(float p_duration, int p_curve) {
+	if (!is_playing()) {
+		// Start silent; the node applies the gain to the first mix block.
+		fade_gain = 0.0f;
+		keep_fade_on_play = true;
+		play_callable.call(0.0);
+		keep_fade_on_play = false;
+		if (stream_playbacks.is_empty()) {
+			fade_gain = 1.0f; // Nothing to play.
+			return;
+		}
+	}
+	fade.start(fade_gain, 1.0f, p_duration, p_curve);
+	fade.active = true; // A duration of 0 finishes in the next frame and emits `fade_finished` there.
+	fade_stop_at_end = false;
+}
+
+void AudioStreamPlayerInternal::fade_out(float p_duration, int p_curve, bool p_stop_at_end) {
+	if (stream_playbacks.is_empty()) {
+		return;
+	}
+	fade.start(fade_gain, 0.0f, p_duration, p_curve);
+	fade.active = true;
+	fade_stop_at_end = p_stop_at_end;
+}
+
+void AudioStreamPlayerInternal::crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, int p_curve) {
+	ERR_FAIL_COND_MSG(p_stream.is_null(), "Cannot crossfade to a null stream; use fade_out() to fade to silence.");
+	// The current playbacks fade out from their gain and stop at the end; the new stream fades in from 0.
+	for (const Ref<AudioStreamPlayback> &playback : stream_playbacks) {
+		FadingPlayback fading;
+		fading.playback = playback;
+		fading.gain = fade_gain;
+		fading.fade.start(fade_gain, 0.0f, p_duration, p_curve);
+		fading.fade.active = true;
+		fading_out.push_back(fading);
+	}
+	stream_playbacks.clear();
+	_assign_stream(p_stream);
+	fade_in(p_duration, p_curve);
+}
+
+bool AudioStreamPlayerInternal::is_fading() const {
+	return fade.active || !fading_out.is_empty();
+}
+
+static HashMap<StringName, Vector<AudioFrame>> _scale_bus_volumes(const HashMap<StringName, Vector<AudioFrame>> &p_bus_volumes, float p_gain) {
+	HashMap<StringName, Vector<AudioFrame>> scaled(p_bus_volumes);
+	for (KeyValue<StringName, Vector<AudioFrame>> &E : scaled) {
+		for (AudioFrame &frame : E.value) {
+			frame *= p_gain;
+		}
+	}
+	return scaled;
+}
+
+void AudioStreamPlayerInternal::apply_bus_volumes(const HashMap<StringName, Vector<AudioFrame>> &p_bus_volumes) {
+	volumes_dirty = false;
+	AudioServer *audio_server = AudioServer::get_singleton();
+	if (!stream_playbacks.is_empty()) {
+		// Unfaded players pass the map through, as before.
+		const HashMap<StringName, Vector<AudioFrame>> faded = fade_gain == 1.0f ? HashMap<StringName, Vector<AudioFrame>>() : _scale_bus_volumes(p_bus_volumes, fade_gain);
+		for (const Ref<AudioStreamPlayback> &playback : stream_playbacks) {
+			audio_server->set_playback_bus_volumes_linear(playback, fade_gain == 1.0f ? p_bus_volumes : faded);
+		}
+	}
+	for (const FadingPlayback &fading : fading_out) {
+		audio_server->set_playback_bus_volumes_linear(fading.playback, _scale_bus_volumes(p_bus_volumes, fading.gain));
+	}
+}
+
+Vector<AudioFrame> AudioStreamPlayerInternal::get_faded_volumes(const Vector<AudioFrame> &p_volumes) const {
+	Vector<AudioFrame> faded = p_volumes;
+	if (fade_gain != 1.0f) {
+		for (AudioFrame &frame : faded) {
+			frame *= fade_gain;
+		}
+	}
+	return faded;
+}
+
+int AudioStreamPlayerInternal::get_current_track_index() {
+	if (stream_playbacks.is_empty()) {
+		return -1;
+	}
+	AudioStreamPlayback::TrackInfo info;
+	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.index : 0;
+}
+
+Ref<AudioStream> AudioStreamPlayerInternal::get_current_track_stream() {
+	if (stream_playbacks.is_empty()) {
+		return Ref<AudioStream>();
+	}
+	AudioStreamPlayback::TrackInfo info;
+	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.stream : stream;
+}
+
+double AudioStreamPlayerInternal::get_track_position() {
+	if (stream_playbacks.is_empty()) {
+		return 0.0;
+	}
+	AudioStreamPlayback::TrackInfo info;
+	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.position : (double)get_playback_position();
+}
+
+double AudioStreamPlayerInternal::get_position_in_playlist() {
+	if (stream_playbacks.is_empty()) {
+		return 0.0;
+	}
+	AudioStreamPlayback::TrackInfo info;
+	return stream_playbacks[stream_playbacks.size() - 1]->get_track_info(info) ? info.list_position : (double)get_playback_position();
 }
 
 StringName AudioStreamPlayerInternal::get_bus() const {

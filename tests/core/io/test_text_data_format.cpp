@@ -90,7 +90,7 @@ TEST_CASE("[TextDataFormat] Base API through INI") {
 	Ref<INI> ini;
 	ini.instantiate();
 	CHECK(ini->get_data().get_type() == Variant::DICTIONARY);
-	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini" }));
+	CHECK(ini->get_recognized_extensions() == PackedStringArray({ "ini", "cfg" }));
 
 	const String text = "; comment\n[player]\nname=\"Ann\"\nlevel=3\n";
 	REQUIRE(ini->parse(text, true) == OK);
@@ -396,6 +396,21 @@ TEST_CASE("[CSV] Blocks of cells for copy, paste and undo") {
 	csv->set_cells(5, 0, tsv);
 	ERR_PRINT_ON;
 	CHECK(csv->get_row_count() == 2);
+}
+
+TEST_CASE("[CSV] Cells wider than the header survive a text round trip") {
+	Ref<CSV> csv;
+	csv.instantiate();
+	REQUIRE(csv->parse("name,hp\nknight,100\n") == OK);
+	Array block;
+	block.push_back(PackedStringArray({ "90", "4", "fast" }));
+	csv->set_cells(0, 1, block);
+
+	// The text gets unnamed header columns, so parsing it again keeps every cell.
+	const String text = csv->encode_to_text();
+	CHECK(text == "name,hp,,\nknight,90,4,fast\n");
+	REQUIRE(csv->parse(text) == OK);
+	CHECK(csv->get_row(0) == PackedStringArray({ "knight", "90", "4", "fast" }));
 }
 
 TEST_CASE("[TextDataFormat] Instance load() and save()") {

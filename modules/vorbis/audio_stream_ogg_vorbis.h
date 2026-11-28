@@ -120,6 +120,7 @@ class AudioStreamOggVorbis : public AudioStream {
 	friend class AudioStreamPlaybackOggVorbis;
 
 	int channels = 1;
+	int bitrate = 0; // Nominal bitrate of the Vorbis header.
 	double length = 0.0;
 	bool loop = false;
 	double loop_offset = 0.0;
@@ -166,6 +167,10 @@ public:
 	Ref<OggPacketSequence> get_packet_sequence() const;
 
 	virtual double get_length() const override; //if supported, otherwise return 0
+	virtual int get_sample_rate() const override;
+	virtual int get_channel_count() const override;
+	virtual int get_bitrate() const override;
+	virtual String get_codec() const override { return "Vorbis"; }
 
 	virtual bool is_monophonic() const override;
 

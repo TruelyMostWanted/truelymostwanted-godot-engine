@@ -31,13 +31,16 @@
 #pragma once
 
 #include "core/object/ref_counted.h"
+#include "core/templates/local_vector.h"
 #include "core/templates/safe_refcount.h"
+#include "scene/audio/audio_fade.h"
 #include "servers/audio/audio_server_enums.h"
 
 class AudioStream;
 class AudioStreamPlayback;
 class AudioSamplePlayback;
 class Node;
+struct AudioFrame;
 
 class AudioStreamPlayerInternal : public Object {
 	GDCLASS(AudioStreamPlayerInternal, Object);
@@ -63,6 +66,25 @@ private:
 
 	bool _is_sample();
 
+	// Playbacks of the previous stream of a crossfade; not counted in polyphony, no `finished`.
+	struct FadingPlayback {
+		Ref<AudioStreamPlayback> playback;
+		float gain = 1.0f;
+		AudioFade fade;
+	};
+	LocalVector<FadingPlayback> fading_out;
+	AudioFade fade;
+	bool fade_stop_at_end = false;
+	bool keep_fade_on_play = false;
+	ObjectID track_playback;
+	uint32_t track_serial = 0;
+	double position_signal_elapsed = 0.0;
+	bool playing_state = false; // Last value of `playing_changed`.
+	bool restarting = false; // Stop and start of seek() and monophonic restarts: no `playing_changed`.
+
+	void _assign_stream(const Ref<AudioStream> &p_stream);
+	void _stop_fading_out();
+
 public:
 	Vector<Ref<AudioStreamPlayback>> stream_playbacks;
 	Ref<AudioStream> stream;
@@ -74,6 +96,10 @@ public:
 	bool autoplay = false;
 	StringName bus;
 	int max_polyphony = 1;
+	float fade_gain = 1.0f; // Multiplies the volume of the current playbacks.
+	bool volumes_dirty = false; // A fade gain changed; cleared by apply_bus_volumes().
+	float position_signal_interval = 0.0f;
+	String subtitle_path; // Override of `AudioStream.subtitle_path` for `SubtitlePlayer`.
 
 	void process();
 	void ensure_playback_limit();
@@ -96,6 +122,8 @@ public:
 	float get_playback_position();
 
 	void set_playing(bool p_enable);
+	// Emits `playing_changed` when "has a running, unpaused playback" changed.
+	void update_playing_state();
 	bool is_active() const;
 
 	void set_stream_paused(bool p_pause);
@@ -106,6 +134,21 @@ public:
 
 	void set_playback_type(AuSE::PlaybackType p_playback_type);
 	AuSE::PlaybackType get_playback_type() const;
+
+	// Fades and crossfade. The nodes set every playback volume through apply_bus_volumes() and start
+	// playbacks with get_faded_volumes(), so the fade gains apply on top of their own volume.
+	void fade_in(float p_duration, int p_curve);
+	void fade_out(float p_duration, int p_curve, bool p_stop_at_end);
+	void crossfade_to(const Ref<AudioStream> &p_stream, float p_duration, int p_curve);
+	bool is_fading() const;
+	void apply_bus_volumes(const HashMap<StringName, Vector<AudioFrame>> &p_bus_volumes);
+	Vector<AudioFrame> get_faded_volumes(const Vector<AudioFrame> &p_volumes) const;
+
+	// Track info: playlists report their current track, single streams index 0.
+	int get_current_track_index();
+	Ref<AudioStream> get_current_track_stream();
+	double get_track_position();
+	double get_position_in_playlist();
 
 	AudioStreamPlayerInternal(Node *p_node, const Callable &p_play_callable, const Callable &p_stop_callable, bool p_physical);
 };

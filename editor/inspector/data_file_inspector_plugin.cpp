@@ -427,14 +427,16 @@ void DataFileInspectorView::_update() {
 	String counts;
 	if (csv) {
 		const Ref<CSV> csv_file = resource;
-		counts = vformat(TTR("%d rows, %d columns"), csv_file->get_row_count(), csv_file->get_column_count());
+		const int rows = csv_file->get_row_count();
+		const int columns = csv_file->get_column_count();
+		counts = vformat(TTRN("%d row", "%d rows", rows), rows) + ", " + vformat(TTRN("%d column", "%d columns", columns), columns);
 	} else if (Object::cast_to<INI>(*resource)) {
 		const Dictionary sections = file_data;
 		int key_count = 0;
 		for (const KeyValue<Variant, Variant> &kv : sections) {
 			key_count += Dictionary(kv.value).size();
 		}
-		counts = vformat(TTR("%d sections, %d keys"), sections.size(), key_count);
+		counts = vformat(TTRN("%d section", "%d sections", sections.size()), sections.size()) + ", " + vformat(TTRN("%d key", "%d keys", key_count), key_count);
 	} else if (xml) {
 		// The tree shows the root element itself as the only top-level node.
 		const Dictionary root = file_data;
@@ -443,7 +445,8 @@ void DataFileInspectorView::_update() {
 			nodes.push_back(root);
 		}
 		root_value = nodes;
-		counts = root.is_empty() ? TTR("No root element") : vformat(TTR("Root element <%s>, %d child nodes"), root.get(XML::KEY_NAME, String()), Array(root.get(XML::KEY_CHILDREN, Array())).size());
+		const int children = Array(root.get(XML::KEY_CHILDREN, Array())).size();
+		counts = root.is_empty() ? TTR("No root element") : vformat(TTRN("Root element <%s>, %d child node", "Root element <%s>, %d child nodes", children), root.get(XML::KEY_NAME, String()), children);
 	} else {
 		const DataFileTreeAdapter::Entry entry = DataFileTreeAdapter::make_entry(String(), file_data, false);
 		counts = entry.data.is_array() || entry.data.get_type() == Variant::DICTIONARY ? entry.type + ", " + entry.value : entry.type;
@@ -483,9 +486,10 @@ void DataFileInspectorView::_validate(bool p_force) {
 		const int line = format.is_valid() ? format->get_error_line() : json->get_error_line() + 1;
 		const int column = format.is_valid() ? format->get_error_column() : 0;
 		const String at = column > 0 ? vformat(TTR("line %d, column %d"), line, column) : vformat(TTR("line %d"), line);
-		status_label->set_text(line > 0 ? vformat(TTR("Parse error at %s: %s"), at, error) : vformat(TTR("Parse error: %s"), error));
+		// The message once, in the list (activating it opens the line); the status only says what failed.
+		status_label->set_text(TTR("The text can't be parsed."));
 		status_label->add_theme_color_override(SceneStringName(font_color), error_color);
-		issue_list->add_item(status_label->get_text());
+		issue_list->add_item(line > 0 ? vformat(TTR("Parse error at %s: %s"), at, error) : vformat(TTR("Parse error: %s"), error));
 		issue_list->set_item_metadata(0, line);
 		issue_list->show();
 		return;

@@ -587,6 +587,10 @@ public:
 
 	int64_t get_face_count() const override;
 
+	// Defined in `system_font_resource_format.cpp`.
+	static Ref<SystemFont> find(const String &p_name, int p_weight = 400, bool p_italic = false, int p_stretch = 100);
+	static Ref<SystemFont> find_first(const PackedStringArray &p_names, int p_weight = 400, bool p_italic = false, int p_stretch = 100);
+
 	SystemFont();
 	~SystemFont();
 };

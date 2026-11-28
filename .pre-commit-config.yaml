@@ -230,3 +230,11 @@ repos:
 #     - id: new-local-hook
 # To add external repo hooks, bring the indentation back to:
 # - repo: my-remote-hook
+
+      # Truely: code that MSVC accepts but the GCC/Clang/SCU CI rejects (truely/PIPELINE-CONVENTIONS.md).
+      - id: truely-pipeline-lint
+        name: truely-pipeline-lint
+        language: python
+        entry: python truely/pipeline_lint.py
+        files: \.(cpp|h|hpp|inc)$
+        exclude: ^thirdparty/

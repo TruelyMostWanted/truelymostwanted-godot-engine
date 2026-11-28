@@ -59,6 +59,7 @@
 #include "core/profiling/profiling.h"
 #include "core/register_core_types.h"
 #include "core/string/resource_localization_server.h"
+#include "core/string/text_insertion_server.h"
 #include "core/string/text_localization_server.h"
 #include "core/string/translation_server.h"
 #include "core/truely_version.h"
@@ -342,6 +343,15 @@ static String get_full_version_string() {
 	return String(GODOT_VERSION_FULL_BUILD) + hash;
 }
 
+// Truely: the startup header shows the Godot base without the build name ("truely"), which the Truely version already says.
+static String get_header_version_string() {
+	String hash = String(GODOT_VERSION_HASH);
+	if (!hash.is_empty()) {
+		hash = "." + hash.left(9);
+	}
+	return String(GODOT_VERSION_FULL_CONFIG) + hash;
+}
+
 #if defined(TOOLS_ENABLED) && defined(MODULE_GDSCRIPT_ENABLED)
 static Vector<String> get_files_with_extension(const String &p_root, const String &p_extension) {
 	Vector<String> paths;
@@ -402,15 +412,15 @@ void Main::print_header(bool p_rich) {
 	if (GODOT_VERSION_TIMESTAMP > 0) {
 		// Version timestamp available.
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_header_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_header_version_string() + " (" + Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC) - " + String(GODOT_VERSION_WEBSITE));
 		}
 	} else {
 		if (p_rich) {
-			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_full_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header_rich(String(TRUELY_VERSION_FULL_NAME " - ") + "\u001b[38;5;39m" + String(GODOT_VERSION_NAME) + "\u001b[0m v" + get_header_version_string() + " - \u001b[4m" + String(GODOT_VERSION_WEBSITE));
 		} else {
-			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_full_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
+			Engine::get_singleton()->print_header(String(TRUELY_VERSION_FULL_NAME " - ") + String(GODOT_VERSION_NAME) + " v" + get_header_version_string() + " - " + String(GODOT_VERSION_WEBSITE));
 		}
 	}
 }
@@ -881,6 +891,10 @@ void Main::test_cleanup() {
 	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 #ifdef TOOLS_ENABLED
@@ -5452,6 +5466,10 @@ void Main::cleanup(bool p_force) {
 	// Callables of formats registered with register_extension_loader()/register_extension_saver() reference scripts: release them before the languages finish.
 	ResourceFormatLoaderCallable::unregister_all();
 	ResourceFormatSaverCallable::unregister_all();
+	// Truely (#386): provider and modifier Callables of TextInsertionServer reference scripts as well.
+	if (TextInsertionServer::get_singleton()) {
+		TextInsertionServer::get_singleton()->finish();
+	}
 	PropertyListHelper::clear_base_helpers();
 
 	// Remove the lock file if the engine exits successfully. Some automated processes such as

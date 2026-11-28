@@ -1,6 +1,6 @@
 # Konventionen der Truely-Engine
 
-Regeln für Code und Issues in dieser Engine-Fork. Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
+Regeln für Code und Issues in dieser Engine-Fork. Wie Features aufgebaut werden (Klassenarten, Schichten, Server-API, Data-Oriented Design): [`ARCHITECTURE.md`](ARCHITECTURE.md). Was zusätzlich die CI verlangt (GCC/Clang, SCU, Sanitizer, Minimal-Template, doctool, C#): [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md). Der Ablauf (Branch, Build, Test, Merge) steht in [`FEATURE-WORKFLOW.md`](FEATURE-WORKFLOW.md),
 Branches und Remotes in [`README.md`](README.md).
 
 ---
@@ -11,7 +11,7 @@ Branches und Remotes in [`README.md`](README.md).
 
 | Regel | Bedeutung |
 |---|---|
-| **Keine Nodes** | Neue Systeme sind **keine Nodes** im Szenenbaum. Server sind C++-Singletons wie `AudioServer` oder `TextServer`. Datentypen sind `Resource`s. |
+| **Passende Klassenart** | Jeder Teil eines Features hat die passende Art: Daten als `Resource`, Laufzeitzustand als `RefCounted`-Playback, gemeinsamer Zustand als Server (C++-Singleton wie `AudioServer`), ein `Node` nur als dünne Verbindung zur Szene (Muster Resource + Playback + Node, wie `AudioStream` + `AudioStreamPlayback` + `AudioStreamPlayer`). Regeln mit Beispielen: [`ARCHITECTURE.md`](ARCHITECTURE.md). |
 | **Das C++-Objekt ist die API** | Methoden, Properties, Signale und Enums werden in `_bind_methods()` gebunden. GDScript sieht sie direkt. C# bekommt sie über den generierten Glue. |
 | **Doku gehört dazu** | Jede Klasse hat ihre Klassenreferenz in `doc/classes/<Klasse>.xml` oder `modules/<modul>/doc_classes/`. Die pre-commit-Hooks `doc-status` und `make-rst` müssen durchlaufen. Die Benutzung steht im [Wiki](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki). |
 | **Zwei Sprachen** | Jedes Feature wird in **GDScript und C#** getestet, mit einem **Mono-Build** (Testprojekt [godot-custom-build-project](https://github.com/TruelyMostWanted/godot-custom-build-project)). |
@@ -107,7 +107,7 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
   - Issue #3 → `03-feature-path-prefix-server`
   - Issue #123 → `123-feature-…`
   - `<art>` folgt dem Typ des Issues: `feature`, `refactoring`, `bug`, `concept`.
-- Derselbe Name gilt für den Feature-Ordner im Testprojekt (`res://03-feature-path-prefix-server/`) und für die Guide-Seite im Wiki.
+- Testprojekt-Ordner und Wiki-Guide tragen den Namen des Themas, nicht den des Branches: Guide `Path-Prefixes`, Ordner `res://path-prefixes/` (Beispiel + Test, siehe `FEATURE-WORKFLOW.md` 4.5).
 - Feature-Branches zweigen von `truely-godot-engine` ab und werden **nie gelöscht**. PR-Branches für Beiträge an Godot zweigen von `master` ab (siehe `README.md`).
 
 ---
@@ -135,8 +135,8 @@ Aus jedem Singleton erzeugt der C#-Generator zwei Typen (`modules/mono/editor/bi
 - [ ] C#/GDScript bindings created and registered
 - [ ] Documentation written (class reference in `doc/classes/` and wiki page: GDScript, C#, GDExtension)
 - [ ] Test build on the current platform done (no errors or warnings)
-- [ ] Tested in the test project (`res://<feature-branch>/`) with a Mono build, in GDScript and in C#
+- [ ] Tested in the test project (`res://<guide>/`: Example and Test) with a Mono build, in GDScript and in C#
 ```
 
-- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (`<feature-branch>`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
+- **Wiki:** Klassenreferenz-Seiten (`Class-<Klasse>`) und Guide-Seiten (nach Thema, z. B. `Path-Prefixes`) nach dem Aufbau der offiziellen Godot-Docs, mit Beispielen in GDScript, C# und C++ (GDExtension). Details: `FEATURE-WORKFLOW.md`, Abschnitt 5.
 - **Tracker:** Größere Vorhaben bekommen ein `[Task] Tracker: …` mit `flag: tracker`, das die Issues in Reihenfolge und mit Abhängigkeiten auflistet.

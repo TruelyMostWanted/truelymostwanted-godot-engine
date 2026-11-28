@@ -5,12 +5,13 @@
 	</brief_description>
 	<description>
 		Base class for audio streams. Audio streams are used for sound effects and music playback, and support WAV (via [AudioStreamWAV]), Ogg (via [AudioStreamOggVorbis]), and MP3 (via [AudioStreamMP3]) file formats.
+		Every stream also carries optional track information such as [member title], [member artist], [member album] and [member cover]. It is read from the tags of the audio file (ID3, RIFF INFO, Vorbis comments) when the file is loaded or imported, unless [member ProjectSettings.audio/info/read_file_tags] is disabled. Use [method load_info] to read only the information of a file without loading its audio data. Empty strings and [code]0[/code] mean unknown.
 	</description>
 	<tutorials>
 		<link title="Audio streams">$DOCS_URL/tutorials/audio/audio_streams.html</link>
-		<link title="Audio Generator Demo">https://godotengine.org/asset-library/asset/2759</link>
-		<link title="Audio Microphone Record Demo">https://godotengine.org/asset-library/asset/2760</link>
-		<link title="Audio Spectrum Visualizer Demo">https://godotengine.org/asset-library/asset/2762</link>
+		<link title="Audio Generator Demo">https://store.godotengine.org/asset/godot-foundation/audio-generator-demo/</link>
+		<link title="Audio Microphone Record Demo">https://store.godotengine.org/asset/godot-foundation/audio-mic-record-demo/</link>
+		<link title="Audio Spectrum Visualizer Demo">https://store.godotengine.org/asset/godot-foundation/audio-spectrum-demo/</link>
 	</tutorials>
 	<methods>
 		<method name="_get_bar_beats" qualifiers="virtual const">
@@ -55,7 +56,7 @@
 			<return type="Dictionary" />
 			<description>
 				Override this method to customize the tags for this audio stream. Should return a [Dictionary] of strings with the tag as the key and its content as the value.
-				Commonly used tags include [code]title[/code], [code]artist[/code], [code]album[/code], [code]tracknumber[/code], and [code]date[/code].
+				Commonly used tags include [code skip-lint]title[/code], [code skip-lint]artist[/code], [code skip-lint]album[/code], [code]tracknumber[/code], and [code]date[/code].
 			</description>
 		</method>
 		<method name="_has_loop" qualifiers="virtual const">
@@ -88,10 +89,34 @@
 				Generates an [AudioSample] based on the current stream.
 			</description>
 		</method>
+		<method name="get_bitrate" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the average bitrate of the audio data in bits per second, or [code]0[/code] if unknown or not applicable (for example for generators). For [AudioStreamMP3] the tag bytes are not counted.
+			</description>
+		</method>
+		<method name="get_channel_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of channels of the audio data, or [code]0[/code] if unknown or not applicable (for example for [AudioStreamGenerator], playlists or [AudioStreamMicrophone]).
+			</description>
+		</method>
+		<method name="get_codec" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the name of the audio format: [code]"PCM"[/code], [code]"IMA ADPCM"[/code] or [code]"QOA"[/code] for [AudioStreamWAV], [code]"MP3"[/code], [code]"Vorbis"[/code] or [code]"Opus"[/code]. Returns an empty string for streams without a file format, such as generators, playlists and the microphone.
+			</description>
+		</method>
 		<method name="get_length" qualifiers="const">
 			<return type="float" />
 			<description>
 				Returns the length of the audio stream in seconds. If this stream is an [AudioStreamRandomizer], returns the length of the last played stream. If this stream has an indefinite length (such as for [AudioStreamGenerator] and [AudioStreamMicrophone]), returns [code]0.0[/code].
+			</description>
+		</method>
+		<method name="get_sample_rate" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the sample rate of the audio data in Hz, or [code]0[/code] if unknown or not applicable (for example for generators, playlists or [AudioStreamMicrophone]).
 			</description>
 		</method>
 		<method name="instantiate_playback">
@@ -112,7 +137,84 @@
 				Returns [code]true[/code] if this audio stream only supports one channel ([i]monophony[/i]), or [code]false[/code] if the audio stream supports two or more channels ([i]polyphony[/i]).
 			</description>
 		</method>
+		<method name="load_info" qualifiers="static">
+			<return type="AudioStream" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Returns a stream of the matching class ([AudioStreamMP3], [AudioStreamWAV], [AudioStreamOggVorbis] or [AudioStreamOpus], detected from the file content, not the extension) with the track information and the format values filled in, but [b]without any audio data[/b]. Only the headers and tags are read (for MP3 the ID3v2 tag, the last 128 bytes and the first frame; for WAV the RIFF chunks, skipping the audio data; for Ogg the first pages and the last page for the length). This is much faster and uses less memory than loading the file, so it suits music libraries and playlists. The returned stream cannot be played, load the file for that.
+				If [param path] is not a readable file (for example in an exported project, where only the imported resource exists), the resource is loaded with [method ResourceLoader.load] instead, which contains the track information saved at import. Returns [code]null[/code] and prints an error if the file is unknown or broken. The track information stays empty if [member ProjectSettings.audio/info/read_file_tags] is [code]false[/code].
+				[codeblocks]
+				[gdscript]
+				for file in DirAccess.get_files_at("user://music"):
+					var info = AudioStream.load_info("user://music/" + file)
+					if info:
+						print("%d. %s - %s" % [info.track_number, info.artist, info.title])
+				[/gdscript]
+				[csharp]
+				foreach (string file in DirAccess.GetFilesAt("user://music"))
+				{
+					AudioStream info = AudioStream.LoadInfo("user://music/" + file);
+					if (info != null)
+					{
+						GD.Print($"{info.TrackNumber}. {info.Artist} - {info.Title}");
+					}
+				}
+				[/csharp]
+				[/codeblocks]
+			</description>
+		</method>
 	</methods>
+	<members>
+		<member name="album" type="String" setter="set_album" getter="get_album" default="&quot;&quot;">
+			The album this track belongs to. Read from ID3 [code]TALB[/code], RIFF [code]IPRD[/code] or the Vorbis comment [code]ALBUM[/code]. Empty if unknown.
+		</member>
+		<member name="album_artist" type="String" setter="set_album_artist" getter="get_album_artist" default="&quot;&quot;">
+			The artist of the whole album, which can differ from [member artist] on compilations. Read from ID3 [code]TPE2[/code] or the Vorbis comment [code]ALBUMARTIST[/code]. Empty if unknown.
+		</member>
+		<member name="artist" type="String" setter="set_artist" getter="get_artist" default="&quot;&quot;">
+			The artist of this track. Read from ID3 [code]TPE1[/code], RIFF [code]IART[/code] or the Vorbis comment [code]ARTIST[/code]. Empty if unknown. Multiple values are joined with [code]", "[/code].
+		</member>
+		<member name="comment" type="String" setter="set_comment" getter="get_comment" default="&quot;&quot;">
+			A free text comment. Read from ID3 [code]COMM[/code] (the one without description is preferred), RIFF [code]ICMT[/code] or the Vorbis comment [code]COMMENT[/code] or [code]DESCRIPTION[/code]. Empty if unknown.
+		</member>
+		<member name="composer" type="String" setter="set_composer" getter="get_composer" default="&quot;&quot;">
+			The composer of this track. Read from ID3 [code]TCOM[/code], RIFF [code]IMUS[/code] or the Vorbis comment [code]COMPOSER[/code]. Empty if unknown.
+		</member>
+		<member name="copyright" type="String" setter="set_copyright" getter="get_copyright" default="&quot;&quot;">
+			The copyright notice. Read from ID3 [code]TCOP[/code], RIFF [code]ICOP[/code] or the Vorbis comment [code]COPYRIGHT[/code]. Empty if unknown.
+		</member>
+		<member name="cover" type="Texture2D" setter="set_cover" getter="get_cover">
+			The cover art of this track. If [member cover_data] is set, the texture is decoded from it on the first access and then cached, so call this where the texture is needed (for example on the main thread). Setting a texture by hand clears [member cover_data], and the texture is then saved with the resource itself. [code]null[/code] if there is no cover.
+		</member>
+		<member name="cover_data" type="PackedByteArray" setter="set_cover_data" getter="get_cover_data" default="PackedByteArray()">
+			The encoded cover image (PNG, JPEG or WebP bytes) as stored in the file. Read from the ID3 [code]APIC[/code] frame (the front cover is preferred) or the Vorbis comment [code]METADATA_BLOCK_PICTURE[/code]. Setting it clears the cached [member cover]. Empty if there is no cover. Not shown in the inspector.
+		</member>
+		<member name="disc_count" type="int" setter="set_disc_count" getter="get_disc_count" default="0">
+			The total number of discs of the release. [code]0[/code] if unknown. Read from the part after the slash of ID3 [code]TPOS[/code] or from the Vorbis comments [code]DISCTOTAL[/code] and [code]TOTALDISCS[/code].
+		</member>
+		<member name="disc_number" type="int" setter="set_disc_number" getter="get_disc_number" default="0">
+			The number of the disc this track is on. [code]0[/code] if unknown. Read from ID3 [code]TPOS[/code] or the Vorbis comment [code]DISCNUMBER[/code].
+		</member>
+		<member name="genre" type="String" setter="set_genre" getter="get_genre" default="&quot;&quot;">
+			The genre of this track. Read from ID3 [code]TCON[/code], RIFF [code]IGNR[/code] or the Vorbis comment [code]GENRE[/code]. ID3 genre codes such as [code]"(17)"[/code] or [code]"17"[/code] are converted to their name (here [code]"Rock"[/code]). Empty if unknown.
+		</member>
+		<member name="subtitle_path" type="String" setter="set_subtitle_path" getter="get_subtitle_path" default="&quot;&quot;">
+			Path of the subtitle file for this stream: a [code].srt[/code], [code].vtt[/code], [code].ttml[/code], [code].dfxp[/code], [code].ass[/code], [code].ssa[/code] or [code].sbv[/code] file, or a saved [Subtitle] resource. The Inspector stores it as a [code]uid://[/code] path if the file has a UID. This is only a path: a [SubtitlePlayer] loads it when the stream plays.
+			The path is kept in the track information of the stream, which is allocated on first use, so streams without a subtitle path need no memory. [code]clear_track_info()[/code] clears it too. Imported audio sets it with the import option [code skip-lint]subtitle_path[/code].
+		</member>
+		<member name="title" type="String" setter="set_title" getter="get_title" default="&quot;&quot;">
+			The title of this track. Read from ID3 [code]TIT2[/code] (or the ID3v1 tag), RIFF [code]INAM[/code] or the Vorbis comment [code]TITLE[/code]. Empty if unknown. To show a localized title, use it as a key, for example with [method Object.tr].
+		</member>
+		<member name="track_count" type="int" setter="set_track_count" getter="get_track_count" default="0">
+			The total number of tracks of the release. [code]0[/code] if unknown. Read from the part after the slash of ID3 [code]TRCK[/code] or from the Vorbis comments [code]TRACKTOTAL[/code] and [code]TOTALTRACKS[/code].
+		</member>
+		<member name="track_number" type="int" setter="set_track_number" getter="get_track_number" default="0">
+			The number of this track on the release. [code]0[/code] if unknown. Read from ID3 [code]TRCK[/code], RIFF [code]ITRK[/code] or the Vorbis comment [code]TRACKNUMBER[/code].
+		</member>
+		<member name="year" type="int" setter="set_year" getter="get_year" default="0">
+			The release year. [code]0[/code] if unknown. Read from ID3 [code]TYER[/code] or [code]TDRC[/code], RIFF [code]ICRD[/code] or the Vorbis comment [code]DATE[/code] or [code]YEAR[/code].
+		</member>
+	</members>
 	<signals>
 		<signal name="parameter_list_changed">
 			<description>

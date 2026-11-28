@@ -103,6 +103,7 @@
 			<description>
 				Saves a resource to disk to the given path, using a [ResourceFormatSaver] that recognizes the resource object. If [param path] is empty, [ResourceSaver] will try to use [member Resource.resource_path].
 				The [param flags] bitmask can be specified to customize the save behavior.
+				Saving does not change [member Resource.resource_path]: without [constant FLAG_CHANGE_PATH] the path is not touched, and with it the path is only changed for the duration of the save (see [constant FLAG_CHANGE_PATH]). To give the resource its new path, set [member Resource.resource_path] or call [method Resource.take_over_path] after saving.
 				Returns [constant OK] on success. Use [method save_result] to get the saver's message as well.
 				[b]Note:[/b] When the project is running, any generated UID associated with the resource will not be saved as the required code is only executed in editor mode.
 			</description>
@@ -159,7 +160,7 @@
 			Bundles external resources.
 		</constant>
 		<constant name="FLAG_CHANGE_PATH" value="4" enum="SaverFlags" is_bitfield="true">
-			Changes the [member Resource.resource_path] of the saved resource to match its new location.
+			Sets [member Resource.resource_path] of the saved resource to its new location while the [ResourceFormatSaver] writes it, so that references to the resource itself are stored relative to that location. After a successful save, the previous path is restored. If another loaded resource holds the new path, the path is not taken over: an error is printed, the resource is saved without a path, and its previous path is restored afterwards.
 		</constant>
 		<constant name="FLAG_OMIT_EDITOR_PROPERTIES" value="8" enum="SaverFlags" is_bitfield="true">
 			Do not save editor-specific metadata (identified by their [code]__editor[/code] prefix).

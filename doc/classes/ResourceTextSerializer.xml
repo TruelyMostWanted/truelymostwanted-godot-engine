@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		[ResourceTextSerializer] maps the properties of a [Resource] that have [constant @GlobalScope.PROPERTY_USAGE_STORAGE] to text that players and other tools can read and edit. The same mapping is used by [ResourceSaver] and [ResourceLoader] for the file extensions [code].json[/code], [code].ini[/code], [code].csv[/code] and [code].xml[/code] (and [code].toml[/code] with the TOML module), so in most cases a call to [method ResourceSaver.save] and [method ResourceLoader.load] is all that is needed. [method serialize] and [method deserialize] do the same with strings, for example to send a resource over the network or to store it in a database. The format is a value of [enum Format]; [method get_available_formats] lists the formats of the current build.
+		[b]Save dialogs:[/b] the editor's save dialogs (New Resource, Save As) offer a class only its native formats: the extensions of its own savers (for example [code].json[/code] for [JSON], [code].csv[/code] and [code].tsv[/code] for [CSV], [code].srt[/code] for subtitles, [code].mmd[/code] for flow graphs), plus [code].tres[/code] and [code].res[/code]. The text formats of [ResourceTextSerializer] are not listed there for any class; they stay available from code: [code]ResourceSaver.save(resource, "res://item.json")[/code] writes the property mapping, and [method ResourceLoader.load] reads it back.
 		[codeblocks]
 		[gdscript]
 		var settings = AudioBusSettings.new() # A Resource with class_name AudioBusSettings.
@@ -51,7 +52,7 @@
 		[b]Values:[/b] [Color] is written as [code]"#rrggbbaa"[/code] when that is exact, otherwise as an array of floats; vectors, rectangles and matrices as arrays of numbers; enums as their names (see [member SerializerOptions.enums_as_names]); [StringName] and [NodePath] as strings. A resource that is saved in its own file is written as its path and loaded from that path. When loading, a key that is missing keeps the default value of the class, and an unknown key is skipped with a warning. Values are converted to the type of the property, so a hand-edited [code]"0.5"[/code] or [code]"yes"[/code] is accepted for a [float] or [bool] property.
 		[b]Options:[/b] [method serialize], [method deserialize] and [method resource_to_dictionary] take a [SerializerOptions]. [code]null[/code] uses the project settings under [code]filesystem/resources/text_formats/[/code], which [ResourceSaver] and [ResourceLoader] use as well.
 		[b]Note:[/b] JSON has only one number type. Integers above 2^53 lose precision, and properties of type [Variant] get [float] values back where [int] values were saved. In plain INI and in CSV, properties of type [Variant] come back as [String]. XML and TOML keep [int], [float], [bool] and [String] apart.
-		[b]Note:[/b] [code].csv[/code] files in [code]res://[/code] are imported as translations by the editor. Keep CSV resources in [code]user://[/code], or set their importer to "Keep File" in the Import dock.
+		[b]Note:[/b] In [code]res://[/code], the editor imports a [code].csv[/code] file with locale columns as a translation ("CSV Translation" importer). Resources saved as CSV have no locale columns and use the "CSV Dataset" importer, which loads the file as is.
 		[b]Note:[/b] The methods of this class can be called from any thread.
 	</description>
 	<tutorials>

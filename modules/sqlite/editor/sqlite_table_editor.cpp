@@ -45,6 +45,7 @@
 #include "scene/gui/line_edit.h"
 #include "scene/gui/tree.h"
 #include "scene/scene_string_names.h"
+#include "servers/display/display_server.h"
 
 static constexpr int PAGE_SIZE = 200;
 
@@ -375,6 +376,48 @@ void SQLiteTableEditor::_revert() {
 	undo_redo->clear_history();
 }
 
+bool SQLiteTableEditor::_has_changes() const {
+	return !updates.is_empty() || !deletes.is_empty() || !inserts.is_empty();
+}
+
+void SQLiteTableEditor::ok_pressed() {
+	// "Close": the dialog does not hide on OK, so pending edits can be saved first.
+	if (_has_changes()) {
+		_prompt_close();
+	} else {
+		hide();
+	}
+}
+
+void SQLiteTableEditor::cancel_pressed() {
+	// Escape or the window's close button hide the dialog (deferred): show it again with the prompt.
+	if (_has_changes()) {
+		callable_mp(this, &SQLiteTableEditor::_prompt_close).call_deferred();
+	}
+}
+
+void SQLiteTableEditor::_prompt_close() {
+	if (!is_visible()) {
+		popup_centered_clamped(Size2(900, 600) * EDSCALE, 0.8);
+	}
+	close_prompt->popup_centered();
+}
+
+void SQLiteTableEditor::_close_saving() {
+	_save();
+	// A failed save keeps the edits and the dialog: the status line says why.
+	if (!_has_changes()) {
+		hide();
+	}
+}
+
+void SQLiteTableEditor::_close_discarding() {
+	close_prompt->hide();
+	_revert();
+	_load_page();
+	hide();
+}
+
 void SQLiteTableEditor::_filter_changed(const String &p_text) {
 	page = 0;
 	_load_page();
@@ -401,7 +444,7 @@ void SQLiteTableEditor::_sort(int p_column, int p_mouse_button) {
 void SQLiteTableEditor::edit(const String &p_path, const String &p_table) {
 	const String global_path = ProjectSettings::get_singleton()->globalize_path(p_path);
 	if (global_path != path || p_table != table) {
-		if (!updates.is_empty() || !deletes.is_empty() || !inserts.is_empty()) {
+		if (_has_changes()) {
 			status_label->set_text(TTR("Save or revert the edits of this table first."));
 			popup_centered_clamped(Size2(900, 600) * EDSCALE, 0.8);
 			return;
@@ -451,6 +494,7 @@ void SQLiteTableEditor::edit(const String &p_path, const String &p_table) {
 SQLiteTableEditor::SQLiteTableEditor() {
 	singleton = this;
 	set_ok_button_text(TTR("Close"));
+	set_hide_on_ok(false);
 	undo_redo = memnew(UndoRedo);
 
 	VBoxContainer *main_box = memnew(VBoxContainer);
@@ -503,6 +547,15 @@ SQLiteTableEditor::SQLiteTableEditor() {
 
 	add_button(TTR("Revert"))->connect(SceneStringName(pressed), callable_mp(this, &SQLiteTableEditor::_revert));
 	add_button(TTR("Save"))->connect(SceneStringName(pressed), callable_mp(this, &SQLiteTableEditor::_save));
+
+	close_prompt = memnew(ConfirmationDialog);
+	close_prompt->set_title(TTR("Unsaved Edits"));
+	close_prompt->set_text(TTR("The table has edits that are not saved. Save them before closing?"));
+	close_prompt->set_ok_button_text(TTR("Save"));
+	close_prompt->add_button(TTR("Discard"), DisplayServer::get_singleton()->get_swap_cancel_ok(), "discard");
+	close_prompt->connect(SceneStringName(confirmed), callable_mp(this, &SQLiteTableEditor::_close_saving));
+	close_prompt->connect("custom_action", callable_mp(this, &SQLiteTableEditor::_close_discarding).unbind(1));
+	add_child(close_prompt);
 }
 
 SQLiteTableEditor::~SQLiteTableEditor() {

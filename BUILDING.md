@@ -30,7 +30,7 @@ Each comes in two variants:
 - **Standard:** GDScript and GDExtension (C++). Smaller, builds faster, needs no .NET.
 - **.NET (Mono):** adds C#. Build with `module_mono_enabled=yes`, then generate the C# glue and assemblies ([section 5](#net-c)). Pick it if your project uses C#. Editor and templates must use the same variant.
 
-A version string tells builds apart, e.g. `4.8.beta5.truely.f031fd0a1`: Godot base version `4.8`, status `beta5`, build name `truely`, commit. The fork's own version, **Truely v&lt;MAJOR.MINOR.PATCH&gt;** (e.g. `Truely v0.1.0`), comes from `truely/version.txt`; the editor shows it in the About dialog, `--truely-version` prints it and `Engine.get_version_info()["truely_version"]` returns it.
+A version string tells builds apart, e.g. `4.8.beta5.truely.f031fd0a1`: Godot base version `4.8`, status `beta5`, build name `truely`, commit. The fork's own version, **Truely v&lt;MAJOR.MINOR.PATCH&gt;**, comes from `truely/version.txt`. The editor shows it like Godot shows its own version, without a patch number of 0, next to the Godot base without the build name: `Truely v0.2 (Godot v4.8.beta5.mono) [61d68d72e]`, `Truely v0.2.1 (Godot v4.8.rc1.mono) [...]`. `--truely-version` prints the full number (`0.2.0`) and `Engine.get_version_info()["truely_version"]` returns it.
 
 ## Prerequisites
 

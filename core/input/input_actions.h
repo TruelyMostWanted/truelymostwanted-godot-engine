@@ -37,12 +37,16 @@
 // A collection of InputAction resources with O(1) lookup by action name (#172).
 // InputMap references two of them as its layers (InputMap.get_input_actions()); it is also the settings
 // resource of InputMapSettingsServer. It emits `changed` when the list or one of its actions changes.
-// The list is the typed array `actions` for the Inspector; action names are unique (adding an action
-// with a name that is already used replaces the old one).
+// The list is the typed array `actions` for the Inspector. add_action() with a name that is already used
+// replaces the old action; set_actions() keeps all entries (the Inspector's "Duplicate Element", a name typed twice)
+// and warns, the last action of a name wins.
 class InputActions : public Resource {
 	GDCLASS(InputActions, Resource);
 
-	LocalVector<Ref<InputAction>> actions;
+	LocalVector<Ref<InputAction>> actions; // Never null; may hold a name more than once (set_actions()).
+	// `actions` with its empty (null) slots, as the Inspector sets it ("Add Element" adds a null slot first);
+	// only while it has one. Changing the list through a method drops the empty slots.
+	LocalVector<Ref<InputAction>> action_slots;
 	mutable HashMap<StringName, uint32_t> lookup;
 	mutable bool lookup_dirty = false;
 
