@@ -50,6 +50,7 @@ jobs:
             cache-name: linux-editor-double-sanitizers
             target: editor
             # Debug symbols disabled as they're huge on this build and we hit the 14 GB limit for runners.
+            # Truely: UBSan vptr checks off, they push the .text section of this build past 2 GB (mold: relocation out of range).
             scons-flags: >-
               dev_build=yes
               scu_build=yes
@@ -57,6 +58,7 @@ jobs:
               precision=double
               use_asan=yes
               use_ubsan=yes
+              cxxflags=-fno-sanitize=vptr
               linker=mold
             bin: ./bin/godot.linuxbsd.editor.dev.double.x86_64.san
             install-mold: true
