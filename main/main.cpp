@@ -4534,8 +4534,9 @@ int Main::start() {
 	}
 
 	// Truely (#399): a scene splash runs before the main scene (also when the editor runs it with `--scene`);
-	// its SplashScreen root changes to the main scene.
-	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && !game_path.is_empty()) {
+	// its SplashScreen root changes to the main scene. Not for headless runs, dedicated servers and `--quit-after`.
+	if (!editor && !project_manager && !cmdline_tool && script.is_empty() && !game_path.is_empty() && quit_after == 0 &&
+			DisplayServer::get_singleton()->get_name() != NULL_DISPLAY_DRIVER && !OS::get_singleton()->has_feature("dedicated_server")) {
 		const String splash_scene = GLOBAL_GET("application/boot_splash/scene");
 		if (!splash_scene.is_empty() && ResourceUID::ensure_path(game_path) == ResourceUID::ensure_path(String(GLOBAL_GET("application/run/main_scene")))) {
 			game_path = ResourceUID::ensure_path(splash_scene);

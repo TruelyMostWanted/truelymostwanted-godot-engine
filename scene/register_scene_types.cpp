@@ -538,7 +538,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(TransitionScreen);
 	GDREGISTER_CLASS(LoadingScreen);
 	GDREGISTER_CLASS(SplashScreen);
-	GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "application/boot_splash/scene", PROPERTY_HINT_FILE, "*.tscn,*.scn"), String());
+	GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "application/boot_splash/scene", PROPERTY_HINT_FILE, "*.tscn,*.scn,*.res"), String());
 	GDREGISTER_CLASS(ResourcePreloader);
 	GDREGISTER_CLASS(Window);
 

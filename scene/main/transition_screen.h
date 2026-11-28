@@ -34,13 +34,13 @@
 #include "scene/main/canvas_layer.h"
 #include "scene/resources/packed_scene.h"
 
-class PreloadList;
+class Preloads;
 class SceneTree;
 
 // Scene transitions (#399). A transition screen is the root of a scene that covers the screen while the next
 // scene loads: it fades in over the current scene, loads `next_scene` with `ResourceLoader::load_threaded_request()`,
 // waits for loading and `min_duration`, changes the scene while it is fully visible, fades out over the new scene
-// and frees itself. Main thread only.
+// and frees itself. One transition runs at a time; it lives under the tree root. Main thread only.
 class TransitionScreen : public CanvasLayer {
 	GDCLASS(TransitionScreen, CanvasLayer);
 
@@ -62,11 +62,14 @@ private:
 	bool skippable = false;
 	bool auto_finish = true;
 	bool free_current_scene_before_loading = false;
-	Ref<PreloadList> preload_assets;
+	Ref<Preloads> preload_assets;
 
 	State state = STATE_IDLE;
 	String loading_path; // Resolved `next_scene`; empty when no scene change happens.
 	bool preload_pending = false;
+	bool request_pending = false; // Loading starts on the frame after the screen became fully visible.
+	bool load_requested = false; // A threaded load token is held until `load_threaded_get()`.
+	Error load_error = OK;
 	bool finish_requested = false;
 	Ref<PackedScene> loaded_scene;
 	double phase_time = 0.0; // Time in the current fade, or time fully visible.
@@ -79,8 +82,12 @@ private:
 	void _set_progress(float p_progress);
 	void _request_loading();
 	void _poll_loading();
+	void _fail_loading(Error p_error);
 	void _change_scene();
-	void _preload_finished(const Ref<PreloadList> &p_list, int p_error);
+	void _preload_finished(const Ref<Preloads> &p_preloads, int p_error);
+
+	static inline ObjectID running_screen; // The transition in progress (one at a time).
+	static TransitionScreen *_get_running_screen();
 
 protected:
 	void _notification(int p_what);
@@ -108,13 +115,14 @@ public:
 	bool is_auto_finish() const;
 	void set_free_current_scene_before_loading(bool p_free);
 	bool is_free_current_scene_before_loading() const;
-	void set_preload_assets(const Ref<PreloadList> &p_assets);
-	Ref<PreloadList> get_preload_assets() const;
+	void set_preload_assets(const Ref<Preloads> &p_assets);
+	Ref<Preloads> get_preload_assets() const;
 
 	void finish();
 	State get_state() const;
 	float get_progress() const;
 	float get_fade() const;
+	Error get_load_error() const;
 
 	// Backs `SceneTree::change_scene_with_transition()`.
 	static Error change_scene_with_transition(SceneTree *p_tree, const String &p_path, const Ref<PackedScene> &p_transition_scene);

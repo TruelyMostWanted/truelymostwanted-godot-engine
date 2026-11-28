@@ -32,7 +32,7 @@
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
-#include "core/io/preload_list.h"
+#include "core/io/preloads.h"
 #include "core/io/resource_database.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_uid.h"
@@ -59,19 +59,37 @@ void TransitionScreen::_notification(int p_what) {
 		case NOTIFICATION_INTERNAL_PROCESS: {
 			_process_transition(get_process_delta_time());
 		} break;
+		case NOTIFICATION_PREDELETE: {
+			if (load_requested) {
+				ResourceLoader::load_threaded_get(loading_path); // Releases the load token (waits for a running load).
+			}
+			if (running_screen == get_instance_id()) {
+				running_screen = ObjectID();
+			}
+		} break;
 	}
 }
 
 void TransitionScreen::input(const Ref<InputEvent> &p_event) {
-	if (!skippable || state == STATE_IDLE || state >= STATE_FADING_OUT || finish_requested) {
+	if (state == STATE_IDLE || state >= STATE_FADING_OUT || p_event.is_null()) {
 		return;
 	}
-	if (p_event.is_null() || !p_event->is_pressed() || p_event->is_echo()) {
-		return;
-	}
+	// The covered scene gets no input while the screen hides it.
 	get_viewport()->set_input_as_handled();
+	if (!skippable || finish_requested || !p_event->is_pressed() || p_event->is_echo()) {
+		return;
+	}
+	const Ref<InputEventMouseButton> mouse_button = p_event;
+	if (mouse_button.is_valid() && mouse_button->get_button_index() >= MouseButton::WHEEL_UP && mouse_button->get_button_index() <= MouseButton::WHEEL_RIGHT) {
+		return; // Scrolling is not a skip.
+	}
 	emit_signal(SNAME("skipped"));
 	finish();
+}
+
+TransitionScreen *TransitionScreen::_get_running_screen() {
+	TransitionScreen *screen = Object::cast_to<TransitionScreen>(ObjectDB::get_instance(running_screen));
+	return screen && screen->state < STATE_COMPLETED ? screen : nullptr;
 }
 
 String TransitionScreen::_get_next_scene_path() const {
@@ -79,16 +97,38 @@ String TransitionScreen::_get_next_scene_path() const {
 }
 
 void TransitionScreen::_start() {
+	const TransitionScreen *running = _get_running_screen();
+	if (running && running != this) {
+		ERR_PRINT("TransitionScreen: Another scene transition is running; this one is ignored.");
+		set_process_internal(false);
+		queue_free();
+		return;
+	}
+	running_screen = get_instance_id();
+	Node *current = get_tree()->get_current_scene();
+	if (current && current != this && current->is_ancestor_of(this)) {
+		// Inside the current scene it would be removed with it: run from the root (starts on the next frame).
+		call_deferred(SNAME("reparent"), get_tree()->get_root(), false);
+		return;
+	}
 	state = STATE_FADING_IN;
 	phase_time = 0.0;
 	loading_path = _get_next_scene_path();
 	if (!loading_path.is_empty() && loading_path == get_scene_file_path()) {
 		loading_path = String(); // Never load the screen's own scene again (a splash set as main scene).
 	}
-	emit_signal(SNAME("started"));
-	if (!free_current_scene_before_loading) {
-		_request_loading();
+	if (loading_path.is_empty() && current == this && !Object::cast_to<SplashScreen>(this)) {
+		WARN_PRINT("TransitionScreen: The current scene is a transition screen without a next scene; no scene follows it.");
 	}
+	emit_signal(SNAME("started"));
+#ifdef THREADS_ENABLED
+	if (!free_current_scene_before_loading) {
+		_request_loading(); // Loads on worker threads while the screen fades in.
+		return;
+	}
+#endif
+	// Without threads, `load_threaded_request()` loads on the calling thread: it waits for the opaque screen.
+	request_pending = true;
 }
 
 void TransitionScreen::_process_transition(double p_delta) {
@@ -113,24 +153,32 @@ void TransitionScreen::_process_transition(double p_delta) {
 				current->get_parent()->remove_child(current);
 				current->queue_free();
 			}
-			_request_loading();
+		}
+		if (request_pending) {
+			return; // This fully visible frame is drawn before loading starts.
 		}
 	}
 
 	if (state == STATE_LOADING || state == STATE_LOADED) {
 		phase_time += p_delta;
 		if (state == STATE_LOADING) {
+			if (request_pending) {
+				request_pending = false;
+				_request_loading();
+			}
 			_poll_loading();
 		}
-		if (state != STATE_LOADED) {
+		if (state == STATE_LOADING) {
 			return;
 		}
-		if (!finish_requested && !(auto_finish && phase_time >= min_duration)) {
-			return;
+		if (state == STATE_LOADED) {
+			if (!finish_requested && !(auto_finish && phase_time >= min_duration)) {
+				return;
+			}
+			_change_scene();
+			state = STATE_FADING_OUT;
 		}
-		_change_scene();
-		state = STATE_FADING_OUT;
-		phase_time = 0.0;
+		phase_time = 0.0; // Fading out: after the change, or after a failed load.
 		p_delta = 0.0;
 	}
 
@@ -143,7 +191,7 @@ void TransitionScreen::_process_transition(double p_delta) {
 		state = STATE_COMPLETED;
 		set_process_internal(false);
 		set_process_input(false);
-		emit_signal(SNAME("completed"));
+		emit_signal(SNAME("finished"));
 		queue_free();
 	}
 }
@@ -162,7 +210,7 @@ void TransitionScreen::_set_progress(float p_progress) {
 	}
 	progress = p_progress;
 	_progress_changed(progress);
-	emit_signal(SNAME("load_progress"), progress);
+	emit_signal(SNAME("progress_changed"), progress);
 }
 
 void TransitionScreen::_request_loading() {
@@ -171,7 +219,7 @@ void TransitionScreen::_request_loading() {
 		const Callable on_finished = callable_mp(this, &TransitionScreen::_preload_finished);
 		database->connect(SNAME("preload_finished"), on_finished);
 		preload_pending = true;
-		const Error preload_error = database->preload_from_list(preload_assets);
+		const Error preload_error = database->preload_from(preload_assets);
 		if (preload_error == ERR_INVALID_PARAMETER || preload_error == ERR_UNAVAILABLE) {
 			// Rejected before starting: `preload_finished` will not be emitted.
 			preload_pending = false;
@@ -181,14 +229,15 @@ void TransitionScreen::_request_loading() {
 	if (loading_path.is_empty()) {
 		return;
 	}
-	const Error err = ResourceLoader::load_threaded_request(loading_path, "PackedScene");
-	if (err != OK) {
-		ERR_PRINT(vformat("TransitionScreen: Can't start loading the next scene '%s' (error %d).", loading_path, int(err)));
-		loading_path = String();
-	}
+	load_error = ResourceLoader::load_threaded_request(loading_path, "PackedScene");
+	load_requested = load_error == OK;
 }
 
 void TransitionScreen::_poll_loading() {
+	if (load_error != OK) {
+		_fail_loading(load_error);
+		return;
+	}
 	if (!loading_path.is_empty() && loaded_scene.is_null()) {
 #ifdef THREADS_ENABLED
 		float load_progress = 0.0f;
@@ -197,12 +246,12 @@ void TransitionScreen::_poll_loading() {
 			return;
 		}
 #endif
-		// Without threads (default Web export) the load completes here, in one blocking step while the screen is
-		// fully visible.
-		loaded_scene = ResourceLoader::load_threaded_get(loading_path);
+		Error err = OK;
+		loaded_scene = ResourceLoader::load_threaded_get(loading_path, &err);
+		load_requested = false;
 		if (loaded_scene.is_null()) {
-			ERR_PRINT(vformat("TransitionScreen: Can't load the next scene '%s'. The current scene stays.", loading_path));
-			loading_path = String();
+			_fail_loading(err != OK ? err : ERR_FILE_UNRECOGNIZED);
+			return;
 		}
 	}
 	if (preload_pending) {
@@ -213,8 +262,16 @@ void TransitionScreen::_poll_loading() {
 	emit_signal(SNAME("loaded"));
 }
 
-void TransitionScreen::_preload_finished(const Ref<PreloadList> &p_list, int p_error) {
-	if (p_list != preload_assets) {
+void TransitionScreen::_fail_loading(Error p_error) {
+	ERR_PRINT(vformat("TransitionScreen: Can't load the next scene '%s' (error %d). The scene does not change.", loading_path, int(p_error)));
+	load_error = p_error;
+	loading_path = String();
+	state = STATE_FADING_OUT;
+	emit_signal(SNAME("load_failed"), p_error);
+}
+
+void TransitionScreen::_preload_finished(const Ref<Preloads> &p_preloads, int p_error) {
+	if (p_preloads != preload_assets) {
 		return;
 	}
 	preload_pending = false;
@@ -234,13 +291,19 @@ void TransitionScreen::_change_scene() {
 		// Opened as the current scene (boot splash, `change_scene_to_file()`): stay in the tree for the fade-out.
 		tree->set_current_scene(nullptr);
 	}
-	tree->change_scene_to_packed(loaded_scene);
+	const Error err = tree->change_scene_to_packed(loaded_scene);
 	loaded_scene.unref();
+	if (err != OK) {
+		load_error = err;
+		emit_signal(SNAME("load_failed"), err);
+	}
 }
 
 Error TransitionScreen::change_scene_with_transition(SceneTree *p_tree, const String &p_path, const Ref<PackedScene> &p_transition_scene) {
 	ERR_FAIL_NULL_V(p_tree, ERR_UNCONFIGURED);
 	ERR_FAIL_COND_V_MSG(p_path.is_empty(), ERR_INVALID_PARAMETER, "The path of the next scene is empty.");
+	ERR_FAIL_COND_V_MSG(_get_running_screen(), ERR_BUSY, "A scene transition is already running.");
+	ERR_FAIL_COND_V_MSG(!ResourceLoader::exists(ResourceUID::ensure_path(p_path)), ERR_CANT_OPEN, vformat("The next scene '%s' does not exist.", p_path));
 
 	TransitionScreen *screen = nullptr;
 	if (p_transition_scene.is_valid()) {
@@ -260,6 +323,7 @@ Error TransitionScreen::change_scene_with_transition(SceneTree *p_tree, const St
 		screen->add_child(background);
 	}
 	screen->set_next_scene(p_path);
+	running_screen = screen->get_instance_id(); // Busy from now on, also before the screen enters the tree.
 	// Deferred: also works when called from `_ready()` while the root is busy adding children.
 	p_tree->get_root()->call_deferred(SNAME("add_child"), screen);
 	return OK;
@@ -321,11 +385,11 @@ bool TransitionScreen::is_free_current_scene_before_loading() const {
 	return free_current_scene_before_loading;
 }
 
-void TransitionScreen::set_preload_assets(const Ref<PreloadList> &p_assets) {
+void TransitionScreen::set_preload_assets(const Ref<Preloads> &p_assets) {
 	preload_assets = p_assets;
 }
 
-Ref<PreloadList> TransitionScreen::get_preload_assets() const {
+Ref<Preloads> TransitionScreen::get_preload_assets() const {
 	return preload_assets;
 }
 
@@ -343,6 +407,10 @@ float TransitionScreen::get_progress() const {
 
 float TransitionScreen::get_fade() const {
 	return fade;
+}
+
+Error TransitionScreen::get_load_error() const {
+	return load_error;
 }
 
 void TransitionScreen::_bind_methods() {
@@ -367,24 +435,26 @@ void TransitionScreen::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_state"), &TransitionScreen::get_state);
 	ClassDB::bind_method(D_METHOD("get_progress"), &TransitionScreen::get_progress);
 	ClassDB::bind_method(D_METHOD("get_fade"), &TransitionScreen::get_fade);
+	ClassDB::bind_method(D_METHOD("get_load_error"), &TransitionScreen::get_load_error);
 
 	GDVIRTUAL_BIND(_update_fade, "fade");
 
 	ADD_GROUP("Transition", "");
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "next_scene", PROPERTY_HINT_FILE, "*.tscn,*.scn"), "set_next_scene", "get_next_scene");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "next_scene", PROPERTY_HINT_FILE, "*.tscn,*.scn,*.res"), "set_next_scene", "get_next_scene");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "min_duration", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_min_duration", "get_min_duration");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_duration", PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s"), "set_fade_in_duration", "get_fade_in_duration");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_duration", PROPERTY_HINT_RANGE, "0,5,0.01,or_greater,suffix:s"), "set_fade_out_duration", "get_fade_out_duration");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "skippable"), "set_skippable", "is_skippable");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_finish"), "set_auto_finish", "is_auto_finish");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "free_current_scene_before_loading"), "set_free_current_scene_before_loading", "is_free_current_scene_before_loading");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "preload_assets", PROPERTY_HINT_RESOURCE_TYPE, "PreloadList"), "set_preload_assets", "get_preload_assets");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "preload_assets", PROPERTY_HINT_RESOURCE_TYPE, "Preloads"), "set_preload_assets", "get_preload_assets");
 
 	ADD_SIGNAL(MethodInfo("started"));
-	ADD_SIGNAL(MethodInfo("load_progress", PropertyInfo(Variant::FLOAT, "progress")));
+	ADD_SIGNAL(MethodInfo("progress_changed", PropertyInfo(Variant::FLOAT, "progress")));
 	ADD_SIGNAL(MethodInfo("loaded"));
+	ADD_SIGNAL(MethodInfo("load_failed", PropertyInfo(Variant::INT, "error", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, "Error")));
 	ADD_SIGNAL(MethodInfo("skipped"));
-	ADD_SIGNAL(MethodInfo("completed"));
+	ADD_SIGNAL(MethodInfo("finished"));
 
 	BIND_ENUM_CONSTANT(STATE_IDLE);
 	BIND_ENUM_CONSTANT(STATE_FADING_IN);

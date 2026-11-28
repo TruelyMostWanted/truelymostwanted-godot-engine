@@ -7,6 +7,7 @@
 		A splash screen is the root of the scene set in [member ProjectSettings.application/boot_splash/scene]. The engine shows the boot image first, then runs this scene instead of the main scene. The splash loads the main scene in the background, stays fully visible for at least [member TransitionScreen.min_duration] seconds (two by default), can be skipped with any key, mouse button, touch or joypad button, then changes to the main scene and fades out over it.
 		If [member TransitionScreen.next_scene] is empty, the splash changes to [member ProjectSettings.application/run/main_scene]. Set it to show another scene first, for example a second splash or a language selection.
 		Animate the splash with an [AnimationPlayer] (autoplay) or a [VideoStreamPlayer]; connect [signal TransitionScreen.skipped] to stop them. Give the background the color of [member ProjectSettings.application/boot_splash/bg_color] so the splash follows the boot image without a visible change.
+		The splash does not run in headless runs, dedicated server exports or with [code]--quit-after[/code]; the main scene starts directly. While it runs, [method SceneTree.change_scene_with_transition] returns [constant ERR_BUSY].
 	</description>
 	<tutorials>
 	</tutorials>

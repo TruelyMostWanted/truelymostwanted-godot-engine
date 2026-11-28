@@ -33,7 +33,7 @@
 TEST_FORCE_LINK(test_transition_screen)
 
 #include "core/io/dir_access.h"
-#include "core/io/preload_list.h"
+#include "core/io/preloads.h"
 #include "core/io/resource_database.h"
 #include "core/io/resource_saver.h"
 #include "core/os/os.h"
@@ -49,7 +49,7 @@ TEST_FORCE_LINK(test_transition_screen)
 namespace TestTransitionScreen {
 
 static String _scene_dir() {
-	const String dir = OS::get_singleton()->get_cache_path().path_join("test_transition_screen");
+	const String dir = OS::get_singleton()->get_user_data_dir().path_join("test_transition_screen");
 	DirAccess::make_dir_recursive_absolute(dir);
 	return dir;
 }
@@ -141,7 +141,7 @@ TEST_CASE("[SceneTree][TransitionScreen] Without a next scene: fade in, wait, fa
 	const ObjectID id = screen->get_instance_id();
 	SIGNAL_WATCH(screen, "started");
 	SIGNAL_WATCH(screen, "loaded");
-	SIGNAL_WATCH(screen, "completed");
+	SIGNAL_WATCH(screen, "finished");
 
 	SceneTree::get_singleton()->get_root()->add_child(screen);
 	CHECK(screen->get_fade() == doctest::Approx(0.0));
@@ -169,10 +169,10 @@ TEST_CASE("[SceneTree][TransitionScreen] Without a next scene: fade in, wait, fa
 
 	SceneTree::get_singleton()->process(0.2);
 	CHECK(screen->get_fade() == doctest::Approx(0.5));
-	SIGNAL_CHECK_FALSE("completed");
+	SIGNAL_CHECK_FALSE("finished");
 
 	SceneTree::get_singleton()->process(0.2);
-	SIGNAL_CHECK("completed", _one_emission());
+	SIGNAL_CHECK("finished", _one_emission());
 	SceneTree::get_singleton()->process(0.0);
 	CHECK_FALSE(_is_alive(id)); // Freed: the watcher's connections are gone with it.
 }
@@ -307,10 +307,14 @@ TEST_CASE("[SceneTree][TransitionScreen] SceneTree.change_scene_with_transition(
 	wrong->pack(not_a_screen);
 	memdelete(not_a_screen);
 	CHECK(tree->change_scene_with_transition(path, wrong) == ERR_INVALID_PARAMETER);
+	CHECK(tree->change_scene_with_transition(_scene_dir().path_join("missing.tscn"), Ref<PackedScene>()) == ERR_CANT_OPEN);
 	ERR_PRINT_ON;
 
-	// Null transition scene: built-in black fade.
+	// Null transition scene: built-in black fade. A second transition is rejected while it runs.
 	REQUIRE(tree->change_scene_with_transition(path, Ref<PackedScene>()) == OK);
+	ERR_PRINT_OFF;
+	CHECK(tree->change_scene_with_transition(path, Ref<PackedScene>()) == ERR_BUSY);
+	ERR_PRINT_ON;
 	tree->process(0.0); // Added deferred.
 	REQUIRE(tree->get_root()->get_child_count() == child_count + 1);
 	TransitionScreen *screen = Object::cast_to<TransitionScreen>(tree->get_root()->get_child(child_count));
@@ -347,10 +351,10 @@ TEST_CASE("[SceneTree][LoadingScreen] Progress bar, tips and the preload list") 
 	screen->set_fade_in_duration(0.0);
 	screen->set_fade_out_duration(10.0);
 	screen->set_auto_finish(false);
-	Ref<PreloadList> list;
-	list.instantiate();
-	list->set_paths(PackedStringArray({ asset_path }));
-	screen->set_preload_assets(list);
+	Ref<Preloads> preloads;
+	preloads.instantiate();
+	preloads->set_paths(PackedStringArray({ asset_path }));
+	screen->set_preload_assets(preloads);
 	tree->get_root()->add_child(screen);
 
 	CHECK(label->get_text() == "first");
@@ -377,6 +381,100 @@ TEST_CASE("[SceneTree][LoadingScreen] Progress bar, tips and the preload list") 
 	CHECK_FALSE(_is_alive(id));
 	tree->unload_current_scene();
 	database->clear();
+}
+
+TEST_CASE("[SceneTree][TransitionScreen] A failed load emits load_failed, not loaded, and keeps the scene") {
+	SceneTree *tree = SceneTree::get_singleton();
+	Node *old_scene = memnew(Node);
+	old_scene->set_name("KeptScene");
+	tree->add_current_scene(old_scene);
+
+	TransitionScreen *screen = memnew(TransitionScreen);
+	screen->set_next_scene(_scene_dir().path_join("missing.tscn"));
+	screen->set_fade_in_duration(0.0);
+	screen->set_fade_out_duration(0.5);
+	const ObjectID id = screen->get_instance_id();
+	SIGNAL_WATCH(screen, "loaded");
+	SIGNAL_WATCH(screen, "load_failed");
+	SIGNAL_WATCH(screen, "finished");
+	tree->get_root()->add_child(screen);
+
+	ERR_PRINT_OFF;
+	_run_until_state(screen, TransitionScreen::STATE_FADING_OUT);
+	ERR_PRINT_ON;
+	CHECK(screen->get_load_error() != OK);
+	CHECK(screen->get_progress() == doctest::Approx(0.0));
+	SIGNAL_CHECK_FALSE("loaded");
+	Array failed;
+	failed.push_back(Array({ int(screen->get_load_error()) }));
+	SIGNAL_CHECK("load_failed", failed);
+	tree->process(0.5); // Fades out over the unchanged scene.
+	SIGNAL_CHECK("finished", _one_emission());
+	CHECK_FALSE(_is_alive(id));
+	CHECK(tree->get_current_scene() == old_scene); // Unchanged.
+	tree->unload_current_scene();
+}
+
+TEST_CASE("[SceneTree][TransitionScreen] One transition at a time; input does not reach the covered scene") {
+	SceneTree *tree = SceneTree::get_singleton();
+	TransitionScreen *first = memnew(TransitionScreen);
+	first->set_fade_in_duration(0.0);
+	first->set_fade_out_duration(1.0);
+	first->set_auto_finish(false);
+	tree->get_root()->add_child(first);
+	TransitionScreen *second = memnew(TransitionScreen);
+	const ObjectID second_id = second->get_instance_id();
+	tree->get_root()->add_child(second);
+
+	ERR_PRINT_OFF;
+	tree->process(0.0);
+	tree->process(0.0);
+	ERR_PRINT_ON;
+	CHECK(first->get_state() == TransitionScreen::STATE_LOADED);
+	CHECK_FALSE(_is_alive(second_id)); // Ignored and freed.
+
+	SEND_GUI_KEY_EVENT(Key::A);
+	CHECK(tree->get_root()->is_input_handled()); // Not skippable, still blocked.
+	CHECK(first->get_state() == TransitionScreen::STATE_LOADED);
+
+	first->finish();
+	tree->process(0.0);
+	CHECK(first->get_state() == TransitionScreen::STATE_FADING_OUT);
+	SEND_GUI_KEY_EVENT(Key::A);
+	CHECK_FALSE(tree->get_root()->is_input_handled()); // The new scene gets input while the screen fades out.
+	memdelete(first);
+}
+
+TEST_CASE("[SceneTree][TransitionScreen] A screen inside the current scene runs from the root; freeing releases the load") {
+	SceneTree *tree = SceneTree::get_singleton();
+	const String path = _save_scene("next_from_level.tscn", "FromLevelNext");
+	Node *level = memnew(Node);
+	tree->add_current_scene(level);
+	TransitionScreen *screen = memnew(TransitionScreen);
+	screen->set_next_scene(path);
+	screen->set_fade_in_duration(0.0);
+	screen->set_fade_out_duration(0.0);
+	const ObjectID id = screen->get_instance_id();
+	level->add_child(screen);
+
+	tree->process(0.0); // Moves to the root (deferred).
+	CHECK(screen->get_parent() == tree->get_root());
+	CHECK(screen->get_state() == TransitionScreen::STATE_IDLE);
+	_run_until_freed(id);
+	CHECK_FALSE(_is_alive(id));
+	REQUIRE(tree->get_current_scene() != nullptr);
+	CHECK(tree->get_current_scene()->get_name() == StringName("FromLevelNext"));
+	tree->unload_current_scene();
+
+	// Freed while loading: the threaded load token is released.
+	TransitionScreen *freed = memnew(TransitionScreen);
+	freed->set_next_scene(path);
+	freed->set_fade_in_duration(10.0);
+	tree->get_root()->add_child(freed);
+	tree->process(0.0);
+	CHECK(freed->get_state() == TransitionScreen::STATE_FADING_IN);
+	memdelete(freed);
+	CHECK(ResourceLoader::load_threaded_get_status(path) == ResourceLoader::THREAD_LOAD_INVALID_RESOURCE);
 }
 
 } // namespace TestTransitionScreen
