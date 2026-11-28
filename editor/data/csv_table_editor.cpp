@@ -329,9 +329,9 @@ void CSVTableEditor::_render_catalog() {
 		}
 		tree->set_column_title(field + 1, column_title);
 		tree->set_column_title_tooltip_text(field + 1, tooltip);
-		tree->set_column_custom_minimum_width(field + 1, 100 * EDSCALE);
 		tree->set_column_clip_content(field + 1, true);
 	}
+	_update_column_widths();
 
 	// The most plural forms of the locales (their plural rules).
 	int plural_form_count = 1;
@@ -346,6 +346,7 @@ void CSVTableEditor::_render_catalog() {
 	TreeItem *root = tree->get_root() ? tree->get_root() : tree->create_item();
 	TreeItem *item = root->get_first_child();
 	const Color issue_color = get_theme_color(SNAME("error_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.35);
+	const Color missing_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.2);
 	for (int row = first; row < last; row++) {
 		if (!item) {
 			item = tree->create_item(root);
@@ -371,7 +372,7 @@ void CSVTableEditor::_render_catalog() {
 				const String *issue = form == 0 ? cell_issues.getptr(_cell_key(row, column)) : nullptr;
 				form_item->set_tooltip_text(column, issue ? *issue : String());
 				if (issue) {
-					form_item->set_custom_bg_color(column, issue_color);
+					form_item->set_custom_bg_color(column, missing_cells.has(_cell_key(row, column)) ? missing_color : issue_color);
 				} else {
 					form_item->clear_custom_bg_color(column);
 				}
@@ -592,15 +593,16 @@ void CSVTableEditor::_render() {
 		const Ref<DataField> field = _get_field(column);
 		tree->set_column_title(column + 1, column < header.size() ? header[column] : itos(column + 1));
 		tree->set_column_title_tooltip_text(column + 1, field.is_valid() ? vformat("%s\n%s", Variant::get_type_name(field->get_value_type()), field->get_description()).strip_edges() : String());
-		tree->set_column_custom_minimum_width(column + 1, 100 * EDSCALE);
 		tree->set_column_clip_content(column + 1, true);
 	}
+	_update_column_widths();
 
 	TreeItem *root = tree->get_root() ? tree->get_root() : tree->create_item();
 	TreeItem *item = root->get_first_child();
 	const Array rows = csv->get_data();
 	const bool editable = csv->get_error_message().is_empty();
 	const Color issue_color = get_theme_color(SNAME("error_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.35);
+	const Color missing_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.2);
 	for (int row = first; row < last; row++) {
 		if (!item) {
 			item = tree->create_item(root);
@@ -613,7 +615,7 @@ void CSVTableEditor::_render() {
 			const String *issue = cell_issues.getptr(_cell_key(row, column));
 			item->set_tooltip_text(column, issue ? *issue : String());
 			if (issue) {
-				item->set_custom_bg_color(column, issue_color);
+				item->set_custom_bg_color(column, missing_cells.has(_cell_key(row, column)) ? missing_color : issue_color);
 			} else {
 				item->clear_custom_bg_color(column);
 			}
@@ -658,6 +660,7 @@ void CSVTableEditor::_validate() {
 		return;
 	}
 	cell_issues.clear();
+	missing_cells.clear();
 	Ref<DataValidation> result;
 	if (catalog.is_valid()) {
 		result = catalog->validate();
@@ -673,6 +676,10 @@ void CSVTableEditor::_validate() {
 	}
 
 	HashMap<int, int> missing; // Column -> missing translations.
+	// Missing translations are gaps, counted per locale below, not issues (#346). In data CSVs they stay issues.
+	const bool gaps = catalog.is_valid() || translation_mode;
+	int issue_count = 0;
+	String first_issue;
 	for (int i = 0; i < result->get_issue_count(); i++) {
 		const int row = result->get_issue_row(i);
 		const int column = result->get_issue_column(i);
@@ -687,13 +694,20 @@ void CSVTableEditor::_validate() {
 			const int64_t key = _cell_key(row, tree_column);
 			const String *previous = cell_issues.getptr(key);
 			cell_issues[key] = previous ? *previous + "\n" + result->get_issue_message(i) : result->get_issue_message(i);
+			if (gaps && result->get_issue_kind(i) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED) {
+				missing_cells.insert(key);
+			}
 		}
 		if (result->get_issue_kind(i) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED) {
 			missing[column]++;
 		}
+		if (!gaps || result->get_issue_kind(i) != DataValidation::ISSUE_KIND_EMPTY_REQUIRED) {
+			first_issue = issue_count == 0 ? result->get_issue_message(i) : first_issue;
+			issue_count++;
+		}
 	}
 
-	String status = result->is_valid() ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), result->get_issue_count(), result->get_issue_message(0));
+	String status = issue_count == 0 ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), issue_count, first_issue);
 	if (catalog.is_valid()) {
 		// Counted per locale, not limited like the issues.
 		PackedStringArray counts;
@@ -863,11 +877,23 @@ void CSVTableEditor::_paste() {
 }
 
 void CSVTableEditor::_save() {
+	// A pending validation would replace the message of the save.
+	if (!validate_timer->is_stopped()) {
+		validate_timer->stop();
+		_validate();
+	}
 	if (catalog.is_valid()) {
-		EditorNode::get_singleton()->save_resource(catalog);
-		catalog_modified_time = FileAccess::get_modified_time(catalog->get_path());
-		if (catalog->get_path().get_extension().to_lower() == LocalizationCatalog::BINARY_EXTENSION && !catalog->get_note_columns().is_empty()) {
-			status_label->set_text(TTR("Saved. Translator notes are not stored in .lcat: save the catalog as CSV, JSON or another text format to keep them."));
+		const String path = catalog->get_path();
+		if (!path.is_resource_file()) {
+			// Built-in or new: saved with the scene or a save dialog, reported by _resource_saved().
+			EditorNode::get_singleton()->save_resource(catalog);
+			return;
+		}
+		// In place (#346): a catalog file is never imported, a CSV with "Keep File" included.
+		resource_saved = false;
+		EditorNode::get_singleton()->save_resource_in_path(catalog, path);
+		if (!resource_saved) {
+			status_label->set_text(vformat(TTR("Can't save \"%s\"."), path));
 		}
 		return;
 	}
@@ -878,7 +904,10 @@ void CSVTableEditor::_save() {
 	if (text_file.is_valid()) {
 		const String path = text_file->get_path();
 		Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
-		ERR_FAIL_COND_MSG(file.is_null(), vformat("Cannot save '%s'.", path));
+		if (file.is_null()) {
+			status_label->set_text(vformat(TTR("Can't save \"%s\"."), path));
+			return;
+		}
 		file->store_string(text_file->get_text());
 		file.unref();
 		const uint64_t modified_time = FileAccess::get_modified_time(path);
@@ -887,11 +916,38 @@ void CSVTableEditor::_save() {
 			text_editor->edited_file_data.last_modified_time = modified_time; // No "changed on disk" prompt.
 		}
 		EditorFileSystem::get_singleton()->update_file(path);
+		status_label->set_text(vformat(TTR("Saved \"%s\"."), path));
 	} else {
 		EditorNode::get_singleton()->save_resource(csv);
 	}
 	if (text_editor) {
 		text_editor->tag_saved_version();
+	}
+}
+
+void CSVTableEditor::_resource_saved(Object *p_resource) {
+	if (!p_resource || (p_resource != catalog.ptr() && p_resource != csv.ptr())) {
+		return;
+	}
+	resource_saved = true;
+	const String path = Object::cast_to<Resource>(p_resource)->get_path();
+	String message = vformat(TTR("Saved \"%s\"."), path);
+	if (catalog.is_valid()) {
+		catalog_modified_time = FileAccess::get_modified_time(path);
+		edited_path = path;
+		file_label->set_text(path.get_file()); // A new catalog has its path now.
+		if (path.get_extension().to_lower() == LocalizationCatalog::BINARY_EXTENSION && !catalog->get_note_columns().is_empty()) {
+			message += " " + TTR("Translator notes are not stored in .lcat: save the catalog as CSV, JSON or another text format to keep them.");
+		}
+	}
+	status_label->set_text(message);
+}
+
+void CSVTableEditor::_update_column_widths() {
+	// Readable columns: Key, Context and five locales fill the table, further columns scroll horizontally (#346).
+	const int width = MAX(int(120 * EDSCALE), int((tree->get_size().x - 80 * EDSCALE) / 7));
+	for (int column = 1; column < tree->get_columns(); column++) {
+		tree->set_column_custom_minimum_width(column, width);
 	}
 }
 
@@ -986,6 +1042,7 @@ void CSVTableEditor::_notification(int p_what) {
 			FileSystemDock::get_singleton()->connect(SNAME("files_moved"), callable_mp(this, &CSVTableEditor::_file_moved));
 			FileSystemDock::get_singleton()->connect(SNAME("file_removed"), callable_mp(this, &CSVTableEditor::_file_removed));
 		}
+		EditorNode::get_singleton()->connect(SNAME("resource_saved"), callable_mp(this, &CSVTableEditor::_resource_saved));
 	}
 }
 
@@ -1014,6 +1071,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 		text_file.unref();
 		schema.unref();
 		cell_issues.clear();
+		missing_cells.clear();
 		page = 0;
 		translation_mode = false;
 		catalog->connect_changed(callable_mp(this, &CSVTableEditor::_csv_changed));
@@ -1029,6 +1087,7 @@ void CSVTableEditor::edit(const Ref<Resource> &p_resource) {
 	csv = p_resource;
 	schema.unref();
 	cell_issues.clear();
+	missing_cells.clear();
 	page = 0;
 	if (text_file.is_valid()) {
 		// Translation CSVs open as TextFile: parse them with the delimiter of their import settings.
@@ -1160,6 +1219,7 @@ CSVTableEditor::CSVTableEditor() {
 	tree->connect(SceneStringName(gui_input), callable_mp(this, &CSVTableEditor::_tree_gui_input));
 	tree->connect(SceneStringName(mouse_entered), callable_mp(this, &CSVTableEditor::_sync_from_text_file));
 	tree->connect("column_title_clicked", callable_mp(this, &CSVTableEditor::_column_title_clicked));
+	tree->connect(SceneStringName(resized), callable_mp(this, &CSVTableEditor::_update_column_widths));
 	tree->set_drag_forwarding(Callable(), callable_mp(this, &CSVTableEditor::_can_drop_resource), callable_mp(this, &CSVTableEditor::_drop_resource));
 	main_vbox->add_child(tree);
 
