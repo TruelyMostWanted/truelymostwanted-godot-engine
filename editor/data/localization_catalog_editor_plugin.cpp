@@ -114,8 +114,17 @@ void LocalizationCatalogIssues::_queue_update() {
 }
 
 void LocalizationCatalogIssues::_update() {
+	// Missing translations are gaps, not errors (#346): listed per locale below, the fallback locales fill them.
 	const Ref<DataValidation> result = catalog->validate();
-	status->set_text(result->is_valid() ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), result->get_issue_count(), result->get_issue_message(0)));
+	int issue_count = 0;
+	String first_issue;
+	for (int i = 0; i < result->get_issue_count(); i++) {
+		if (result->get_issue_kind(i) != DataValidation::ISSUE_KIND_EMPTY_REQUIRED) {
+			first_issue = issue_count == 0 ? result->get_issue_message(i) : first_issue;
+			issue_count++;
+		}
+	}
+	status->set_text(issue_count == 0 ? TTR("No issues.") : vformat(TTR("%d issue(s). First: %s"), issue_count, first_issue));
 
 	// Missing keys per locale, collapsed; the CSV Table dock shows them in place.
 	missing_tree->clear();
@@ -454,6 +463,17 @@ void LocalizationCatalogEditorPlugin::_project_settings_changed() {
 	}
 }
 
+void LocalizationCatalogEditorPlugin::_resource_saved(Object *p_resource) {
+	// A catalog saved as a text file outside of the manifests (a new one, "Save As") becomes a catalog of the
+	// project: without a manifest the file would open as a data file and the CSV importer would take it (#346).
+	const LocalizationCatalog *catalog = Object::cast_to<LocalizationCatalog>(p_resource);
+	if (!catalog || !_is_text_catalog_path(catalog->get_path()) || get_manifest_catalog_class(catalog->get_path()) != StringName()) {
+		return;
+	}
+	const StringName catalog_class = Object::cast_to<TextLocalizationCatalog>(p_resource) ? StringName("TextLocalizationCatalog") : StringName("ResourceLocalizationCatalog");
+	callable_mp_static(&LocalizationCatalogEditorPlugin::add_catalog_files).call_deferred(PackedStringArray({ catalog->get_path() }), catalog_class);
+}
+
 void LocalizationCatalogEditorPlugin::_convert_project_translations() {
 	const PackedStringArray translations = GLOBAL_GET(SETTING_TRANSLATIONS);
 	const Dictionary remaps = GLOBAL_GET(SETTING_TRANSLATION_REMAPS);
@@ -545,10 +565,12 @@ void LocalizationCatalogEditorPlugin::_notification(int p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			VariantWriter::write_to_string(GLOBAL_GET(LocalizationServer::SETTING_CATALOG_MANIFESTS), loaded_manifests);
 			ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
+			EditorNode::get_singleton()->connect("resource_saved", callable_mp(this, &LocalizationCatalogEditorPlugin::_resource_saved));
 			add_tool_menu_item(TTR("Convert Project Translations to Catalogs..."), callable_mp(this, &LocalizationCatalogEditorPlugin::_popup_convert_dialog));
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 			ProjectSettings::get_singleton()->disconnect("settings_changed", callable_mp(this, &LocalizationCatalogEditorPlugin::_project_settings_changed));
+			EditorNode::get_singleton()->disconnect("resource_saved", callable_mp(this, &LocalizationCatalogEditorPlugin::_resource_saved));
 			remove_tool_menu_item(TTR("Convert Project Translations to Catalogs..."));
 		} break;
 	}

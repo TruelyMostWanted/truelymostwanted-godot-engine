@@ -281,7 +281,8 @@ void DataFileInspectorView::_restore(TreeItem *p_item, const HashSet<String> &p_
 			child->select(0);
 		}
 		if (child->is_collapsed() && p_expanded.has(path)) {
-			child->set_collapsed(false); // Fills the children, see _item_collapsed().
+			child->set_collapsed(false);
+			_expand(child); // Now, to restore the expanded children too.
 		}
 		if (!child->is_collapsed()) {
 			_restore(child, p_expanded, p_selected);
@@ -538,11 +539,25 @@ void DataFileInspectorView::_validate(bool p_force) {
 	issue_list->show();
 }
 
-void DataFileInspectorView::_item_collapsed(TreeItem *p_item) {
+void DataFileInspectorView::_expand(TreeItem *p_item) {
+	// Replaces the placeholder child of an expanded item with the first page of its children.
 	TreeItem *first = p_item->get_first_child();
 	if (!p_item->is_collapsed() && first && int(first->get_metadata(1)) == PLACEHOLDER_INDEX) {
 		memdelete(first);
 		_fill(p_item, 0);
+	}
+}
+
+void DataFileInspectorView::_item_collapsed(TreeItem *p_item) {
+	// Deferred: a click on the fold arrow blocks creating and removing items until the mouse event is handled.
+	// By ID, because a rebuild of the tree in between frees the item.
+	callable_mp(this, &DataFileInspectorView::_expand_deferred).call_deferred(p_item->get_instance_id());
+}
+
+void DataFileInspectorView::_expand_deferred(ObjectID p_item_id) {
+	TreeItem *item = ObjectDB::get_instance<TreeItem>(p_item_id);
+	if (item) {
+		_expand(item);
 	}
 }
 
