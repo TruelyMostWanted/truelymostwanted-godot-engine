@@ -788,5 +788,5 @@ HTTPRequest::HTTPRequest() {
 	timer->set_one_shot(true);
 	timer->set_ignore_time_scale(true);
 	timer->connect("timeout", callable_mp(this, &HTTPRequest::_timeout));
-	add_child(timer, false, INTERNAL_MODE_FRONT); // Truely (#379): engine-owned, so TimerServer.stop_all() skips it.
+	add_child(timer);
 }

@@ -98,7 +98,7 @@
 		<method name="pause_all">
 			<return type="void" />
 			<description>
-				Pauses every running timer. The timers emit their [code]pause_changed[/code] signal and report [method timer_is_paused] as [code]true[/code]. Timers that are not running are not paused. Engine-owned timers (internal [Timer] nodes such as those of [HTTPRequest] or GUI controls, and the editor's own [Timer] nodes) are skipped. See also [method resume_all].
+				Pauses every running timer. The timers emit their [code]pause_changed[/code] signal and report [method timer_is_paused] as [code]true[/code]. Timers that are not running are not paused. Engine-owned timers (internal [Timer] nodes such as those of GUI controls, and the editor's own [Timer] nodes) are skipped; the timeout timer of [HTTPRequest] is a regular child and is paused too. See also [method resume_all].
 			</description>
 		</method>
 		<method name="resume_all">
