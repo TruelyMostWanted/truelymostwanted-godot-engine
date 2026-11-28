@@ -252,3 +252,22 @@ Gemergt (2026-11-24, nach dem Limit-Reset): #87, #17, #70, #83, #89, #78, #51 (+
 - **Danach:** #397, #414 (Features), 0.3.0-Konzepte #399 #405–#407.
 - **0.2.1 veröffentlicht (2026-11-28):** Post `truely-v0.2.1-godot4.8-rc1` (aus dem 0.2.0-Post verschoben), 8 Dateien von `f5b22b5`, Text `P:/wt/rel-body-021-final.md` (neuer AI-Disclaimer). Release-Workflow von Hand gestartet (Run 46088380685); Update-Workflow hat jetzt eigene Concurrency-Gruppe. Neu: `truely/PIPELINE-CONVENTIONS.md` + `truely/pipeline_lint.py` (pre-commit), `truely/ARCHITECTURE.md`, Versionsanzeige `Truely v0.2 (Godot v4.8.rc1.mono)`.
 - **Offen:** #419 alle Plattformen (Branch `419-feature-release-all-platforms`, Dry-Run 46098649468 → Smoke-Test Android/Web-Export → Merge → Update-Workflow für 0.2.1). Besitzer-Funde: #346 (Katalog-CSV `null`, Save ohne Feedback, Lücken erlauben, horizontales Scrollen) und #361 (INI im Inspector friert ein), Fix-Agenten laufen (Worktrees `P:/wt/fix/loc3`, `P:/wt/fix/ini361`).
+
+### Übergabe (2026-11-28, früh) — Nacht-Auftrag 0.3.0 (Tracker #422)
+
+**Auftrag des Besitzers (Nacht, eigenständig, FullAutonomous):** Version 0.3.0 bauen, nur eigene Features (keine Godot-PR-/Proposal-Features: #405–#407 raus). Alles steht in **Tracker #422**; dort die Reihenfolge abhaken.
+1. **Text-Formate (#421):** schlaues Konzept für JSON/CSV/INI/XML/YAML/TOML: je Format eine eigene Klasse direkt von `Resource` (wie `JSON`), eigene API, eigener Inspector, ggf. eigenes Dock; statt gemeinsamer Basisklasse (`TextDataFormat`, #268). Erst Konzept + Decision im Issue, dann Feature-Issues.
+2. **Untertitel (#325):** Bearbeitung aus dem Inspector in ein eigenes „Subtitles“-Dock; Inspector = schneller Weg, Dock = volle UI/UX.
+3. **Docks (#420):** Dataset- und Database-Dock statt CSV-Table-Dock (Namen offen: „Dataset“/„Database“ vs. „… Viewer“).
+4. **Alle Issues chronologisch** abarbeiten (Liste in #422).
+5. **Aufräumen:** nicht mehr benötigte Worktrees/Dateien regelmäßig löschen (Branches bleiben).
+6. **Vor jedem Merge playtesten:** Build, durch Inspector, Editor-Hilfe (Klassenreferenz), Resource-Properties, Docks klicken; Exceptions vor dem Merge finden, nicht erst in der CI (45 min). Harness `P:/wt/pt/<bereich>/` mit Szenario je Feature; Briefs `P:/wt/pt/brief.md`, `brief-final.md`, `fix-brief.md`.
+7. **Review (Besitzer):** nach jedem fertigen Feature 1–3 unabhängige Reviewer-Agenten (Datenmodelle, Code-Review, UI/UX-Review); Funde ins Issue, vor dem Merge beheben oder begründen.
+8. Release 0.3.0 am Ende: volle CI grün → `truely/version.txt` 0.3.0 → `release.ps1` **erst nach Freigabe des Besitzers im Chat**.
+
+**Zuerst fertig machen (aus 0.2.x):**
+- Branch `389-fixes-022` (gepusht): #361 (Absturz Daten-Baum im Inspector, Fix `b649ae9211`, Worktree `P:/wt/fix/ini361`) + #346 (Katalog-CSV, Worktree `P:/wt/fix/loc3`). Build grün (2157/2157). Offen: **Absturz nach Klick auf TOML-Unterzeile** in `fix_361_all` (Log `P:/wt/pt/formats/logs/fix_361_all.*`; Harness oder Engine? Agent lief beim Neustart noch). `fix_361_ini`: Zähler „inputs=0“ im Harness falsch. `fix_346_owner`: 19 PASS, nur Kopfzeilen-Check erwartet `Keys,Context,en` → Kopfzeile bleibt Godot-kompatibel `keys,?context,en` (Besitzer hat nicht widersprochen), Check anpassen. Danach Merge (0.2.2-Inhalt geht in 0.3.0 auf, oder 0.2.2 vorab, wenn der Besitzer es will).
+- #419 alle Plattformen: Branch `419-feature-release-all-platforms`, Dry-Run 46098649468: rot Web editor, Linux arm32 editor (.NET); Rest lief noch.
+- Inspector-Buttons „Open as Text“/„Open in Table“: Vorschlag (Doppelklick öffnet Text + Tabelle, Buttons weg, Kontextmenü) → in #420 umsetzen.
+
+**Neue Dokumente dieser Session:** `truely/ARCHITECTURE.md` (Klassenarten, Schichten, Server-API, DOD, Code, Editor, Docks; Godot- und Truely-Beispiel je Regel), `truely/PIPELINE-CONVENTIONS.md` + `truely/pipeline_lint.py` (pre-commit-Hook). Fix-Agenten: `P:/wt/tools/find_broken_strings.py` vor jedem Commit (echte Zeilenumbrüche in C++-Strings).
