@@ -281,7 +281,8 @@ void DataFileInspectorView::_restore(TreeItem *p_item, const HashSet<String> &p_
 			child->select(0);
 		}
 		if (child->is_collapsed() && p_expanded.has(path)) {
-			child->set_collapsed(false); // Fills the children, see _item_collapsed().
+			child->set_collapsed(false);
+			_item_collapsed(child); // Fills the children now; the deferred signal call then finds them filled.
 		}
 		if (!child->is_collapsed()) {
 			_restore(child, p_expanded, p_selected);
@@ -661,7 +662,8 @@ DataFileInspectorView::DataFileInspectorView(const Ref<Resource> &p_resource) {
 	tree->set_hide_root(true);
 	tree->set_column_titles_visible(true);
 	tree->set_select_mode(Tree::SELECT_ROW);
-	tree->connect("item_collapsed", callable_mp(this, &DataFileInspectorView::_item_collapsed));
+	// Deferred: a click on the fold arrow blocks creating and removing items until the mouse event is handled.
+	tree->connect("item_collapsed", callable_mp(this, &DataFileInspectorView::_item_collapsed), CONNECT_DEFERRED);
 	// Deferred: the selected "more" item is removed.
 	tree->connect(SceneStringName(item_selected), callable_mp(this, &DataFileInspectorView::_item_selected), CONNECT_DEFERRED);
 	add_child(tree);
