@@ -34,6 +34,7 @@
 TEST_FORCE_LINK(test_timer_server)
 
 #include "core/object/callable_mp.h"
+#include "core/os/os.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/timer.h"
 #include "scene/main/timer_server.h"
@@ -306,6 +307,30 @@ TEST_CASE("[TimerServer] Many timers: heap order and stale entries") {
 	CHECK(event_count[TimerServer::TIMER_EVENT_TIMEOUT] == 100);
 	for (const RID &rid : rids) {
 		server->free_rid(rid);
+	}
+}
+
+TEST_CASE("[TimerServer] Idle timers cost nothing per frame") {
+	// 100000 running code timers that do not fire: a frame compares only the heap tops with the clocks.
+	TimerServer *server = TimerServer::get_singleton();
+	Ref<TimerInfo> info;
+	info.instantiate();
+	info->set_total_time(1000.0);
+	info->set_loop(true);
+	LocalVector<Ref<TimerInstance>> instances;
+	for (int idx = 0; idx < 100000; idx++) {
+		instances.push_back(server->create_timer(info));
+		instances[idx]->start();
+	}
+	const uint64_t begin = OS::get_singleton()->get_ticks_usec();
+	for (int idx = 0; idx < 1000; idx++) {
+		step(1.0 / 60.0);
+	}
+	const uint64_t usec = OS::get_singleton()->get_ticks_usec() - begin;
+	MESSAGE("1000 frames with 100000 idle timers: ", usec, " µs.");
+	CHECK_MESSAGE(usec < 20000, "Idle timers must not be visited per frame.");
+	for (const Ref<TimerInstance> &instance : instances) {
+		instance->stop();
 	}
 }
 
