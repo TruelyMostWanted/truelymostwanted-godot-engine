@@ -47,15 +47,29 @@ class INIEditor : public EditorDock {
 
 	static inline INIEditor *singleton = nullptr;
 
+	// Edits of the kept text, one line per item, so comments and formatting stay (#424 review).
+	enum TextChange {
+		TEXT_CHANGE_SET_VALUE,
+		TEXT_CHANGE_RENAME_KEY,
+		TEXT_CHANGE_REMOVE_KEYS,
+		TEXT_CHANGE_ADD_KEY,
+		TEXT_CHANGE_ADD_SECTION,
+		TEXT_CHANGE_RENAME_SECTION,
+		TEXT_CHANGE_REMOVE_SECTION,
+	};
+
 	Ref<INI> ini;
 	String section; // Selected section; "" holds the keys before the first section header.
+	String previous_section; // Selected before the last edit; selected again after its undo.
 	uint32_t reloaded_version = UINT32_MAX; // Version of the text editor's text right after the dock reloaded it.
 	bool update_queued = false;
-	String rendered_text; // `data` in Variant syntax when the dock rendered it (types included).
+	String rendered_key; // _get_render_key() when the dock rendered.
 	bool edit_section = false; // Starts editing the selected section's name after the next render.
 	String edit_key; // Starts editing this key's name after the next render.
 
 	Label *file_label = nullptr;
+	Button *add_section_button = nullptr;
+	Button *save_button = nullptr;
 	Button *remove_section_button = nullptr;
 	Button *add_key_button = nullptr;
 	Button *remove_key_button = nullptr;
@@ -66,7 +80,10 @@ class INIEditor : public EditorDock {
 
 	TextEditorBase *_get_text_editor() const;
 	bool _can_edit();
-	void _commit(const String &p_action, const Dictionary &p_data, const String &p_section);
+	String _get_text() const;
+	String _get_render_key() const;
+	// p_key: the edited key; p_to: the new key or section name; p_value: the value, or the keys to remove.
+	void _edit_text(const String &p_action, TextChange p_change, const String &p_key = String(), const String &p_to = String(), const Variant &p_value = Variant());
 
 	void _ini_changed();
 	void _update();

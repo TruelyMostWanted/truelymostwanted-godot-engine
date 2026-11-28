@@ -31,6 +31,7 @@
 #include "ini_editor.h"
 
 #include "core/input/input_event.h"
+#include "core/io/resource_text_serializer.h"
 #include "core/object/callable_mp.h"
 #include "core/variant/variant_utility.h"
 #include "editor/docks/editor_dock_manager.h"
@@ -52,29 +53,75 @@
 #include "scene/gui/tree.h"
 
 // The types offered in the Type column; a value of another type adds its own.
-static const Variant::Type VALUE_TYPES[] = { Variant::BOOL, Variant::INT, Variant::FLOAT, Variant::STRING, Variant::VECTOR2, Variant::VECTOR3, Variant::COLOR, Variant::ARRAY, Variant::DICTIONARY };
+static const Variant::Type INI_EDITOR_VALUE_TYPES[] = { Variant::BOOL, Variant::INT, Variant::FLOAT, Variant::STRING, Variant::VECTOR2, Variant::VECTOR3, Variant::COLOR, Variant::ARRAY, Variant::DICTIONARY };
 
-enum KeyColumn {
-	KEY_COLUMN_KEY,
-	KEY_COLUMN_TYPE,
-	KEY_COLUMN_VALUE,
+enum INIEditorColumn {
+	INI_EDITOR_COLUMN_KEY,
+	INI_EDITOR_COLUMN_TYPE,
+	INI_EDITOR_COLUMN_VALUE,
 };
 
-static String _get_unique_name(const Dictionary &p_dictionary, const String &p_base) {
+// What one line of INI text is, by the rules of ResourceTextSerializer::parse_ini_sections(): one item per line,
+// `;` and `#` start a comment line, keys before the first header belong to the section "".
+struct INIEditorTextLine {
+	enum Kind {
+		KIND_OTHER, // Comment or blank line.
+		KIND_HEADER,
+		KIND_KEY,
+	};
+	Kind kind = KIND_OTHER;
+	String section; // The section of the line; a header's own name.
+	String key;
+};
+
+static LocalVector<INIEditorTextLine> _ini_editor_scan(const Vector<String> &p_lines) {
+	LocalVector<INIEditorTextLine> result;
+	result.resize(p_lines.size());
+	String current;
+	for (int i = 0; i < p_lines.size(); i++) {
+		String line = p_lines[i].strip_edges();
+		if (i == 0 && !line.is_empty() && line[0] == 0xFEFF) {
+			line = line.substr(1).strip_edges();
+		}
+		INIEditorTextLine &info = result[i];
+		if (!line.is_empty() && line[0] == '[') {
+			current = line.substr(1, line.length() - 2).strip_edges();
+			info.kind = INIEditorTextLine::KIND_HEADER;
+		} else if (!line.is_empty() && line[0] != ';' && line[0] != '#') {
+			info.kind = INIEditorTextLine::KIND_KEY;
+			info.key = line.substr(0, MAX(line.find_char('='), 0)).strip_edges();
+			if (info.key.begins_with("\"")) {
+				const Variant parsed = ResourceTextSerializer::ini_text_to_value(info.key);
+				if (parsed.get_type() == Variant::STRING) {
+					info.key = parsed;
+				}
+			}
+		}
+		info.section = current;
+	}
+	return result;
+}
+
+// Replaces the text of a line and keeps its "\r" (CRLF files).
+static void _ini_editor_set_line(Vector<String> &r_lines, int p_index, const String &p_text) {
+	r_lines.write[p_index] = p_text + (r_lines[p_index].ends_with("\r") ? "\r" : "");
+}
+
+static String _ini_editor_get_unique_name(const PackedStringArray &p_names, const String &p_base) {
 	String result = p_base;
-	for (int i = 2; p_dictionary.has(result); i++) {
+	for (int i = 2; p_names.has(result); i++) {
 		result = p_base + "_" + itos(i);
 	}
 	return result;
 }
 
-// Text of a value: Strings as they are, every other type in Variant syntax.
-static String _value_to_text(const Variant &p_value) {
+// Text of a value in a cell: Strings as they are, every other type in Variant syntax.
+static String _ini_editor_value_to_text(const Variant &p_value) {
 	return p_value.get_type() == Variant::STRING ? String(p_value) : VariantUtilityFunctions::var_to_str(p_value);
 }
 
 // A String typed in a plain file or a cell becomes the target type when it is written in that type's syntax.
-static Variant _convert(const Variant &p_value, Variant::Type p_type) {
+static Variant _ini_editor_convert(const Variant &p_value, Variant::Type p_type) {
 	if (p_value.get_type() == Variant::STRING && p_type != Variant::STRING) {
 		const Variant parsed = VariantUtilityFunctions::str_to_var(p_value);
 		if (parsed.get_type() == p_type) {
@@ -82,15 +129,6 @@ static Variant _convert(const Variant &p_value, Variant::Type p_type) {
 		}
 	}
 	return VariantUtilityFunctions::type_convert(p_value, p_type);
-}
-
-// Replaces a key of a Dictionary by another one at the same position.
-static Dictionary _rename_key(const Dictionary &p_dictionary, const String &p_from, const String &p_to) {
-	Dictionary result;
-	for (const KeyValue<Variant, Variant> &kv : p_dictionary) {
-		result[String(kv.key) == p_from ? Variant(p_to) : kv.key] = kv.value;
-	}
-	return result;
 }
 
 TextEditorBase *INIEditor::_get_text_editor() const {
@@ -117,12 +155,115 @@ bool INIEditor::_can_edit() {
 	return true;
 }
 
-void INIEditor::_commit(const String &p_action, const Dictionary &p_data, const String &p_section) {
+String INIEditor::_get_text() const {
+	const String text = ini->get_parsed_text();
+	return text.is_empty() ? ini->encode_to_text() : text;
+}
+
+void INIEditor::_edit_text(const String &p_action, TextChange p_change, const String &p_key, const String &p_to, const Variant &p_value) {
+	const String old_text = _get_text();
+	Vector<String> lines = old_text.split("\n");
+	const LocalVector<INIEditorTextLine> info = _ini_editor_scan(lines);
+	const String cr = old_text.contains("\r\n") ? "\r" : "";
+	const bool plain = ResourceTextSerializer::get_options(ini->get_options()).ini_plain_values;
+	// Where appended lines go: before the empty element of a final line break.
+	const int end = lines.size() > 0 && lines[lines.size() - 1].is_empty() ? lines.size() - 1 : lines.size();
+	String select = section;
+
+	switch (p_change) {
+		case TEXT_CHANGE_SET_VALUE: {
+			// The last line of a repeated key wins when the file is read.
+			for (int i = (int)info.size() - 1; i >= 0; i--) {
+				if (info[i].kind == INIEditorTextLine::KIND_KEY && info[i].section == section && info[i].key == p_key) {
+					const String line = lines[i].trim_suffix("\r");
+					const int equal = line.find_char('=');
+					const bool space = line.substr(equal + 1).begins_with(" ");
+					_ini_editor_set_line(lines, i, line.substr(0, equal + 1) + (space ? " " : "") + ResourceTextSerializer::ini_value_to_text(p_value, plain));
+					break;
+				}
+			}
+		} break;
+		case TEXT_CHANGE_RENAME_KEY: {
+			for (uint32_t i = 0; i < info.size(); i++) {
+				if (info[i].kind == INIEditorTextLine::KIND_KEY && info[i].section == section && info[i].key == p_key) {
+					// Keeps the indentation and the spaces around `=`.
+					const String line = lines[i].trim_suffix("\r");
+					const int start = line.length() - line.strip_edges(true, false).length();
+					const int equal = line.find_char('=');
+					const String spaces = line.substr(start, equal - start);
+					_ini_editor_set_line(lines, i, line.substr(0, start) + p_to.property_name_encode() + spaces.substr(spaces.strip_edges(false, true).length()) + line.substr(equal));
+				}
+			}
+		} break;
+		case TEXT_CHANGE_REMOVE_KEYS: {
+			const PackedStringArray removed = p_value;
+			for (int i = (int)info.size() - 1; i >= 0; i--) {
+				if (info[i].kind == INIEditorTextLine::KIND_KEY && info[i].section == section && removed.has(info[i].key)) {
+					lines.remove_at(i);
+				}
+			}
+		} break;
+		case TEXT_CHANGE_ADD_KEY: {
+			// After the section's last key or header; keys without a section before the first header.
+			int at = -1;
+			int first_header = -1;
+			for (uint32_t i = 0; i < info.size(); i++) {
+				if (info[i].kind == INIEditorTextLine::KIND_HEADER && first_header < 0) {
+					first_header = i;
+				}
+				if (info[i].kind != INIEditorTextLine::KIND_OTHER && info[i].section == section && (info[i].kind == INIEditorTextLine::KIND_KEY || !section.is_empty())) {
+					at = i + 1;
+				}
+			}
+			if (at < 0) {
+				at = first_header >= 0 ? first_header : end;
+				if (first_header >= 0) {
+					lines.insert(at, cr); // A blank line before the first header.
+				}
+			}
+			lines.insert(at, p_key.property_name_encode() + "=" + ResourceTextSerializer::ini_value_to_text(p_value, plain) + cr);
+		} break;
+		case TEXT_CHANGE_ADD_SECTION: {
+			int at = end;
+			if (at > 0 && !lines[at - 1].strip_edges().is_empty()) {
+				lines.insert(at++, cr);
+			}
+			lines.insert(at, "[" + p_to + "]" + cr);
+			if (at == lines.size() - 1) {
+				lines.push_back(String()); // The file ends with a line break.
+			}
+			select = p_to;
+		} break;
+		case TEXT_CHANGE_RENAME_SECTION: {
+			for (uint32_t i = 0; i < info.size(); i++) {
+				if (info[i].kind == INIEditorTextLine::KIND_HEADER && info[i].section == section) {
+					const String line = lines[i].trim_suffix("\r");
+					_ini_editor_set_line(lines, i, line.substr(0, line.find_char('[')) + "[" + p_to + "]");
+				}
+			}
+			select = p_to;
+		} break;
+		case TEXT_CHANGE_REMOVE_SECTION: {
+			// Every block of the section with its comments; for "" only its keys.
+			for (int i = (int)info.size() - 1; i >= 0; i--) {
+				if (info[i].section == section && (!section.is_empty() || info[i].kind == INIEditorTextLine::KIND_KEY)) {
+					lines.remove_at(i);
+				}
+			}
+		} break;
+	}
+
+	const String new_text = String("\n").join(lines);
+	if (new_text == old_text) {
+		return;
+	}
+	// The text is committed, not the data: comments, blank lines and formatting stay, and undo restores the exact text.
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(p_action);
-	undo_redo->add_do_method(ini.ptr(), "set_data", p_data);
-	undo_redo->add_undo_method(ini.ptr(), "set_data", Dictionary(ini->get_data()).duplicate(true));
-	section = p_section;
+	undo_redo->add_do_method(ini.ptr(), "parse", new_text, true);
+	undo_redo->add_undo_method(ini.ptr(), "parse", old_text, true);
+	previous_section = section;
+	section = select;
 	undo_redo->commit_action(); // `changed` renders the dock deferred, not while a tree emits a signal.
 }
 
@@ -134,24 +275,27 @@ void INIEditor::_ini_changed() {
 	}
 }
 
+String INIEditor::_get_render_key() const {
+	// The kept text, or the data with types when a script changed it.
+	const String text = ini->get_parsed_text();
+	return text.is_empty() ? VariantUtilityFunctions::var_to_str(ini->get_data()) : text;
+}
+
 void INIEditor::_update() {
 	update_queued = false;
 	if (ini.is_null()) {
 		return;
 	}
-	// No kept text: the data was changed by the dock, undo/redo or a script, not by parsing the text.
-	// Show the change in the text editor, so neither side overwrites the other.
-	if (ini->get_parsed_text().is_empty()) {
-		const String text = ini->encode_to_text();
-		TextEditorBase *text_editor = _get_text_editor();
-		const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
-		if (text_edit && text_edit->get_text() != text) {
-			text_editor->reload_text();
-			reloaded_version = text_edit->get_version();
-		}
+	// Show a change of the dock, undo/redo or a script in the text editor, so neither side overwrites the other.
+	// Text the text editor parsed itself is equal and stays as it is.
+	TextEditorBase *text_editor = _get_text_editor();
+	const TextEdit *text_edit = text_editor ? Object::cast_to<TextEdit>(text_editor->get_base_editor()) : nullptr;
+	if (text_edit && text_edit->get_text() != _get_text()) {
+		text_editor->reload_text();
+		reloaded_version = text_edit->get_version();
 	}
-	// The text editor parses the reloaded text again: same data, and a render would close an open cell editor.
-	if (VariantUtilityFunctions::var_to_str(ini->get_data()) != rendered_text) {
+	// The text editor parses the reloaded text again: same text, and a render would close an open cell editor.
+	if (_get_render_key() != rendered_key) {
 		_render();
 	}
 }
@@ -160,7 +304,10 @@ void INIEditor::_render() {
 	section_tree->clear();
 	TreeItem *root = section_tree->create_item();
 	const Dictionary file_data = ini.is_valid() ? Dictionary(ini->get_data()) : Dictionary();
-	rendered_text = VariantUtilityFunctions::var_to_str(file_data);
+	rendered_key = ini.is_valid() ? _get_render_key() : String();
+	if (!file_data.has(section) && file_data.has(previous_section)) {
+		section = previous_section; // Undo of a rename or removal selects the section again.
+	}
 	if (!file_data.has(section) && !file_data.is_empty()) {
 		section = file_data.get_key_at_index(0);
 	}
@@ -194,8 +341,8 @@ void INIEditor::_edit_added() {
 		section_tree->edit_selected(true);
 	}
 	for (TreeItem *item = key_tree->get_root()->get_first_child(); item && !edit_key.is_empty(); item = item->get_next()) {
-		if (String(item->get_metadata(KEY_COLUMN_KEY)) == edit_key) {
-			key_tree->set_selected(item, KEY_COLUMN_KEY);
+		if (String(item->get_metadata(INI_EDITOR_COLUMN_KEY)) == edit_key) {
+			key_tree->set_selected(item, INI_EDITOR_COLUMN_KEY);
 			key_tree->edit_selected(true);
 		}
 	}
@@ -212,6 +359,7 @@ void INIEditor::_section_selected() {
 	const Dictionary file_data = ini.is_valid() ? Dictionary(ini->get_data()) : Dictionary();
 	const Dictionary keys = file_data.get(section, Dictionary());
 	remove_section_button->set_disabled(!file_data.has(section));
+	add_section_button->set_disabled(ini.is_null());
 	add_key_button->set_disabled(ini.is_null());
 	remove_key_button->set_disabled(keys.is_empty());
 	if (ini.is_null()) {
@@ -228,42 +376,42 @@ void INIEditor::_section_selected() {
 	TreeItem *root = key_tree->create_item();
 	for (const KeyValue<Variant, Variant> &kv : keys) {
 		TreeItem *item = key_tree->create_item(root);
-		item->set_metadata(KEY_COLUMN_KEY, kv.key);
-		item->set_text(KEY_COLUMN_KEY, kv.key);
-		item->set_editable(KEY_COLUMN_KEY, true);
+		item->set_metadata(INI_EDITOR_COLUMN_KEY, kv.key);
+		item->set_text(INI_EDITOR_COLUMN_KEY, kv.key);
+		item->set_editable(INI_EDITOR_COLUMN_KEY, true);
 
 		const Variant::Type type = kv.value.get_type();
 		String type_names;
 		int type_index = -1;
-		for (int i = 0; i < (int)std_size(VALUE_TYPES); i++) {
-			type_names += (i > 0 ? "," : "") + Variant::get_type_name(VALUE_TYPES[i]);
-			if (VALUE_TYPES[i] == type) {
+		for (int i = 0; i < (int)std_size(INI_EDITOR_VALUE_TYPES); i++) {
+			type_names += (i > 0 ? "," : "") + Variant::get_type_name(INI_EDITOR_VALUE_TYPES[i]);
+			if (INI_EDITOR_VALUE_TYPES[i] == type) {
 				type_index = i;
 			}
 		}
 		if (type_index < 0) {
-			type_index = (int)std_size(VALUE_TYPES);
+			type_index = (int)std_size(INI_EDITOR_VALUE_TYPES);
 			type_names += "," + Variant::get_type_name(type);
 		}
-		item->set_cell_mode(KEY_COLUMN_TYPE, TreeItem::CELL_MODE_RANGE);
-		item->set_text(KEY_COLUMN_TYPE, type_names);
-		item->set_range(KEY_COLUMN_TYPE, type_index);
+		item->set_cell_mode(INI_EDITOR_COLUMN_TYPE, TreeItem::CELL_MODE_RANGE);
+		item->set_text(INI_EDITOR_COLUMN_TYPE, type_names);
+		item->set_range(INI_EDITOR_COLUMN_TYPE, type_index);
 		// Plain files store every value as text.
-		item->set_editable(KEY_COLUMN_TYPE, !plain);
+		item->set_editable(INI_EDITOR_COLUMN_TYPE, !plain);
 		if (plain) {
-			item->set_tooltip_text(KEY_COLUMN_TYPE, TTR("Plain INI files store every value as text (SerializerOptions.ini_value_style)."));
+			item->set_tooltip_text(INI_EDITOR_COLUMN_TYPE, TTR("Plain INI files store every value as text (SerializerOptions.ini_value_style)."));
 		}
 
 		if (type == Variant::BOOL) {
-			item->set_cell_mode(KEY_COLUMN_VALUE, TreeItem::CELL_MODE_CHECK);
-			item->set_checked(KEY_COLUMN_VALUE, kv.value);
-			item->set_text(KEY_COLUMN_VALUE, kv.value ? "true" : "false");
+			item->set_cell_mode(INI_EDITOR_COLUMN_VALUE, TreeItem::CELL_MODE_CHECK);
+			item->set_checked(INI_EDITOR_COLUMN_VALUE, kv.value);
+			item->set_text(INI_EDITOR_COLUMN_VALUE, kv.value ? "true" : "false");
 		} else {
-			const String text = _value_to_text(kv.value);
-			item->set_text(KEY_COLUMN_VALUE, text);
-			item->set_tooltip_text(KEY_COLUMN_VALUE, text);
+			const String text = _ini_editor_value_to_text(kv.value);
+			item->set_text(INI_EDITOR_COLUMN_VALUE, text);
+			item->set_tooltip_text(INI_EDITOR_COLUMN_VALUE, text);
 		}
-		item->set_editable(KEY_COLUMN_VALUE, true);
+		item->set_editable(INI_EDITOR_COLUMN_VALUE, true);
 	}
 }
 
@@ -271,61 +419,67 @@ void INIEditor::_section_edited() {
 	TreeItem *item = section_tree->get_edited();
 	const String from = item->get_metadata(0);
 	const String to = item->get_text(0).strip_edges();
-	if (to == from) {
+	if (to == from || !_can_edit()) {
+		callable_mp(this, &INIEditor::_render).call_deferred(); // Restores the name; not while the tree is emitting.
 		return;
 	}
-	const Dictionary file_data = ini->get_data();
 	if (to.is_empty() || to.contains_char(']') || to.contains_char('\n')) {
 		status_label->set_text(TTR("A section name can't be empty or contain \"]\"."));
-	} else if (file_data.has(to)) {
+	} else if (ini->has_section(to)) {
 		status_label->set_text(vformat(TTR("A section named \"%s\" already exists."), to));
-	} else if (_can_edit()) {
-		_commit(TTR("Rename INI Section"), _rename_key(Dictionary(ini->get_data()).duplicate(true), from, to), to);
+	} else {
+		section = from;
+		_edit_text(TTR("Rename INI Section"), TEXT_CHANGE_RENAME_SECTION, String(), to);
 		return;
 	}
-	callable_mp(this, &INIEditor::_render).call_deferred(); // Restores the name; not while the tree is emitting.
+	callable_mp(this, &INIEditor::_render).call_deferred();
 }
 
 void INIEditor::_key_edited() {
 	TreeItem *item = key_tree->get_edited();
 	const int column = key_tree->get_edited_column();
-	const String key = item->get_metadata(KEY_COLUMN_KEY);
+	const String key = item->get_metadata(INI_EDITOR_COLUMN_KEY);
 	if (!_can_edit() || !ini->has_section_key(section, key)) {
 		callable_mp(this, &INIEditor::_render).call_deferred();
 		return;
 	}
-	Dictionary file_data = Dictionary(ini->get_data()).duplicate(true);
-	Dictionary keys = file_data[section];
-	const Variant value = keys[key];
+	const Variant value = ini->get_value(section, key);
 	String error;
-	if (column == KEY_COLUMN_KEY) {
-		const String to = item->get_text(KEY_COLUMN_KEY).strip_edges();
+	if (column == INI_EDITOR_COLUMN_KEY) {
+		const String to = item->get_text(INI_EDITOR_COLUMN_KEY).strip_edges();
 		if (to == key) {
 			return;
 		}
 		if (to.is_empty() || to.contains_char('=') || to.contains_char('\n')) {
 			error = TTR("A key name can't be empty or contain \"=\".");
-		} else if (keys.has(to)) {
+		} else if (to[0] == ';' || to[0] == '#' || to[0] == '[' || to[0] == '"') {
+			// The line would be read as a comment, a section header or a quoted name.
+			error = TTR("A key name can't start with \";\", \"#\", \"[\" or a quote.");
+		} else if (ini->has_section_key(section, to)) {
 			error = vformat(TTR("The key \"%s\" already exists in this section."), to);
 		} else {
-			file_data[section] = _rename_key(keys, key, to);
-			_commit(TTR("Rename INI Key"), file_data, section);
+			_edit_text(TTR("Rename INI Key"), TEXT_CHANGE_RENAME_KEY, key, to);
 			return;
 		}
-	} else if (column == KEY_COLUMN_TYPE) {
-		const Variant::Type type = Variant::get_type_by_name(item->get_text(KEY_COLUMN_TYPE).get_slicec(',', (int)item->get_range(KEY_COLUMN_TYPE)));
+	} else if (column == INI_EDITOR_COLUMN_TYPE) {
+		const Variant::Type type = Variant::get_type_by_name(item->get_text(INI_EDITOR_COLUMN_TYPE).get_slicec(',', (int)item->get_range(INI_EDITOR_COLUMN_TYPE)));
 		if (type == value.get_type()) {
 			return;
 		}
-		keys[key] = _convert(value, type);
-		_commit(TTR("Change INI Value Type"), file_data, section);
+		const Variant converted = _ini_editor_convert(value, type);
+		_edit_text(TTR("Change INI Value Type"), TEXT_CHANGE_SET_VALUE, key, String(), converted);
+		const String from_text = _ini_editor_value_to_text(value);
+		const String to_text = _ini_editor_value_to_text(converted);
+		if (from_text != to_text) {
+			status_label->set_text(vformat(TTR("Converted \"%s\" to %s."), from_text, to_text)); // A lossy conversion is visible.
+		}
 		return;
 	} else {
-		const String text = item->get_text(KEY_COLUMN_VALUE);
+		const String text = item->get_text(INI_EDITOR_COLUMN_VALUE);
 		Variant new_value;
 		switch (value.get_type()) {
 			case Variant::BOOL:
-				new_value = item->is_checked(KEY_COLUMN_VALUE);
+				new_value = item->is_checked(INI_EDITOR_COLUMN_VALUE);
 				break;
 			case Variant::STRING:
 				new_value = text;
@@ -349,9 +503,8 @@ void INIEditor::_key_edited() {
 		}
 		if (new_value.get_type() == Variant::NIL) {
 			error = vformat(TTR("\"%s\" is not a valid %s value."), text, Variant::get_type_name(value.get_type()));
-		} else if (new_value != value) {
-			keys[key] = new_value;
-			_commit(TTR("Set INI Value"), file_data, section);
+		} else if (new_value != value || new_value.get_type() != value.get_type()) {
+			_edit_text(TTR("Set INI Value"), TEXT_CHANGE_SET_VALUE, key, String(), new_value);
 			return;
 		}
 	}
@@ -363,49 +516,37 @@ void INIEditor::_add_section() {
 	if (!_can_edit()) {
 		return;
 	}
-	Dictionary file_data = Dictionary(ini->get_data()).duplicate(true);
-	const String name = _get_unique_name(file_data, "new_section");
-	file_data[name] = Dictionary();
 	edit_section = true;
-	_commit(TTR("Add INI Section"), file_data, name);
+	_edit_text(TTR("Add INI Section"), TEXT_CHANGE_ADD_SECTION, String(), _ini_editor_get_unique_name(ini->get_sections(), "new_section"));
 }
 
 void INIEditor::_remove_section() {
 	if (!_can_edit() || !ini->has_section(section)) {
 		return;
 	}
-	Dictionary file_data = Dictionary(ini->get_data()).duplicate(true);
-	file_data.erase(section);
-	_commit(TTR("Remove INI Section"), file_data, section);
+	_edit_text(TTR("Remove INI Section"), TEXT_CHANGE_REMOVE_SECTION);
 }
 
 void INIEditor::_add_key() {
 	if (!_can_edit()) {
 		return;
 	}
-	Dictionary file_data = Dictionary(ini->get_data()).duplicate(true);
-	if (!file_data.has(section)) {
-		file_data[section] = Dictionary();
-	}
-	Dictionary keys = file_data[section];
-	const String key = _get_unique_name(keys, "new_key");
-	keys[key] = String();
-	edit_key = key;
-	_commit(TTR("Add INI Key"), file_data, section);
+	const PackedStringArray keys = ini->has_section(section) ? ini->get_section_keys(section) : PackedStringArray();
+	edit_key = _ini_editor_get_unique_name(keys, "new_key");
+	_edit_text(TTR("Add INI Key"), TEXT_CHANGE_ADD_KEY, edit_key, String(), String());
 }
 
 void INIEditor::_remove_keys() {
 	if (!_can_edit() || !ini->has_section(section)) {
 		return;
 	}
-	Dictionary file_data = Dictionary(ini->get_data()).duplicate(true);
-	Dictionary keys = file_data[section];
 	// The section stays, also when it has no keys left.
+	PackedStringArray keys;
 	for (TreeItem *item = key_tree->get_next_selected(nullptr); item; item = key_tree->get_next_selected(item)) {
-		keys.erase(item->get_metadata(KEY_COLUMN_KEY));
+		keys.push_back(item->get_metadata(INI_EDITOR_COLUMN_KEY));
 	}
-	if (keys.size() != ini->get_section_keys(section).size()) {
-		_commit(TTR("Remove INI Keys"), file_data, section);
+	if (!keys.is_empty()) {
+		_edit_text(TTR("Remove INI Keys"), TEXT_CHANGE_REMOVE_KEYS, String(), String(), keys);
 	}
 }
 
@@ -428,16 +569,14 @@ void INIEditor::_resource_saved(Object *p_resource) {
 
 void INIEditor::_tree_gui_input(const Ref<InputEvent> &p_event, bool p_sections) {
 	Tree *tree = p_sections ? section_tree : key_tree;
+	const Ref<InputEventKey> key_event = p_event;
+	if (key_event.is_null() || !key_event->is_pressed() || key_event->is_echo()) {
+		return; // Shortcuts match released keys too: Ctrl+S would save twice.
+	}
 	if (ED_IS_SHORTCUT("editor/save_scene", p_event)) {
 		_save();
 		tree->accept_event();
-		return;
-	}
-	const Ref<InputEventKey> key_event = p_event;
-	if (key_event.is_null() || !key_event->is_pressed() || key_event->is_echo()) {
-		return;
-	}
-	if (key_event->get_keycode() == Key::KEY_DELETE) {
+	} else if (key_event->get_keycode() == Key::KEY_DELETE) {
 		if (p_sections) {
 			_remove_section();
 		} else {
@@ -445,8 +584,11 @@ void INIEditor::_tree_gui_input(const Ref<InputEvent> &p_event, bool p_sections)
 		}
 		tree->accept_event();
 	} else if (key_event->get_keycode() == Key::F2 && tree->get_selected()) {
-		tree->set_selected(tree->get_selected(), 0);
-		tree->edit_selected(true);
+		// "(no section)" can't be renamed.
+		if (tree->get_selected()->is_editable(0)) {
+			tree->set_selected(tree->get_selected(), 0);
+			tree->edit_selected();
+		}
 		tree->accept_event();
 	}
 }
@@ -476,6 +618,9 @@ void INIEditor::_notification(int p_what) {
 			FileSystemDock::get_singleton()->connect(SNAME("file_removed"), callable_mp(this, &INIEditor::_file_removed));
 		}
 		EditorNode::get_singleton()->connect(SNAME("resource_saved"), callable_mp(this, &INIEditor::_resource_saved));
+		save_button->set_tooltip_text(vformat(TTR("Save the file (%s in the dock)."), ED_GET_SHORTCUT("editor/save_scene")->get_as_text()));
+	} else if (p_what == NOTIFICATION_THEME_CHANGED && ini.is_valid()) {
+		_render(); // The color of "(no section)".
 	}
 }
 
@@ -518,7 +663,8 @@ INIEditor::INIEditor() {
 	file_label = memnew(Label);
 	toolbar->add_child(file_label);
 
-	Button *add_section_button = memnew(Button(TTR("Add Section")));
+	add_section_button = memnew(Button(TTR("Add Section")));
+	add_section_button->set_tooltip_text(TTR("Add a section at the end of the file and name it."));
 	add_section_button->connect(SceneStringName(pressed), callable_mp(this, &INIEditor::_add_section));
 	toolbar->add_child(add_section_button);
 	remove_section_button = memnew(Button(TTR("Remove Section")));
@@ -533,8 +679,7 @@ INIEditor::INIEditor() {
 	remove_key_button->set_tooltip_text(TTR("Remove the selected keys (Delete in the key table)."));
 	remove_key_button->connect(SceneStringName(pressed), callable_mp(this, &INIEditor::_remove_keys));
 	toolbar->add_child(remove_key_button);
-	Button *save_button = memnew(Button(TTR("Save")));
-	save_button->set_tooltip_text(TTR("Save the file (Ctrl+S in the dock)."));
+	save_button = memnew(Button(TTR("Save")));
 	save_button->connect(SceneStringName(pressed), callable_mp(this, &INIEditor::_save));
 	toolbar->add_child(save_button);
 
@@ -558,14 +703,14 @@ INIEditor::INIEditor() {
 	key_tree->set_hide_root(true);
 	key_tree->set_column_titles_visible(true);
 	key_tree->set_select_mode(Tree::SELECT_MULTI);
-	key_tree->set_column_title(KEY_COLUMN_KEY, TTR("Key"));
-	key_tree->set_column_title(KEY_COLUMN_TYPE, TTR("Type"));
-	key_tree->set_column_title(KEY_COLUMN_VALUE, TTR("Value"));
-	key_tree->set_column_expand_ratio(KEY_COLUMN_KEY, 1);
-	key_tree->set_column_expand(KEY_COLUMN_TYPE, false);
-	key_tree->set_column_custom_minimum_width(KEY_COLUMN_TYPE, 120 * EDSCALE);
-	key_tree->set_column_expand_ratio(KEY_COLUMN_VALUE, 2);
-	key_tree->set_column_clip_content(KEY_COLUMN_VALUE, true);
+	key_tree->set_column_title(INI_EDITOR_COLUMN_KEY, TTR("Key"));
+	key_tree->set_column_title(INI_EDITOR_COLUMN_TYPE, TTR("Type"));
+	key_tree->set_column_title(INI_EDITOR_COLUMN_VALUE, TTR("Value"));
+	key_tree->set_column_expand_ratio(INI_EDITOR_COLUMN_KEY, 1);
+	key_tree->set_column_expand(INI_EDITOR_COLUMN_TYPE, false);
+	key_tree->set_column_custom_minimum_width(INI_EDITOR_COLUMN_TYPE, 120 * EDSCALE);
+	key_tree->set_column_expand_ratio(INI_EDITOR_COLUMN_VALUE, 2);
+	key_tree->set_column_clip_content(INI_EDITOR_COLUMN_VALUE, true);
 	key_tree->connect("item_edited", callable_mp(this, &INIEditor::_key_edited));
 	key_tree->connect(SceneStringName(gui_input), callable_mp(this, &INIEditor::_tree_gui_input).bind(false));
 	split->add_child(key_tree);
