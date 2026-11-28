@@ -37,6 +37,7 @@
 #include "core/io/xml_format.h"
 #include "core/object/callable_mp.h"
 #include "editor/data/csv_table_editor.h"
+#include "editor/data/ini_editor.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_string_names.h"
 #include "editor/script/data_schema_lookup.h"
@@ -457,7 +458,11 @@ void DataFileInspectorView::_update() {
 	// Only plain file_data files open in the script editor (see ScriptEditorPlugin::handles()).
 	const String path = resource->get_path();
 	text_button->set_disabled(format.is_valid() ? !format->is_recognized_path(path) : path.get_extension().to_lower() != "json");
-	table_button->set_visible(csv);
+	// INI files open in the INI dock (#424), CSV files in the CSV Table dock.
+	const bool ini = Object::cast_to<INI>(*resource) != nullptr;
+	table_button->set_visible(csv || ini);
+	table_button->set_text(ini ? TTR("Open in INI Dock") : TTR("Open in Table"));
+	table_button->set_tooltip_text(ini ? TTR("Edit the sections and keys in the INI dock.") : TTR("Edit the rows in the CSV Table dock."));
 	search->set_visible(!csv);
 
 	if (csv) {
@@ -581,6 +586,12 @@ void DataFileInspectorView::_open_text(int p_line) {
 }
 
 void DataFileInspectorView::_open_table() {
+	INIEditor *ini_editor = INIEditor::get_singleton();
+	if (ini_editor && Object::cast_to<INI>(*resource)) {
+		ini_editor->edit(resource);
+		ini_editor->make_visible();
+		return;
+	}
 	CSVTableEditor *table_editor = CSVTableEditor::get_singleton();
 	if (table_editor) {
 		table_editor->edit(resource);
