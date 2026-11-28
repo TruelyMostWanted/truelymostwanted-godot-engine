@@ -205,6 +205,8 @@ Terms of **truely-godot-engine** (this fork of [godotengine/godot](https://githu
 
 **TileSet coordinate system**: `TileSet` options `swap_x_and_y_axis`, `flip_x` and `flip_y` change the cell numbering of a tile map without moving tiles (replaced `CoordinateAxes`, #261). In code: `scene/resources/2d/tile_set.*`, `modules/tilemap/`. Wiki: [`TileSet-Coordinate-Axes`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/TileSet-Coordinate-Axes).
 
+**Transition screen** (`TransitionScreen`, `LoadingScreen`, `SplashScreen`): `CanvasLayer` root of a scene that fades in over the current scene, loads the next scene with `ResourceLoader.load_threaded_request()` (plus optional `Preloads`), changes the scene while fully visible, fades out over the new scene and frees itself. `LoadingScreen` drives a `Range` and rotating tips; `SplashScreen` runs at boot from `application/boot_splash/scene` and changes to the main scene; `SceneTree.change_scene_with_transition()` starts one. One transition at a time; input to the covered scene is blocked; a failed load emits `load_failed`. Web without threads: one blocking load step on the frame after the screen became opaque. In code: `scene/main/transition_screen.*`. Issue: #399. Wiki: [`399-feature-scene-transitions`](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki/399-feature-scene-transitions).
+
 **Tracker** (issue #32, label `flag: tracker`): lists the issues, their order and dependencies; `gh issue list --label "flag: tracker"`.
 
 **Translator note**: text for translators per catalog key in a `_` column or field (`_notes`, `_max_length`) of a `LocalizationCatalog` text format; `get_note(key, context, column)`. Never used for lookups, not stored in `.lcat`. In code: `core/string/localization_catalog.*`. Issue: #357.
@@ -267,6 +269,7 @@ Feature area to main files. Each class has `doc/classes/<Class>.xml` (module cla
 | Subtitles, TTS | `SubtitleServer`, `Subtitle`, `SubtitlePlayback`, `SubtitlePlayer`, `TTSServer`, `TTSPersona` | `servers/subtitle/`, `scene/main/subtitle_player.*`, `servers/tts/` | `tests/servers/test_subtitle*.cpp`, `tests/scene/test_subtitle_player.cpp`, `test_tts_server.cpp` |
 | Input icons, screenshots, HTTP | `InputIconServer`, `InputIconSet`, `ScreenshotServer`, `HTTPRequestTarget`, `HTTPResponse` | `scene/main/`, `scene/resources/` | `tests/scene/` |
 | 2D | `SpriteSheet`, `TileSet`, `TileMapLayer`, `TileMapPathGraph` | `scene/resources/sprite_sheet.*`, `scene/resources/2d/tile_set.*`, `modules/tilemap/`, `modules/tilemap/tile_map_path_graph.*` | `modules/tilemap/tests/` |
+| Scene transitions | `TransitionScreen`, `LoadingScreen`, `SplashScreen` | `scene/main/transition_screen.*` | `tests/scene/test_transition_screen.cpp` |
 | World-space bars | `ProgressBarServer`, `ProgressBarStyle` | `scene/main/progress_bar_server.*`, `scene/resources/progress_bar_style.*` | `tests/scene/test_progress_bar_server.cpp` |
 | Random | `SeedServer` | `core/math/seed_server.*` | `tests/core/math/test_seed_server.cpp` |
 | Performance | `PerformanceRecorder`, `PerformanceBudget`, `PerformanceRecordingProfile`, `PerformanceSummary` | `main/performance_*.*` | `tests/main/` |

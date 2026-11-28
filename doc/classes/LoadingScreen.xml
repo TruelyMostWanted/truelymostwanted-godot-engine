@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LoadingScreen" inherits="TransitionScreen" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A [TransitionScreen] that shows the load progress in a progress bar and rotates tips.
+	</brief_description>
+	<description>
+		A loading screen is a [TransitionScreen] with two optional helpers: it writes the load progress into the [Range] at [member progress_bar] (for example a [ProgressBar] or [TextureProgressBar]) and shows [member tips] one after another in the node at [member tip_label] (any node with a [code]text[/code] property: [Label], [RichTextLabel], [Button]).
+		Design the loading screen as a scene with a [LoadingScreen] root, then start it with [method SceneTree.change_scene_with_transition]:
+		[codeblocks]
+		[gdscript]
+		get_tree().change_scene_with_transition("res://levels/level_2.tscn", preload("res://ui/loading_screen.tscn"))
+		[/gdscript]
+		[csharp]
+		GetTree().ChangeSceneWithTransition("res://levels/level_2.tscn", GD.Load&lt;PackedScene&gt;("res://ui/loading_screen.tscn"));
+		[/csharp]
+		[/codeblocks]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_current_tip" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the tip that is shown now, or an empty string if [member tips] is empty.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="progress_bar" type="NodePath" setter="set_progress_bar" getter="get_progress_bar" default="NodePath(&quot;&quot;)">
+			Path to a [Range] (for example a [ProgressBar]) that shows the load progress. It is set through [member Range.ratio], so any [member Range.min_value] and [member Range.max_value] work.
+		</member>
+		<member name="tip_interval" type="float" setter="set_tip_interval" getter="get_tip_interval" default="5.0">
+			Seconds each tip is shown before the next one. [code]0.0[/code] keeps the first tip.
+		</member>
+		<member name="tip_label" type="NodePath" setter="set_tip_label" getter="get_tip_label" default="NodePath(&quot;&quot;)">
+			Path to the node that shows the tips: any node with a [code]text[/code] property, such as [Label], [RichTextLabel] or [Button].
+		</member>
+		<member name="tips" type="PackedStringArray" setter="set_tips" getter="get_tips" default="PackedStringArray()">
+			Tips shown in order while the screen is visible, starting with the first one. Shuffle the array in a script for a random order. Translation keys are translated by the label as usual.
+		</member>
+	</members>
+</class>
