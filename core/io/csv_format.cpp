@@ -359,10 +359,12 @@ void CSV::set_cells(int p_row, int p_column, const Array &p_cells) {
 }
 
 // Inserts p_value at p_column of a row (or header) wider than p_column; a shorter one gets it only if it is not empty.
-static PackedStringArray _insert_cell(PackedStringArray p_cells, int p_column, const String &p_value) {
+// Rows may be shorter than the header, so an empty cell past their end is left out; the header always gets the cell
+// (`p_always`), else a column appended without a name would not count.
+static PackedStringArray _insert_cell(PackedStringArray p_cells, int p_column, const String &p_value, bool p_always = false) {
 	if (p_column < p_cells.size()) {
 		p_cells.insert(p_column, p_value);
-	} else if (!p_value.is_empty()) {
+	} else if (p_always || !p_value.is_empty()) {
 		p_cells.resize(p_column);
 		p_cells.push_back(p_value);
 	}
@@ -372,7 +374,7 @@ static PackedStringArray _insert_cell(PackedStringArray p_cells, int p_column, c
 void CSV::insert_column(int p_column, const String &p_name, const String &p_value) {
 	ERR_FAIL_INDEX(p_column, get_column_count() + 1);
 	if (!header.is_empty() || !p_name.is_empty()) {
-		header = _insert_cell(header, p_column, p_name);
+		header = _insert_cell(header, p_column, p_name, true);
 	}
 	Array rows = _get_rows();
 	for (int i = 0; i < rows.size(); i++) {
