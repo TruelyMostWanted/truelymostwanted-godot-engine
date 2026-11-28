@@ -64,7 +64,7 @@ class FlowGraphEditor : public EditorDock {
 	};
 
 	Ref<FlowGraph> graph;
-	LocalVector<Ref<FlowNode>> watched_nodes;
+	LocalVector<Ref<Resource>> watched; // Nodes and frames; their changes rebuild the view.
 
 	GraphEdit *graph_edit = nullptr;
 	Label *status = nullptr;
@@ -78,6 +78,7 @@ class FlowGraphEditor : public EditorDock {
 	bool editing_inline = false;
 	bool drag_queued = false;
 	bool frame_view_pending = false; // Show the contents when a graph is opened.
+	int fit_frame = -1; // Frame added around nodes: store the rect GraphEdit fits around them after the rebuild.
 	Vector2 menu_position;
 	Vector2 add_position;
 
@@ -121,6 +122,7 @@ class FlowGraphEditor : public EditorDock {
 	void _queue_rebuild();
 	void _rebuild();
 	void _frame_view();
+	void _fit_frame(int p_index);
 	void _add_option(int p_id);
 	void _add_inline_properties(GraphNode *p_graph_node, const Ref<FlowNode> &p_node, int p_id);
 	Vector2 _to_graph_position(const Vector2 &p_local) const;

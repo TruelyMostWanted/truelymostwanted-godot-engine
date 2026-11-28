@@ -12,7 +12,9 @@ nutzbar aus GDScript, C# und GDExtension.
 
 | Datei | Inhalt |
 |---|---|
-| [`truely/CONVENTIONS.md`](truely/CONVENTIONS.md) | Regeln für Code (Server als C++-Singletons, keine Nodes, Namen, Bindings, Doku) und für Issues (Englisch, Vorlagen, Labels, fünf Abnahmepunkte) |
+| [`truely/CONVENTIONS.md`](truely/CONVENTIONS.md) | Regeln für Code (Klassenarten, Namen, Bindings, Doku) und für Issues (Englisch, Vorlagen, Labels, fünf Abnahmepunkte) |
+| [`truely/ARCHITECTURE.md`](truely/ARCHITECTURE.md) | Aufbau eines Features nach Godots Architektur: Klassenarten (Resource, Playback, Node, Server, Registry, Editor), Schichten, Server-API mit RIDs, Data-Oriented Design, Code-Regeln, Prüfliste für neue Features |
+| [`truely/PIPELINE-CONVENTIONS.md`](truely/PIPELINE-CONVENTIONS.md) | Regeln der CI (GCC/Clang/SCU/Sanitizer/Minimal-Template, pre-commit-Hooks, doctool, C#-Glue, Release), die MSVC lokal nicht prüft; Lint `truely/pipeline_lint.py` |
 | [`truely/FEATURE-WORKFLOW.md`](truely/FEATURE-WORKFLOW.md) | Ablauf pro Issue: Feature-Branch, Commits, Mono-Build, Testprojekt, Wiki, Push, CI, Squash-Merge |
 | [`GLOSSARY.md`](GLOSSARY.md) | Begriffe dieser Fork (Server, Settings, Pfad-Präfixe, Packs, Workflow) mit Pfaden, Issues und Wiki-Links, dazu Datei-Index nach Feature-Bereich |
 | [`BUILDING.md`](BUILDING.md) | Bauen für alle: Voraussetzungen, Editor, Export-Templates (Standard und .NET), Ausführen, Fehlerbehebung (Englisch, auch im Wiki unter „Building“) |
@@ -26,7 +28,7 @@ nutzbar aus GDScript, C# und GDExtension.
 |---|---|
 | `master` | reine Kopie von `upstream/master`, **keine eigenen Commits** |
 | `truely-godot-engine` | Standard-Branch: die eigene Engine, wird gebaut |
-| `truely/` | eigene Werkzeuge und Doku: `build.ps1`, `sync-upstream.ps1`, `README.md`, `CONVENTIONS.md`, `FEATURE-WORKFLOW.md` |
+| `truely/` | eigene Werkzeuge und Doku: `build.ps1`, `sync-upstream.ps1`, `README.md`, `CONVENTIONS.md`, `ARCHITECTURE.md`, `PIPELINE-CONVENTIONS.md`, `FEATURE-WORKFLOW.md`, `pipeline_lint.py` |
 | `.github/ISSUE_TEMPLATE/` | TRUELY-Vorlagen (Feature, Bug, Refactoring, Concept, Task, …) mit Engine-Bereichen |
 | [Wiki](https://github.com/TruelyMostWanted/truelymostwanted-godot-engine/wiki) | Doku der Features: Benutzung aus GDScript, C# und GDExtension |
 | [godot-custom-build-project](https://github.com/TruelyMostWanted/godot-custom-build-project) | Testprojekt: ein Ordner pro Feature, Checks in GDScript und C# |
@@ -39,7 +41,7 @@ nutzbar aus GDScript, C# und GDExtension.
 
 1. **Issue** suchen oder anlegen (`gh issue list --state all --search "<Stichwort>"`), nach Vorlage, auf Englisch.
 2. **Feature-Branch** von `truely-godot-engine`, Name mit der Issue-Nummer als Präfix (mindestens zweistellig): `03-feature-path-prefix-server`. Beiträge an Godot selbst: PR-Branch von `master`.
-3. **Implementieren** nach `CONVENTIONS.md`, **beliebig oft committen**. Der pre-commit-Hook muss durchlaufen.
+3. **Implementieren** nach `CONVENTIONS.md`, `ARCHITECTURE.md` und `PIPELINE-CONVENTIONS.md`, **beliebig oft committen**. Der pre-commit-Hook (inkl. `truely-pipeline-lint`) muss durchlaufen.
 4. **Mono-Build**, dann im Testprojekt den Guide-Ordner anlegen (`new-feature.ps1 -Name <guide>`) oder den vorhandenen nehmen: `Example` (Snippets des Guides) und `Test` (ganze API) in GDScript und C#, ein Statement pro Zeile; ausführen.
 5. **Wiki** schreiben, nach dem Aufbau der Godot-Docs: eine Klassenreferenz-Seite pro Klasse (`Class-<Klasse>`) und eine Guide-Seite pro Feature (nach Thema, z. B. `Path-Prefixes`), Beispiele in GDScript, C# und C++ (GDExtension).
 6. **Abnahmepunkte** im Issue abhaken, Ergebnisse als Kommentar ins Issue.

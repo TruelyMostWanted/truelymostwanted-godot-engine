@@ -152,6 +152,9 @@ public:
 	// FileAccess, DirAccess and ResourceLoader can use their engine access (including the PCK).
 	// Returns `p_path` unchanged if the chain does not reach one of them.
 	String resolve_engine_path(const String &p_path) const;
+	// Returns ERR_FILE_NO_PERMISSION and prints an error if `p_path` starts with a read-only prefix
+	// (`streaming://` in exports). Used by FileAccess and DirAccess before they write.
+	Error check_writable(const String &p_path) const;
 
 	Ref<PathInfo> resolve(const String &p_path) const;
 	Ref<PathInfo> resolve_safe(const String &p_path, AccessMode p_access, const PackedStringArray &p_allowed_roots = PackedStringArray()) const;

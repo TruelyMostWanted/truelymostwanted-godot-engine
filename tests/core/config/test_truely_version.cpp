@@ -41,7 +41,9 @@ namespace TestTruelyVersion {
 TEST_CASE("[TruelyVersion] Version macros are consistent") {
 	CHECK_EQ(String(TRUELY_VERSION_NUMBER), vformat("%d.%d.%d", TRUELY_VERSION_MAJOR, TRUELY_VERSION_MINOR, TRUELY_VERSION_PATCH));
 	CHECK_EQ(TRUELY_VERSION_HEX, (TRUELY_VERSION_MAJOR << 16) | (TRUELY_VERSION_MINOR << 8) | TRUELY_VERSION_PATCH);
-	CHECK_EQ(String(TRUELY_VERSION_FULL_NAME), String("Truely v") + String(TRUELY_VERSION_NUMBER));
+	const String shown = TRUELY_VERSION_PATCH == 0 ? vformat("%d.%d", TRUELY_VERSION_MAJOR, TRUELY_VERSION_MINOR) : String(TRUELY_VERSION_NUMBER);
+	CHECK_EQ(String(TRUELY_VERSION_SHORT), shown);
+	CHECK_EQ(String(TRUELY_VERSION_FULL_NAME), String("Truely v") + shown);
 }
 
 TEST_CASE("[TruelyVersion] Engine.get_version_info() has the Truely version") {

@@ -10,7 +10,7 @@ Gilt für jedes Feature- und Refactoring-Issue. Branches und Remotes stehen in [
 ## 1. Grundregeln
 
 Die Regeln für Code und Issues stehen in [`CONVENTIONS.md`](CONVENTIONS.md). Kurz:
-- Neue Systeme sind **keine Nodes**, sondern C++-Singletons (Server) und `Resource`s (Daten), gebunden in `_bind_methods()`.
+- Jeder Teil eines Features hat die passende Klassenart (Resource, Playback, Node, Server, Registry, Editor), gebunden in `_bind_methods()`; siehe [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - C# bekommt die API über den generierten Glue: `TTSServer` (statisch) und `TTSServerInstance`.
 - Jedes Feature hat Klassenreferenz, Wiki-Seite und Checks in GDScript und C# (Mono-Build).
 - Issues auf Englisch, nach Vorlage, mit „Feasibility to check“ und den fünf Abnahmepunkten.
@@ -44,7 +44,7 @@ git switch -c 03-feature-path-prefix-server
 ### 2.2 Committen
 
 - **Beliebig oft** in den Feature-Branch committen.
-- Der pre-commit-Hook (clang-format, codespell, doc-status, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen.
+- Der pre-commit-Hook (clang-format, codespell, doc-status, `truely-pipeline-lint`, …) muss durchlaufen. Korrigiert er Dateien, diese neu hinzufügen und noch einmal committen. Welche CI-Regeln lokal nicht auffallen und wie man sie trotzdem prüft: [`PIPELINE-CONVENTIONS.md`](PIPELINE-CONVENTIONS.md).
 
 ### 2.3 Lokal prüfen und pushen
 

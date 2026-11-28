@@ -709,6 +709,17 @@ String PathPrefixServer::resolve_engine_path(const String &p_path) const {
 	return p_path;
 }
 
+Error PathPrefixServer::check_writable(const String &p_path) const {
+	String prefix;
+	String rest;
+	if (is_engine_fast_path(p_path) || !split_prefix(p_path, prefix, rest)) {
+		return OK;
+	}
+	const Ref<PathPrefix> logic = _get_active(prefix);
+	ERR_FAIL_COND_V_MSG(logic.is_valid() && logic->is_read_only(), ERR_FILE_NO_PERMISSION, vformat("Cannot write to '%s': the prefix '%s' is read-only.", p_path, prefix));
+	return OK;
+}
+
 String PathPrefixServer::localize(const String &p_global_path) const {
 	const String path = p_global_path.replace_char('\\', '/').simplify_path();
 

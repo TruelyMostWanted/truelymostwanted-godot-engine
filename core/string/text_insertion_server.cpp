@@ -497,6 +497,10 @@ void TextInsertionServer::finish() {
 		cache.clear();
 	}
 	// Freed here, outside of the lock: releasing a script object may call back into the server.
+	old_providers.clear();
+	old_modifiers.clear();
+	old_values.clear();
+	old_values_resources.clear();
 }
 
 TextInsertionServer::TextInsertionServer() {

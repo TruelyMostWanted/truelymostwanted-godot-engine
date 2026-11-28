@@ -794,6 +794,7 @@ PCKPackageEditor::PCKPackageEditor(const Ref<PCKPackage> &p_package) {
 
 	Label *key_label = memnew(Label(TTR("Key (64 hexadecimal characters; empty for the key compiled into the engine). It is never stored:")));
 	key_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	key_label->set_custom_minimum_size(Size2(400, 0) * EDSCALE);
 	build_vb->add_child(key_label);
 	HBoxContainer *key_hb = memnew(HBoxContainer);
 	build_vb->add_child(key_hb);
@@ -808,6 +809,7 @@ PCKPackageEditor::PCKPackageEditor(const Ref<PCKPackage> &p_package) {
 
 	build_status_label = memnew(Label);
 	build_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	build_status_label->set_custom_minimum_size(Size2(400, 0) * EDSCALE);
 	build_vb->add_child(build_status_label);
 
 	package->connect_changed(callable_mp(this, &PCKPackageEditor::_queue_update));

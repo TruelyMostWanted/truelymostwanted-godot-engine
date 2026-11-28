@@ -622,9 +622,11 @@ void CSVTableEditor::_render() {
 			}
 			const String text = column - 1 < cells.size() ? cells[column - 1] : String();
 			const Ref<DataField> field = _get_field(column - 1);
-			if (field.is_valid() && field->get_value_type() == Variant::BOOL) {
+			const String lower = text.to_lower();
+			// Another value in a bool column stays a text cell, so one click does not overwrite it.
+			if (field.is_valid() && field->get_value_type() == Variant::BOOL && (lower.is_empty() || lower == "true" || lower == "false" || lower == "1" || lower == "0")) {
 				item->set_cell_mode(column, TreeItem::CELL_MODE_CHECK);
-				item->set_checked(column, text.to_lower() == "true" || text == "1");
+				item->set_checked(column, lower == "true" || lower == "1");
 			} else if (field.is_valid() && field->get_hint() == PROPERTY_HINT_ENUM && (field->get_value_type() != Variant::STRING || field->get_hint_string().split(",").has(text))) {
 				// Like the inspector: "Name:value" options for numbers, the option index for strings.
 				// A string that is no option stays a text cell below, so the wrong value is visible.
@@ -758,6 +760,11 @@ void CSVTableEditor::_add_row(bool p_insert) {
 	if (csv.is_null() || !_can_edit()) {
 		return;
 	}
+	if (csv->get_column_count() == 0) {
+		// An empty row of an empty CSV writes no text, so nothing would be added.
+		status_label->set_text(TTR("The CSV has no columns yet. Type the header row in the text editor first."));
+		return;
+	}
 	TreeItem *selected = tree->get_selected();
 	const int row = p_insert && selected ? (int)selected->get_metadata(0) : csv->get_row_count();
 	PackedStringArray cells;
@@ -826,7 +833,9 @@ void CSVTableEditor::_copy() {
 		}
 	}
 	if (last_row >= 0) {
-		DisplayServer::get_singleton()->clipboard_set(CSV::stringify(_get_cells(first_row, first_column, last_row - first_row + 1, last_column - first_column + 1), _tsv_options()));
+		// Without the line break after the last row, so one copied cell pastes as plain text elsewhere.
+		const String text = CSV::stringify(_get_cells(first_row, first_column, last_row - first_row + 1, last_column - first_column + 1), _tsv_options());
+		DisplayServer::get_singleton()->clipboard_set(text.trim_suffix("\n").trim_suffix("\r"));
 	}
 }
 
@@ -836,7 +845,18 @@ void CSVTableEditor::_paste() {
 	if ((csv.is_null() && catalog.is_null()) || !item || tree_column < 1) {
 		return;
 	}
-	const Array cells = CSV::parse_string(DisplayServer::get_singleton()->clipboard_get(), _tsv_options());
+	Array cells = CSV::parse_string(DisplayServer::get_singleton()->clipboard_get(), _tsv_options());
+	const int width = csv.is_valid() ? csv->get_column_count() - (tree_column - 1) : 0;
+	if (width > 0) {
+		// Like spreadsheets: a block wider than the table is clipped at the last column.
+		for (int i = 0; i < cells.size(); i++) {
+			PackedStringArray row = cells[i];
+			if (row.size() > width) {
+				row.resize(width);
+				cells[i] = row;
+			}
+		}
+	}
 	if (!cells.is_empty()) {
 		_commit_cells(TTR("Paste CSV Cells"), (int)item->get_metadata(0), tree_column - 1, cells, (int)item->get_metadata(1));
 	}
@@ -876,14 +896,17 @@ void CSVTableEditor::_save() {
 }
 
 void CSVTableEditor::_filesystem_changed() {
-	if (catalog.is_null() || !catalog->get_path().is_resource_file()) {
+	const String path = catalog.is_valid() ? catalog->get_path() : edited_path;
+	if (!path.is_resource_file()) {
 		return;
 	}
-	const String path = catalog->get_path();
 	if (!FileAccess::exists(path)) {
 		// Deleted or moved outside of the editor: Save would write the old file again (#403).
 		edit(Ref<Resource>());
 		status_label->set_text(vformat(TTR("\"%s\" was deleted or moved. The table is closed."), path));
+		return;
+	}
+	if (catalog.is_null()) {
 		return;
 	}
 	file_label->set_text(path.get_file()); // Moved in the FileSystem dock: the catalog has the new path.
