@@ -355,10 +355,18 @@ TEST_CASE("[Subtitle] Translatable strings for POT generation") {
 	subtitle->add_segment(make_segment(2, 3, ""));
 
 	// Extraction does not depend on auto_translate; empty texts are skipped.
+	// Then one entry per speaker with the context "speaker" (a caption's speaker is not shown, so not listed).
+	Ref<SubtitleSegment> caption = make_segment(3, 4, "Door", SubtitleSegment::KIND_SOUND);
+	caption->set_speaker("Door");
+	subtitle->add_segment(caption);
+	Ref<SubtitleSegment> again = make_segment(4, 5, "Again");
+	again->set_speaker("Anna");
+	subtitle->add_segment(again);
 	const TypedArray<PackedStringArray> strings = subtitle->get_translatable_strings();
-	REQUIRE(strings.size() == 2);
+	REQUIRE(strings.size() == 5);
 	CHECK(PackedStringArray(strings[0]) == PackedStringArray({ "Hello", "", "", "" }));
 	CHECK(PackedStringArray(strings[1]) == PackedStringArray({ "Run!", "chase", "", "Speaker: Anna" }));
+	CHECK(PackedStringArray(strings[4]) == PackedStringArray({ "Anna", "speaker", "", "Speaker name" }));
 
 	// A loaded .srt file gives its cue texts.
 	const String path = TestUtils::get_temp_path("subtitle_pot.srt");

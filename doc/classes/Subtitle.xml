@@ -85,7 +85,7 @@
 		<method name="get_translatable_strings" qualifiers="const">
 			<return type="PackedStringArray[]" />
 			<description>
-				Returns one entry per segment with text, for POT generation: [code][text, context, "", comment][/code] with [member SubtitleSegment.translation_context] as the context and [code]"Speaker: name"[/code] as the translator comment when [member SubtitleSegment.speaker] is set. The editor uses it for subtitle files ([code].srt[/code], [code].vtt[/code], ...) and [Subtitle] resources added to the POT generation list ([b]Project Settings &gt; Localization &gt; POT Generation[/b]). The entries do not depend on [member auto_translate].
+				Returns the entries for POT generation: one per segment with text, [code][text, context, "", comment][/code] with [member SubtitleSegment.translation_context] as the context and [code]"Speaker: name"[/code] as the translator comment when [member SubtitleSegment.speaker] is set; then one entry per distinct speaker of the dialog lines, [code][name, "speaker", "", "Speaker name"][/code]. The context [code]"speaker"[/code] is what [method SubtitleServer.get_display_speaker] and [SubtitleLabel] translate speaker names with. The editor uses it for subtitle files ([code].srt[/code], [code].vtt[/code], ...) and [Subtitle] resources added to the POT generation list ([b]Project Settings &gt; Localization &gt; POT Generation[/b]). The entries do not depend on [member auto_translate].
 			</description>
 		</method>
 		<method name="load_from_file">

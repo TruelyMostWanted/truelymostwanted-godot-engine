@@ -33,6 +33,7 @@
 #include "core/io/file_access.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/templates/hash_set.h"
 #include "servers/subtitle/subtitle_format_srt.h"
 #include "servers/subtitle/subtitle_formats.h"
 
@@ -279,6 +280,18 @@ TypedArray<PackedStringArray> Subtitle::get_translatable_strings() const {
 		}
 		const StringName speaker = segment->get_speaker();
 		result.push_back(PackedStringArray({ segment->get_text(), String(segment->get_translation_context()), String(), speaker == StringName() ? String() : vformat("Speaker: %s", speaker) }));
+	}
+	// Speaker names of the shown lines (not of captions), once each, with the context `SPEAKER_TRANSLATION_CONTEXT`.
+	HashSet<StringName> seen_speakers;
+	for (const Ref<SubtitleSegment> &segment : segments) {
+		if (segment.is_null() || segment->get_text().is_empty() || segment->is_caption()) {
+			continue;
+		}
+		const StringName speaker = segment->get_speaker();
+		if (speaker != StringName() && !seen_speakers.has(speaker)) {
+			seen_speakers.insert(speaker);
+			result.push_back(PackedStringArray({ String(speaker), SPEAKER_TRANSLATION_CONTEXT, String(), "Speaker name" }));
+		}
 	}
 	return result;
 }
