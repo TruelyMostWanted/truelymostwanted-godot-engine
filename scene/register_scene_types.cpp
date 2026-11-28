@@ -621,7 +621,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(ColorPicker);
 	GDREGISTER_CLASS(ColorPickerButton);
 	GDREGISTER_CLASS(RichTextLabel);
-	GDREGISTER_CLASS(SubtitleLabel);
+	GDREGISTER_CLASS(SubtitleLabel); // Fork: subtitle display (#324).
 	GDREGISTER_CLASS(RichTextEffect);
 	GDREGISTER_CLASS(CharFXTransform);
 

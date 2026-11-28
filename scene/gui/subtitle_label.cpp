@@ -37,8 +37,10 @@
 #include "servers/settings/accessibility_settings_server.h"
 #include "servers/subtitle/subtitle_server.h"
 
-static const char *const PLAYER_SIGNALS[] = { "segment_changed", "segment_started", "segment_ended" };
-static const char *const SETTINGS_SIGNALS[] = { "subtitles_enabled_changed", "subtitle_scale_changed", "font_size_factor_changed" };
+// `segment_changed` is left out: it follows `segment_started` or `segment_ended`, one rebuild each is enough.
+static const char *const _SUBTITLE_LABEL_PLAYER_SIGNALS[] = { "segment_started", "segment_ended" };
+static const char *const _SUBTITLE_LABEL_SETTINGS_SIGNALS[] = { "subtitles_enabled_changed", "captions_enabled_changed", "subtitle_scale_changed", "font_size_factor_changed" };
+static const char *const _SUBTITLE_LABEL_SERVER_SIGNALS[] = { "enabled_changed", "captions_enabled_changed" };
 
 SubtitlePlayer *SubtitleLabel::_get_player() const {
 	return ObjectDB::get_instance<SubtitlePlayer>(player_id);
@@ -46,12 +48,17 @@ SubtitlePlayer *SubtitleLabel::_get_player() const {
 
 void SubtitleLabel::_connect_player(bool p_connect) {
 	const Callable callback = callable_mp(this, &SubtitleLabel::refresh).unbind(1);
+	// The player leaves the tree or is freed: resolve the path again, which clears the line if it is gone.
+	const Callable exiting_callback = callable_mp(this, &SubtitleLabel::_reconnect);
 	SubtitlePlayer *subtitle_player = _get_player();
 	if (subtitle_player != nullptr) {
-		for (const char *signal_name : PLAYER_SIGNALS) {
+		for (const char *signal_name : _SUBTITLE_LABEL_PLAYER_SIGNALS) {
 			if (subtitle_player->is_connected(signal_name, callback)) {
 				subtitle_player->disconnect(signal_name, callback);
 			}
+		}
+		if (subtitle_player->is_connected(SceneStringName(tree_exiting), exiting_callback)) {
+			subtitle_player->disconnect(SceneStringName(tree_exiting), exiting_callback);
 		}
 	}
 	player_id = ObjectID();
@@ -63,25 +70,40 @@ void SubtitleLabel::_connect_player(bool p_connect) {
 		return;
 	}
 	player_id = found->get_instance_id();
-	for (const char *signal_name : PLAYER_SIGNALS) {
+	for (const char *signal_name : _SUBTITLE_LABEL_PLAYER_SIGNALS) {
 		found->connect(signal_name, callback);
+	}
+	found->connect(SceneStringName(tree_exiting), exiting_callback, CONNECT_DEFERRED);
+}
+
+void SubtitleLabel::_reconnect() {
+	if (!is_inside_tree()) {
+		return; // Connected again when the label re-enters the tree.
+	}
+	_connect_player(true);
+	_connect_settings(true);
+	refresh();
+}
+
+template <size_t SIZE>
+static void _subtitle_label_connect(Object *p_source, const char *const (&p_signals)[SIZE], const Callable &p_callback, bool p_connect) {
+	if (p_source == nullptr) {
+		return;
+	}
+	for (const char *signal_name : p_signals) {
+		const bool connected = p_source->is_connected(signal_name, p_callback);
+		if (p_connect && !connected) {
+			p_source->connect(signal_name, p_callback);
+		} else if (!p_connect && connected) {
+			p_source->disconnect(signal_name, p_callback);
+		}
 	}
 }
 
 void SubtitleLabel::_connect_settings(bool p_connect) {
-	AccessibilitySettingsServer *settings = AccessibilitySettingsServer::get_singleton();
-	if (settings == nullptr) {
-		return;
-	}
 	const Callable callback = callable_mp(this, &SubtitleLabel::refresh).unbind(1);
-	for (const char *signal_name : SETTINGS_SIGNALS) {
-		const bool connected = settings->is_connected(signal_name, callback);
-		if (p_connect && !connected) {
-			settings->connect(signal_name, callback);
-		} else if (!p_connect && connected) {
-			settings->disconnect(signal_name, callback);
-		}
-	}
+	_subtitle_label_connect(AccessibilitySettingsServer::get_singleton(), _SUBTITLE_LABEL_SETTINGS_SIGNALS, callback, p_connect);
+	_subtitle_label_connect(SubtitleServer::get_singleton(), _SUBTITLE_LABEL_SERVER_SIGNALS, callback, p_connect);
 }
 
 int SubtitleLabel::get_display_font_size() const {
@@ -95,11 +117,13 @@ String SubtitleLabel::get_subtitle_text() const {
 	if (server == nullptr || subtitle_player == nullptr || !server->is_enabled()) {
 		return String();
 	}
+	bool show_captions = server->is_captions_enabled();
 	if (follow_accessibility_settings) {
 		const AccessibilitySettingsServer *settings = AccessibilitySettingsServer::get_singleton();
 		if (settings != nullptr && !settings->is_subtitles_enabled()) {
 			return String();
 		}
+		show_captions = show_captions && (settings == nullptr || settings->is_captions_enabled());
 	}
 	const Ref<SubtitlePlayback> playback = subtitle_player->get_playback();
 	const Ref<Subtitle> subtitle = playback->get_subtitle();
@@ -107,7 +131,7 @@ String SubtitleLabel::get_subtitle_text() const {
 	PackedStringArray lines;
 	for (int idx = 0; idx < segments.size(); idx++) {
 		const Ref<SubtitleSegment> segment = segments[idx];
-		if (segment.is_null() || (segment->is_caption() && !server->is_captions_enabled())) {
+		if (segment.is_null() || (segment->is_caption() && !show_captions)) {
 			continue;
 		}
 		String line = server->get_display_text(subtitle, segment, true);
@@ -142,23 +166,37 @@ void SubtitleLabel::refresh() {
 
 void SubtitleLabel::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_ENTER_TREE: {
+			// Re-entering after a reparent: no second `_ready()`. Once more deferred if the player comes later.
+			if (is_ready()) {
+				_reconnect();
+				if (player_id.is_null()) {
+					callable_mp(this, &SubtitleLabel::_reconnect).call_deferred();
+				}
+			}
+		} break;
 		case NOTIFICATION_READY: {
 			// Ready, not enter tree: the player may be a later sibling.
-			_connect_player(true);
-			_connect_settings(true);
-			refresh();
+			_reconnect();
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 			_connect_player(false);
 			_connect_settings(false);
-			request_ready();
+		} break;
+		case NOTIFICATION_TRANSLATION_CHANGED: {
+			// The subtitles channel locale changed: the active lines are translated again. Also sent on every enter
+			// tree and by `set_auto_translate_mode()` in the constructor: the first refresh is at ready.
+			if (is_ready()) {
+				refresh();
+			}
 		} break;
 	}
 }
 
 void SubtitleLabel::_validate_property(PropertyInfo &p_property) const {
 	// Written by the label itself: not stored, not editable.
-	if (p_property.name == "text" || p_property.name == "bbcode_enabled") {
+	// `auto_translate_mode` too: the lines are translated in the `subtitles` domain, not again in the node's domain.
+	if (p_property.name == "text" || p_property.name == "bbcode_enabled" || p_property.name == "auto_translate_mode") {
 		p_property.usage = (p_property.usage & ~PROPERTY_USAGE_STORAGE) | PROPERTY_USAGE_READ_ONLY;
 	}
 }
@@ -241,4 +279,5 @@ SubtitleLabel::SubtitleLabel() {
 	set_fit_content(true);
 	set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 	set_mouse_filter(MOUSE_FILTER_IGNORE);
+	set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 }
