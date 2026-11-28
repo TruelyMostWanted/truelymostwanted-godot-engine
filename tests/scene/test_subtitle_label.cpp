@@ -35,12 +35,15 @@ TEST_FORCE_LINK(test_subtitle_label)
 #ifndef ADVANCED_GUI_DISABLED
 
 #include "core/config/project_settings.h"
+#include "core/object/message_queue.h"
+#include "core/string/translation_server.h"
 #include "scene/gui/subtitle_label.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/subtitle_player.h"
 #include "scene/main/window.h"
 #include "servers/settings/accessibility_settings_server.h"
 #include "servers/subtitle/subtitle_server.h"
+#include "tests/signal_watcher.h"
 
 namespace TestSubtitleLabel {
 
@@ -102,10 +105,17 @@ TEST_CASE("[SceneTree][SubtitleLabel] Follows the player, colors speakers, honor
 
 	player->seek(3.5); // A sound and a line: two lines in start order, the caption without speaker.
 	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
-	SubtitleServer::get_singleton()->set_captions_enabled(false);
-	label->refresh();
+	SubtitleServer *server = SubtitleServer::get_singleton();
+	const bool captions = server->is_captions_enabled();
+	server->set_captions_enabled(true);
+	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
+	server->set_captions_enabled(false); // Signal: the label updates at once.
 	CHECK(label->get_text() == sized(label, "Ben: Run!"));
-	SubtitleServer::get_singleton()->set_captions_enabled(true);
+	server->set_captions_enabled(true);
+	server->set_enabled(false);
+	CHECK(label->get_text().is_empty());
+	server->set_enabled(true);
+	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
 
 	label->set_font_size(20);
 	CHECK(label->get_text() == "[font_size=20][lb]Applause[rb]\nBen: Run![/font_size]");
@@ -113,25 +123,30 @@ TEST_CASE("[SceneTree][SubtitleLabel] Follows the player, colors speakers, honor
 	player->stop();
 	CHECK(label->get_text().is_empty());
 
-	// The text is written by the label: not saved with the scene.
+	// The text is written by the label: not saved with the scene. It is translated in the subtitles domain only.
+	CHECK(label->get_auto_translate_mode() == Node::AUTO_TRANSLATE_MODE_DISABLED);
 	List<PropertyInfo> properties;
 	label->get_property_list(&properties);
 	for (const PropertyInfo &property : properties) {
-		if (property.name == "text") {
+		if (property.name == "text" || property.name == "auto_translate_mode") {
 			CHECK_FALSE((property.usage & PROPERTY_USAGE_STORAGE) != 0);
 		}
 	}
 
 	memdelete(scene);
+	server->set_captions_enabled(captions);
 }
 
 TEST_CASE("[SceneTree][SubtitleLabel] Follows AccessibilitySettings") {
 	AccessibilitySettingsServer *settings = AccessibilitySettingsServer::get_singleton();
 	REQUIRE(settings != nullptr);
+	const Variant autosave = ProjectSettings::get_singleton()->get_setting("settings/general/autosave");
 	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", false);
 	const bool enabled = settings->is_subtitles_enabled();
+	const bool captions = settings->is_captions_enabled();
 	const float scale = settings->get_subtitle_scale();
 	settings->set_subtitles_enabled(true);
+	settings->set_captions_enabled(true);
 	settings->set_subtitle_scale(1.0);
 
 	Window *root = SceneTree::get_singleton()->get_root().ptr();
@@ -157,11 +172,93 @@ TEST_CASE("[SceneTree][SubtitleLabel] Follows AccessibilitySettings") {
 	settings->set_subtitles_enabled(true);
 	CHECK(label->get_text() == sized(label, "Anna: Hello"));
 
+	player->seek(3.5); // The player's captions setting drops the sound, speech stays.
+	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
+	settings->set_captions_enabled(false);
+	CHECK(label->get_text() == sized(label, "Ben: Run!"));
+	label->set_follow_accessibility_settings(false);
+	CHECK(label->get_text() == "[font_size=32][lb]Applause[rb]\nBen: Run![/font_size]");
+	label->set_follow_accessibility_settings(true);
+	settings->set_captions_enabled(true);
+	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
+
 	memdelete(label);
 	memdelete(player);
 	settings->set_subtitles_enabled(enabled);
+	settings->set_captions_enabled(captions);
 	settings->set_subtitle_scale(scale);
-	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", true);
+	ProjectSettings::get_singleton()->set_setting("settings/general/autosave", autosave);
+}
+
+TEST_CASE("[SceneTree][SubtitleLabel] A locale change of the subtitles channel translates the active line") {
+	TranslationServer *translation_server = TranslationServer::get_singleton();
+	Ref<Translation> german;
+	german.instantiate();
+	german->set_locale("de");
+	german->add_message("LINE_1", "Wo sind wir?");
+	const Ref<TranslationDomain> domain = translation_server->get_or_add_domain("subtitles");
+	domain->add_translation(german);
+	const String locale = translation_server->get_locale();
+	translation_server->set_locale("en");
+
+	Ref<Subtitle> subtitle;
+	subtitle.instantiate();
+	subtitle->set_auto_translate(true);
+	subtitle->add_segment(make_segment(0.0, 1.0, "LINE_1"));
+	Window *root = SceneTree::get_singleton()->get_root().ptr();
+	SubtitlePlayer *player = memnew(SubtitlePlayer);
+	player->set_subtitle(subtitle);
+	root->add_child(player);
+	SubtitleLabel *label = memnew(SubtitleLabel);
+	label->set_follow_accessibility_settings(false);
+	root->add_child(label);
+	label->set_player(label->get_path_to(player));
+	player->play(0.5);
+	CHECK(label->get_text() == sized(label, "LINE_1"));
+
+	translation_server->set_locale_for("subtitles", "de"); // No segment change: the label follows the locale.
+	CHECK(label->get_text() == sized(label, "Wo sind wir?"));
+	translation_server->clear_locale_for("subtitles");
+	CHECK(label->get_text() == sized(label, "LINE_1"));
+
+	memdelete(label);
+	memdelete(player);
+	domain->remove_translation(german);
+	translation_server->set_locale(locale);
+}
+
+TEST_CASE("[SceneTree][SubtitleLabel] Clears the line when the player is freed, keeps one ready on reparent") {
+	Window *root = SceneTree::get_singleton()->get_root().ptr();
+	SubtitlePlayer *player = memnew(SubtitlePlayer);
+	player->set_name("Player");
+	player->set_subtitle(make_subtitle());
+	SubtitleLabel *label = memnew(SubtitleLabel);
+	label->set_follow_accessibility_settings(false);
+	label->set_player(NodePath("../Player"));
+	Node *scene = memnew(Node);
+	scene->add_child(player);
+	scene->add_child(label);
+	root->add_child(scene);
+	player->play(0.5);
+	CHECK(label->get_text() == sized(label, "Anna: Hello"));
+
+	// Reparent: no second ready (user `_ready()` scripts run once), the path is resolved again.
+	SIGNAL_WATCH(label, "ready");
+	scene->remove_child(label);
+	scene->add_child(label);
+	MessageQueue::get_singleton()->flush();
+	SIGNAL_CHECK_FALSE("ready");
+	SIGNAL_UNWATCH(label, "ready");
+	player->seek(3.5);
+	CHECK(label->get_text() == sized(label, "[lb]Applause[rb]\nBen: Run!"));
+
+	// The player is freed mid-line: no segment signal, the label clears itself.
+	memdelete(player);
+	MessageQueue::get_singleton()->flush();
+	CHECK(label->get_text().is_empty());
+	CHECK_FALSE(label->is_visible());
+
+	memdelete(scene);
 }
 
 } // namespace TestSubtitleLabel

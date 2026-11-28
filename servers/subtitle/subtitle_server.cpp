@@ -337,6 +337,7 @@ void SubtitleServer::set_enabled(bool p_enabled) {
 			_update_track(id, track->last_time);
 		}
 	}
+	emit_signal(SNAME("enabled_changed"), p_enabled);
 }
 
 bool SubtitleServer::is_enabled() const {
@@ -354,6 +355,7 @@ void SubtitleServer::set_captions_enabled(bool p_enabled) {
 			_update_track(id, track->last_time);
 		}
 	}
+	emit_signal(SNAME("captions_enabled_changed"), p_enabled);
 }
 
 bool SubtitleServer::is_captions_enabled() const {
@@ -426,6 +428,8 @@ void SubtitleServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("track_seeked", PropertyInfo(Variant::INT, "track_id"), PropertyInfo(Variant::FLOAT, "time")));
 	ADD_SIGNAL(MethodInfo("track_finished", PropertyInfo(Variant::INT, "track_id")));
 	ADD_SIGNAL(MethodInfo("track_canceled", PropertyInfo(Variant::INT, "track_id")));
+	ADD_SIGNAL(MethodInfo("enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("captions_enabled_changed", PropertyInfo(Variant::BOOL, "enabled")));
 }
 
 SubtitleServer::SubtitleServer() {

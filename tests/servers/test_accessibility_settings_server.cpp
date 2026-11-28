@@ -92,7 +92,7 @@ TEST_CASE("[AccessibilitySettingsServer] The domain is an engine singleton regis
 		CHECK(server->is_setting_bound(engine_values[i]));
 		CHECK_FALSE(server->get_setting_flags(engine_values[i]).has_flag(SettingsServer::SETTING_FLAG_NO_ENGINE_TARGET));
 	}
-	static const char *game_values[] = { "reduce_motion", "reduce_transparency", "colorblind_mode", "subtitles_enabled", "subtitle_scale", nullptr };
+	static const char *game_values[] = { "reduce_motion", "reduce_transparency", "colorblind_mode", "subtitles_enabled", "captions_enabled", "subtitle_scale", nullptr };
 	for (int i = 0; game_values[i] != nullptr; i++) {
 		CHECK(server->get_setting_names().has(game_values[i]));
 		CHECK(server->get_setting_flags(game_values[i]).has_flag(SettingsServer::SETTING_FLAG_NO_ENGINE_TARGET));
@@ -112,6 +112,7 @@ TEST_CASE("[AccessibilitySettingsServer] Defaults and validation") {
 	CHECK_FALSE(server->is_speaking_focused_controls());
 	CHECK(server->get_colorblind_mode() == AccessibilitySettingsServer::COLORBLIND_MODE_NONE);
 	CHECK_FALSE(server->is_subtitles_enabled());
+	CHECK(server->is_captions_enabled());
 	CHECK(server->get_subtitle_scale() == doctest::Approx(1.0));
 
 	// Ranges are clamped.

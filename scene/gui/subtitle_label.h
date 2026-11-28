@@ -37,7 +37,7 @@
 class SubtitlePlayer;
 
 // A ready-made subtitle line: shows the active segments of a `SubtitlePlayer`, colors speakers and follows
-// `AccessibilitySettingsServer` (`subtitles_enabled`, `subtitle_scale`, `font_size_factor`). It writes `text` itself.
+// `AccessibilitySettingsServer` (`subtitles_enabled`, `captions_enabled`, `subtitle_scale`, `font_size_factor`). It writes `text` itself.
 class SubtitleLabel : public RichTextLabel {
 	GDCLASS(SubtitleLabel, RichTextLabel);
 
@@ -52,6 +52,7 @@ class SubtitleLabel : public RichTextLabel {
 	SubtitlePlayer *_get_player() const;
 	void _connect_player(bool p_connect);
 	void _connect_settings(bool p_connect);
+	void _reconnect();
 
 protected:
 	void _notification(int p_what);
