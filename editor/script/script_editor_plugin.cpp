@@ -2485,7 +2485,9 @@ Error DocumentEditorContainer::_save_text_file(Ref<TextFile> p_text_file, const 
 }
 
 bool DocumentEditorContainer::edit(const Ref<Resource> &p_resource, int p_line, int p_col, bool p_grab_focus) {
-	if (p_resource.is_null()) {
+	// Truely (#346): a localization catalog read from a data file (a cached CSV) has no document editor; it opens
+	// in the inspector.
+	if (p_resource.is_null() || Object::cast_to<LocalizationCatalog>(p_resource.ptr())) {
 		return false;
 	}
 
