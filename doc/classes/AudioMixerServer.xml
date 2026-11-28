@@ -57,7 +57,7 @@
 		}
 		[/csharp]
 		[/codeblocks]
-		Channels can also be controlled by data: an [AudioCommand] describes one action (play, stop, toggle, fade, enqueue, ...), an [AudioCommandList] holds many and saves as [code].tres[/code], JSON, INI or CSV. [method execute] runs a command; [method register_commands] makes the commands of a list callable by name ([method execute_named]) and by group ([method execute_group]). The project setting [code]audio/mixer/default_commands[/code] registers a list at startup.
+		Channels can also be controlled by data: an [AudioCommand] describes one action (play, stop, toggle, fade, enqueue, ...), an [AudioCommands] holds many and saves as [code].tres[/code], JSON, INI or CSV. [method execute] runs a command; [method register_commands] makes the commands of a list callable by name ([method execute_named]) and by group ([method execute_group]). The project setting [code]audio/mixer/default_commands[/code] registers a list at startup.
 		[b]Note:[/b] All methods must be called on the main thread, like the playback API of [AudioServer] that the mixer uses. Signals are emitted on the main thread.
 		[b]Note:[/b] The mixer updates fades, detects the end of streams and advances queues once per frame, when the [AudioServer] updates on the main thread (also while the [SceneTree] is paused). The next queue entry therefore starts up to one frame after the previous one ended. For gapless sequences, put an [AudioStreamPlaylist] into one queue entry.
 		[b]Note:[/b] On the Web, streams play as samples by default (project setting [code]audio/general/default_playback_type.web[/code]). Fades work for samples too; browsers start audio only after the first user input.
@@ -143,7 +143,14 @@
 			<description>
 				Runs [param command] on its channel and returns [constant OK], then emits [signal command_executed]. [method execute] calls the same methods as code does ([method play], [method stop], [method enqueue], [method cross_fade], ...); see [enum AudioCommand.Command] for which properties each command uses.
 				A command that cannot run changes nothing, prints one error that names the command, and returns an error code: [constant ERR_INVALID_PARAMETER] (no channel, missing [member AudioCommand.stream_path] or [member AudioCommand.clip_name], pitch scale not above [code]0[/code]), [constant ERR_DOES_NOT_EXIST] (unknown channel, nothing to play), [constant ERR_FILE_NOT_FOUND] (the stream file does not exist), [constant ERR_FILE_UNRECOGNIZED] (the file is not an [AudioStream]), [constant ERR_PARAMETER_RANGE_ERROR] (no queue entry at [member AudioCommand.queue_index]) or [constant ERR_UNAVAILABLE] (the channel is not playing, or its stream is not an [AudioStreamInteractive]). Other channels are not affected.
-				A stream is loaded on first use through the resource cache: it stays in memory while it plays (or while an [AudioCommandList] keeps it with [method AudioCommandList.preload_streams]) and is freed afterwards.
+				A stream is loaded on first use through the resource cache: it stays in memory while it plays (or while an [AudioCommands] keeps it with [method AudioCommands.preload_streams]) and is freed afterwards.
+			</description>
+		</method>
+		<method name="execute_commands">
+			<return type="int" enum="Error" />
+			<param index="0" name="commands" type="AudioCommands" />
+			<description>
+				Runs all commands of [param commands] in order, without registering them. Every command runs even if one fails; returns the first error.
 			</description>
 		</method>
 		<method name="execute_group">
@@ -153,11 +160,11 @@
 				Runs all registered commands whose [member AudioCommand.group] is [param group], in the order they were registered, for example all ambience commands of a forest. Every command runs even if one fails; returns the first error, or [constant ERR_DOES_NOT_EXIST] if no registered command has that group.
 			</description>
 		</method>
-		<method name="execute_list">
+		<method name="execute_list" deprecated="Use [method execute_commands] instead.">
 			<return type="int" enum="Error" />
-			<param index="0" name="list" type="AudioCommandList" />
+			<param index="0" name="commands" type="AudioCommands" />
 			<description>
-				Runs all commands of [param list] in order, without registering them. Every command runs even if one fails; returns the first error.
+				Deprecated alias of [method execute_commands].
 			</description>
 		</method>
 		<method name="execute_named">
@@ -380,17 +387,17 @@
 		</method>
 		<method name="register_commands">
 			<return type="int" enum="Error" />
-			<param index="0" name="list" type="AudioCommandList" />
+			<param index="0" name="commands" type="AudioCommands" />
 			<description>
-				Registers the commands of [param list], so they can run by name with [method execute_named] and by group with [method execute_group]. The commands are kept by reference: later changes to a command take effect, but a changed [member AudioCommand.command_name] needs a new registration. If a name is already registered by another command, the new command replaces it and a warning is printed (so a later list, for example a mod, can override a command on purpose).
-				A CSV file has no type of its own, so load it with the type hint [code]"AudioCommandList"[/code]:
+				Registers the commands of [param commands], so they can run by name with [method execute_named] and by group with [method execute_group]. The commands are kept by reference: later changes to a command take effect, but a changed [member AudioCommand.command_name] needs a new registration. If a name is already registered by another command, the new command replaces it and a warning is printed (so a later set, for example a mod, can override a command on purpose).
+				A CSV file has no type of its own, so load it with the type hint [code]"AudioCommands"[/code]:
 				[codeblocks]
 				[gdscript]
-				var board = ResourceLoader.load("user://soundboard.csv", "AudioCommandList")
+				var board = ResourceLoader.load("user://soundboard.csv", "AudioCommands")
 				AudioMixerServer.register_commands(board)
 				[/gdscript]
 				[csharp]
-				var board = ResourceLoader.Load&lt;AudioCommandList&gt;("user://soundboard.csv", "AudioCommandList");
+				var board = ResourceLoader.Load&lt;AudioCommands&gt;("user://soundboard.csv", "AudioCommands");
 				AudioMixerServer.RegisterCommands(board);
 				[/csharp]
 				[/codeblocks]
@@ -485,9 +492,9 @@
 		</method>
 		<method name="unregister_commands">
 			<return type="void" />
-			<param index="0" name="list" type="AudioCommandList" />
+			<param index="0" name="commands" type="AudioCommands" />
 			<description>
-				Removes the commands of [param list] from the registered commands. A name that another list registered later stays registered; a name that this list had replaced is not restored.
+				Removes the commands of [param commands] from the registered commands. A name that another set of commands registered later stays registered; a name that this set had replaced is not restored.
 			</description>
 		</method>
 	</methods>
@@ -511,7 +518,7 @@
 			<param index="0" name="command_name" type="StringName" />
 			<param index="1" name="command" type="AudioCommand" />
 			<description>
-				Emitted after [param command] ran successfully through [method execute], [method execute_list], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
+				Emitted after [param command] ran successfully through [method execute], [method execute_commands], [method execute_named] or [method execute_group]. [param command_name] is its [member AudioCommand.command_name] (empty for unnamed commands).
 			</description>
 		</signal>
 		<signal name="ducking_changed">

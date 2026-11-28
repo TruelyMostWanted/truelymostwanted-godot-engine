@@ -258,7 +258,8 @@ Error ResourceImporterCSVTranslation::import(ResourceUID::ID p_source_id, const 
 		Ref<Translation> xlt = E.value;
 
 		if (xlt->get_message_count() == 0) {
-			WARN_PRINT(vformat("Locale '%s' does not contain any translation. This locale will be ignored.", xlt->get_locale()));
+			// Truely (#346): a planned locale without texts yet is a gap, not a mistake; the fallback locales fill it.
+			print_verbose(vformat("Locale '%s' does not contain any translation. This locale will be ignored.", xlt->get_locale()));
 			continue;
 		}
 

@@ -358,6 +358,47 @@ void CSV::set_cells(int p_row, int p_column, const Array &p_cells) {
 	_mark_data_changed();
 }
 
+// Inserts p_value at p_column of a row (or header) wider than p_column; a shorter one gets it only if it is not empty.
+// Rows may be shorter than the header, so an empty cell past their end is left out; the header always gets the cell
+// (`p_always`), else a column appended without a name would not count.
+static PackedStringArray _insert_cell(PackedStringArray p_cells, int p_column, const String &p_value, bool p_always = false) {
+	if (p_column < p_cells.size()) {
+		p_cells.insert(p_column, p_value);
+	} else if (p_always || !p_value.is_empty()) {
+		p_cells.resize(p_column);
+		p_cells.push_back(p_value);
+	}
+	return p_cells;
+}
+
+void CSV::insert_column(int p_column, const String &p_name, const String &p_value) {
+	ERR_FAIL_INDEX(p_column, get_column_count() + 1);
+	if (!header.is_empty() || !p_name.is_empty()) {
+		header = _insert_cell(header, p_column, p_name, true);
+	}
+	Array rows = _get_rows();
+	for (int i = 0; i < rows.size(); i++) {
+		rows[i] = _insert_cell(rows[i], p_column, p_value);
+	}
+	_mark_data_changed();
+}
+
+void CSV::remove_column(int p_column) {
+	ERR_FAIL_INDEX(p_column, get_column_count());
+	if (p_column < header.size()) {
+		header.remove_at(p_column);
+	}
+	Array rows = _get_rows();
+	for (int i = 0; i < rows.size(); i++) {
+		PackedStringArray cells = rows[i];
+		if (p_column < cells.size()) {
+			cells.remove_at(p_column);
+			rows[i] = cells;
+		}
+	}
+	_mark_data_changed();
+}
+
 int CSV::find_column(const String &p_name) const {
 	return (int)header.find(p_name);
 }
@@ -686,6 +727,8 @@ void CSV::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_cell", "row", "column", "value"), &CSV::set_cell);
 	ClassDB::bind_method(D_METHOD("get_cells", "row", "column", "row_count", "column_count"), &CSV::get_cells);
 	ClassDB::bind_method(D_METHOD("set_cells", "row", "column", "cells"), &CSV::set_cells);
+	ClassDB::bind_method(D_METHOD("insert_column", "column", "name", "value"), &CSV::insert_column, DEFVAL(String()), DEFVAL(String()));
+	ClassDB::bind_method(D_METHOD("remove_column", "column"), &CSV::remove_column);
 	ClassDB::bind_method(D_METHOD("find_column", "name"), &CSV::find_column);
 	ClassDB::bind_method(D_METHOD("get_column", "column"), &CSV::get_column);
 	ClassDB::bind_method(D_METHOD("find_rows", "column", "value"), &CSV::find_rows);

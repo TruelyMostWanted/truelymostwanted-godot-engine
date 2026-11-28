@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  preload_list.h                                                        */
+/*  preloads.h                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -36,11 +36,11 @@
 #include "core/variant/typed_dictionary.h"
 
 // Names resources to keep in memory: direct references, paths and manifests, plus optional
-// keys (key -> path). `ResourceDatabase.preload_from_list()` loads them once and holds them.
-// All properties are stored, so a list can be saved as `.tres` and named in the project
-// setting `filesystem/resources/preload_lists`.
-class PreloadList : public Resource {
-	GDCLASS(PreloadList, Resource);
+// keys (key -> path). `ResourceDatabase.preload_from()` loads them once and holds them.
+// All properties are stored, so it can be saved as `.tres` and named in the project
+// setting `filesystem/resources/preloads`.
+class Preloads : public Resource {
+	GDCLASS(Preloads, Resource);
 
 	TypedArray<Resource> resources;
 	PackedStringArray paths;
@@ -63,6 +63,6 @@ public:
 	void set_keys(const TypedDictionary<String, String> &p_keys);
 	TypedDictionary<String, String> get_keys() const;
 
-	// True if the list names nothing.
+	// True if it names nothing.
 	bool is_empty() const;
 };

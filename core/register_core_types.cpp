@@ -466,7 +466,11 @@ void register_core_types() {
 	GDREGISTER_CLASS(PCKBuildPlan);
 	GDREGISTER_ABSTRACT_CLASS(PCKPackageServer);
 	GDREGISTER_ABSTRACT_CLASS(StreamingAssetsServer);
-	GDREGISTER_CLASS(PreloadList);
+	GDREGISTER_CLASS(Preloads);
+#ifndef DISABLE_DEPRECATED
+	// Renamed in 0.2.2 (naming rule: no container type in a name); saved resources keep loading.
+	ClassDB::add_compatibility_class("PreloadList", "Preloads");
+#endif // DISABLE_DEPRECATED
 	GDREGISTER_ABSTRACT_CLASS(ResourceDatabase);
 	GDREGISTER_CLASS(CoreBind::ResourceLoader);
 	GDREGISTER_CLASS(CoreBind::ResourceSaver);
@@ -515,7 +519,10 @@ void register_core_types() {
 void register_core_settings() {
 	// Since in register core types, globals may not be present.
 	GLOBAL_DEF(PropertyInfo(Variant::DICTIONARY, "filesystem/manifests/autoload", PROPERTY_HINT_DICTIONARY_TYPE, "String;String"), Dictionary());
+	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, "filesystem/resources/preloads", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:*.tres,*.res", Variant::STRING, PROPERTY_HINT_FILE)), PackedStringArray());
+#ifndef DISABLE_DEPRECATED
 	GLOBAL_DEF(PropertyInfo(Variant::PACKED_STRING_ARRAY, "filesystem/resources/preload_lists", PROPERTY_HINT_TYPE_STRING, vformat("%d/%d:*.tres,*.res", Variant::STRING, PROPERTY_HINT_FILE)), PackedStringArray());
+#endif
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/tcp/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "network/limits/unix/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"), (30));
 	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "network/limits/packet_peer_stream/max_buffer_po2", PROPERTY_HINT_RANGE, "8,64,1,or_greater"), (16));
