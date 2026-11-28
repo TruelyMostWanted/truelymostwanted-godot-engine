@@ -33,6 +33,7 @@
 #include "core/io/csv_format.h"
 #include "core/io/data_schema.h"
 #include "core/string/localization_catalog.h"
+#include "core/templates/hash_set.h"
 #include "editor/docks/editor_dock.h"
 #include "editor/plugins/editor_plugin.h"
 
@@ -68,6 +69,8 @@ class CSVTableEditor : public EditorDock {
 	PackedStringArray catalog_fields; // Tree column - 1 -> entry field (`_key`, `_context`, `_plural`, locale, `_<note>`).
 	uint64_t catalog_modified_time = 0; // Of the catalog file when loaded or saved by the table.
 	HashMap<int64_t, String> cell_issues; // (row << 32) | tree column -> messages.
+	HashSet<int64_t> missing_cells; // Keys of `cell_issues` that are missing translations: gaps, not errors (#346).
+	bool resource_saved = false; // Set by _resource_saved() during an in-place save.
 	int page = 0;
 	bool updating = false;
 	bool update_queued = false;
@@ -123,6 +126,8 @@ class CSVTableEditor : public EditorDock {
 	void _copy();
 	void _paste();
 	void _save();
+	void _resource_saved(Object *p_resource);
+	void _update_column_widths();
 	void _change_page(int p_delta);
 	void _schema_changed(const Ref<Resource> &p_schema);
 	void _tree_gui_input(const Ref<InputEvent> &p_event);

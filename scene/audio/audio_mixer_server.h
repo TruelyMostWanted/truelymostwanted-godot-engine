@@ -40,7 +40,7 @@
 #include "scene/resources/audio/audio_stream.h"
 
 class AudioCommand;
-class AudioCommandList;
+class AudioCommands;
 class AudioCommandRegistry;
 class AudioServer;
 
@@ -240,11 +240,11 @@ public:
 	float get_duck_volume_db(const StringName &p_channel) const;
 	int get_active_utterance_count() const;
 
-	// Commands (AudioCommand, AudioCommandList), implemented by AudioCommandRegistry.
+	// Commands (AudioCommand, AudioCommands), implemented by AudioCommandRegistry.
 	Error execute(const Ref<AudioCommand> &p_command);
-	Error execute_list(const Ref<AudioCommandList> &p_list);
-	Error register_commands(const Ref<AudioCommandList> &p_list);
-	void unregister_commands(const Ref<AudioCommandList> &p_list);
+	Error execute_commands(const Ref<AudioCommands> &p_commands);
+	Error register_commands(const Ref<AudioCommands> &p_commands);
+	void unregister_commands(const Ref<AudioCommands> &p_commands);
 	bool has_command(const StringName &p_name) const;
 	Error execute_named(const StringName &p_name);
 	Error execute_group(const StringName &p_group);

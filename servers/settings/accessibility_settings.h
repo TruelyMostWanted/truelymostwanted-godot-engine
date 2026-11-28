@@ -51,6 +51,7 @@ class AccessibilitySettings : public Resource {
 	bool reduce_transparency = false;
 	int colorblind_mode = 0; // AccessibilitySettingsServer::ColorblindMode
 	bool subtitles_enabled = false;
+	bool captions_enabled = true;
 	float subtitle_scale = 1.0;
 
 protected:
@@ -80,6 +81,8 @@ public:
 	int get_colorblind_mode() const;
 	void set_subtitles_enabled(bool p_enabled);
 	bool is_subtitles_enabled() const;
+	void set_captions_enabled(bool p_enabled);
+	bool is_captions_enabled() const;
 	void set_subtitle_scale(float p_scale);
 	float get_subtitle_scale() const;
 };

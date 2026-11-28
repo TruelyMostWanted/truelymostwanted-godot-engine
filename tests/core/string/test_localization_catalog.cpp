@@ -549,6 +549,58 @@ TEST_CASE("[LocalizationCatalog] CSV delimiters and serializer options") {
 	CHECK(format->get_options() == options);
 }
 
+TEST_CASE("[LocalizationCatalog] A new catalog saved as CSV is a localization table") {
+	// #346: the header with the context column and the tool locale, loaded back as a catalog.
+	const String tool_locale = TranslationServer::get_singleton()->get_tool_locale();
+	Ref<TextLocalizationCatalog> text_catalog;
+	text_catalog.instantiate();
+	Ref<ResourceLocalizationCatalog> resource_catalog;
+	resource_catalog.instantiate();
+	for (const Ref<LocalizationCatalog> &catalog : { Ref<LocalizationCatalog>(text_catalog), Ref<LocalizationCatalog>(resource_catalog) }) {
+		const String text = catalog->to_text(ResourceTextSerializer::FORMAT_CSV);
+		CHECK(text.strip_edges() == "keys,?context," + tool_locale);
+		Ref<LocalizationCatalog> copy = Object::cast_to<LocalizationCatalog>(ClassDB::instantiate(catalog->get_class()));
+		REQUIRE(copy.is_valid());
+		REQUIRE(copy->load_from_text(text, ResourceTextSerializer::FORMAT_CSV) == OK);
+		CHECK(copy->get_key_count() == 0);
+		CHECK(copy->get_locales() == PackedStringArray({ tool_locale }));
+	}
+
+	// Without locale columns the catalog is empty; unknown column names are still no localization table.
+	CHECK(text_catalog->load_from_text("keys\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(text_catalog->load_from_text("keys,?context,_notes\nHELLO,,note\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(text_catalog->get_key_count() == 1);
+	ERR_PRINT_OFF;
+	CHECK(text_catalog->load_from_text("id,1234\n1,a\n", ResourceTextSerializer::FORMAT_CSV) == ERR_INVALID_DATA);
+	ERR_PRINT_ON;
+}
+
+TEST_CASE("[LocalizationCatalog] Empty cells and empty locale columns are valid") {
+	// #346: a partly filled and a completely empty locale load, save and validate as missing translations only.
+	Ref<TextLocalizationCatalog> catalog;
+	catalog.instantiate();
+	REQUIRE(catalog->load_from_text("keys,en,es,pt\nHELLO,Hello,Hola,\nBYE,Bye,,\n", ResourceTextSerializer::FORMAT_CSV) == OK);
+	CHECK(catalog->get_locales() == PackedStringArray({ "en", "es", "pt" }));
+	CHECK(catalog->get_missing_rows("es") == PackedInt32Array({ 1 }));
+	CHECK(catalog->get_missing_rows("pt") == PackedInt32Array({ 0, 1 }));
+	const Ref<DataValidation> result = catalog->validate();
+	REQUIRE(result->get_issue_count() == 3);
+	for (int i = 0; i < result->get_issue_count(); i++) {
+		CHECK(result->get_issue_kind(i) == DataValidation::ISSUE_KIND_EMPTY_REQUIRED);
+	}
+	CHECK(catalog->to_text(ResourceTextSerializer::FORMAT_CSV).begins_with("keys,en,es,pt\n"));
+
+	const String path = TestUtils::get_temp_path("gaps.lcat");
+	REQUIRE(catalog->save_to_file(path) == OK);
+	Ref<TextLocalizationCatalog> copy;
+	copy.instantiate();
+	REQUIRE(copy->load_from_file(path) == OK);
+	CHECK(copy->get_locales() == PackedStringArray({ "en", "es", "pt" }));
+	CHECK(copy->get_text("HELLO", "es") == "Hola");
+	CHECK(copy->get_text("HELLO", "pt").is_empty());
+	DirAccess::remove_absolute(path);
+}
+
 TEST_CASE("[LocalizationCatalog] ResourceSaver writes catalogs in their text format") {
 	// The editor saves catalogs through ResourceSaver: not the generic resource JSON of the text resource savers.
 	Ref<TextLocalizationCatalog> catalog = make_text_catalog();

@@ -175,6 +175,8 @@ public:
 	void shift_times(double p_seconds);
 
 	Ref<SubtitleValidation> validate(double p_max_characters_per_second = 20.0) const;
+	// POT entries [text, translation_context, "", comment] for ResourceTranslationParserPlugin.
+	TypedArray<PackedStringArray> get_translatable_strings() const;
 
 	String to_text(Format p_format) const;
 	Error load_from_text(const String &p_text, Format p_format);

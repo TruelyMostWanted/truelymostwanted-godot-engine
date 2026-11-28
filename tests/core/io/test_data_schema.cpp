@@ -378,4 +378,45 @@ TEST_CASE("[DataSchema] Many CSV rows validate") {
 	CHECK(result->is_valid());
 }
 
+TEST_CASE("[DataSchema] create_from_resource describes the stored properties") {
+	// The sample is a DataSchema: an enum, a typed array of resources, a nested resource and a packed array.
+	Ref<DataSchema> sample;
+	sample.instantiate();
+	sample->add_field(make_field("id", Variant::INT));
+	const Ref<DataSchema> schema = DataSchema::create_from_resource(sample);
+	REQUIRE(schema.is_valid());
+	CHECK(schema->get_extra_fields() == DataSchema::EXTRA_FIELDS_ALLOW);
+
+	const Ref<DataField> extra = schema->get_field("extra_fields");
+	REQUIRE(extra.is_valid());
+	CHECK(extra->get_value_type() == Variant::STRING); // Enums are written as names.
+	CHECK(extra->get_hint() == PROPERTY_HINT_ENUM);
+	const Ref<DataField> fields = schema->get_field("fields");
+	REQUIRE(fields.is_valid());
+	CHECK(fields->get_value_type() == Variant::ARRAY);
+	REQUIRE(fields->get_element_schema().is_valid());
+	CHECK(fields->get_element_schema()->get_field("name").is_valid());
+	const Ref<DataField> field_template = schema->get_field("extra_field_template");
+	REQUIRE(field_template.is_valid());
+	CHECK(field_template->get_value_type() == Variant::NIL); // Not set: an object or a path.
+	CHECK(schema->get_field("resource_name").is_null());
+	CHECK(schema->get_field("resource_local_to_scene").is_null());
+	CHECK(schema->get_field("file_patterns")->get_value_type() == Variant::PACKED_STRING_ARRAY);
+	CHECK_FALSE(schema->get_field("fields")->is_required());
+
+	// Without enums as names the enum stays a number.
+	Ref<SerializerOptions> options;
+	options.instantiate();
+	options->set_enums_as_names(false);
+	CHECK(DataSchema::create_from_resource(sample, options)->get_field("extra_fields")->get_value_type() == Variant::INT);
+
+	// Data as the text formats write it validates; an unknown enum name does not.
+	Dictionary data;
+	data["type"] = "DataSchema";
+	data["extra_fields"] = "Allow";
+	CHECK(schema->validate(data)->is_valid());
+	data["extra_fields"] = "Maybe";
+	CHECK_FALSE(schema->validate(data)->is_valid());
+}
+
 } // namespace TestDataSchema

@@ -131,6 +131,15 @@ bool AccessibilitySettings::is_subtitles_enabled() const {
 	return subtitles_enabled;
 }
 
+void AccessibilitySettings::set_captions_enabled(bool p_enabled) {
+	captions_enabled = p_enabled;
+	emit_changed();
+}
+
+bool AccessibilitySettings::is_captions_enabled() const {
+	return captions_enabled;
+}
+
 void AccessibilitySettings::set_subtitle_scale(float p_scale) {
 	subtitle_scale = p_scale;
 	emit_changed();
@@ -163,6 +172,8 @@ void AccessibilitySettings::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_colorblind_mode"), &AccessibilitySettings::get_colorblind_mode);
 	ClassDB::bind_method(D_METHOD("set_subtitles_enabled", "enabled"), &AccessibilitySettings::set_subtitles_enabled);
 	ClassDB::bind_method(D_METHOD("is_subtitles_enabled"), &AccessibilitySettings::is_subtitles_enabled);
+	ClassDB::bind_method(D_METHOD("set_captions_enabled", "enabled"), &AccessibilitySettings::set_captions_enabled);
+	ClassDB::bind_method(D_METHOD("is_captions_enabled"), &AccessibilitySettings::is_captions_enabled);
 	ClassDB::bind_method(D_METHOD("set_subtitle_scale", "scale"), &AccessibilitySettings::set_subtitle_scale);
 	ClassDB::bind_method(D_METHOD("get_subtitle_scale"), &AccessibilitySettings::get_subtitle_scale);
 
@@ -180,5 +191,6 @@ void AccessibilitySettings::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "reduce_transparency"), "set_reduce_transparency", "is_reducing_transparency");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "colorblind_mode", PROPERTY_HINT_ENUM, "None,Protanopia,Deuteranopia,Tritanopia,Achromatopsia"), "set_colorblind_mode", "get_colorblind_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "subtitles_enabled"), "set_subtitles_enabled", "is_subtitles_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "captions_enabled"), "set_captions_enabled", "is_captions_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "subtitle_scale", PROPERTY_HINT_RANGE, "0.5,3,0.05"), "set_subtitle_scale", "get_subtitle_scale");
 }

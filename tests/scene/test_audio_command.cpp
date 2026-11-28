@@ -33,6 +33,7 @@
 TEST_FORCE_LINK(test_audio_command)
 
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/io/resource_text_serializer.h"
@@ -108,8 +109,8 @@ static void check_same_command(const Ref<AudioCommand> &p_a, const Ref<AudioComm
 	CHECK(p_a->get_clip_name() == p_b->get_clip_name());
 }
 
-static Ref<AudioCommandList> make_mixed_list() {
-	Ref<AudioCommandList> list;
+static Ref<AudioCommands> make_mixed_list() {
+	Ref<AudioCommands> list;
 	list.instantiate();
 	Ref<AudioCommand> toggle = make_command("pad_1", AudioCommand::COMMAND_TOGGLE, "board", "res://sounds/horn.wav");
 	toggle->set_group("board");
@@ -165,7 +166,7 @@ TEST_CASE("[AudioCommand] Defaults and labels") {
 	CHECK(AudioCommand::get_command_label(AudioCommand::COMMAND_FADE_IN) == "Fade In");
 	CHECK(AudioCommand::get_command_label(AudioCommand::COMMAND_STOP_ALL) == "Stop All");
 
-	Ref<AudioCommandList> list = make_mixed_list();
+	Ref<AudioCommands> list = make_mixed_list();
 	CHECK(list->get_commands().size() == 6);
 	CHECK(list->find_command("quiet").is_valid());
 	CHECK(list->find_command("missing").is_null());
@@ -174,7 +175,7 @@ TEST_CASE("[AudioCommand] Defaults and labels") {
 TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and XML") {
 	ResourceTextSerializer *serializer = ResourceTextSerializer::get_singleton();
 	REQUIRE(serializer != nullptr);
-	const Ref<AudioCommandList> list = make_mixed_list();
+	const Ref<AudioCommands> list = make_mixed_list();
 	CHECK(serializer->can_serialize(list, ResourceTextSerializer::FORMAT_CSV));
 
 	const String csv = serializer->serialize(list, ResourceTextSerializer::FORMAT_CSV);
@@ -190,7 +191,7 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 		CAPTURE(format);
 		const String text = serializer->serialize(list, format);
 		REQUIRE_FALSE(text.is_empty());
-		const Ref<AudioCommandList> loaded = serializer->deserialize(text, format, "AudioCommandList");
+		const Ref<AudioCommands> loaded = serializer->deserialize(text, format, "AudioCommands");
 		REQUIRE(loaded.is_valid());
 		const TypedArray<AudioCommand> original = list->get_commands();
 		const TypedArray<AudioCommand> commands = loaded->get_commands();
@@ -203,7 +204,7 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 	SUBCASE("Through ResourceSaver and ResourceLoader") {
 		const String path = TestUtils::get_temp_path("audio_commands.csv");
 		CHECK(ResourceSaver::save(Ref<Resource>(list), path) == OK);
-		const Ref<AudioCommandList> from_file = ResourceLoader::load(path, "AudioCommandList", ResourceFormatLoader::CACHE_MODE_IGNORE);
+		const Ref<AudioCommands> from_file = ResourceLoader::load(path, "AudioCommands", ResourceFormatLoader::CACHE_MODE_IGNORE);
 		REQUIRE(from_file.is_valid());
 		CHECK(from_file->get_commands().size() == 6);
 		check_same_command(from_file->find_command("forest_in"), list->find_command("forest_in"));
@@ -211,7 +212,7 @@ TEST_CASE("[AudioCommand] A command list round-trips through CSV, JSON, INI and 
 	}
 
 	SUBCASE("Numbers load as well as names") {
-		const Ref<AudioCommandList> numeric = serializer->deserialize("command_name,command,channel,loop_mode\npad,4,board,-1\nbed,Fade In,ambience,1\n", ResourceTextSerializer::FORMAT_CSV, "AudioCommandList");
+		const Ref<AudioCommands> numeric = serializer->deserialize("command_name,command,channel,loop_mode\npad,4,board,-1\nbed,Fade In,ambience,1\n", ResourceTextSerializer::FORMAT_CSV, "AudioCommands");
 		REQUIRE(numeric.is_valid());
 		REQUIRE(numeric->get_commands().size() == 2);
 		const Ref<AudioCommand> pad = numeric->find_command("pad");
@@ -231,7 +232,7 @@ TEST_CASE("[AudioCommand] Registering, collisions and unregistering") {
 	AudioMixerServer *mixer = AudioMixerServer::get_singleton();
 	REQUIRE(mixer != nullptr);
 
-	Ref<AudioCommandList> base;
+	Ref<AudioCommands> base;
 	base.instantiate();
 	Ref<AudioCommand> base_stop = make_command("stop_music", AudioCommand::COMMAND_STOP, "music");
 	base->add_command(base_stop);
@@ -250,7 +251,7 @@ TEST_CASE("[AudioCommand] Registering, collisions and unregistering") {
 	CHECK(mixer->get_command_names().size() == 2);
 
 	// The last registered command with a name wins.
-	Ref<AudioCommandList> mod;
+	Ref<AudioCommands> mod;
 	mod.instantiate();
 	Ref<AudioCommand> mod_stop = make_command("stop_music", AudioCommand::COMMAND_FADE_OUT, "music");
 	mod->add_command(mod_stop);
@@ -268,7 +269,7 @@ TEST_CASE("[AudioCommand] Registering, collisions and unregistering") {
 	ERR_PRINT_OFF;
 	CHECK(mixer->execute_named("stop_music") == ERR_DOES_NOT_EXIST);
 	CHECK(mixer->execute_group("nothing") == ERR_DOES_NOT_EXIST);
-	CHECK(mixer->register_commands(Ref<AudioCommandList>()) == ERR_INVALID_PARAMETER);
+	CHECK(mixer->register_commands(Ref<AudioCommands>()) == ERR_INVALID_PARAMETER);
 	CHECK(mixer->execute(Ref<AudioCommand>()) == ERR_INVALID_PARAMETER);
 	ERR_PRINT_ON;
 }
@@ -320,7 +321,7 @@ TEST_CASE("[Audio][AudioCommand] A soundboard of five toggles") {
 	AudioMixerServer *mixer = AudioMixerServer::get_singleton();
 	REQUIRE(mixer != nullptr);
 
-	Ref<AudioCommandList> board;
+	Ref<AudioCommands> board;
 	board.instantiate();
 	LocalVector<String> paths;
 	for (int i = 0; i < 5; i++) {
@@ -372,7 +373,7 @@ TEST_CASE("[Audio][AudioCommand] A group starts all ambience commands") {
 	const String birds_path = save_wav("audio_command_birds.tres", 10.0);
 	const String wind_path = save_wav("audio_command_wind.tres", 10.0);
 
-	Ref<AudioCommandList> ambience;
+	Ref<AudioCommands> ambience;
 	ambience.instantiate();
 	const char *forest_channels[] = { "birds", "wind", "river" };
 	for (const char *channel_name : forest_channels) {
@@ -396,12 +397,12 @@ TEST_CASE("[Audio][AudioCommand] A group starts all ambience commands") {
 	CHECK(mixer->get_channel("birds")->is_loop_current_entry());
 
 	// The whole list at once.
-	Ref<AudioCommandList> stop_all;
+	Ref<AudioCommands> stop_all;
 	stop_all.instantiate();
 	Ref<AudioCommand> stop = make_command(StringName(), AudioCommand::COMMAND_STOP_ALL, StringName());
 	stop->set_fade_time(0.0f);
 	stop_all->add_command(stop);
-	CHECK(mixer->execute_list(stop_all) == OK);
+	CHECK(mixer->execute_commands(stop_all) == OK);
 	CHECK_FALSE(mixer->is_playing("birds"));
 
 	DirAccess::remove_absolute(birds_path);
@@ -452,5 +453,22 @@ TEST_CASE("[Audio][AudioCommand] An invalid command fails alone") {
 
 	DirAccess::remove_absolute(song);
 }
+
+#ifndef DISABLE_DEPRECATED
+TEST_CASE("[AudioCommands] A .tres with the old type AudioCommandList loads as AudioCommands") {
+	const String path = TestUtils::get_temp_path("old_audio_command_list.tres");
+	Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+	REQUIRE(file.is_valid());
+	file->store_string("[gd_resource type=\"AudioCommandList\" format=3]\n\n[sub_resource type=\"AudioCommand\" id=\"1\"]\ncommand_name = &\"pad\"\n\n[resource]\ncommands = [SubResource(\"1\")]\n");
+	file.unref();
+
+	const Ref<AudioCommands> loaded = ResourceLoader::load(path, "", ResourceFormatLoader::CACHE_MODE_IGNORE);
+	REQUIRE(loaded.is_valid());
+	CHECK(loaded->get_class() == "AudioCommands");
+	CHECK(loaded->get_commands().size() == 1);
+	CHECK(loaded->find_command("pad").is_valid());
+	DirAccess::remove_absolute(path);
+}
+#endif // DISABLE_DEPRECATED
 
 } // namespace TestAudioCommand
