@@ -32,6 +32,7 @@
 
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/templates/local_vector.h"
 #include "editor/audio/subtitles_dock.h"
 #include "editor/docks/editor_dock_manager.h"
 #include "editor/editor_data.h"
@@ -327,8 +328,13 @@ void SubtitleEditor::_update() {
 		}
 	}
 	// Remove the rows of segments that are gone.
-	while (root->get_child_count() > count) {
-		memdelete(root->get_child(root->get_child_count() - 1));
+	// Collect the surplus rows first: each delete clears the parent's child cache.
+	LocalVector<TreeItem *> surplus;
+	for (TreeItem *item = count < root->get_child_count() ? root->get_child(count) : nullptr; item != nullptr; item = item->get_next()) {
+		surplus.push_back(item);
+	}
+	for (TreeItem *item : surplus) {
+		memdelete(item);
 	}
 	problem_rows.clear();
 	for (const KeyValue<int, PackedStringArray> &problem : problems) {
