@@ -713,51 +713,46 @@ bool EditorInspectorPluginDataFile::parse_property(Object *p_object, const Varia
 
 // EditorInspectorPluginDataSchema
 
-// The button and the class picker it opens.
-class DataSchemaGenerateButton : public Button {
-	GDCLASS(DataSchemaGenerateButton, Button);
-
-	Ref<DataSchema> schema;
-	CreateDialog *dialog = nullptr;
-
-	void _generate() {
-		Ref<Resource> sample = Object::cast_to<Resource>(dialog->instantiate_selected().get_validated_object());
-		if (sample.is_null()) {
-			return;
-		}
-		const Ref<DataSchema> generated = DataSchema::create_from_resource(sample);
-		if (generated.is_null() || generated->get_fields().is_empty()) {
-			EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), dialog->get_selected_type()));
-			return;
-		}
-		EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-		undo_redo->create_action(TTR("Generate Data Schema from Resource"), UndoRedo::MERGE_DISABLE, schema.ptr());
-		undo_redo->add_do_property(schema.ptr(), "fields", generated->get_fields());
-		undo_redo->add_undo_property(schema.ptr(), "fields", schema->get_fields().duplicate());
-		undo_redo->add_do_property(schema.ptr(), "extra_fields", generated->get_extra_fields());
-		undo_redo->add_undo_property(schema.ptr(), "extra_fields", schema->get_extra_fields());
-		undo_redo->commit_action();
+// A Button created in the inspector cannot be a GDCLASS of its own (unregistered classes have no signals), so the
+// class picker calls a static function bound to the schema.
+static void _generate_data_schema(const Ref<DataSchema> &p_schema, Object *p_dialog) {
+	CreateDialog *dialog = Object::cast_to<CreateDialog>(p_dialog);
+	ERR_FAIL_NULL(dialog);
+	Ref<Resource> sample = Object::cast_to<Resource>(dialog->instantiate_selected().get_validated_object());
+	if (sample.is_null()) {
+		return;
 	}
-
-public:
-	DataSchemaGenerateButton(const Ref<DataSchema> &p_schema) :
-			Button(TTR("Generate from Resource...")) {
-		schema = p_schema;
-		set_tooltip_text(TTR("Replace the fields with one field per stored property of a Resource class, as the text formats write them."));
-		dialog = memnew(CreateDialog);
-		dialog->set_base_type("Resource");
-		dialog->connect("create", callable_mp(this, &DataSchemaGenerateButton::_generate));
-		add_child(dialog);
-		connect(SceneStringName(pressed), callable_mp(dialog, &CreateDialog::popup_create).bind(true, false, String(), String()));
+	const Ref<DataSchema> generated = DataSchema::create_from_resource(sample);
+	if (generated.is_null() || generated->get_fields().is_empty()) {
+		EditorNode::get_singleton()->show_warning(vformat(TTR("%s has no stored properties to describe."), dialog->get_selected_type()));
+		return;
 	}
-};
+	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+	undo_redo->create_action(TTR("Generate Data Schema from Resource"), UndoRedo::MERGE_DISABLE, p_schema.ptr());
+	undo_redo->add_do_property(p_schema.ptr(), "fields", generated->get_fields());
+	undo_redo->add_undo_property(p_schema.ptr(), "fields", p_schema->get_fields().duplicate());
+	undo_redo->add_do_property(p_schema.ptr(), "extra_fields", generated->get_extra_fields());
+	undo_redo->add_undo_property(p_schema.ptr(), "extra_fields", p_schema->get_extra_fields());
+	undo_redo->commit_action();
+}
+
+static Button *_make_data_schema_generate_button(const Ref<DataSchema> &p_schema) {
+	Button *button = memnew(Button(TTR("Generate from Resource...")));
+	button->set_tooltip_text(TTR("Replace the fields with one field per stored property of a Resource class, as the text formats write them."));
+	CreateDialog *dialog = memnew(CreateDialog);
+	dialog->set_base_type("Resource");
+	dialog->connect("create", callable_mp_static(&_generate_data_schema).bind(p_schema, dialog));
+	button->add_child(dialog);
+	button->connect(SceneStringName(pressed), callable_mp(dialog, &CreateDialog::popup_create).bind(true, false, String(), String()));
+	return button;
+}
 
 bool EditorInspectorPluginDataSchema::can_handle(Object *p_object) {
 	return Object::cast_to<DataSchema>(p_object) != nullptr;
 }
 
 void EditorInspectorPluginDataSchema::parse_begin(Object *p_object) {
-	add_custom_control(memnew(DataSchemaGenerateButton(Ref<DataSchema>(Object::cast_to<DataSchema>(p_object)))));
+	add_custom_control(_make_data_schema_generate_button(Ref<DataSchema>(Object::cast_to<DataSchema>(p_object))));
 }
 
 // DataFileInspectorEditorPlugin
