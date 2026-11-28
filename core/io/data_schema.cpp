@@ -405,6 +405,8 @@ static Ref<DataField> _schema_field_from_property(const Object *p_object, const 
 			}
 		} else if (nested.is_valid()) {
 			field->set_value_type(Variant::STRING);
+		} else {
+			field->set_value_type(Variant::NIL); // Any: an object or a path.
 		}
 		return field;
 	}
