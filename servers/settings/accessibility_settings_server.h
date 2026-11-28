@@ -162,6 +162,8 @@ public:
 	ColorblindMode get_colorblind_mode() const;
 	void set_subtitles_enabled(bool p_enabled);
 	bool is_subtitles_enabled() const;
+	void set_captions_enabled(bool p_enabled);
+	bool is_captions_enabled() const;
 	void set_subtitle_scale(float p_scale);
 	float get_subtitle_scale() const;
 

@@ -66,6 +66,15 @@
 				Creates a schema from a short form: each key is a field name, each value a [enum Variant.Type], a [Dictionary] (a [Dictionary] field with that nested schema) or an [Array] with one element (an [Array] field with that element type or element schema). The fields are [member DataField.required].
 			</description>
 		</method>
+		<method name="create_from_resource" qualifiers="static">
+			<return type="DataSchema" />
+			<param index="0" name="resource" type="Resource" />
+			<param index="1" name="options" type="SerializerOptions" default="null" />
+			<description>
+				Creates a schema from the stored properties of [param resource], the properties that [ResourceTextSerializer] writes. Pass an instance of a class or script to describe its layout (for example [code]MyItem.new()[/code]). Each property becomes an optional [DataField] with its type; enum and range hints are kept. A built-in resource property becomes a [Dictionary] field with a nested schema, a resource saved in a file is a [String] field (its path), and a resource property that is not set stays untyped because it can be either. An array gets the [member DataField.element_type] of its typed elements; an array of built-in resources, or an empty array of a script class, gets an [member DataField.element_schema]. The properties of [Resource] itself ([member Resource.resource_name], [member Resource.resource_local_to_scene]) are left out. With [member SerializerOptions.enums_as_names] (the default), enum properties are [String] fields with the names. Extra fields are allowed, so the type marker of the text formats passes. Cycles are cut at a depth of 6 levels.
+				In the editor, the inspector of a [DataSchema] has the button [b]Generate from Resource...[/b] that does this for a chosen class.
+			</description>
+		</method>
 		<method name="find_field" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="name" type="StringName" />

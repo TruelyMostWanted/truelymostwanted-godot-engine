@@ -31,6 +31,9 @@
 #include "subtitle_editor_plugin.h"
 
 #include "core/object/callable_mp.h"
+#include "core/object/class_db.h"
+#include "editor/audio/subtitles_dock.h"
+#include "editor/docks/editor_dock_manager.h"
 #include "editor/editor_data.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_string_names.h"
@@ -41,6 +44,7 @@
 #include "scene/gui/label.h"
 #include "scene/gui/tree.h"
 #include "scene/main/subtitle_player.h"
+#include "scene/resources/audio/audio_stream.h"
 #include "scene/scene_string_names.h"
 #include "servers/subtitle/subtitle_format_srt.h"
 #include "servers/subtitle/subtitle_server.h"
@@ -137,6 +141,72 @@ String SubtitleEditorHelper::get_kind_name(SubtitleSegment::Kind p_kind) {
 	}
 }
 
+bool SubtitleEditorHelper::parse_short_time(const String &p_text, double &r_seconds) {
+	const PackedStringArray parts = p_text.strip_edges().replace(",", ".").split(":");
+	if (parts.size() > 3) {
+		return false;
+	}
+	double seconds = 0.0;
+	for (int i = 0; i < parts.size(); i++) {
+		const bool last = i == parts.size() - 1;
+		if (last ? !parts[i].is_valid_float() : !parts[i].is_valid_int()) {
+			return false;
+		}
+		seconds = seconds * 60.0 + (last ? parts[i].to_float() : double(parts[i].to_int()));
+	}
+	if (seconds < 0.0) {
+		return false;
+	}
+	r_seconds = seconds;
+	return true;
+}
+
+int SubtitleEditorHelper::get_insert_index(const Ref<Subtitle> &p_subtitle, double p_start_time) {
+	ERR_FAIL_COND_V(p_subtitle.is_null(), 0);
+	const int count = p_subtitle->get_segment_count();
+	for (int i = 0; i < count; i++) {
+		const Ref<SubtitleSegment> segment = p_subtitle->get_segment(i);
+		if (segment.is_valid() && segment->get_start_time() > p_start_time) {
+			return i;
+		}
+	}
+	return count;
+}
+
+TypedArray<SubtitleSegment> SubtitleEditorHelper::get_segments_with_segment_at(const Ref<Subtitle> &p_subtitle, double p_start_time, double p_end_time) {
+	ERR_FAIL_COND_V(p_subtitle.is_null(), TypedArray<SubtitleSegment>());
+	TypedArray<SubtitleSegment> segments = p_subtitle->get_segments();
+	Ref<SubtitleSegment> segment;
+	segment.instantiate();
+	segment->set_start_time(p_start_time);
+	segment->set_end_time(p_end_time);
+	segments.insert(get_insert_index(p_subtitle, p_start_time), segment);
+	return segments;
+}
+
+HashMap<int, PackedStringArray> SubtitleEditorHelper::get_problems(const Ref<Subtitle> &p_subtitle) {
+	HashMap<int, PackedStringArray> problems;
+	ERR_FAIL_COND_V(p_subtitle.is_null(), problems);
+	const Ref<SubtitleValidation> validation = p_subtitle->validate();
+	const String invalid_time = TTR("The end is not after the start, or the start is negative.");
+	const String empty_text = TTR("The text is empty.");
+	const String overlapping = TTR("Overlaps the next segment.");
+	const String fast_reading = TTR("More than 20 characters per second: hard to read in time.");
+	for (int index : validation->get_invalid_time_segments()) {
+		problems[index].push_back(invalid_time);
+	}
+	for (int index : validation->get_empty_text_segments()) {
+		problems[index].push_back(empty_text);
+	}
+	for (int index : validation->get_overlapping_segments()) {
+		problems[index].push_back(overlapping);
+	}
+	for (int index : validation->get_fast_reading_segments()) {
+		problems[index].push_back(fast_reading);
+	}
+	return problems;
+}
+
 // SubtitleEditor
 
 void SubtitleEditor::_queue_update() {
@@ -171,9 +241,9 @@ void SubtitleEditor::_update() {
 
 	const Ref<SubtitleValidation> validation = subtitle->validate();
 	const int count = subtitle->get_segment_count();
-	String summary = vformat(TTR("%d segments"), count);
+	String summary = vformat(TTRN("%d segment", "%d segments", count), count);
 	if (count > 0) {
-		summary += ", " + SubtitleFormatSRT::format_time(subtitle->get_start_time()) + " - " + SubtitleFormatSRT::format_time(subtitle->get_end_time());
+		summary += ", " + SubtitleEditorHelper::format_short_time(subtitle->get_start_time()) + " - " + SubtitleEditorHelper::format_short_time(subtitle->get_end_time());
 	}
 	if (!subtitle->get_language().is_empty()) {
 		summary += ", " + subtitle->get_language();
@@ -193,23 +263,7 @@ void SubtitleEditor::_update() {
 	save_note_label->set_visible(subtitle->get_time_offset() != 0.0 && Subtitle::get_recognized_extensions().has(extension));
 	save_note_label->set_text(vformat(TTR("Saving as .%s adds the time offset to the written times, because the format has no offset field."), extension));
 
-	HashMap<int, PackedStringArray> problems;
-	const String invalid_time = TTR("The end is not after the start, or the start is negative.");
-	const String empty_text = TTR("The text is empty.");
-	const String overlapping = TTR("Overlaps the next segment.");
-	const String fast_reading = TTR("More than 20 characters per second: hard to read in time.");
-	for (int index : validation->get_invalid_time_segments()) {
-		problems[index].push_back(invalid_time);
-	}
-	for (int index : validation->get_empty_text_segments()) {
-		problems[index].push_back(empty_text);
-	}
-	for (int index : validation->get_overlapping_segments()) {
-		problems[index].push_back(overlapping);
-	}
-	for (int index : validation->get_fast_reading_segments()) {
-		problems[index].push_back(fast_reading);
-	}
+	const HashMap<int, PackedStringArray> problems = SubtitleEditorHelper::get_problems(subtitle);
 
 	tree->clear();
 	TreeItem *root = tree->create_item();
@@ -231,7 +285,7 @@ void SubtitleEditor::_update() {
 			item->set_text(COLUMN_TEXT, TTR("<empty slot>"));
 		}
 		if (problems.has(i)) {
-			const String tooltip = String("\n").join(problems[i]);
+			const String tooltip = String("\n").join(problems.get(i));
 			for (int column = 0; column < COLUMN_MAX; column++) {
 				item->set_custom_color(column, warning_color);
 				item->set_tooltip_text(column, item->get_tooltip_text(column) + "\n" + tooltip);
@@ -274,6 +328,13 @@ void SubtitleEditor::_item_activated() {
 	if (segment.is_valid()) {
 		EditorInterface::get_singleton()->edit_resource(segment);
 	}
+}
+
+void SubtitleEditor::_open_in_dock() {
+	SubtitlesDock *dock = SubtitlesDock::get_singleton();
+	ERR_FAIL_NULL(dock);
+	dock->edit(subtitle);
+	dock->make_visible();
 }
 
 void SubtitleEditor::_notification(int p_what) {
@@ -320,6 +381,10 @@ SubtitleEditor::SubtitleEditor(const Ref<Subtitle> &p_subtitle) {
 	sort_button = memnew(Button(TTR("Sort by Time")));
 	sort_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitleEditor::_sort_segments));
 	toolbar->add_child(sort_button);
+	Button *dock_button = memnew(Button(TTR("Open in Subtitles Dock")));
+	dock_button->set_tooltip_text(TTR("Edit the cues on a timeline with the waveform of the audio, and spot them while it plays."));
+	dock_button->connect(SceneStringName(pressed), callable_mp(this, &SubtitleEditor::_open_in_dock));
+	toolbar->add_child(dock_button);
 
 	tree = memnew(Tree);
 	tree->set_columns(COLUMN_MAX);
@@ -360,10 +425,28 @@ SubtitleEditor::~SubtitleEditor() {
 // EditorInspectorPluginSubtitle
 
 bool EditorInspectorPluginSubtitle::can_handle(Object *p_object) {
-	return Object::cast_to<Subtitle>(p_object) != nullptr;
+	return Object::cast_to<Subtitle>(p_object) != nullptr || Object::cast_to<AudioStream>(p_object) != nullptr;
+}
+
+void EditorInspectorPluginSubtitle::_open_stream_in_dock(ObjectID p_stream) {
+	SubtitlesDock *dock = SubtitlesDock::get_singleton();
+	AudioStream *stream = ObjectDB::get_instance<AudioStream>(p_stream);
+	ERR_FAIL_COND(dock == nullptr || stream == nullptr);
+	dock->edit(Ref<AudioStream>(stream));
+	dock->make_visible();
 }
 
 void EditorInspectorPluginSubtitle::parse_category(Object *p_object, const String &p_category) {
+	AudioStream *stream = Object::cast_to<AudioStream>(p_object);
+	if (stream != nullptr) {
+		if (p_category == "AudioStream" && !SubtitlesDock::get_stream_subtitle_path(stream).is_empty()) {
+			Button *button = memnew(Button(TTR("Open in Subtitles Dock")));
+			button->set_tooltip_text(TTR("Edit the subtitle file of this stream on a timeline with its waveform."));
+			button->connect(SceneStringName(pressed), callable_mp(this, &EditorInspectorPluginSubtitle::_open_stream_in_dock).bind(stream->get_instance_id()));
+			add_custom_control(button);
+		}
+		return;
+	}
 	// Below the class header of Subtitle, like the class's own properties.
 	if (p_category != "Subtitle") {
 		return;
@@ -445,7 +528,26 @@ void EditorInspectorPluginSubtitleSync::_add_subtitle_player(ObjectID p_player) 
 
 // SubtitleEditorPlugin
 
+void SubtitleEditorPlugin::edit(Object *p_object) {
+	dock->edit(Ref<Resource>(Object::cast_to<Resource>(p_object)));
+}
+
+bool SubtitleEditorPlugin::handles(Object *p_object) const {
+	return SubtitlesDock::can_edit(p_object);
+}
+
+void SubtitleEditorPlugin::make_visible(bool p_visible) {
+	// Never closed here (like the Animation dock): it closes with its own close button.
+	if (p_visible) {
+		dock->make_visible();
+	}
+}
+
 SubtitleEditorPlugin::SubtitleEditorPlugin() {
+	dock = memnew(SubtitlesDock);
+	EditorDockManager::get_singleton()->add_dock(dock);
+	dock->close();
+
 	Ref<EditorInspectorPluginSubtitle> plugin;
 	plugin.instantiate();
 	add_inspector_plugin(plugin);
