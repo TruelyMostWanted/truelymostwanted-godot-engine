@@ -224,8 +224,9 @@ void SubtitlesDock::_update() {
 	stream_picker->set_editable(has_subtitle);
 
 	String status;
+	problems.clear();
 	if (has_subtitle) {
-		const HashMap<int, PackedStringArray> problems = SubtitleEditorHelper::get_problems(subtitle);
+		problems = SubtitleEditorHelper::get_problems(subtitle);
 		status = vformat(TTR("%d cues"), subtitle->get_segment_count());
 		if (!problems.is_empty()) {
 			status += ", " + vformat(TTR("%d with problems (highlighted, see the tooltips)"), problems.size());
@@ -249,7 +250,6 @@ void SubtitlesDock::_update_tree() {
 		return;
 	}
 	TreeItem *root = tree->create_item();
-	const HashMap<int, PackedStringArray> problems = SubtitleEditorHelper::get_problems(subtitle);
 	const Color warning_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor));
 	String kinds;
 	for (int kind = 0; kind < SubtitleSegment::KIND_MAX; kind++) {
@@ -473,7 +473,7 @@ void SubtitlesDock::_preview_updated(ObjectID p_id) {
 void SubtitlesDock::_timeline_draw() {
 	const Size2 size = timeline->get_size();
 	const Ref<Font> font = get_theme_font(SceneStringName(font), SNAME("Label"));
-	const int font_size = get_theme_font_size(SceneStringName(font_size), SNAME("Label")) * 0.85;
+	const int font_size = int(get_theme_font_size(SceneStringName(font_size), SNAME("Label")) * 0.85);
 	const Color font_color = get_theme_color(SceneStringName(font_color), SNAME("Label"));
 	const Color accent_color = get_theme_color(SNAME("accent_color"), EditorStringName(Editor));
 	const Color warning_color = get_theme_color(SNAME("warning_color"), EditorStringName(Editor));
@@ -496,8 +496,8 @@ void SubtitlesDock::_timeline_draw() {
 		const real_t wave_height = lane_top - ruler;
 		Vector<Vector2> points;
 		for (int x = 0; x < int(MIN(size.width, end_x)); x++) {
-			const float from = _x_to_time(x);
-			const float to = _x_to_time(x + 1);
+			const float from = float(_x_to_time(x));
+			const float to = float(_x_to_time(x + 1));
 			if (from >= preview_length) {
 				break;
 			}
@@ -529,7 +529,6 @@ void SubtitlesDock::_timeline_draw() {
 
 	// Cues.
 	if (subtitle.is_valid()) {
-		const HashMap<int, PackedStringArray> problems = SubtitleEditorHelper::get_problems(subtitle);
 		const real_t padding = 4 * EDSCALE;
 		for (int i = 0; i < subtitle->get_segment_count(); i++) {
 			const Rect2 rect = _get_cue_rect(i);
@@ -822,9 +821,9 @@ void SubtitlesDock::edit(const Ref<Resource> &p_resource) {
 	if (playing) {
 		_play_pause();
 	}
-	const Callable changed = callable_mp(this, &SubtitlesDock::_subtitle_changed);
-	if (subtitle.is_valid() && subtitle->is_connected(CoreStringName(changed), changed)) {
-		subtitle->disconnect_changed(changed);
+	const Callable callback = callable_mp(this, &SubtitlesDock::_subtitle_changed);
+	if (subtitle.is_valid() && subtitle->is_connected(CoreStringName(changed), callback)) {
+		subtitle->disconnect_changed(callback);
 	}
 	Ref<Subtitle> new_subtitle = Ref<Subtitle>(Object::cast_to<Subtitle>(p_resource.ptr()));
 	Ref<AudioStream> new_stream = Ref<AudioStream>(Object::cast_to<AudioStream>(p_resource.ptr()));
@@ -842,7 +841,7 @@ void SubtitlesDock::edit(const Ref<Resource> &p_resource) {
 	subtitle = new_subtitle;
 	stream = new_stream;
 	if (subtitle.is_valid()) {
-		subtitle->connect_changed(changed);
+		subtitle->connect_changed(callback);
 	}
 	player->set_stream(stream);
 	stream_picker->set_edited_resource(stream);

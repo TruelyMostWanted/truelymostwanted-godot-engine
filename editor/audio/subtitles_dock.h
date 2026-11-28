@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/templates/hash_map.h"
 #include "editor/docks/editor_dock.h"
 #include "servers/subtitle/subtitle.h"
 
@@ -60,6 +61,7 @@ class SubtitlesDock : public EditorDock {
 	Ref<Subtitle> subtitle;
 	Ref<AudioStream> stream;
 	int selected = -1;
+	HashMap<int, PackedStringArray> problems; // Of the last update: segment index -> messages.
 	bool dirty = false;
 	bool update_queued = false;
 	bool updating_tree = false;
